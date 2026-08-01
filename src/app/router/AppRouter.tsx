@@ -1,0 +1,176 @@
+import { Suspense, lazy } from "react";
+import { useTranslation } from "react-i18next";
+import {
+  BrowserRouter,
+  Navigate,
+  Outlet,
+  Route,
+  Routes,
+  useLocation,
+} from "react-router-dom";
+import { LoadingScreen } from "@/components/LoadingScreen";
+import { useAuth } from "@/core/presentation/hooks/useAuth";
+import {
+  PAGE_PERMISSIONS,
+  PERMISSION_ROUTE_ORDER,
+  usePermissions,
+} from "@/features/permissions/usePermissions";
+
+const LoginPage = lazy(() =>
+  import("../../pages/LoginPage").then((module) => ({
+    default: module.LoginPage,
+  }))
+);
+const DashboardPage = lazy(() =>
+  import("../../pages/DashboardPage").then((module) => ({
+    default: module.DashboardPage,
+  }))
+);
+const UsersPage = lazy(() =>
+  import("../../pages/UsersPage").then((module) => ({
+    default: module.UsersPage,
+  }))
+);
+const CustomersPage = lazy(() =>
+  import("../../pages/CustomersPage").then((module) => ({
+    default: module.CustomersPage,
+  }))
+);
+const NotFoundPage = lazy(() =>
+  import("../../pages/NotFoundPage").then((module) => ({
+    default: module.NotFoundPage,
+  }))
+);
+const AppShell = lazy(() =>
+  import("../../widgets/layout/AppShell").then((module) => ({
+    default: module.AppShell,
+  }))
+);
+
+function RouteFallback() {
+  return <LoadingScreen />;
+}
+
+function RequireAuth() {
+  const { isAuthenticated, isLoading } = useAuth();
+  const location = useLocation();
+
+  if (isLoading) return <RouteFallback />;
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+  return <Outlet />;
+}
+
+function UnauthorizedPage() {
+  const { t } = useTranslation();
+
+  return (
+    <section className="page">
+      <div className="card">
+        <h1 className="pageTitle">{t("router.accessDeniedTitle")}</h1>
+        <p className="pageDescription">
+          {t("router.accessDeniedDescription")}
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function PermissionRedirect() {
+  const { isLoading } = useAuth();
+  const { canAccess } = usePermissions();
+
+  if (isLoading) return <RouteFallback />;
+
+  const firstAccessibleRoute = PERMISSION_ROUTE_ORDER.find((entry) =>
+    canAccess(entry.permissions)
+  );
+
+  if (firstAccessibleRoute) {
+    return <Navigate to={firstAccessibleRoute.path} replace />;
+  }
+
+  return <UnauthorizedPage />;
+}
+
+function RequirePermission({
+  requiredPermissions,
+  redirectToFirstAllowed = true,
+  children,
+}: {
+  requiredPermissions: readonly string[];
+  redirectToFirstAllowed?: boolean;
+  children: React.ReactNode;
+}) {
+  const { isLoading } = useAuth();
+  const { canAccess } = usePermissions();
+  const location = useLocation();
+
+  if (isLoading) return <RouteFallback />;
+  if (!canAccess(requiredPermissions)) {
+    if (redirectToFirstAllowed) {
+      const firstAccessibleRoute = PERMISSION_ROUTE_ORDER.find((entry) =>
+        canAccess(entry.permissions)
+      );
+
+      if (
+        firstAccessibleRoute &&
+        firstAccessibleRoute.path !== location.pathname
+      ) {
+        return <Navigate to={firstAccessibleRoute.path} replace />;
+      }
+    }
+
+    return <UnauthorizedPage />;
+  }
+  return <>{children}</>;
+}
+
+export function AppRouter() {
+  return (
+    <BrowserRouter>
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route element={<RequireAuth />}>
+            <Route element={<AppShell />}>
+              <Route path="/" element={<PermissionRedirect />} />
+              <Route
+                path="/dashboard"
+                element={
+                  <RequirePermission
+                    requiredPermissions={PAGE_PERMISSIONS.dashboard}
+                  >
+                    <DashboardPage />
+                  </RequirePermission>
+                }
+              />
+              <Route
+                path="/users"
+                element={
+                  <RequirePermission
+                    requiredPermissions={PAGE_PERMISSIONS.users}
+                  >
+                    <UsersPage />
+                  </RequirePermission>
+                }
+              />
+              <Route
+                path="/customers"
+                element={
+                  <RequirePermission
+                    requiredPermissions={PAGE_PERMISSIONS.customers}
+                  >
+                    <CustomersPage />
+                  </RequirePermission>
+                }
+              />
+            </Route>
+          </Route>
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </Suspense>
+    </BrowserRouter>
+  );
+}

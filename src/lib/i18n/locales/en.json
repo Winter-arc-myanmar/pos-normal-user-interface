@@ -1,0 +1,109 @@
+{
+  "common": {
+    "refresh": "Refresh",
+    "refreshing": "Refreshing...",
+    "delete": "Delete",
+    "save": "Save",
+    "cancel": "Cancel",
+    "loading": "Loading..."
+  },
+  "language": {
+    "english": "English",
+    "korean": "한국어",
+    "myanmar": "မြန်မာ",
+    "chineseSimplified": "简体中文"
+  },
+  "networkStatus": {
+    "offlineTitle": "You are offline",
+    "offlineSubtitle": "Reconnect to continue.",
+    "offlineBadge": "Offline"
+  },
+  "shell": {
+    "brandTitle": "App",
+    "brandSubtitle": "Frontend template",
+    "mainMenu": "Main menu",
+    "workspace": "Workspace",
+    "workspaceTitle": "Getting started",
+    "workspaceText": "Use Users and Customers as architecture examples, then replace them with your features.",
+    "appVersion": "v{{version}}",
+    "dashboardTitle": "Dashboard",
+    "dashboardMeta": "Overview",
+    "usersTitle": "Users",
+    "usersMeta": "Example list",
+    "customersTitle": "Customers",
+    "customersMeta": "Example CRUD",
+    "topbarTitle": "Workspace",
+    "topbarSubtitle": "Authenticated app shell",
+    "signedInAs": "Signed in as",
+    "fullAccessRole": "Full access",
+    "userRole": "User",
+    "userFallback": "User",
+    "logout": "Log out"
+  },
+  "login": {
+    "title": "Sign in",
+    "subtitle": "Use your account credentials to continue.",
+    "identifierLabel": "Email or username",
+    "identifierPlaceholder": "you@example.com",
+    "passwordLabel": "Password",
+    "passwordPlaceholder": "Enter password",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "submit": "Sign in",
+    "submitting": "Signing in...",
+    "errorFallback": "Unable to sign in"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "description": "Neutral starter home. Replace this page with your product overview.",
+    "usersCard": "Users",
+    "customersCard": "Customers",
+    "exampleValue": "—",
+    "usersHint": "Example resource via useUserManagement",
+    "customersHint": "Example resource via useCustomerManagement",
+    "nextStepsTitle": "Next steps",
+    "nextStepsText": "Explore the example pages, then add your own feature using architecture.md.",
+    "openUsers": "Open users",
+    "openCustomers": "Open customers"
+  },
+  "users": {
+    "title": "Users",
+    "description": "Thin example list page wired through core layers.",
+    "loading": "Loading users...",
+    "empty": "No users found. Point USERS endpoints at your backend to populate this list.",
+    "total": "{{count}} users",
+    "columns": {
+      "name": "Name",
+      "email": "Email",
+      "role": "Role"
+    }
+  },
+  "customers": {
+    "title": "Customers",
+    "description": "Example CRUD resource. Copy this pattern for new features.",
+    "createTitle": "Create customer",
+    "createSubmit": "Create",
+    "createError": "Unable to create customer",
+    "loading": "Loading customers...",
+    "empty": "No customers yet. Create one above or connect your API.",
+    "total": "{{count}} customers",
+    "fields": {
+      "name": "Name",
+      "email": "Email",
+      "phone": "Phone",
+      "address": "Address"
+    },
+    "columns": {
+      "actions": "Actions"
+    }
+  },
+  "router": {
+    "accessDeniedTitle": "Access denied",
+    "accessDeniedDescription": "You do not have permission to view this page."
+  },
+  "notFound": {
+    "title": "Page not found",
+    "description": "That route does not exist.",
+    "goToDashboard": "Go to dashboard"
+  }
+}

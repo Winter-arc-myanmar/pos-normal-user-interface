@@ -1,0 +1,28 @@
+{
+  "shell": {
+    "brandTitle": "App",
+    "brandSubtitle": "Frontend template",
+    "dashboardTitle": "Dashboard",
+    "usersTitle": "Users",
+    "customersTitle": "Customers",
+    "logout": "ထွက်ရန်"
+  },
+  "login": {
+    "title": "အကောင့်ဝင်ရန်",
+    "submit": "ဝင်မည်",
+    "submitting": "ဝင်နေသည်..."
+  },
+  "dashboard": {
+    "title": "Dashboard"
+  },
+  "users": {
+    "title": "Users"
+  },
+  "customers": {
+    "title": "Customers"
+  },
+  "notFound": {
+    "title": "စာမျက်နှာ မတွေ့ပါ",
+    "goToDashboard": "Dashboard သို့"
+  }
+}

@@ -1,0 +1,944 @@
+/* ============================================================
+   LIGHT MODE CSS — Complete light mode color system & overrides
+   Import this file AFTER your main CSS (index.css / global.css)
+   ============================================================ */
+
+/* ── Light Mode CSS Variables ─────────────────────────────── */
+[data-theme="light"] {
+  /* Page & Surface Colors */
+  --bg-light: #F8FAFC;              /* slate-50 - main page background */
+  --bg-surface-hover: #F8FAFC;      /* slate-50 - hover states */
+  --bg-elevated-light: #F1F5F9;     /* slate-100 - elevated backgrounds */
+
+  /* Cards & Surfaces */
+  --surface-light: #FFFFFF;         /* white - cards, modals, sidebar */
+  --border-light: #E2E8F0;         /* slate-200 - default borders */
+  --border-medium: #CBD5E1;        /* slate-300 - hover/focus borders */
+
+  /* Text Colors */
+  --text-primary-light: #0F172A;   /* slate-900 - headings, important */
+  --text-secondary-light: #475569; /* slate-600 - body text */
+  --text-tertiary-light: #64748B;  /* slate-500 - labels, helper */
+  --text-placeholder-light: #94A3B8; /* slate-400 - placeholder text */
+  --text-disabled-light: #CBD5E1;  /* slate-300 - disabled text */
+
+  /* Brand Colors (Primary) — dark blue matching KBZPay header */
+  --brand-primary: #1E3A8A;        /* blue-900 — KBZPay header dark blue */
+  --brand-hover: #1E2A5A;          /* blue-950 — darker hover */
+  --brand-soft: #DBEAFE;           /* blue-100 */
+  --brand-primary-ring: rgba(30, 58, 138, 0.15);
+
+  /* Semantic Colors */
+  --success: #059669;              /* emerald-600 */
+  --success-soft: #D1FAE5;         /* emerald-50 */
+  --warning: #D97706;              /* amber-600 */
+  --warning-soft: #FEF3C7;         /* amber-50 */
+  --error: #DC2626;                /* red-600 */
+  --error-soft: #FEF2F2;           /* red-50 */
+  --info: #3B82F6;                 /* blue-500 */
+  --info-soft: #EFF6FF;            /* blue-50 */
+  --neutral-hover: #F1F5F9;        /* slate-100 */
+
+  /* Shadows for Light Mode */
+  --shadow-sm-light: 0 1px 2px rgba(0, 0, 0, 0.03), 0 1px 1px rgba(0, 0, 0, 0.02);
+  --shadow-md-light: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  --shadow-lg-light: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+
+  /* Focus Ring */
+  --focus-ring: 0 0 0 3px rgba(30, 58, 138, 0.15);
+}
+
+/* ── Page Background ─────────────────────────────────────── */
+[data-theme="light"] body,
+[data-theme="light"] #root,
+[data-theme="light"] .appShell,
+[data-theme="light"] .main,
+[data-theme="light"] .content {
+  background: var(--bg-light) !important;
+}
+
+[data-theme="light"] .appShell {
+  background: var(--bg-light) !important;
+}
+
+[data-theme="light"] .main {
+  background: var(--bg-light) !important;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────── */
+[data-theme="light"] .sidebar {
+  background: #FFFFFF !important;
+  border-right: 1px solid var(--border-light) !important;
+  color: var(--text-primary-light) !important;
+}
+
+[data-theme="light"] .sidebarHeader,
+[data-theme="light"] .sidebarInfoCard,
+[data-theme="light"] .sidebarFoot {
+  background: var(--bg-light) !important;
+  border: 1px solid var(--border-light) !important;
+  backdrop-filter: none !important;
+}
+
+[data-theme="light"] .brandTitle {
+  color: var(--text-primary-light) !important;
+}
+
+[data-theme="light"] .brandSubtitle {
+  color: var(--text-tertiary-light) !important;
+}
+
+[data-theme="light"] .navSectionLabel {
+  color: var(--text-tertiary-light) !important;
+}
+
+[data-theme="light"] .navItem {
+  color: var(--text-secondary-light) !important;
+  border-color: transparent !important;
+}
+
+[data-theme="light"] .navItem:hover {
+  background: var(--neutral-hover) !important;
+  border-color: var(--border-light) !important;
+  color: var(--text-primary-light) !important;
+  transform: none !important;
+}
+
+[data-theme="light"] .navItem.active {
+  background: #E2E8F0 !important;
+  border-color: #0A192F !important;
+  color: #0A192F !important;
+  box-shadow: none !important;
+}
+
+[data-theme="light"] .navItem.active::before {
+  background: #0A192F !important;
+}
+
+[data-theme="light"] .navItemMeta {
+  color: var(--text-tertiary-light) !important;
+}
+
+[data-theme="light"] .navItem.active .navItemMeta {
+  color: #0A192F !important;
+  opacity: 0.7;
+}
+
+[data-theme="light"] .sidebarInfoTitle {
+  color: var(--text-primary-light) !important;
+}
+
+[data-theme="light"] .sidebarInfoText {
+  color: var(--text-tertiary-light) !important;
+}
+
+[data-theme="light"] .sidebarFootLabel {
+  color: var(--text-tertiary-light) !important;
+}
+
+[data-theme="light"] .sidebarFootUser {
+  color: var(--text-primary-light) !important;
+}
+
+/* ── Topbar ──────────────────────────────────────────────── */
+[data-theme="light"] .topbar {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-bottom: 1px solid var(--border-light) !important;
+}
+
+[data-theme="light"] .topbarEyebrow {
+  color: var(--text-primary-light) !important;
+}
+
+[data-theme="light"] .topbarSubtext {
+  color: var(--text-tertiary-light) !important;
+}
+
+[data-theme="light"] .topbarIconButton {
+  background: #FFFFFF !important;
+  border: 1px solid var(--border-light) !important;
+  color: var(--text-tertiary-light) !important;
+  box-shadow: var(--shadow-sm-light) !important;
+}
+
+[data-theme="light"] .topbarIconButton:hover {
+  border-color: var(--border-medium) !important;
+  box-shadow: var(--shadow-md-light) !important;
+  transform: translateY(-1px);
+}
+
+[data-theme="light"] .sidebarToggleButton.isActive {
+  border-color: var(--brand-primary) !important;
+  color: var(--brand-primary) !important;
+  background: var(--brand-soft) !important;
+}
+
+[data-theme="light"] .topbarIdentity {
+  border-left: 1px solid var(--border-light) !important;
+  background: transparent !important;
+}
+
+[data-theme="light"] .topbarUser {
+  color: var(--text-primary-light) !important;
+}
+
+[data-theme="light"] .topbarRole {
+  color: var(--text-tertiary-light) !important;
+}
+
+[data-theme="light"] .topbarLogout {
+  background: #0A192F !important;
+  border: 1px solid #0A192F !important;
+  color: #FFFFFF !important;
+  transition: all 0.2s ease-in-out !important;
+}
+
+[data-theme="light"] .topbarLogout:hover {
+  background: #132238 !important;
+  border-color: #132238 !important;
+  color: #FFFFFF !important;
+}
+
+/* ── Cards & Surfaces ────────────────────────────────────── */
+[data-theme="light"] .card,
+[data-theme="light"] .metricCard,
+[data-theme="light"] .surfaceMessage,
+[data-theme="light"] .notificationsPanel,
+[data-theme="light"] .notificationsItem,
+[data-theme="light"] .notificationsPageItem,
+[data-theme="light"] .notificationsPageEmpty,
+[data-theme="light"] .notificationsToast,
+[data-theme="light"] .rewardsPanel,
+[data-theme="light"] .rewardsSectionCard,
+[data-theme="light"] .rewardsTableWrap,
+[data-theme="light"] .verificationPanel,
+[data-theme="light"] .verificationSectionCard,
+[data-theme="light"] .verificationStepperCard,
+[data-theme="light"] .verificationMissingState,
+[data-theme="light"] .verificationInstructionPreview,
+[data-theme="light"] .verificationDetailPage .verificationSectionCard,
+[data-theme="light"] .verificationDetailPage .verificationStepperCard,
+[data-theme="light"] .verificationDetailPage .verificationMissingState,
+[data-theme="light"] .verificationDetailPage .verificationPreviewCard,
+[data-theme="light"] .categoryTreeRow,
+[data-theme="light"] .detailItem,
+[data-theme="light"] .verificationSummaryCard,
+[data-theme="light"] .notificationsSummaryCard,
+[data-theme="light"] .rewardsSummaryCard,
+[data-theme="light"] .sliderModal,
+[data-theme="light"] .sliderConfirmDialog,
+[data-theme="light"] .adminChatSummaryCardGold,
+[data-theme="light"] .adminChatSummaryCardSky,
+[data-theme="light"] .adminChatSummaryCardMint,
+[data-theme="light"] .adminChatQueuePanel,
+[data-theme="light"] .adminChatFlowCard,
+[data-theme="light"] .adminChatDetailCard,
+[data-theme="light"] .adminChatTab,
+[data-theme="light"] .adminChatListCard,
+[data-theme="light"] .adminChatFlowStep,
+[data-theme="light"] .adminChatActionCard,
+[data-theme="light"] .adminChatEmptyState,
+[data-theme="light"] .categoriesBatchPanel,
+[data-theme="light"] .categoriesTreePanel,
+[data-theme="light"] .categoriesDetailsPanel {
+  background: var(--surface-light) !important;
+  border: 1px solid var(--border-light) !important;
+  box-shadow: var(--shadow-sm-light) !important;
+}
+
+/* ── Metric Cards ────────────────────────────────────────── */
+[data-theme="light"] .metricCard {
+  border: 1px solid var(--border-light) !important;
+  box-shadow: var(--shadow-sm-light) !important;
+  transition: box-shadow 200ms ease, transform 200ms ease;
+}
+
+[data-theme="light"] .metricCard:hover {
+  box-shadow: var(--shadow-md-light) !important;
+  transform: translateY(-1px);
+}
+
+[data-theme="light"] .metricLabel {
+  color: var(--text-tertiary-light) !important;
+}
+
+[data-theme="light"] .metricValue {
+  color: var(--text-primary-light) !important;
+}
+
+[data-theme="light"] .metricMeta {
+  color: var(--text-tertiary-light) !important;
+}
+
+[data-theme="light"] .metricCardPrimary {
+  background: var(--brand-primary) !important;
+  border-color: var(--brand-primary) !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme="light"] .metricCardPrimary .metricLabel,
+[data-theme="light"] .metricCardPrimary .metricMeta {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
+[data-theme="light"] .metricCardPrimary .metricValue {
+  color: #FFFFFF !important;
+}
+
+/* ── Data Tables ─────────────────────────────────────────── */
+[data-theme="light"] .verificationTable th,
+[data-theme="light"] .rewardsTable th {
+  background: var(--bg-light) !important;
+  color: var(--text-tertiary-light) !important;
+  border-bottom: 1px solid var(--border-light) !important;
+}
+
+[data-theme="light"] .verificationTable td,
+[data-theme="light"] .rewardsTable td {
+  border-bottom: 1px solid var(--border-light) !important;
+  color: var(--text-secondary-light) !important;
+}
+
+[data-theme="light"] .verificationTable tbody tr:nth-child(even),
+[data-theme="light"] .rewardsTable tbody tr:nth-child(even) {
+  background: #FAFAFA !important;
+}
+
+[data-theme="light"] .verificationTable tbody tr:hover,
+[data-theme="light"] .rewardsTable tbody tr:hover {
+  background: var(--neutral-hover) !important;
+}
+
+[data-theme="light"] .verificationTable tbody tr:hover td,
+[data-theme="light"] .rewardsTable tbody tr:hover td {
+  background: var(--neutral-hover) !important;
+}
+
+[data-theme="light"] .verificationSearchRow {
+  background: var(--surface-light) !important;
+  border-bottom: 1px solid var(--border-light) !important;
+}
+
+[data-theme="light"] .verificationSearchIcon {
+  color: var(--text-tertiary-light) !important;
+}
+
+[data-theme="light"] .verificationPanel {
+  border: 1px solid var(--border-light) !important;
+  box-shadow: var(--shadow-sm-light) !important;
+}
+
+/* ── Buttons ─────────────────────────────────────────────── */
+
+/* Generic .btn — used by legacy components */
+[data-theme="light"] .btn {
+  background: #121417 !important;
+  border: 1px solid #121417 !important;
+  color: #FFFFFF !important;
+  border-radius: 10px !important;
+  box-shadow: var(--shadow-sm-light) !important;
+}
+
+[data-theme="light"] .btn:hover {
+  background: #1E2126 !important;
+  border-color: #1E2126 !important;
+  box-shadow: var(--shadow-md-light) !important;
+  transform: translateY(-1px);
+}
+
+/* Primary action buttons — matching KBZPay header text color (deep navy) */
+[data-theme="light"] .verificationActionButton {
+  background: var(--text-primary-light) !important;
+  border: 1px solid var(--text-primary-light) !important;
+  color: #FFFFFF !important;
+  border-radius: 10px !important;
+}
+
+/* Secondary / subtle action buttons */
+[data-theme="light"] .verificationActionButton.subtle {
+  background: #FFFFFF !important;
+  border: 1px solid var(--border-light) !important;
+  color: var(--text-secondary-light) !important;
+}
+
+[data-theme="light"] .verificationActionButton.subtle:hover {
+  border-color: var(--border-medium) !important;
+  background: var(--neutral-hover) !important;
+}
+
+/* Destructive action buttons */
+[data-theme="light"] .verificationActionButton.danger {
+  background: #FFFFFF !important;
+  border: 1px solid var(--error-soft) !important;
+  color: var(--error) !important;
+}
+
+[data-theme="light"] .verificationActionButton.danger:hover {
+  background: var(--error-soft) !important;
+}
+
+/* Rewards primary — matching KBZPay header text color (deep navy) */
+[data-theme="light"] .rewardsBtn.primary {
+  background: var(--text-primary-light) !important;
+  border-color: var(--text-primary-light) !important;
+  color: #FFFFFF !important;
+}
+
+/* Rewards secondary */
+[data-theme="light"] .rewardsBtn.secondary {
+  background: #FFFFFF !important;
+  border: 1px solid var(--border-light) !important;
+  color: var(--text-secondary-light) !important;
+}
+
+/* Rewards success */
+[data-theme="light"] .rewardsBtn.success {
+  background: var(--success) !important;
+  border-color: var(--success) !important;
+  color: #FFFFFF !important;
+}
+
+/* Rewards danger */
+[data-theme="light"] .rewardsBtn.danger {
+  background: #FFFFFF !important;
+  border: 1px solid var(--error-soft) !important;
+  color: var(--error) !important;
+}
+
+[data-theme="light"] .rewardsBtn.danger:hover {
+  background: var(--error-soft) !important;
+}
+
+/* Rewards danger subtle */
+[data-theme="light"] .rewardsBtn.danger.subtle {
+  background: #FFFFFF !important;
+  border-color: var(--border-light) !important;
+  color: var(--error) !important;
+}
+
+/* ── Tabs ────────────────────────────────────────────────── */
+[data-theme="light"] .verificationTabs,
+[data-theme="light"] .rewardsTabs {
+  background: var(--surface-light) !important;
+  border-bottom: 1px solid var(--border-light) !important;
+}
+
+[data-theme="light"] .verificationTab,
+[data-theme="light"] .rewardsTab {
+  background: #FFFFFF !important;
+  border: 1px solid var(--border-light) !important;
+  color: var(--text-secondary-light) !important;
+  box-shadow: var(--shadow-sm-light) !important;
+}
+
+[data-theme="light"] .verificationTab:hover,
+[data-theme="light"] .rewardsTab:hover {
+  border-color: var(--border-medium) !important;
+  box-shadow: var(--shadow-md-light) !important;
+}
+
+[data-theme="light"] .verificationTab.active,
+[data-theme="light"] .rewardsTab.active {
+  background: var(--text-primary-light) !important;
+  border-color: var(--text-primary-light) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.25) !important;
+}
+
+[data-theme="light"] .verificationTab.active .verificationTabStep,
+[data-theme="light"] .verificationTab.active .verificationTabCount {
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme="light"] .verificationTabStep {
+  background: var(--brand-soft) !important;
+  color: var(--brand-primary) !important;
+}
+
+[data-theme="light"] .verificationTabCount {
+  background: var(--bg-light) !important;
+  color: var(--text-tertiary-light) !important;
+}
+
+/* ── Admin Chat Tabs ─────────────────────────────────────── */
+[data-theme="light"] .adminChatTab.active {
+  background: #0A192F !important;
+  border-color: #0A192F !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme="light"] .adminChatTab.active .adminChatTabCount {
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme="light"] .adminChatTabCount {
+  background: var(--bg-light) !important;
+  color: var(--text-tertiary-light) !important;
+}
+
+[data-theme="light"] .adminChatListCard.active {
+  border-color: var(--brand-primary) !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12) !important;
+}
+
+[data-theme="light"] .adminChatFlowStep.active {
+  border-color: var(--brand-primary) !important;
+  background: var(--brand-soft) !important;
+}
+
+[data-theme="light"] .adminChatFlowStep.active .adminChatFlowStepNumber {
+  background: var(--brand-primary) !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme="light"] .adminChatFlowStep.done {
+  border-color: var(--success) !important;
+  background: var(--success-soft) !important;
+}
+
+[data-theme="light"] .adminChatFlowStep.done .adminChatFlowStepNumber {
+  background: var(--success) !important;
+  color: #FFFFFF !important;
+}
+
+/* ── Search / Input Fields ───────────────────────────────── */
+[data-theme="light"] .authInput,
+[data-theme="light"] select.authInput,
+[data-theme="light"] textarea.authInput,
+[data-theme="light"] .topbarSearch,
+[data-theme="light"] .verificationSearchInput,
+[data-theme="light"] .categoriesSearchInput {
+  background: #FFFFFF !important;
+  border: 1px solid var(--border-light) !important;
+  color: var(--text-primary-light) !important;
+}
+
+[data-theme="light"] .authInput::placeholder,
+[data-theme="light"] .topbarSearch input::placeholder {
+  color: var(--text-disabled-light) !important;
+}
+
+[data-theme="light"] .authInput:focus,
+[data-theme="light"] .topbarSearch:focus-within,
+[data-theme="light"] .verificationSearchInput:focus,
+[data-theme="light"] .categoriesSearchInput:focus {
+  border-color: var(--brand-primary) !important;
+  box-shadow: var(--focus-ring) !important;
+  outline: none !important;
+}
+
+/* Keep login card inputs aligned with the dark auth card visual style. */
+[data-theme="light"] .authCardSimple .authTitle {
+  color: #f6efe1 !important;
+}
+
+[data-theme="light"] .authCardSimple .authSubtitle {
+  color: rgba(223, 214, 198, 0.9) !important;
+}
+
+[data-theme="light"] .authCardSimple .authLabel {
+  color: rgba(214, 205, 188, 0.85) !important;
+}
+
+[data-theme="light"] .authCardSimple .authInput {
+  background: rgba(20, 28, 42, 0.78) !important;
+  border-color: rgba(255, 255, 255, 0.22) !important;
+  color: #efe6d7 !important;
+}
+
+[data-theme="light"] .authCardSimple .authInput::placeholder {
+  color: rgba(214, 205, 188, 0.72) !important;
+}
+
+[data-theme="light"] .authCardSimple .authInput:focus {
+  border-color: rgba(255, 255, 255, 0.44) !important;
+  box-shadow: 0 0 0 3px rgba(95, 114, 255, 0.2) !important;
+}
+
+[data-theme="light"] .topbarSearch {
+  border: 1px solid var(--border-light) !important;
+  background: #FFFFFF !important;
+}
+
+[data-theme="light"] .topbarSearchIcon {
+  color: var(--text-tertiary-light) !important;
+}
+
+/* ── Status Badges ───────────────────────────────────────── */
+[data-theme="light"] .inlineBadge,
+[data-theme="light"] .statusPill {
+  background: var(--bg-light) !important;
+  border: 1px solid var(--border-light) !important;
+  color: var(--text-secondary-light) !important;
+}
+
+/* ── Verification Status Badges ──────────────────────────── */
+[data-theme="light"] .verificationStatusBadge.registered,
+[data-theme="light"] .verificationHeroBadge.registered {
+  background: var(--bg-light) !important;
+  border-color: var(--border-light) !important;
+  color: var(--text-tertiary-light) !important;
+}
+
+[data-theme="light"] .verificationStatusBadge.requested,
+[data-theme="light"] .verificationHeroBadge.requested,
+[data-theme="light"] .verificationStatusBadge.moneyCheck,
+[data-theme="light"] .verificationHeroBadge.moneyCheck {
+  background: var(--warning-soft) !important;
+  border-color: #FDE68A !important;
+  color: #92400E !important;
+}
+
+[data-theme="light"] .verificationStatusBadge.verified,
+[data-theme="light"] .verificationHeroBadge.verified,
+[data-theme="light"] .verificationHeroBadge {
+  background: var(--success-soft) !important;
+  border-color: #A7F3D0 !important;
+  color: #065F46 !important;
+}
+
+/* ── Rewards Badges ──────────────────────────────────────── */
+[data-theme="light"] .rewardsBadge.pending {
+  background: var(--warning-soft) !important;
+  color: #92400E !important;
+  border-color: #FDE68A !important;
+}
+
+[data-theme="light"] .rewardsBadge.completed {
+  background: var(--success-soft) !important;
+  color: #065F46 !important;
+  border-color: #A7F3D0 !important;
+}
+
+[data-theme="light"] .rewardsBadge.rejected {
+  background: var(--error-soft) !important;
+  color: #991B1B !important;
+  border-color: #FECACA !important;
+}
+
+/* ── Category Tree ───────────────────────────────────────── */
+[data-theme="light"] .categoryTreeRow {
+  background: var(--surface-light) !important;
+  border: 1px solid var(--border-light) !important;
+}
+
+[data-theme="light"] .categoryTreeRow:hover {
+  border-color: var(--border-medium) !important;
+  box-shadow: var(--shadow-md-light) !important;
+}
+
+[data-theme="light"] .categoryTreeRow.active {
+  border-color: var(--brand-primary) !important;
+  background: var(--brand-soft) !important;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.10) !important;
+}
+
+[data-theme="light"] .categoryTreeExpandButton,
+[data-theme="light"] .categoryTreeDragHandle {
+  background: #FFFFFF !important;
+  border: 1px solid var(--border-light) !important;
+  color: var(--text-secondary-light) !important;
+}
+
+[data-theme="light"] .categoryTreeFolder {
+  background: var(--brand-soft) !important;
+  color: var(--brand-primary) !important;
+}
+
+[data-theme="light"] .categoryTreeCountBadge {
+  background: var(--bg-light) !important;
+  color: var(--text-tertiary-light) !important;
+}
+
+[data-theme="light"] .categoryTreeChildZone.active {
+  background: var(--bg-light) !important;
+  border-color: var(--border-medium) !important;
+  color: var(--text-tertiary-light) !important;
+}
+
+[data-theme="light"] .categoriesEmptyState {
+  background: var(--bg-light) !important;
+  border-color: var(--border-light) !important;
+  color: var(--text-tertiary-light) !important;
+}
+
+[data-theme="light"] .categoriesDetailsHero {
+  background: linear-gradient(135deg, var(--brand-soft), var(--surface-light)) !important;
+  border-color: #DBEAFE !important;
+}
+
+[data-theme="light"] .categoriesStatusPill {
+  background: var(--brand-soft) !important;
+  border-color: #DBEAFE !important;
+  color: var(--brand-primary) !important;
+}
+
+[data-theme="light"] .categoriesStatusPill.inactive {
+  background: var(--error-soft) !important;
+  border-color: #FECACA !important;
+  color: var(--error) !important;
+}
+
+/* ── Slider Ads ──────────────────────────────────────────── */
+[data-theme="light"] .sliderModalOverlay {
+  background: rgba(15, 23, 42, 0.22) !important;
+}
+
+[data-theme="light"] .sliderModal,
+[data-theme="light"] .sliderConfirmDialog {
+  background: var(--surface-light) !important;
+  border: 1px solid var(--border-light) !important;
+}
+
+[data-theme="light"] .sliderModalHeader {
+  background: var(--surface-light) !important;
+  border-bottom: 1px solid var(--border-light) !important;
+}
+
+[data-theme="light"] .sliderModalClose {
+  background: var(--bg-light) !important;
+  border: 1px solid var(--border-light) !important;
+  color: var(--text-primary-light) !important;
+}
+
+[data-theme="light"] .sliderForm,
+[data-theme="light"] .sliderUploadPreview,
+[data-theme="light"] .categoryFormPreviewBox {
+  background: var(--surface-light) !important;
+}
+
+[data-theme="light"] .sliderReorderButton {
+  background: #FFFFFF !important;
+  border: 1px solid var(--border-light) !important;
+  color: var(--text-secondary-light) !important;
+}
+
+[data-theme="light"] .sliderToggle {
+  background: var(--bg-light) !important;
+  border: 1px solid var(--border-light) !important;
+}
+
+[data-theme="light"] .sliderToggle.active {
+  background: var(--success-soft) !important;
+  border-color: #86EFAC !important;
+}
+
+[data-theme="light"] .sliderToggleLabel {
+  color: var(--text-secondary-light) !important;
+}
+
+[data-theme="light"] .sliderPreviewEmpty,
+[data-theme="light"] .sliderPreviewPlaceholder,
+[data-theme="light"] .sliderUploadPreviewEmpty,
+[data-theme="light"] .sliderThumbPlaceholder {
+  background: var(--bg-light) !important;
+  border-color: var(--border-light) !important;
+  color: var(--text-tertiary-light) !important;
+}
+
+[data-theme="light"] .sliderThumb {
+  border: 1px solid var(--border-light) !important;
+}
+
+/* ── Notifications ───────────────────────────────────────── */
+[data-theme="light"] .notificationsPanelHeader,
+[data-theme="light"] .notificationsPanelFooter {
+  background: var(--surface-light) !important;
+  border-color: var(--border-light) !important;
+}
+
+[data-theme="light"] .notificationsItem.unread {
+  border-color: #DBEAFE !important;
+  background: var(--brand-soft) !important;
+}
+
+[data-theme="light"] .notificationsPageItem.unread {
+  border-color: #DBEAFE !important;
+  background: var(--brand-soft) !important;
+}
+
+[data-theme="light"] .notificationsPageItem.highlighted {
+  border-color: var(--brand-primary) !important;
+  background: var(--brand-soft) !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15) !important;
+}
+
+[data-theme="light"] .notificationsToast {
+  background: linear-gradient(180deg, var(--brand-soft), var(--surface-light)) !important;
+  border-color: #DBEAFE !important;
+}
+
+[data-theme="light"] .notificationsToastClose {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border: 1px solid var(--border-light) !important;
+  color: var(--text-primary-light) !important;
+}
+
+[data-theme="light"] .notificationsSummaryCardBlue {
+  border-color: #DBEAFE !important;
+}
+
+[data-theme="light"] .notificationsSummaryCardAmber {
+  border-color: #FDE68A !important;
+}
+
+[data-theme="light"] .notificationsSummaryCardGreen {
+  border-color: #A7F3D0 !important;
+}
+
+/* ── Verification Summary Cards ──────────────────────────── */
+[data-theme="light"] .verificationSummaryCardBlue {
+  border-color: #DBEAFE !important;
+}
+
+[data-theme="light"] .verificationSummaryCardGreen {
+  border-color: #A7F3D0 !important;
+}
+
+[data-theme="light"] .verificationSummaryCardYellow {
+  border-color: #FDE68A !important;
+}
+
+/* ── Verification Detail Page ────────────────────────────── */
+[data-theme="light"] .verificationDetailPage .verificationSectionCard,
+[data-theme="light"] .verificationDetailPage .verificationStepperCard,
+[data-theme="light"] .verificationDetailPage .verificationMissingState {
+  background: var(--surface-light) !important;
+  border: 1px solid var(--border-light) !important;
+}
+
+[data-theme="light"] .verificationStep:not(:last-child)::after {
+  background: var(--border-light) !important;
+}
+
+[data-theme="light"] .verificationStepMarker {
+  background: var(--bg-light) !important;
+  border-color: var(--border-light) !important;
+  color: var(--text-tertiary-light) !important;
+}
+
+[data-theme="light"] .verificationStepMarker.active {
+  background: var(--warning-soft) !important;
+  border-color: #FCD34D !important;
+  color: #92400E !important;
+}
+
+[data-theme="light"] .verificationStepMarker.done {
+  background: var(--success) !important;
+  border-color: var(--success) !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme="light"] .verificationBackButton {
+  background: #FFFFFF !important;
+  border: 1px solid var(--border-light) !important;
+  color: var(--text-secondary-light) !important;
+}
+
+[data-theme="light"] .copyActionButton {
+  background: var(--bg-light) !important;
+  border: 1px solid var(--border-light) !important;
+  color: var(--text-secondary-light) !important;
+}
+
+[data-theme="light"] .verificationPrimaryButton {
+  background: var(--brand-primary) !important;
+  border-color: var(--brand-primary) !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme="light"] .verificationSuccessButton {
+  background: var(--success) !important;
+  border-color: var(--success) !important;
+  color: #FFFFFF !important;
+}
+
+/* ── Category Management ─────────────────────────────────── */
+[data-theme="light"] .categoryMgmtFilterButton {
+  background: #FFFFFF !important;
+  border: 1px solid var(--border-light) !important;
+  color: var(--text-secondary-light) !important;
+}
+
+[data-theme="light"] .categoryMgmtFilterButton:hover {
+  border-color: var(--border-medium) !important;
+}
+
+[data-theme="light"] .categoryMgmtFilterButton.active {
+  background: var(--brand-primary) !important;
+  border-color: var(--brand-primary) !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme="light"] .categoryMgmtActivePill {
+  background: var(--success-soft) !important;
+  color: #065F46 !important;
+  border-color: #A7F3D0 !important;
+}
+
+[data-theme="light"] .categoryMgmtVisiblePill {
+  background: var(--brand-soft) !important;
+  color: var(--brand-primary) !important;
+  border-color: #DBEAFE !important;
+}
+
+[data-theme="light"] .categoryMgmtMutedPill {
+  background: var(--bg-light) !important;
+  color: var(--text-tertiary-light) !important;
+  border-color: var(--border-light) !important;
+}
+
+[data-theme="light"] .categoryMgmtDropInside {
+  background: var(--bg-light) !important;
+  border: 1px dashed var(--border-medium) !important;
+  color: var(--text-tertiary-light) !important;
+}
+
+[data-theme="light"] .categoryMgmtDropInside:hover {
+  border-color: var(--brand-primary) !important;
+  color: var(--brand-primary) !important;
+}
+
+[data-theme="light"] .categoryMgmtBulkBar {
+  background: rgba(255, 255, 255, 0.98) !important;
+  border: 1px solid var(--border-light) !important;
+  box-shadow: var(--shadow-lg-light) !important;
+}
+
+[data-theme="light"] .categoryMgmtUndoToast {
+  background: rgba(255, 255, 255, 0.98) !important;
+  border: 1px solid var(--border-light) !important;
+  box-shadow: var(--shadow-lg-light) !important;
+}
+
+/* ── Page Elements ───────────────────────────────────────── */
+[data-theme="light"] .pageTitle,
+[data-theme="light"] .sectionTitle,
+[data-theme="light"] .cardTitle {
+  color: var(--text-primary-light) !important;
+}
+
+[data-theme="light"] .pageDescription,
+[data-theme="light"] .sectionDescription {
+  color: var(--text-tertiary-light) !important;
+}
+
+[data-theme="light"] .pageEyebrow {
+  color: var(--text-tertiary-light) !important;
+}
+
+[data-theme="light"] .detailLabel {
+  color: var(--text-tertiary-light) !important;
+}
+
+[data-theme="light"] .detailValue {
+  color: var(--text-primary-light) !important;
+}
+
+[data-theme="light"] .muted {
+  color: var(--text-tertiary-light) !important;
+}
+
+/* ── Progress Ring ─────────────────

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff0b6" />
+      <stop offset="30%" stop-color="#f8d369" />
+      <stop offset="65%" stop-color="#c7861d" />
+      <stop offset="100%" stop-color="#8f5a11" />
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="#fbf7ef" />
+  <g fill="none" stroke="url(#gold)" stroke-linecap="round">
+    <path d="M58 20a34 34 0 1 0 0 88" stroke-width="7" />
+    <path d="M70 20a34 34 0 1 1 0 88" stroke-width="7" />
+  </g>
+  <text x="64" y="72" fill="url(#gold)" font-family="Segoe UI, Arial, sans-serif" font-size="32" font-weight="900" text-anchor="middle">F</text>
+</svg>
