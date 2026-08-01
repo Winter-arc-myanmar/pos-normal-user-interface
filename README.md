@@ -17,7 +17,7 @@ Use it for admin dashboards, internal tools, or other product UIs. Replace the e
 - App shell + router + permission skeleton
 - Example Users list page
 - Example Customers CRUD page
-- Shared UI primitives (table, metric card, loading states, theme/language toggles)
+- Shared UI primitives (Button, MetricCard, loading states, theme/language toggles) using Tailwind CSS
 
 ## Scripts
 

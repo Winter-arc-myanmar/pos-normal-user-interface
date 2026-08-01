@@ -66,10 +66,12 @@ function UnauthorizedPage() {
   const { t } = useTranslation();
 
   return (
-    <section className="page">
-      <div className="card">
-        <h1 className="pageTitle">{t("router.accessDeniedTitle")}</h1>
-        <p className="pageDescription">
+    <section className="mx-auto max-w-3xl">
+      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+          {t("router.accessDeniedTitle")}
+        </h1>
+        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
           {t("router.accessDeniedDescription")}
         </p>
       </div>

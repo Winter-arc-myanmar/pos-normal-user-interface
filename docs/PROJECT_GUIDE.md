@@ -91,9 +91,10 @@ Copy that path for every new resource.
 
 ## 8. UI guidance
 
-- Prefer existing CSS classes (`page`, `pageHeader`, `card`, `verificationTable`, `btn`)
+- Use Tailwind utility classes for layout and styling
+- Reuse shared components in `src/components/ui` (Button, MetricCard, etc.)
+- Dark mode uses the `dark` class on `<html>` via `ThemeProvider`
 - Keep branding/product naming neutral until the new project owns them
-- Do not introduce a second API style under `src/features`
 
 ## 9. Validation
 

@@ -16,16 +16,7 @@ type MetricCardProps = {
 
 function TrendUpIcon() {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="w-3.5 h-3.5"
-      aria-hidden="true"
-    >
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden="true">
       <path d="M5 12h14" />
       <path d="m12 5 7 7-7 7" />
     </svg>
@@ -34,16 +25,7 @@ function TrendUpIcon() {
 
 function TrendDownIcon() {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="w-3.5 h-3.5"
-      aria-hidden="true"
-    >
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden="true">
       <path d="M5 12h14" />
       <path d="m12 19 7-7-7-7" />
     </svg>
@@ -64,24 +46,19 @@ export function MetricCard({
   return (
     <div
       className={[
-        "relative rounded-xl border p-5",
-        "transition-all duration-200 ease-in-out",
-        "hover:shadow-md hover:-translate-y-0.5",
+        "relative rounded-xl border p-5 transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-md",
         isPrimary
-          ? "bg-blue-900 border-blue-900 text-white"
-          : "bg-white border-slate-200 shadow-sm",
+          ? "border-blue-900 bg-blue-900 text-white"
+          : "border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900",
         className,
       ].join(" ")}
     >
-      {/* Top row: icon + trend */}
       <div className="flex items-start justify-between gap-3">
         {icon ? (
           <div
             className={[
-              "flex items-center justify-center w-10 h-10 rounded-lg flex-shrink-0",
-              isPrimary
-                ? "bg-white/15 text-white"
-                : "bg-blue-50 text-blue-900",
+              "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
+              isPrimary ? "bg-white/15 text-white" : "bg-blue-50 text-blue-900 dark:bg-blue-950 dark:text-blue-200",
             ].join(" ")}
           >
             {icon}
@@ -93,7 +70,7 @@ export function MetricCard({
         {trend ? (
           <span
             className={[
-              "inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2 py-0.5",
+              "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold",
               trend.direction === "up"
                 ? trend.positive !== false
                   ? "bg-green-50 text-green-700"
@@ -110,32 +87,29 @@ export function MetricCard({
         ) : null}
       </div>
 
-      {/* Title — metric label: slate-500 */}
       <p
         className={[
           "mt-3 text-xs font-medium tracking-wide",
-          isPrimary ? "text-blue-100" : "text-slate-500",
+          isPrimary ? "text-blue-100" : "text-slate-500 dark:text-slate-400",
         ].join(" ")}
       >
         {title}
       </p>
 
-      {/* Value — metric value: slate-900 */}
       <p
         className={[
           "mt-1.5 text-2xl font-bold tracking-tight",
-          isPrimary ? "text-white" : "text-slate-900",
+          isPrimary ? "text-white" : "text-slate-900 dark:text-white",
         ].join(" ")}
       >
         {value}
       </p>
 
-      {/* Subtitle — helper text: slate-500 */}
       {subtitle ? (
         <p
           className={[
             "mt-1.5 text-xs leading-relaxed",
-            isPrimary ? "text-blue-100" : "text-slate-500",
+            isPrimary ? "text-blue-100" : "text-slate-500 dark:text-slate-400",
           ].join(" ")}
         >
           {subtitle}

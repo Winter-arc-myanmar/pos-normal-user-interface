@@ -12,7 +12,6 @@ export function PageTransition({ children }: PageTransitionProps) {
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -8, scale: 0.997 }}
       transition={{ type: "spring", stiffness: 260, damping: 28, mass: 0.9 }}
-      className="pageTransition"
     >
       {children}
     </motion.div>

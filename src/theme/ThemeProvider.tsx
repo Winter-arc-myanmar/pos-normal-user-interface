@@ -38,10 +38,8 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   );
 
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
     document.documentElement.style.colorScheme = theme;
 
-    // Toggle Tailwind `dark` class for components using dark: prefix
     if (theme === "dark") {
       document.documentElement.classList.add("dark");
     } else {

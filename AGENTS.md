@@ -21,8 +21,8 @@ When implementing features, prioritize:
 - TypeScript
 - Vite
 - Axios via `HttpClient`
+- Tailwind CSS for UI styling
 - Framer Motion for shell/page transitions
-- Existing project CSS classes in `src/index.css` and related files
 - i18n is present; new features should add keys in `src/lib/i18n/locales/en.json`
 
 ## Architecture (required)
@@ -78,8 +78,8 @@ Starter examples already in the template:
 
 ## UI Rules
 
-- Reuse existing project classes before adding new styling systems
-- Do not introduce Tailwind unless the repo already uses it for that area
+- Use Tailwind utility classes for layout and styling
+- Reuse shared UI components in `src/components/ui` where possible
 - Prefer clean, compact layouts over custom one-off designs
 - Keep pages thin; business logic belongs in services/hooks
 

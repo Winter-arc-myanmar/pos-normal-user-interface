@@ -11,7 +11,12 @@
     "english": "English",
     "korean": "한국어",
     "myanmar": "မြန်မာ",
-    "chineseSimplified": "简体中文"
+    "chineseSimplified": "简体中文",
+    "switchLanguage": "Switch language"
+  },
+  "theme": {
+    "switchToLightMode": "Switch to light mode",
+    "switchToDarkMode": "Switch to dark mode"
   },
   "networkStatus": {
     "offlineTitle": "You are offline",

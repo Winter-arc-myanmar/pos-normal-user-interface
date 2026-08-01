@@ -1,12 +1,12 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiLoadingState } from "@/components/ApiLoadingState";
+import { Button } from "@/components/ui/Button";
 import { useCustomerManagement } from "@/core/presentation/hooks/useCustomerManagement";
 
-/**
- * Thin example CRUD page for the Customer resource.
- * Follow architecture.md when adding your own resources.
- */
+const inputClassName =
+  "w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-900/10 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500 dark:focus:ring-white/10";
+
 export function CustomersPage() {
   const { t } = useTranslation();
   const {
@@ -60,34 +60,35 @@ export function CustomersPage() {
   };
 
   return (
-    <section className="page">
-      <header className="pageHeader">
+    <section className="mx-auto max-w-6xl space-y-6">
+      <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="pageTitle">{t("customers.title")}</h1>
-          <p className="pageDescription">{t("customers.description")}</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+            {t("customers.title")}
+          </h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            {t("customers.description")}
+          </p>
         </div>
-        <button
-          type="button"
-          className="verificationActionButton"
-          onClick={refresh}
-          disabled={isLoading}
-        >
+        <Button variant="secondary" isLoading={isLoading} onClick={refresh}>
           {isLoading ? t("common.refreshing") : t("common.refresh")}
-        </button>
+        </Button>
       </header>
 
-      <div className="card" style={{ marginBottom: 16 }}>
-        <h2 className="sectionTitle">{t("customers.createTitle")}</h2>
-        <form className="authForm" onSubmit={handleCreate}>
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+          {t("customers.createTitle")}
+        </h2>
+        <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={handleCreate}>
           <input
-            className="authInput"
+            className={inputClassName}
             placeholder={t("customers.fields.name")}
             value={name}
             onChange={(event) => setName(event.target.value)}
             required
           />
           <input
-            className="authInput"
+            className={inputClassName}
             type="email"
             placeholder={t("customers.fields.email")}
             value={email}
@@ -95,66 +96,72 @@ export function CustomersPage() {
             required
           />
           <input
-            className="authInput"
+            className={inputClassName}
             placeholder={t("customers.fields.phone")}
             value={phone}
             onChange={(event) => setPhone(event.target.value)}
             required
           />
           <input
-            className="authInput"
+            className={inputClassName}
             placeholder={t("customers.fields.address")}
             value={address}
             onChange={(event) => setAddress(event.target.value)}
             required
           />
           {(formError || error) && (
-            <p className="authError">{formError || error}</p>
+            <p className="sm:col-span-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
+              {formError || error}
+            </p>
           )}
-          <button className="btn" type="submit" disabled={isLoading}>
-            {t("customers.createSubmit")}
-          </button>
+          <div className="sm:col-span-2">
+            <Button type="submit" isLoading={isLoading}>
+              {t("customers.createSubmit")}
+            </Button>
+          </div>
         </form>
       </div>
 
       {isLoading && customers.length === 0 ? (
         <ApiLoadingState label={t("customers.loading")} />
       ) : customers.length === 0 ? (
-        <div className="card">
-          <p className="muted">{t("customers.empty")}</p>
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            {t("customers.empty")}
+          </p>
         </div>
       ) : (
-        <div className="card">
-          <p className="muted" style={{ marginBottom: 12 }}>
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="border-b border-slate-200 px-4 py-3 text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
             {t("customers.total", { count: totalCustomers })}
-          </p>
-          <div className="verificationTableWrap">
-            <table className="verificationTable">
-              <thead>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-950/50 dark:text-slate-400">
                 <tr>
-                  <th>{t("customers.fields.name")}</th>
-                  <th>{t("customers.fields.email")}</th>
-                  <th>{t("customers.fields.phone")}</th>
-                  <th>{t("customers.columns.actions")}</th>
+                  <th className="px-4 py-3 font-semibold">{t("customers.fields.name")}</th>
+                  <th className="px-4 py-3 font-semibold">{t("customers.fields.email")}</th>
+                  <th className="px-4 py-3 font-semibold">{t("customers.fields.phone")}</th>
+                  <th className="px-4 py-3 font-semibold">{t("customers.columns.actions")}</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                 {customers.map((customer) => (
-                  <tr key={customer.id}>
-                    <td>{customer.name}</td>
-                    <td>{customer.email}</td>
-                    <td>{customer.phone}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="verificationActionButton subtle"
+                  <tr key={customer.id} className="text-slate-700 dark:text-slate-200">
+                    <td className="px-4 py-3">{customer.name}</td>
+                    <td className="px-4 py-3">{customer.email}</td>
+                    <td className="px-4 py-3">{customer.phone}</td>
+                    <td className="px-4 py-3">
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        disabled={isLoading}
                         onClick={() => {
                           void deleteCustomer(customer.id).then(refresh);
                         }}
-                        disabled={isLoading}
                       >
                         {t("common.delete")}
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 ))}

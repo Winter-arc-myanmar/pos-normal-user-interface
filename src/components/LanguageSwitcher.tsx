@@ -18,12 +18,7 @@ function resolveSelectedLanguage(language?: string) {
 
 function ChevronDownIcon() {
   return (
-    <svg
-      viewBox="0 0 20 20"
-      fill="currentColor"
-      aria-hidden="true"
-      className="h-4 w-4"
-    >
+    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="h-4 w-4">
       <path
         fillRule="evenodd"
         d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
@@ -71,11 +66,11 @@ export function LanguageSwitcher() {
   }, [isOpen]);
 
   return (
-    <div className="topbarLanguageSwitcher" ref={containerRef}>
-      <span className="srOnly">{t("language.switchLanguage")}</span>
+    <div className="relative" ref={containerRef}>
+      <span className="sr-only">{t("language.switchLanguage")}</span>
       <button
         type="button"
-        className="topbarLanguageSelect"
+        className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
         aria-label={t("language.switchLanguage")}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
@@ -85,9 +80,9 @@ export function LanguageSwitcher() {
         <ChevronDownIcon />
       </button>
 
-      {isOpen && (
+      {isOpen ? (
         <ul
-          className="topbarLanguageDropdown"
+          className="absolute right-0 z-30 mt-2 min-w-[10rem] overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-900"
           role="listbox"
           aria-label={t("language.switchLanguage")}
         >
@@ -98,9 +93,12 @@ export function LanguageSwitcher() {
                 key={option.value}
                 role="option"
                 aria-selected={isSelected}
-                className={`topbarLanguageOption ${
-                  isSelected ? "topbarLanguageOptionSelected" : ""
-                }`}
+                className={[
+                  "cursor-pointer px-3 py-2 text-sm",
+                  isSelected
+                    ? "bg-slate-100 font-medium text-slate-900 dark:bg-slate-800 dark:text-white"
+                    : "text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800",
+                ].join(" ")}
                 onClick={() => handleSelect(option.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
@@ -115,7 +113,7 @@ export function LanguageSwitcher() {
             );
           })}
         </ul>
-      )}
+      ) : null}
     </div>
   );
 }
