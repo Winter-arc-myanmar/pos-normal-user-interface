@@ -5,6 +5,7 @@ import {
   isTokenExpired,
   isTokenExpiringSoon,
   getTimeUntilExpiration,
+  clearAuthAndRedirectToLogin,
 } from "@/lib/cookies";
 
 /**
@@ -30,7 +31,9 @@ export class HttpClient {
       headers: {
         "Content-Type": "application/json",
       },
-      withCredentials: true, // Important for cookies and CSRF
+      // JWT auth uses Authorization header; credentials cookies are not required
+      // and break cross-origin login when the API CORS policy is strict.
+      withCredentials: false,
     });
 
     // Add request interceptor for auth token and CSRF protection
@@ -73,8 +76,8 @@ export class HttpClient {
           return config;
         }
 
-        // Skip CSRF for login endpoint
-        if (config.url === API_ENDPOINTS.AUTH.LOGIN) {
+        // Skip CSRF for sign-in endpoint
+        if (config.url === API_ENDPOINTS.AUTH.SIGNIN) {
           return config;
         }
 
@@ -99,17 +102,28 @@ export class HttpClient {
         if (error.response?.status === 401) {
           console.warn("Received 401 Unauthorized, token may be expired");
 
-          // Only redirect if we're not on the login page and not making a login request
-          const isLoginRequest = error.config?.url === API_ENDPOINTS.AUTH.LOGIN;
+          const isLoginRequest = error.config?.url === API_ENDPOINTS.AUTH.SIGNIN;
+          const isSessionRequest =
+            error.config?.url === API_ENDPOINTS.AUTH.SESSION;
           const isOnLoginPage = window.location.pathname === "/login";
 
-          if (!isLoginRequest && !isOnLoginPage) {
+          if (!isLoginRequest && !isOnLoginPage && !isSessionRequest) {
             this.handleTokenExpiration();
             return Promise.reject(new Error("Authentication required"));
           }
 
-          // For login requests, just reject with the original error
           return Promise.reject(error);
+        }
+
+        if (error.response?.status === 403) {
+          const isSessionRequest =
+            error.config?.url === API_ENDPOINTS.AUTH.SESSION;
+          const isOnLoginPage = window.location.pathname === "/login";
+
+          if (isSessionRequest && isOnLoginPage) {
+            tokenCookies.clearAll();
+            return Promise.reject(error);
+          }
         }
 
         // Handle CSRF token errors
@@ -138,16 +152,13 @@ export class HttpClient {
     this.isRedirecting = true;
 
     // Clear all tokens
-    tokenCookies.clearAll();
     this.csrfToken = null;
     this.csrfSupported = true;
 
     // Show user-friendly message
     console.log("Your session has expired. Please log in again.");
 
-    // Redirect to login page
-    // Use window.location.href for a full page reload to clear any cached state
-    window.location.href = "/login";
+    clearAuthAndRedirectToLogin("session_expired");
   }
 
   /**
@@ -197,7 +208,7 @@ export class HttpClient {
         `${this.baseUrl}${API_ENDPOINTS.CSRF.TOKEN}`,
         {
           headers: { Authorization: `Bearer ${token}` },
-          withCredentials: true,
+          withCredentials: false,
         }
       );
 

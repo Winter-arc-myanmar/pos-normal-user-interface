@@ -51,7 +51,10 @@ export function decodeJWT(token: string): JWTPayload | null {
  */
 export function isTokenExpired(token: string): boolean {
   const payload = decodeJWT(token);
-  if (!payload) return true;
+  if (!payload || typeof payload.exp !== "number") {
+    // Opaque or non-standard tokens must be validated by the API, not the client.
+    return false;
+  }
 
   const currentTime = Math.floor(Date.now() / 1000);
   return payload.exp < currentTime;
@@ -65,7 +68,7 @@ export function isTokenExpiringSoon(
   warningMinutes: number = 5
 ): boolean {
   const payload = decodeJWT(token);
-  if (!payload) return true;
+  if (!payload || typeof payload.exp !== "number") return false;
 
   const currentTime = Math.floor(Date.now() / 1000);
   const warningTime = warningMinutes * 60; // Convert to seconds
@@ -93,7 +96,7 @@ export function getTimeUntilExpiration(token: string): number {
   return Math.max(0, payload.exp - currentTime);
 }
 
-export function clearAuthAndRedirectToLogin(): void {
+export function clearAuthAndRedirectToLogin(reason?: string): void {
   tokenCookies.clearAll();
 
   if (typeof window === "undefined") {
@@ -101,7 +104,8 @@ export function clearAuthAndRedirectToLogin(): void {
   }
 
   if (window.location.pathname !== "/login") {
-    window.location.href = "/login";
+    const params = reason ? `?reason=${encodeURIComponent(reason)}` : "";
+    window.location.href = `/login${params}`;
   }
 }
 
@@ -118,7 +122,7 @@ export function setCookie(
     maxAge,
     path = "/",
     domain,
-    secure = true,
+    secure = typeof window !== "undefined" && window.location.protocol === "https:",
     sameSite = "Strict",
     httpOnly = false,
   } = options;
@@ -214,7 +218,9 @@ class SecureStorage {
       setCookie(key, value, {
         maxAge: 24 * 60 * 60, // 24 hours
         path: "/",
-        secure: true,
+        secure:
+          typeof window !== "undefined" &&
+          window.location.protocol === "https:",
         sameSite: "Strict",
       });
     } else {
@@ -255,79 +261,98 @@ class SecureStorage {
 // Create singleton instance
 const secureStorage = new SecureStorage();
 
+// Auth session keys — stored in sessionStorage because backend JWTs with large
+// permission payloads exceed browser cookie size limits (~4KB).
+const AUTH_TOKEN_KEY = "wms_token";
+const AUTH_USER_KEY = "wms_user";
+const CSRF_TOKEN_KEY = "wms_csrf_token";
+
+const readSessionValue = (key: string): string | null => {
+  if (typeof window === "undefined") return null;
+  return sessionStorage.getItem(key);
+};
+
+const writeSessionValue = (key: string, value: string): void => {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem(key, value);
+};
+
+const removeSessionValue = (key: string): void => {
+  if (typeof window === "undefined") return;
+  sessionStorage.removeItem(key);
+};
+
 /**
- * Token-specific cookie functions with secure defaults
+ * Token-specific storage functions.
+ * Auth token/user use sessionStorage; CSRF may use the smaller cookie path.
  */
 export const tokenCookies = {
-  /**
-   * Set authentication token cookie
-   */
   setToken: (token: string) => {
-    secureStorage.setItem("wms_token", token);
+    writeSessionValue(AUTH_TOKEN_KEY, token);
   },
 
-  /**
-   * Get authentication token
-   */
   getToken: (): string | null => {
-    return secureStorage.getItem("wms_token");
+    const fromSession = readSessionValue(AUTH_TOKEN_KEY);
+    if (fromSession) return fromSession;
+
+    // Migrate legacy cookie storage if present.
+    const fromCookie = getCookie(AUTH_TOKEN_KEY);
+    if (fromCookie) {
+      writeSessionValue(AUTH_TOKEN_KEY, fromCookie);
+      removeCookie(AUTH_TOKEN_KEY);
+      return fromCookie;
+    }
+
+    return null;
   },
 
-  /**
-   * Remove authentication token
-   */
   removeToken: () => {
-    secureStorage.removeItem("wms_token");
+    removeSessionValue(AUTH_TOKEN_KEY);
+    removeCookie(AUTH_TOKEN_KEY);
   },
 
-  /**
-   * Set user data cookie (for non-sensitive user info)
-   */
   setUser: (userData: string) => {
-    secureStorage.setItem("wms_user", userData);
+    writeSessionValue(AUTH_USER_KEY, userData);
   },
 
-  /**
-   * Get user data
-   */
   getUser: (): string | null => {
-    return secureStorage.getItem("wms_user");
+    const fromSession = readSessionValue(AUTH_USER_KEY);
+    if (fromSession) return fromSession;
+
+    const fromCookie = getCookie(AUTH_USER_KEY);
+    if (fromCookie) {
+      writeSessionValue(AUTH_USER_KEY, fromCookie);
+      removeCookie(AUTH_USER_KEY);
+      return fromCookie;
+    }
+
+    return null;
   },
 
-  /**
-   * Remove user data
-   */
   removeUser: () => {
-    secureStorage.removeItem("wms_user");
+    removeSessionValue(AUTH_USER_KEY);
+    removeCookie(AUTH_USER_KEY);
   },
 
-  /**
-   * Set CSRF token cookie
-   */
   setCsrfToken: (token: string) => {
-    secureStorage.setItem("wms_csrf_token", token);
+    secureStorage.setItem(CSRF_TOKEN_KEY, token);
   },
 
-  /**
-   * Get CSRF token
-   */
   getCsrfToken: (): string | null => {
-    return secureStorage.getItem("wms_csrf_token");
+    return secureStorage.getItem(CSRF_TOKEN_KEY);
   },
 
-  /**
-   * Remove CSRF token
-   */
   removeCsrfToken: () => {
-    secureStorage.removeItem("wms_csrf_token");
+    secureStorage.removeItem(CSRF_TOKEN_KEY);
   },
 
-  /**
-   * Clear all auth-related cookies
-   */
   clearAll: () => {
-    secureStorage.clear();
-    // Also clear CSRF token
-    secureStorage.removeItem("wms_csrf_token");
+    removeSessionValue(AUTH_TOKEN_KEY);
+    removeSessionValue(AUTH_USER_KEY);
+    removeSessionValue(CSRF_TOKEN_KEY);
+    removeCookie(AUTH_TOKEN_KEY);
+    removeCookie(AUTH_USER_KEY);
+    removeCookie(CSRF_TOKEN_KEY);
+    secureStorage.removeItem(CSRF_TOKEN_KEY);
   },
 };

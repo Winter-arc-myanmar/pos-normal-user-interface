@@ -6,6 +6,7 @@ import {
   ReactNode,
 } from "react";
 import { User } from "../../domain/entities/User";
+import { LoginInputDTO } from "../../application/dtos/AuthDTO";
 import { IAuthService } from "../../domain/services/IAuthService";
 import container from "../../infrastructure/di/container";
 import { tokenCookies } from "@/lib/cookies";
@@ -14,7 +15,8 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (identifier: string, password: string) => Promise<void>;
+  login: (input: LoginInputDTO) => Promise<void>;
+  setActiveBranch: (branchId: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (updatedUser: User) => void;
   error: string | null;
@@ -57,12 +59,12 @@ export function AuthProvider({ children, service }: AuthProviderProps) {
   }, [authService]);
 
   // Login function
-  const login = async (identifier: string, password: string) => {
+  const login = async (input: LoginInputDTO) => {
     setIsLoading(true);
     setError(null); // Clear any previous errors
 
     try {
-      const loggedInUser = await authService.login(identifier, password);
+      const loggedInUser = await authService.login(input);
       setUser(loggedInUser);
       setError(null); // Clear error on success
     } catch (err) {
@@ -72,6 +74,25 @@ export function AuthProvider({ children, service }: AuthProviderProps) {
         setError("An unexpected error occurred during login");
       }
       throw err; // Re-throw to allow component to handle
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const setActiveBranch = async (branchId: string) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const updatedUser = await authService.setActiveBranch({ branchId });
+      setUser(updatedUser);
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("An unexpected error occurred while switching branch");
+      }
+      throw err;
     } finally {
       setIsLoading(false);
     }
@@ -93,7 +114,6 @@ export function AuthProvider({ children, service }: AuthProviderProps) {
   // Update user function
   const updateUser = (updatedUser: User) => {
     setUser(updatedUser);
-    sessionStorage.setItem("wms_user", JSON.stringify(updatedUser));
     tokenCookies.setUser(JSON.stringify(updatedUser));
   };
 
@@ -103,6 +123,7 @@ export function AuthProvider({ children, service }: AuthProviderProps) {
     isAuthenticated: !!user,
     isLoading,
     login,
+    setActiveBranch,
     logout,
     updateUser,
     error,

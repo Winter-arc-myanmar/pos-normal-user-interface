@@ -6,12 +6,19 @@ export class User {
   id!: string;
   name!: string;
   email!: string;
+  tenantId?: string;
   phone?: string;
   role!: "ADMIN" | "STAFF";
   nickname?: string;
   adminRoleId?: string;
   adminRoleName?: string;
   permissions?: string[];
+  activeBranchId?: string;
+  branchAccess?: Array<{
+    branchId: string;
+    roles: string[];
+    permissions: string[];
+  }>;
   profileImageUrl?: string;
   createdDate?: Date;
   updatedDate?: Date;
@@ -23,12 +30,19 @@ export class User {
     id: string;
     name: string;
     email: string;
+    tenantId?: string;
     phone?: string;
     role: "ADMIN" | "STAFF";
     nickname?: string;
     adminRoleId?: string;
     adminRoleName?: string;
     permissions?: string[];
+    activeBranchId?: string;
+    branchAccess?: Array<{
+      branchId: string;
+      roles: string[];
+      permissions: string[];
+    }>;
     profileImageUrl?: string;
     createdDate?: Date;
     updatedDate?: Date;

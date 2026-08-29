@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/core/presentation/hooks/useAuth";
 
@@ -31,17 +31,20 @@ export function LoginPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { login, user, isAuthenticated, isLoading, error } = useAuth();
-  const [identifier, setIdentifier] = useState("");
+
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
   const from = (location.state as { from?: { pathname?: string } })?.from
     ?.pathname;
+  const sessionExpired = searchParams.get("reason") === "session_expired";
 
   if (isAuthenticated && user) {
-    return <Navigate to={from || "/dashboard"} replace />;
+    return <Navigate to={from || "/cashier"} replace />;
   }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -49,8 +52,11 @@ export function LoginPage() {
     setLocalError(null);
 
     try {
-      await login(identifier.trim(), password);
-      navigate(from || "/dashboard", { replace: true });
+      await login({
+        email: email.trim(),
+        password,
+      });
+      navigate(from || "/cashier", { replace: true });
     } catch (err) {
       const message =
         err instanceof Error ? err.message : t("login.errorFallback");
@@ -77,18 +83,18 @@ export function LoginPage() {
           <div>
             <label
               className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300"
-              htmlFor="identifier"
+              htmlFor="email"
             >
-              {t("login.identifierLabel")}
+              {t("login.emailLabel")}
             </label>
             <input
-              id="identifier"
+              id="email"
               className={inputClassName}
-              type="text"
+              type="email"
               autoComplete="username"
-              placeholder={t("login.identifierPlaceholder")}
-              value={identifier}
-              onChange={(event) => setIdentifier(event.target.value)}
+              placeholder={t("login.emailPlaceholder")}
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
               required
             />
           </div>
@@ -127,9 +133,11 @@ export function LoginPage() {
             </div>
           </div>
 
-          {(localError || error) && (
+          {(sessionExpired || localError || error) && (
             <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
-              {localError || error}
+              {localError ||
+                error ||
+                (sessionExpired ? t("login.sessionExpired") : null)}
             </p>
           )}
 

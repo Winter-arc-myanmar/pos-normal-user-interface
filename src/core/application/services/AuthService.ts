@@ -1,28 +1,39 @@
 import { User } from "../../domain/entities/User";
 import { IAuthService } from "../../domain/services/IAuthService";
-import { ApiAuthRepository } from "../../infrastructure/repositories/ApiAuthRepository";
+import { IAuthRepository } from "../../domain/repositories/IAuthRepository";
+import {
+  LoginInputDTO,
+  SetActiveBranchRequestDTO,
+} from "../dtos/AuthDTO";
 
 /**
  * Auth Service implementation
  * Contains business logic for authentication-related operations
  */
 export class AuthService implements IAuthService {
-  private authRepository: ApiAuthRepository;
+  private authRepository: IAuthRepository;
 
-  constructor(authRepository: ApiAuthRepository) {
+  constructor(authRepository: IAuthRepository) {
     this.authRepository = authRepository;
   }
 
   /**
    * Login a user with email and password
    */
-  async login(identifier: string, password: string): Promise<User> {
-    if (!identifier || !password) {
-      throw new Error("Phone/email and password are required");
+  async login(input: LoginInputDTO): Promise<User> {
+    const email = input.email?.trim();
+    const password = input.password;
+
+    if (!email || !password) {
+      throw new Error("Email and password are required");
     }
 
     try {
-      const result = await this.authRepository.login(identifier, password);
+      const result = await this.authRepository.login({
+        email,
+        password,
+        type: "user",
+      });
       return result.user;
     } catch (error: unknown) {
       console.error("Login failed:", error);
@@ -31,6 +42,18 @@ export class AuthService implements IAuthService {
       }
       throw new Error("Login failed. Please try again.");
     }
+  }
+
+  async setActiveBranch(payload: SetActiveBranchRequestDTO): Promise<User> {
+    if (!payload.branchId?.trim()) {
+      throw new Error("Branch is required");
+    }
+
+    const result = await this.authRepository.setActiveBranch({
+      branchId: payload.branchId.trim(),
+    });
+
+    return result.user;
   }
 
   /**

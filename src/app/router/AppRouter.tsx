@@ -26,6 +26,26 @@ const DashboardPage = lazy(() =>
     default: module.DashboardPage,
   }))
 );
+const CashierPage = lazy(() =>
+  import("../../pages/CashierPage").then((module) => ({
+    default: module.CashierPage,
+  }))
+);
+const WaitlistPage = lazy(() =>
+  import("../../pages/WaitlistPage").then((module) => ({
+    default: module.WaitlistPage,
+  }))
+);
+const TipPoolsPage = lazy(() =>
+  import("../../pages/TipPoolsPage").then((module) => ({
+    default: module.TipPoolsPage,
+  }))
+);
+const CounterOrdersPage = lazy(() =>
+  import("../../pages/CounterOrdersPage").then((module) => ({
+    default: module.CounterOrdersPage,
+  }))
+);
 const UsersPage = lazy(() =>
   import("../../pages/UsersPage").then((module) => ({
     default: module.UsersPage,
@@ -145,6 +165,46 @@ export function AppRouter() {
                     requiredPermissions={PAGE_PERMISSIONS.dashboard}
                   >
                     <DashboardPage />
+                  </RequirePermission>
+                }
+              />
+              <Route
+                path="/cashier"
+                element={
+                  <RequirePermission
+                    requiredPermissions={PAGE_PERMISSIONS.cashier}
+                  >
+                    <CashierPage />
+                  </RequirePermission>
+                }
+              />
+              <Route
+                path="/waitlist"
+                element={
+                  <RequirePermission
+                    requiredPermissions={PAGE_PERMISSIONS.waitlist}
+                  >
+                    <WaitlistPage />
+                  </RequirePermission>
+                }
+              />
+              <Route
+                path="/tip-pools"
+                element={
+                  <RequirePermission
+                    requiredPermissions={PAGE_PERMISSIONS.tipPools}
+                  >
+                    <TipPoolsPage />
+                  </RequirePermission>
+                }
+              />
+              <Route
+                path="/counter-orders"
+                element={
+                  <RequirePermission
+                    requiredPermissions={PAGE_PERMISSIONS.counterOrders}
+                  >
+                    <CounterOrdersPage />
                   </RequirePermission>
                 }
               />

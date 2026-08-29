@@ -1,52 +1,44 @@
 import axios from "axios";
 import { User } from "../../domain/entities/User";
+import { IAuthRepository } from "../../domain/repositories/IAuthRepository";
 import { HttpClient } from "../api/HttpClient";
 import { API_ENDPOINTS, API_CONFIG } from "../api/constants";
-import { decodeJWT, isTokenExpired, tokenCookies } from "@/lib/cookies";
+import { isTokenExpired, tokenCookies } from "@/lib/cookies";
+import {
+  ApiEnvelopeDTO,
+  AuthResultDTO,
+  AuthSessionPayloadDTO,
+  BranchAccessDTO,
+  SetActiveBranchRequestDTO,
+  SignInRequestDTO,
+} from "../../application/dtos/AuthDTO";
 
 /**
  * API response types for auth endpoints
  */
-interface LoginResponse {
-  token?: string;
-  accessToken?: string;
-  user?: RegisterResponse;
-  admin?: RegisterResponse;
-}
-
-interface RegisterResponse {
+interface ApiAuthUser {
   id: string;
-  name: string;
-  nickname?: string;
   email: string;
-  phone: string;
-  role: string;
-  adminRoleId?: string;
-  adminRoleName?: string;
-  permissions?: unknown[];
-  adminRole?: {
-    id?: string;
-    name?: string;
-    permissions?: unknown[];
-  };
+  fullName?: string;
+  type?: string;
+  tenantId?: string;
+  name?: string;
+  role?: string;
+  permissions?: string[];
   profileImageUrl?: string;
-  createdDate: string;
-  updatedDate: string;
+  activeBranch?: string;
+  access?: BranchAccessDTO[];
+  createdDate?: string;
+  updatedDate?: string;
   createdAt?: string;
   updatedAt?: string;
-}
-
-interface ApiResponse<T> {
-  message: string;
-  code: number;
-  data: T;
 }
 
 /**
  * Auth Repository implementation for API calls
  * Handles authentication through HTTP API
  */
-export class ApiAuthRepository {
+export class ApiAuthRepository implements IAuthRepository {
   private httpClient: HttpClient;
 
   constructor(httpClient: HttpClient) {
@@ -56,72 +48,43 @@ export class ApiAuthRepository {
   /**
    * Login user with email and password
    */
-  async login(
-    identifier: string,
-    password: string
-  ): Promise<{ user: User; token: string }> {
+  async login(payload: SignInRequestDTO): Promise<AuthResultDTO> {
     try {
       this.clearPersistedAuthenticatedSession();
-      const loginPayload = this.buildLoginPayload(identifier, password);
-
-      const response = await this.httpClient.post<ApiResponse<LoginResponse>>(
-        API_ENDPOINTS.AUTH.LOGIN,
-        loginPayload
+      const response = await this.httpClient.post<ApiEnvelopeDTO<AuthSessionPayloadDTO>>(
+        API_ENDPOINTS.AUTH.SIGNIN,
+        payload
       );
-
-      const token = this.extractToken(response);
-      if (!token) {
-        throw new Error("Login response did not include a token");
-      }
-
-      const responseUser = this.extractUser(response, identifier, token);
-      if (!responseUser) {
-        throw new Error("Login response did not include a user");
-      }
-
-      const user = this.mapApiResponseToUser(responseUser);
-
-      this.persistAuthenticatedSession(token, user);
-
-      return { user, token };
+      return this.persistSessionFromEnvelope(response);
     } catch (error: unknown) {
       console.error("Error during login:", error);
 
-      if (axios.isAxiosError(error)) {
-        const msg = error.response?.data?.message;
-        if (msg) throw new Error(String(msg));
-      }
-      if (error instanceof Error) {
-        throw new Error(error.message);
-      }
-      throw new Error("Invalid credentials");
+      throw new Error(this.resolveApiErrorMessage(error, "Unable to sign in"));
     }
   }
 
-  private buildLoginPayload(
-    identifier: string,
-    password: string
-  ): Record<string, string> {
-    if (identifier.includes("@")) {
-      return { email: identifier, password };
-    }
+  async setActiveBranch(payload: SetActiveBranchRequestDTO): Promise<AuthResultDTO> {
+    try {
+      const response = await this.httpClient.post<ApiEnvelopeDTO<AuthSessionPayloadDTO>>(
+        API_ENDPOINTS.AUTH.SET_ACTIVE_BRANCH,
+        payload
+      );
+      return this.persistSessionFromEnvelope(response);
+    } catch (error: unknown) {
+      console.error("Error switching active branch:", error);
 
-    return { phone: identifier, password };
+      throw new Error(
+        this.resolveApiErrorMessage(error, "Unable to switch branch")
+      );
+    }
   }
 
   private persistAuthenticatedSession(token: string, user: User): void {
-    sessionStorage.setItem("wms_token", token);
-    sessionStorage.setItem("wms_user", JSON.stringify(user));
-
-    // Keep existing tokenCookies integration so the current app auth restore
-    // flow continues to work without wider repository changes.
     tokenCookies.setToken(token);
     tokenCookies.setUser(JSON.stringify(user));
   }
 
   private clearPersistedAuthenticatedSession(): void {
-    sessionStorage.removeItem("wms_token");
-    sessionStorage.removeItem("wms_user");
     tokenCookies.clearAll();
   }
 
@@ -141,28 +104,71 @@ export class ApiAuthRepository {
   }
 
   /**
-   * Get current user from secure cookie
+   * Restore session from login/signin response stored locally.
+   * Unlike NextAuth, this app uses JWT + local cache instead of a server session cookie.
    */
   async getCurrentUser(): Promise<User | null> {
+    const token = tokenCookies.getToken();
+    if (!token) {
+      this.clearPersistedAuthenticatedSession();
+      return null;
+    }
+
+    if (isTokenExpired(token)) {
+      this.clearPersistedAuthenticatedSession();
+      return null;
+    }
+
+    const cachedUser = this.restoreCachedUser();
+    if (cachedUser) {
+      return cachedUser;
+    }
+
     try {
-      const token = tokenCookies.getToken();
-      const userJson = tokenCookies.getUser();
-      if (!token || !userJson) {
-        tokenCookies.clearAll();
-        return null;
-      }
-
-      if (isTokenExpired(token)) {
-        tokenCookies.clearAll();
-        return null;
-      }
-
-      const userData = JSON.parse(userJson);
-      const user = this.mapApiResponseToUser(userData);
-
-      return user;
+      const sessionResponse =
+        await this.httpClient.get<ApiEnvelopeDTO<AuthSessionPayloadDTO>>(
+          API_ENDPOINTS.AUTH.SESSION
+        );
+      const result = this.persistSessionFromEnvelope(sessionResponse);
+      return result.user;
     } catch (error) {
+      if (
+        axios.isAxiosError(error) &&
+        [401, 403].includes(error.response?.status ?? 0)
+      ) {
+        this.clearPersistedAuthenticatedSession();
+        return null;
+      }
+
       console.error("Error getting current user:", error);
+      return null;
+    }
+  }
+
+  private restoreCachedUser(): User | null {
+    const userJson = tokenCookies.getUser();
+    if (!userJson) return null;
+
+    try {
+      const parsed = JSON.parse(userJson) as Partial<User> & Partial<ApiAuthUser>;
+      if (!parsed.id || !parsed.email) return null;
+
+      return this.mapApiResponseToUser(
+        {
+          id: String(parsed.id),
+          email: String(parsed.email),
+          fullName: parsed.fullName || parsed.name,
+          name: parsed.name,
+          tenantId: parsed.tenantId,
+          role: parsed.role,
+          permissions: parsed.permissions,
+          profileImageUrl: parsed.profileImageUrl,
+          activeBranch: parsed.activeBranchId || parsed.activeBranch,
+        },
+        parsed.activeBranchId || parsed.activeBranch,
+        parsed.branchAccess || []
+      );
+    } catch {
       return null;
     }
   }
@@ -170,24 +176,27 @@ export class ApiAuthRepository {
   /**
    * Map API response to User entity
    */
-  private mapApiResponseToUser(apiUser: RegisterResponse): User {
-    const normalizedRole = this.normalizeRole(apiUser.role);
-    const rolePermissions = this.normalizePermissions(
-      apiUser.permissions ??
-        apiUser.adminRole?.permissions ??
-        []
-    );
+  private mapApiResponseToUser(
+    apiUser: ApiAuthUser,
+    activeBranch?: string,
+    access: BranchAccessDTO[] = []
+  ): User {
+    const activeBranchAccess = this.resolveActiveBranchAccess(access, activeBranch);
+    const normalizedRole = this.normalizeRole(activeBranchAccess.roles, apiUser.role);
+    const rolePermissions = this.resolvePermissions(activeBranchAccess.permissions, access);
 
     return new User({
       id: String(apiUser.id),
-      name: apiUser.name || apiUser.nickname || "",
-      nickname: apiUser.nickname || apiUser.name || "",
+      name: apiUser.fullName || apiUser.name || "",
+      nickname: apiUser.fullName || apiUser.name || "",
       email: apiUser.email || "",
-      phone: apiUser.phone,
+      tenantId: apiUser.tenantId,
+      phone: "",
       role: normalizedRole,
-      adminRoleId: apiUser.adminRoleId || apiUser.adminRole?.id,
-      adminRoleName: apiUser.adminRoleName || apiUser.adminRole?.name,
+      adminRoleName: activeBranchAccess.roles[0],
       permissions: rolePermissions,
+      activeBranchId: activeBranch || apiUser.activeBranch,
+      branchAccess: access,
       profileImageUrl: this.convertToFullUrl(apiUser.profileImageUrl),
       createdDate: new Date(apiUser.createdDate || apiUser.createdAt || Date.now()),
       updatedDate: new Date(apiUser.updatedDate || apiUser.updatedAt || Date.now()),
@@ -207,110 +216,124 @@ export class ApiAuthRepository {
     return `${API_CONFIG.BASE_URL}${url}`;
   }
 
-  private extractToken(response: unknown): string | null {
-    if (!response || typeof response !== "object") return null;
-    const root = response as Record<string, unknown>;
-    const data =
-      root.data && typeof root.data === "object"
-        ? (root.data as Record<string, unknown>)
-        : null;
-    const nestedTokens =
-      data?.tokens && typeof data.tokens === "object"
-        ? (data.tokens as Record<string, unknown>)
-        : null;
-
-    const candidates = [
-      root.token,
-      root.accessToken,
-      data?.token,
-      data?.accessToken,
-      data?.jwt,
-      nestedTokens?.accessToken,
-      nestedTokens?.token,
-    ];
-
-    for (const candidate of candidates) {
-      if (typeof candidate === "string" && candidate.trim()) {
-        return candidate;
-      }
+  private resolveApiErrorMessage(error: unknown, fallback: string): string {
+    if (axios.isAxiosError(error)) {
+      const payload = error.response?.data as
+        | { message?: string; error?: { message?: string } }
+        | undefined;
+      const message = payload?.error?.message || payload?.message;
+      if (message) return String(message);
+      if (error.message) return error.message;
     }
-    return null;
+    if (error instanceof Error && error.message) {
+      return error.message;
+    }
+    return fallback;
   }
 
-  private extractUser(
-    response: unknown,
-    identifier?: string,
-    token?: string
-  ): RegisterResponse | null {
-    if (!response || typeof response !== "object") return null;
-    const root = response as Record<string, unknown>;
-    const data =
-      root.data && typeof root.data === "object"
-        ? (root.data as Record<string, unknown>)
-        : null;
-    const nestedData =
-      data?.data && typeof data.data === "object"
-        ? (data.data as Record<string, unknown>)
-        : null;
+  private persistSessionFromEnvelope(
+    envelope: ApiEnvelopeDTO<AuthSessionPayloadDTO> | AuthSessionPayloadDTO
+  ): AuthResultDTO {
+    const session = this.unwrapSessionPayload(envelope);
+    const accessToken =
+      session.access_token ||
+      (session as { accessToken?: string }).accessToken;
 
-    const candidates = [
-      nestedData?.user,
-      nestedData?.admin,
-      data?.user,
-      data?.admin,
-      root.user,
-      root.admin,
-    ].filter(
-      (candidate): candidate is Record<string, unknown> =>
-        !!candidate && typeof candidate === "object"
+    if (!accessToken) {
+      throw new Error("Auth response did not include access_token");
+    }
+    if (!session?.user) {
+      throw new Error("Auth response did not include user");
+    }
+
+    const access = Array.isArray(session.access) ? session.access : [];
+    const user = this.mapApiResponseToUser(
+      session.user,
+      session.activeBranch,
+      access
     );
 
-    if (candidates.length === 0) return null;
+    this.persistAuthenticatedSession(accessToken, user);
 
-    const normalizedIdentifier = String(identifier || "").trim().toLowerCase();
-    const tokenPayload = token ? decodeJWT(token) : null;
-    const tokenEmail = String(tokenPayload?.email || "").trim().toLowerCase();
-    const tokenUserId = String(tokenPayload?.sub || "").trim();
+    if (!tokenCookies.getToken()) {
+      throw new Error("Unable to save login session in this browser");
+    }
 
-    const matchedCandidate = candidates.find((candidate) => {
-      const candidateEmail = String(candidate.email || "").trim().toLowerCase();
-      const candidatePhone = String(candidate.phone || "").trim().toLowerCase();
-      const candidateId = String(candidate.id || "").trim();
-
-      return (
-        (!!normalizedIdentifier &&
-          (candidateEmail === normalizedIdentifier ||
-            candidatePhone === normalizedIdentifier)) ||
-        (!!tokenEmail && candidateEmail === tokenEmail) ||
-        (!!tokenUserId && candidateId === tokenUserId)
-      );
-    });
-
-    return (matchedCandidate || candidates[0]) as unknown as RegisterResponse;
+    return {
+      token: accessToken,
+      user,
+      activeBranch: session.activeBranch,
+      access,
+    };
   }
 
-  private normalizeRole(rawRole: unknown): "ADMIN" | "STAFF" {
-    const value = String(rawRole || "").trim().toUpperCase();
-    return value === "ADMIN" ? "ADMIN" : "STAFF";
+  private unwrapSessionPayload(
+    envelope: ApiEnvelopeDTO<AuthSessionPayloadDTO> | AuthSessionPayloadDTO
+  ): AuthSessionPayloadDTO {
+    let current: unknown = envelope;
+
+    while (current && typeof current === "object" && "data" in current) {
+      const nested = (current as { data?: unknown }).data;
+      if (!nested || nested === current) break;
+      current = nested;
+    }
+
+    return current as AuthSessionPayloadDTO;
   }
 
-  private normalizePermissions(rawPermissions: unknown[]): string[] {
-    if (!Array.isArray(rawPermissions)) return [];
+  private resolveActiveBranchAccess(
+    access: BranchAccessDTO[],
+    activeBranch?: string
+  ): BranchAccessDTO {
+    const fallback: BranchAccessDTO = {
+      branchId: activeBranch || "",
+      roles: [],
+      permissions: [],
+    };
+    if (!Array.isArray(access) || access.length === 0) return fallback;
 
-    return rawPermissions
-      .map((entry) => {
-        if (typeof entry === "string") return entry.trim();
-        if (entry && typeof entry === "object") {
-          const permission = entry as Record<string, unknown>;
-          return String(
-            permission.key ||
-              permission.name ||
-              permission.id ||
-              ""
-          ).trim();
-        }
-        return "";
-      })
+    if (activeBranch) {
+      const selected = access.find((entry) => entry.branchId === activeBranch);
+      if (selected) return selected;
+    }
+
+    return access[0];
+  }
+
+  private normalizeRole(
+    branchRoles: string[],
+    fallbackRole?: string
+  ): "ADMIN" | "STAFF" {
+    const roleCandidates = [
+      ...branchRoles,
+      String(fallbackRole || ""),
+    ]
+      .map((value) => value.trim().toUpperCase())
       .filter(Boolean);
+
+    const hasAdminRole = roleCandidates.some((value) =>
+      ["ADMIN", "ROOT_ADMIN", "SUPER_ADMIN", "OWNER"].includes(value)
+    );
+
+    return hasAdminRole ? "ADMIN" : "STAFF";
+  }
+
+  private resolvePermissions(
+    activeBranchPermissions: string[],
+    access: BranchAccessDTO[]
+  ): string[] {
+    const source = activeBranchPermissions.length
+      ? activeBranchPermissions
+      : access.flatMap((entry) =>
+          Array.isArray(entry.permissions) ? entry.permissions : []
+        );
+
+    return Array.from(
+      new Set(
+        source
+          .map((value) => String(value || "").trim())
+          .filter(Boolean)
+      )
+    );
   }
 }

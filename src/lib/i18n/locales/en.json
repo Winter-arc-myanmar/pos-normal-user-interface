@@ -33,6 +33,11 @@
     "appVersion": "v{{version}}",
     "dashboardTitle": "Dashboard",
     "dashboardMeta": "Overview",
+    "cashierTitle": "Cashier",
+    "cashierMeta": "POS mode",
+    "counterOrdersTitle": "Counter orders",
+    "waitlistTitle": "Waitlist",
+    "tipPoolsTitle": "Tip pools",
     "usersTitle": "Users",
     "usersMeta": "Example list",
     "customersTitle": "Customers",
@@ -43,18 +48,35 @@
     "fullAccessRole": "Full access",
     "userRole": "User",
     "userFallback": "User",
-    "logout": "Log out"
+    "logout": "Log out",
+    "drawer": "Drawer",
+    "menu": "Menu",
+    "orders": "Orders",
+    "pay": "Pay",
+    "branch": "Active branch"
   },
   "login": {
     "title": "Sign in",
     "subtitle": "Use your account credentials to continue.",
-    "identifierLabel": "Email or username",
-    "identifierPlaceholder": "you@example.com",
+    "userTypeLabel": "Account type",
+    "userTypes": {
+      "systemAdmin": "System admin",
+      "tenantUser": "Tenant user"
+    },
+    "systemAdminHint": "Platform admin login. Email and password only.",
+    "tenantUserHint": "POS staff login for a specific tenant and branch.",
+    "tenantIdLabel": "Tenant ID",
+    "tenantIdPlaceholder": "Enter tenant ID",
+    "branchIdLabel": "Branch ID",
+    "branchIdPlaceholder": "Enter branch ID",
+    "emailLabel": "Email",
+    "emailPlaceholder": "you@example.com",
     "passwordLabel": "Password",
     "passwordPlaceholder": "Enter password",
     "showPassword": "Show password",
     "hidePassword": "Hide password",
     "submit": "Sign in",
+    "sessionExpired": "Your session expired. Please sign in again.",
     "submitting": "Signing in...",
     "errorFallback": "Unable to sign in"
   },
@@ -100,6 +122,86 @@
     },
     "columns": {
       "actions": "Actions"
+    }
+  },
+  "cashier": {
+    "newOrder": "+ New",
+    "currentOrder": "Current order",
+    "total": "Total",
+    "table": "Table",
+    "sessionState": "Session",
+    "payNow": "Pay",
+    "pickupOrder": "Mark Pickup",
+    "emptySelection": "Select an order tile or create a new one.",
+    "searchProducts": "Search products...",
+    "loading": "Loading cashier workspace...",
+    "waitlistTitle": "Waitlist",
+    "waitingCount": "{{count}} active",
+    "waitlistEmpty": "No active waitlist entries.",
+    "partySize": "Party",
+    "notify": "Notify",
+    "seat": "Seat",
+    "cancel": "Cancel",
+    "noShow": "No-show",
+    "tipPoolsTitle": "Tip Pools",
+    "tipPoolsEmpty": "No tip pools yet.",
+    "serviceTypes": {
+      "table": "Table",
+      "dineIn": "Dine In",
+      "takeAway": "Take Away",
+      "delivery": "Delivery",
+      "pickUp": "Pick Up"
+    },
+    "status": {
+      "all": "All",
+      "pending": "Pending",
+      "placed": "Placed",
+      "paid": "Paid"
+    },
+    "locations": {
+      "all": "All"
+    },
+    "productMenu": {
+      "search": "Search products",
+      "close": "Close",
+      "noSku": "No SKU",
+      "notFound": "No products found",
+      "variant": "Variant",
+      "quantity": "Quantity",
+      "add": "Add to order",
+      "selectOrder": "Select or create an order first.",
+      "selectPrompt": "Select a product to choose its variant and quantity."
+    },
+    "orderPanel": {
+      "emptyLines": "Open Menu and add products.",
+      "noOrder": "No order selected",
+      "paymentAmount": "Payment amount",
+      "paymentMethod": "Payment method",
+      "selectPayment": "Select payment method",
+      "sendKds": "Send KDS",
+      "pickedUp": "Picked up",
+      "decrease": "-1",
+      "increase": "+1",
+      "remove": "Remove",
+      "itemUpdated": "Item quantity updated.",
+      "itemRemoved": "Item removed from order.",
+      "checkoutSuccess": "Checkout successful."
+    },
+    "errors": {
+      "missingContext": "Missing tenant or inventory location context. Ensure your tenant has at least one inventory location configured.",
+      "missingTenant": "Your login session is missing tenant information. Please sign in again.",
+      "missingLocation": "No inventory location is available for this tenant. Create one in the admin backend, then refresh.",
+      "createOrder": "Unable to create order.",
+      "selectOrder": "Create or select an order first.",
+      "openTable": "Unable to open table session.",
+      "addProduct": "Unable to add product.",
+      "checkout": "Unable to process checkout.",
+      "updateOrderLine": "Unable to update item quantity.",
+      "removeOrderLine": "Unable to remove item from order.",
+      "paymentMethodRequired": "Choose a payment method first.",
+      "noTableAvailable": "No available table for this waitlist party.",
+      "seatWaitlist": "Unable to seat waitlist entry.",
+      "pickupFailed": "Unable to mark pickup."
     }
   },
   "router": {

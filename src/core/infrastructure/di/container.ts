@@ -5,11 +5,16 @@ import { ApiAuthRepository } from "../repositories/ApiAuthRepository";
 import { ICustomerRepository } from "../../domain/repositories/ICustomerRepository";
 import { ApiCustomerRepository } from "../repositories/ApiCustomerRepository";
 import { IAuthService } from "../../domain/services/IAuthService";
+import { IAuthRepository } from "../../domain/repositories/IAuthRepository";
 import { AuthService } from "../../application/services/AuthService";
+import { ICashierRepository } from "../../domain/repositories/ICashierRepository";
+import { ICashierService } from "../../domain/services/ICashierService";
 import { UserManagementService } from "../../application/services/UserManagementService";
 import { CustomerManagementService } from "../../application/services/CustomerManagementService";
 import { ICustomerService } from "../../domain/services/ICustomerService";
 import { IUserService } from "../../domain/services/IUserService";
+import { CashierService } from "../../application/services/CashierService";
+import { ApiCashierRepository } from "../repositories/ApiCashierRepository";
 
 /**
  * Dependency Injection Container
@@ -30,7 +35,7 @@ class Container {
       new ApiUserRepository(this.resolve("httpClient"))
     );
 
-    this.register<ApiAuthRepository>(
+    this.register<IAuthRepository>(
       "authRepository",
       new ApiAuthRepository(this.resolve("httpClient"))
     );
@@ -38,6 +43,10 @@ class Container {
     this.register<ICustomerRepository>(
       "customerRepository",
       new ApiCustomerRepository(this.resolve("httpClient"))
+    );
+    this.register<ICashierRepository>(
+      "cashierRepository",
+      new ApiCashierRepository(this.resolve("httpClient"))
     );
 
     this.register<IAuthService>(
@@ -53,6 +62,10 @@ class Container {
     this.register<ICustomerService>(
       "customerService",
       new CustomerManagementService(this.resolve("customerRepository"))
+    );
+    this.register<ICashierService>(
+      "cashierService",
+      new CashierService(this.resolve("cashierRepository"))
     );
   }
 

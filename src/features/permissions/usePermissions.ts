@@ -12,9 +12,17 @@ export const PAGE_PERMISSIONS = {
   dashboard: [] as string[],
   users: ["MANAGE_USERS"],
   customers: ["MANAGE_CUSTOMERS"],
+  cashier: [] as string[],
+  waitlist: [] as string[],
+  tipPools: [] as string[],
+  counterOrders: [] as string[],
 } as const;
 
 export const PERMISSION_ROUTE_ORDER = [
+  { path: "/cashier", permissions: PAGE_PERMISSIONS.cashier },
+  { path: "/counter-orders", permissions: PAGE_PERMISSIONS.counterOrders },
+  { path: "/waitlist", permissions: PAGE_PERMISSIONS.waitlist },
+  { path: "/tip-pools", permissions: PAGE_PERMISSIONS.tipPools },
   { path: "/dashboard", permissions: PAGE_PERMISSIONS.dashboard },
   { path: "/users", permissions: PAGE_PERMISSIONS.users },
   { path: "/customers", permissions: PAGE_PERMISSIONS.customers },

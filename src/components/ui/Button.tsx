@@ -13,15 +13,15 @@ type ButtonProps = {
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    "bg-slate-900 hover:bg-slate-950 active:bg-slate-900 text-white border-slate-900 hover:border-slate-950 shadow-sm dark:bg-white dark:text-slate-900 dark:border-white dark:hover:bg-slate-100",
+    "bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white border-blue-500 hover:border-blue-600 shadow-sm",
   secondary:
-    "bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-600 border-slate-200 hover:border-slate-300 shadow-sm dark:bg-slate-900 dark:text-slate-200 dark:border-slate-700 dark:hover:bg-slate-800",
+    "bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white border-slate-600 shadow-sm",
   outline:
-    "bg-transparent hover:bg-slate-50 active:bg-slate-100 text-slate-600 border-slate-200 hover:border-slate-300 dark:text-slate-200 dark:border-slate-700 dark:hover:bg-slate-800",
+    "bg-transparent hover:bg-white/10 active:bg-white/15 text-slate-200 border-slate-600 hover:border-slate-500",
   destructive:
-    "bg-white hover:bg-red-50 active:bg-red-100 text-red-600 border-red-200 hover:border-red-300 shadow-sm dark:bg-slate-900 dark:text-red-400 dark:border-red-900/50 dark:hover:bg-red-950/40",
+    "bg-red-600 hover:bg-red-700 active:bg-red-800 text-white border-red-500 shadow-sm",
   ghost:
-    "bg-transparent hover:bg-slate-100 active:bg-slate-200 text-slate-500 border-transparent hover:border-transparent dark:text-slate-300 dark:hover:bg-slate-800",
+    "bg-transparent hover:bg-white/10 active:bg-white/15 text-slate-300 border-transparent hover:border-transparent",
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
@@ -77,9 +77,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         type={type}
         disabled={disabled || isLoading}
         className={[
-          "inline-flex items-center justify-center rounded-lg border font-semibold",
+          "inline-flex items-center justify-center rounded-sm border font-semibold",
           "transition-all duration-150 ease-in-out",
-          "focus:outline-none focus:ring-2 focus:ring-slate-900/30 focus:ring-offset-1 dark:focus:ring-white/20",
+          "focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:ring-offset-1 focus:ring-offset-black",
           "disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none",
           variantStyles[variant],
           sizeStyles[size],
