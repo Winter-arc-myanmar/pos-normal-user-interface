@@ -84,6 +84,14 @@ export interface TableSessionFilterDTO extends PaginatedQueryDTO {
   openOnly?: boolean;
 }
 
+export interface PosRegisterFilterDTO extends PaginatedQueryDTO {}
+
+export interface PosSessionFilterDTO extends PaginatedQueryDTO {
+  registerId?: string;
+  cashierId?: string;
+  status?: "OPEN" | "CLOSED";
+}
+
 export interface CreateSalesOrderDTO {
   tenantId: string;
   locationId: string;
@@ -124,6 +132,23 @@ export interface CreateOrderPaymentDTO {
   amount: string;
   tipAmount?: string;
   transactionReference?: string;
+}
+
+export interface CreatePosRegisterDTO {
+  tenantId: string;
+  locationId: string;
+  code: string;
+  name: string;
+  macAddress: string;
+}
+
+export interface CreatePosSessionDTO {
+  tenantId: string;
+  registerId: string;
+  cashierId: string;
+  openingCashFloat: string;
+  expectedClosingCash?: string;
+  status: "OPEN" | "CLOSED";
 }
 
 export interface CheckoutRequestDTO {

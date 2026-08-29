@@ -8,12 +8,16 @@ import {
   DiningTableFilterDTO,
   FireKdsDTO,
   OpenTableSessionDTO,
+  PosRegisterFilterDTO,
+  PosSessionFilterDTO,
   ProductFilterDTO,
   SalesOrderFilterDTO,
   SeatWaitlistEntryDTO,
   ServiceType,
   TableSessionCheckoutDTO,
   TableSessionFilterDTO,
+  CreatePosRegisterDTO,
+  CreatePosSessionDTO,
   TipPoolAllocationDTO,
   TipPoolFilterDTO,
   UpdateSalesOrderLineDTO,
@@ -29,6 +33,8 @@ import {
   InventoryLocation,
   OrderPayment,
   PaymentMethod,
+  PosRegister,
+  PosSession,
   Product,
   ProductVariant,
   SalesOrder,
@@ -70,11 +76,19 @@ interface UseCashierReturn {
   isLoading: boolean;
   isLocationsLoading: boolean;
   error: string | null;
-  fetchInventoryLocations: (tenantId: string) => Promise<string>;
+  fetchInventoryLocations: (
+    tenantId: string,
+    options?: { ignoreStored?: boolean }
+  ) => Promise<string>;
   fetchProducts: (params?: ProductFilterDTO) => Promise<void>;
   fetchProductVariants: (productId: string) => Promise<ProductVariant[]>;
   fetchSalesOrders: (params?: SalesOrderFilterDTO) => Promise<void>;
   fetchPaymentMethods: () => Promise<void>;
+  fetchPosRegisters: (params?: PosRegisterFilterDTO) => Promise<PosRegister[]>;
+  createPosRegister: (payload: CreatePosRegisterDTO) => Promise<PosRegister>;
+  fetchPosSessions: (params?: PosSessionFilterDTO) => Promise<PosSession[]>;
+  createPosSession: (payload: CreatePosSessionDTO) => Promise<PosSession>;
+  closePosSession: (sessionId: string) => Promise<PosSession>;
   fetchDiningZones: () => Promise<void>;
   fetchDiningTables: (params?: DiningTableFilterDTO) => Promise<void>;
   fetchTableSessions: (params?: TableSessionFilterDTO) => Promise<void>;
@@ -194,7 +208,10 @@ export function useCashier(): UseCashierReturn {
   }, [inventoryLocations]);
 
   const fetchInventoryLocations = useCallback(
-    async (tenantId: string): Promise<string> => {
+    async (
+      tenantId: string,
+      options?: { ignoreStored?: boolean }
+    ): Promise<string> => {
       if (!tenantId?.trim()) {
         setInventoryLocations([]);
         setActiveLocationIdState("");
@@ -207,11 +224,15 @@ export function useCashier(): UseCashierReturn {
         const locations = await cashierService.getInventoryLocations();
         setInventoryLocations(locations);
 
-        const storedId = readStoredActiveLocationId(tenantId);
+        const storedId = options?.ignoreStored
+          ? null
+          : readStoredActiveLocationId(tenantId);
         const resolvedId =
           storedId && locations.some((location) => location.id === storedId)
             ? storedId
-            : resolveActiveLocationId(tenantId, locations);
+            : resolveActiveLocationId(tenantId, locations, {
+                ignoreStored: options?.ignoreStored,
+              });
 
         setActiveLocationIdState(resolvedId);
         return resolvedId;
@@ -444,6 +465,96 @@ export function useCashier(): UseCashierReturn {
       setIsLoading(false);
     }
   }, [cashierService, clearError]);
+
+  const fetchPosRegisters = useCallback(
+    async (params?: PosRegisterFilterDTO) => {
+      setIsLoading(true);
+      clearError();
+      try {
+        return await cashierService.getPosRegisters(params);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to fetch POS registers";
+        setError(message);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [cashierService, clearError]
+  );
+
+  const createPosRegister = useCallback(
+    async (payload: CreatePosRegisterDTO) => {
+      setIsLoading(true);
+      clearError();
+      try {
+        return await cashierService.createPosRegister(payload);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to create POS register";
+        setError(message);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [cashierService, clearError]
+  );
+
+  const fetchPosSessions = useCallback(
+    async (params?: PosSessionFilterDTO) => {
+      setIsLoading(true);
+      clearError();
+      try {
+        return await cashierService.getPosSessions(params);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to fetch POS sessions";
+        setError(message);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [cashierService, clearError]
+  );
+
+  const createPosSession = useCallback(
+    async (payload: CreatePosSessionDTO) => {
+      setIsLoading(true);
+      clearError();
+      try {
+        return await cashierService.createPosSession(payload);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to create POS session";
+        setError(message);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [cashierService, clearError]
+  );
+
+  const closePosSession = useCallback(
+    async (sessionId: string) => {
+      setIsLoading(true);
+      clearError();
+      try {
+        return await cashierService.closePosSession(sessionId);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to close POS session";
+        setError(message);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [cashierService, clearError]
+  );
 
   const fetchDiscountReasons = useCallback(async () => {
     setIsLoading(true);
@@ -1163,6 +1274,11 @@ export function useCashier(): UseCashierReturn {
       fetchProductVariants,
       fetchSalesOrders,
       fetchPaymentMethods,
+      fetchPosRegisters,
+      createPosRegister,
+      fetchPosSessions,
+      createPosSession,
+      closePosSession,
       fetchDiscountReasons,
       fetchVoidReasons,
       fetchDiningZones,
@@ -1232,6 +1348,11 @@ export function useCashier(): UseCashierReturn {
       fetchProductVariants,
       fetchSalesOrders,
       fetchPaymentMethods,
+      fetchPosRegisters,
+      createPosRegister,
+      fetchPosSessions,
+      createPosSession,
+      closePosSession,
       fetchDiscountReasons,
       fetchVoidReasons,
       fetchDiningZones,

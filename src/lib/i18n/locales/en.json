@@ -126,6 +126,8 @@
   },
   "cashier": {
     "newOrder": "+ New",
+    "location": "Location",
+    "selectLocation": "Select location",
     "currentOrder": "Current order",
     "total": "Total",
     "table": "Table",
@@ -161,6 +163,24 @@
     "locations": {
       "all": "All"
     },
+    "pos": {
+      "title": "POS Session",
+      "setupTitle": "Set up your POS workspace",
+      "setupSubtitle": "Choose your location and open a POS session before taking orders.",
+      "register": "POS register",
+      "selectRegister": "Select register",
+      "openSession": "Open session",
+      "closeSession": "Close",
+      "continue": "Continue",
+      "closeSession": "Close",
+      "sessionActive": "Session is active.",
+      "sessionInactive": "No active session.",
+      "sessionOpened": "POS session opened.",
+      "sessionClosed": "POS session closed.",
+      "sessionAlreadyOpen": "A POS session is already open.",
+      "sessionRequired": "Open a POS session to continue.",
+      "contextRefreshed": "POS context refreshed."
+    },
     "productMenu": {
       "search": "Search products",
       "close": "Close",
@@ -185,7 +205,8 @@
       "remove": "Remove",
       "itemUpdated": "Item quantity updated.",
       "itemRemoved": "Item removed from order.",
-      "checkoutSuccess": "Checkout successful."
+      "checkoutSuccess": "Checkout successful.",
+      "kdsSent": "Order sent to KDS."
     },
     "errors": {
       "missingContext": "Missing tenant or inventory location context. Ensure your tenant has at least one inventory location configured.",
@@ -198,10 +219,15 @@
       "checkout": "Unable to process checkout.",
       "updateOrderLine": "Unable to update item quantity.",
       "removeOrderLine": "Unable to remove item from order.",
+      "missingPosSession": "No active POS session. Open a session and try again.",
+      "posSessionControl": "Unable to update POS session.",
       "paymentMethodRequired": "Choose a payment method first.",
       "noTableAvailable": "No available table for this waitlist party.",
       "seatWaitlist": "Unable to seat waitlist entry.",
-      "pickupFailed": "Unable to mark pickup."
+      "pickupFailed": "Unable to mark pickup.",
+      "emptyOrder": "Add at least one item before sending to KDS.",
+      "kdsTargetMissing": "Create or select an order before sending to KDS.",
+      "kdsFailed": "Failed to send order to KDS."
     }
   },
   "router": {

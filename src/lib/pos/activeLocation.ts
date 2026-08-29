@@ -21,15 +21,27 @@ export function writeStoredActiveLocationId(
   }
 }
 
+export function clearStoredActiveLocationId(tenantId: string): void {
+  if (!tenantId) return;
+  try {
+    sessionStorage.removeItem(`${STORAGE_PREFIX}${tenantId}`);
+  } catch {
+    // Ignore storage failures in embedded WebViews.
+  }
+}
+
 export function resolveActiveLocationId(
   tenantId: string,
-  locations: Array<{ id: string }>
+  locations: Array<{ id: string }>,
+  options?: { ignoreStored?: boolean }
 ): string {
   if (!locations.length) return "";
 
-  const storedId = readStoredActiveLocationId(tenantId);
-  if (storedId && locations.some((location) => location.id === storedId)) {
-    return storedId;
+  if (!options?.ignoreStored) {
+    const storedId = readStoredActiveLocationId(tenantId);
+    if (storedId && locations.some((location) => location.id === storedId)) {
+      return storedId;
+    }
   }
 
   const nextId = locations[0]?.id || "";

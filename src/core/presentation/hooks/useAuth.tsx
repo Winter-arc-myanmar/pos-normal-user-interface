@@ -10,6 +10,7 @@ import { LoginInputDTO } from "../../application/dtos/AuthDTO";
 import { IAuthService } from "../../domain/services/IAuthService";
 import container from "../../infrastructure/di/container";
 import { tokenCookies } from "@/lib/cookies";
+import { preparePosWorkspaceForLogin, clearPosWorkspaceStorage } from "@/lib/pos/posWorkspace";
 
 interface AuthContextType {
   user: User | null;
@@ -65,6 +66,7 @@ export function AuthProvider({ children, service }: AuthProviderProps) {
 
     try {
       const loggedInUser = await authService.login(input);
+      preparePosWorkspaceForLogin(loggedInUser.tenantId);
       setUser(loggedInUser);
       setError(null); // Clear error on success
     } catch (err) {
@@ -103,6 +105,7 @@ export function AuthProvider({ children, service }: AuthProviderProps) {
     setIsLoading(true);
     try {
       await authService.logout();
+      clearPosWorkspaceStorage(user?.tenantId);
       setUser(null);
     } catch (err) {
       console.error("Logout error:", err);

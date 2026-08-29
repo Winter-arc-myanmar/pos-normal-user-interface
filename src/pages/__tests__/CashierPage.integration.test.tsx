@@ -6,6 +6,11 @@ import { CashierPage } from "../CashierPage";
 const mocks = vi.hoisted(() => ({
   addProductToTableSession: vi.fn(),
   checkoutTableSession: vi.fn(),
+  closePosSession: vi.fn(),
+  createPosRegister: vi.fn(),
+  createPosSession: vi.fn(),
+  fetchPosRegisters: vi.fn(),
+  fetchPosSessions: vi.fn(),
   fetchProductVariants: vi.fn(),
   fireToKds: vi.fn(),
   getCounterOrderById: vi.fn(),
@@ -20,6 +25,9 @@ const product = {
   name: "Coffee",
   basePrice: "10.0000",
   baseSku: "COFFEE",
+  isTaxable: true,
+  taxRate: 5,
+  isPriceInclusive: false,
 };
 
 const variant = {
@@ -71,9 +79,28 @@ vi.mock("react-i18next", () => ({
 vi.mock("@/core/presentation/hooks/useAuth", () => ({
   useAuth: () => ({
     user: {
+      id: "cashier-1",
       tenantId: "tenant-1",
       activeBranchId: "branch-1",
     },
+  }),
+}));
+
+vi.mock("@/core/presentation/hooks/usePosWorkspace", () => ({
+  usePosWorkspace: () => ({
+    activeLocationId: "location-1",
+    activePosRegisterId: "register-1",
+    activePosSessionId: "pos-session-1",
+    isWorkspaceReady: true,
+    isPosSessionLoading: false,
+    isSetupModalOpen: false,
+    requireCashierContext: vi.fn().mockResolvedValue({
+      tenantId: "tenant-1",
+      locationId: "location-1",
+      posRegisterId: "register-1",
+      posSessionId: "pos-session-1",
+    }),
+    refreshPosContext: vi.fn(),
   }),
 }));
 
@@ -103,6 +130,7 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
     activeServiceType: "TABLE",
     setActiveServiceType: vi.fn(),
     activeLocationId: "location-1",
+    setActiveLocationId: vi.fn(),
     inventoryLocations: [{ id: "location-1", tenantId: "tenant-1", name: "Main", type: "store" }],
     fetchInventoryLocations: vi.fn().mockResolvedValue("location-1"),
     isLocationsLoading: false,
@@ -112,6 +140,11 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
     fetchProductVariants: mocks.fetchProductVariants,
     fetchSalesOrders: vi.fn().mockResolvedValue(undefined),
     fetchPaymentMethods: vi.fn().mockResolvedValue(undefined),
+    fetchPosRegisters: mocks.fetchPosRegisters,
+    createPosRegister: mocks.createPosRegister,
+    fetchPosSessions: mocks.fetchPosSessions,
+    createPosSession: mocks.createPosSession,
+    closePosSession: mocks.closePosSession,
     fetchDiningZones: vi.fn().mockResolvedValue(undefined),
     fetchDiningTables: vi.fn().mockResolvedValue(undefined),
     fetchTableSessions: vi.fn().mockResolvedValue(undefined),
@@ -139,6 +172,48 @@ describe("CashierPage integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.fetchProductVariants.mockResolvedValue([variant]);
+    mocks.fetchPosRegisters.mockResolvedValue([
+      {
+        id: "register-1",
+        tenantId: "tenant-1",
+        locationId: "location-1",
+        code: "R-01",
+        name: "Register 1",
+      },
+    ]);
+    mocks.fetchPosSessions.mockResolvedValue([
+      {
+        id: "pos-session-1",
+        tenantId: "tenant-1",
+        registerId: "register-1",
+        cashierId: "cashier-1",
+        status: "OPEN",
+        closedAt: null,
+      },
+    ]);
+    mocks.createPosRegister.mockResolvedValue({
+      id: "register-1",
+      tenantId: "tenant-1",
+      locationId: "location-1",
+      code: "R-01",
+      name: "Register 1",
+    });
+    mocks.createPosSession.mockResolvedValue({
+      id: "pos-session-1",
+      tenantId: "tenant-1",
+      registerId: "register-1",
+      cashierId: "cashier-1",
+      status: "OPEN",
+      closedAt: null,
+    });
+    mocks.closePosSession.mockResolvedValue({
+      id: "pos-session-1",
+      tenantId: "tenant-1",
+      registerId: "register-1",
+      cashierId: "cashier-1",
+      status: "CLOSED",
+      closedAt: "2026-08-29T00:00:00Z",
+    });
     mocks.addProductToTableSession.mockResolvedValue({
       id: "line-2",
       salesOrderId: "order-1",
@@ -195,9 +270,11 @@ describe("CashierPage integration", () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByLabelText("cashier.orderPanel.paymentAmount")).toHaveValue(
-      "10.0000"
-    );
+    expect(
+      (screen.getByLabelText("cashier.orderPanel.paymentAmount") as HTMLInputElement)
+        .value
+    ).toBe("10.5000");
+    expect(screen.queryByText("10.50")).not.toBeNull();
 
     fireEvent.click(
       screen.getByRole("button", { name: "cashier.orderPanel.sendKds" })
@@ -214,7 +291,7 @@ describe("CashierPage integration", () => {
       expect(mocks.getCounterOrderById).toHaveBeenCalledWith("order-1");
       expect(mocks.pickupCounterOrder).toHaveBeenCalledWith("order-1");
       expect(mocks.checkoutTableSession).toHaveBeenCalledWith("session-1", {
-        payments: [{ paymentMethodId: "cash", amount: "10.0000" }],
+        payments: [{ paymentMethodId: "cash", amount: "10.5000" }],
       });
     });
   });

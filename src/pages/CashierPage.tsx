@@ -13,17 +13,22 @@ import {
   TableSessionState,
   toApiServiceType,
 } from "@/core/application/dtos/CashierDTO";
-import { useAuth } from "@/core/presentation/hooks/useAuth";
 import { useCashier } from "@/core/presentation/hooks/useCashier";
+import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
 import { CashierBoard } from "./cashier/CashierBoard";
 import { OrderPanel } from "./cashier/OrderPanel";
 import { ProductMenu } from "./cashier/ProductMenu";
+import {
+  Product,
+  ProductVariant,
+  SalesOrderLine,
+} from "@/core/domain/entities/Cashier";
+import { calcLineTotals } from "@/lib/pos/checkoutCalculations";
 
 const BOARD_PAGE_SIZE = 15;
 
 export function CashierPage() {
   const { t } = useTranslation();
-  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const {
     products,
@@ -37,9 +42,6 @@ export function CashierPage() {
     tableSessions,
     activeServiceType,
     setActiveServiceType,
-    activeLocationId,
-    fetchInventoryLocations,
-    isLocationsLoading,
     isLoading,
     error,
     fetchProducts,
@@ -67,6 +69,12 @@ export function CashierPage() {
     processCheckout,
     clearError,
   } = useCashier();
+  const {
+    activeLocationId,
+    isWorkspaceReady,
+    isPosSessionLoading,
+    requireCashierContext,
+  } = usePosWorkspace();
 
   const [statusFilter, setStatusFilter] = useState<"ALL" | OrderStatus>("ALL");
   const [zoneFilter, setZoneFilter] = useState("ALL");
@@ -79,15 +87,9 @@ export function CashierPage() {
   const [isDirectCheckoutMode, setIsDirectCheckoutMode] = useState(false);
   const paymentInputRef = useRef<HTMLInputElement>(null);
 
-  const tenantId = String(user?.tenantId || "");
   const locationId = activeLocationId;
   const activeView = searchParams.get("view") || "orders";
   const isTableService = activeServiceType === "TABLE";
-
-  useEffect(() => {
-    if (!tenantId) return;
-    void fetchInventoryLocations(tenantId);
-  }, [fetchInventoryLocations, tenantId]);
 
   const loadData = useCallback(async () => {
     clearError();
@@ -150,22 +152,108 @@ export function CashierPage() {
     [diningTables, selectedOrderSession]
   );
 
-  const activeOrderLines = useMemo(
-    () => (isDirectCheckoutMode ? directCartLines : selectedOrderLines),
-    [directCartLines, isDirectCheckoutMode, selectedOrderLines]
+  const productById = useMemo(
+    () =>
+      products.reduce<Record<string, (typeof products)[number]>>((acc, product) => {
+        acc[product.id] = product;
+        return acc;
+      }, {}),
+    [products]
   );
 
+  const variantById = useMemo(() => {
+    const allVariants = Object.values(variantsByProductId).flat();
+    return allVariants.reduce<Record<string, (typeof allVariants)[number]>>(
+      (acc, variant) => {
+        acc[variant.id] = variant;
+        return acc;
+      },
+      {}
+    );
+  }, [variantsByProductId]);
+
+  const formatAmount = useCallback((value: number) => value.toFixed(4), []);
+
+  const buildDirectLine = useCallback(
+    (
+      line: SalesOrderLine,
+      product?: Product,
+      variant?: ProductVariant
+    ) => {
+      const variantModifier = Number(variant?.priceModifier || 0);
+      const basePrice = Number(product?.basePrice || line.unitPrice || 0);
+      const unitPrice = basePrice + variantModifier;
+      const lineTotals = calcLineTotals({
+        quantity: line.quantity,
+        unitPrice,
+        lineDiscount: line.lineDiscount || "0.0000",
+        isTaxable: variant?.isTaxable ?? product?.isTaxable,
+        taxRate: variant?.taxRate ?? product?.taxRate,
+        isPriceInclusive: variant?.isPriceInclusive ?? product?.isPriceInclusive,
+      });
+      return {
+        ...line,
+        unitPrice: formatAmount(unitPrice),
+        taxAmount: formatAmount(lineTotals.taxAmount),
+      };
+    },
+    [formatAmount]
+  );
+
+  const normalizedDirectCartLines = useMemo(
+    () =>
+      directCartLines.map((line) => {
+        const variant = variantById[line.variantId];
+        const product = variant ? productById[variant.productId] : undefined;
+        return buildDirectLine(line, product, variant);
+      }),
+    [buildDirectLine, directCartLines, productById, variantById]
+  );
+
+  const activeOrderLines = useMemo(
+    () => (isDirectCheckoutMode ? normalizedDirectCartLines : selectedOrderLines),
+    [isDirectCheckoutMode, normalizedDirectCartLines, selectedOrderLines]
+  );
+
+  const displayOrderLines = useMemo(() => {
+    if (isDirectCheckoutMode) return activeOrderLines;
+
+    return selectedOrderLines.map((line) => {
+      const variant = variantById[line.variantId];
+      const product = variant ? productById[variant.productId] : undefined;
+      return product || variant ? buildDirectLine(line, product, variant) : line;
+    });
+  }, [
+    activeOrderLines,
+    buildDirectLine,
+    isDirectCheckoutMode,
+    productById,
+    selectedOrderLines,
+    variantById,
+  ]);
+
   const orderTotal = useMemo(() => {
-    const lineTotal = activeOrderLines.reduce((sum, line) => {
+    const backendTotal = Number(selectedOrder?.grandTotal || 0);
+    const totalLines = isDirectCheckoutMode ? activeOrderLines : displayOrderLines;
+    const lineTotal = totalLines.reduce((sum, line) => {
       const quantity = Number(line.quantity || 0);
       const unitPrice = Number(line.unitPrice || 0);
       const discount = Number(line.lineDiscount || 0);
       const tax = Number(line.taxAmount || 0);
       return sum + quantity * unitPrice - discount + tax;
     }, 0);
-    const backendTotal = Number(selectedOrder?.grandTotal || 0);
+
+    if (!isDirectCheckoutMode && backendTotal > 0) {
+      return Math.max(backendTotal, lineTotal).toFixed(4);
+    }
+
     return (lineTotal > 0 ? lineTotal : backendTotal).toFixed(4);
-  }, [activeOrderLines, selectedOrder?.grandTotal]);
+  }, [
+    activeOrderLines,
+    displayOrderLines,
+    isDirectCheckoutMode,
+    selectedOrder?.grandTotal,
+  ]);
 
   useEffect(() => {
     setPaymentAmount(orderTotal);
@@ -251,20 +339,6 @@ export function CashierPage() {
     }
   }, [isDirectCheckoutMode, isTableService]);
 
-  const requireCashierContext = useCallback(async () => {
-    if (!tenantId) {
-      throw new Error(t("cashier.errors.missingTenant"));
-    }
-
-    const resolvedLocationId =
-      locationId || (await fetchInventoryLocations(tenantId));
-    if (!resolvedLocationId) {
-      throw new Error(t("cashier.errors.missingLocation"));
-    }
-
-    return { tenantId, locationId: resolvedLocationId };
-  }, [fetchInventoryLocations, locationId, t, tenantId]);
-
   const handleCreateOrder = async () => {
     setLocalError(null);
     try {
@@ -318,6 +392,8 @@ export function CashierPage() {
         tableId: table.id,
         locationId: context.locationId,
         guestCount: Math.max(1, table.maxSeats || 1),
+        posRegisterId: context.posRegisterId,
+        openedByPosSessionId: context.posSessionId,
         salesChannel: "POS",
       });
       if (newSession.salesOrderId) {
@@ -360,19 +436,23 @@ export function CashierPage() {
     } else if (!isTableService) {
       setIsDirectCheckoutMode(true);
       setDirectCartLines((current) => {
+        const variants = variantsByProductId[product.id] || [];
+        const variant = variants.find((item) => item.id === variantId);
         const existing = current.find((line) => line.variantId === variantId);
         if (existing) {
-          return current.map((line) =>
-            line.variantId === variantId
-              ? {
-                  ...line,
-                  quantity: (Number(line.quantity || 0) + Math.max(1, quantity)).toFixed(4),
-                }
-              : line
+          const updated = buildDirectLine(
+            {
+              ...existing,
+              quantity: (
+                Number(existing.quantity || 0) + Math.max(1, quantity)
+              ).toFixed(4),
+            },
+            product,
+            variant
           );
+          return current.map((line) => (line.variantId === variantId ? updated : line));
         }
-        return [
-          ...current,
+        const nextLine = buildDirectLine(
           {
             id: `direct-${variantId}`,
             salesOrderId: "direct-checkout",
@@ -383,6 +463,12 @@ export function CashierPage() {
             taxAmount: "0.0000",
             status: "PENDING",
           },
+          product,
+          variant
+        );
+        return [
+          ...current,
+          nextLine,
         ];
       });
     } else {
@@ -417,6 +503,7 @@ export function CashierPage() {
         await processCheckout({
           tenantId: context.tenantId,
           locationId: selectedOrder?.locationId || context.locationId,
+          posSessionId: context.posSessionId,
           salesChannel: "POS",
           serviceType: toApiServiceType(selectedServiceType),
           idempotencyKey: `checkout-${selectedOrder?.id || "direct"}-${Date.now()}`,
@@ -450,11 +537,18 @@ export function CashierPage() {
       if (quantity <= 0) {
         setDirectCartLines((current) => current.filter((line) => line.id !== lineId));
       } else {
-        setDirectCartLines((current) =>
-          current.map((line) =>
-            line.id === lineId ? { ...line, quantity: quantity.toFixed(4) } : line
-          )
-        );
+        setDirectCartLines((current) => {
+          const line = current.find((entry) => entry.id === lineId);
+          if (!line) return current;
+          const variant = variantById[line.variantId];
+          const product = variant ? productById[variant.productId] : undefined;
+          const updated = buildDirectLine(
+            { ...line, quantity: quantity.toFixed(4) },
+            product,
+            variant
+          );
+          return current.map((entry) => (entry.id === lineId ? updated : entry));
+        });
       }
       return;
     }
@@ -519,19 +613,62 @@ export function CashierPage() {
   };
 
   const handleFireKds = async () => {
-    if (!selectedOrder) return;
     setLocalError(null);
     setNotice(null);
+
     try {
+      let salesOrderId = selectedOrder?.id;
+      const sessionId = selectedOrderSession?.id;
+
+      if (!salesOrderId && !sessionId && isDirectCheckoutMode) {
+        if (!activeOrderLines.length) {
+          throw new Error(t("cashier.errors.emptyOrder"));
+        }
+
+        const context = await requireCashierContext();
+        const order = await createOrder({
+          tenantId: context.tenantId,
+          locationId: context.locationId,
+          salesChannel: "POS",
+          status: "DRAFT",
+          subtotal: "0.0000",
+          totalDiscount: "0.0000",
+          totalTax: "0.0000",
+          grandTotal: "0.0000",
+          idempotencyKey: `cashier-kds-${Date.now()}`,
+        });
+
+        for (const line of activeOrderLines) {
+          const variant = variantById[line.variantId];
+          const product = variant ? productById[variant.productId] : undefined;
+          if (!product) continue;
+
+          await addProductToOrder(
+            order.id,
+            product,
+            line.variantId,
+            Number(line.quantity || 1)
+          );
+        }
+
+        salesOrderId = order.id;
+        setIsDirectCheckoutMode(false);
+        setDirectCartLines([]);
+      }
+
+      if (!salesOrderId && !sessionId) {
+        throw new Error(t("cashier.errors.kdsTargetMissing"));
+      }
+
       await fireToKds(
-        selectedOrderSession
-          ? { sessionId: selectedOrderSession.id }
-          : { salesOrderId: selectedOrder.id }
+        sessionId ? { sessionId } : { salesOrderId: salesOrderId! }
       );
-      setNotice("Order sent to KDS");
+      setNotice(t("cashier.orderPanel.kdsSent"));
     } catch (caught) {
       setLocalError(
-        caught instanceof Error ? caught.message : "Failed to send order to KDS"
+        caught instanceof Error
+          ? caught.message
+          : t("cashier.errors.kdsFailed")
       );
     }
   };
@@ -600,7 +737,7 @@ export function CashierPage() {
     <section className="grid h-full min-h-0 min-w-0 grid-cols-[13rem_minmax(0,1fr)_5.5rem] overflow-hidden bg-[#070707] text-white min-[1100px]:grid-cols-[18rem_minmax(0,1fr)_8rem]">
       <OrderPanel
         selectedOrder={selectedOrder}
-        selectedOrderLines={activeOrderLines}
+        selectedOrderLines={displayOrderLines}
         products={products}
         variantsByProductId={variantsByProductId}
         paymentMethods={paymentMethods}
@@ -610,8 +747,8 @@ export function CashierPage() {
         selectedTable={selectedOrderTable}
         selectedSession={selectedOrderSession}
         paymentInputRef={paymentInputRef}
-        isLoading={isLoading || isLocationsLoading}
-        canCreateOrder={Boolean(tenantId && locationId)}
+        isLoading={isLoading || isPosSessionLoading}
+        canCreateOrder={isWorkspaceReady && !isPosSessionLoading}
         feedback={notice}
         errorMessage={localError}
         onCreateOrder={() => void handleCreateOrder()}

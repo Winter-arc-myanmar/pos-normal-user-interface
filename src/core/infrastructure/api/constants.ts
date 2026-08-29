@@ -83,6 +83,24 @@ export const API_ENDPOINTS = {
     LIST: "/api/v1/payment-methods",
   },
 
+  POS_REGISTERS: {
+    LIST: "/api/v1/pos-registers",
+    CREATE: "/api/v1/pos-registers",
+    BY_ID: (id: string) => `/api/v1/pos-registers/${id}`,
+    UPDATE: (id: string) => `/api/v1/pos-registers/${id}`,
+    DELETE: (id: string) => `/api/v1/pos-registers/${id}`,
+  },
+
+  POS_SESSIONS: {
+    LIST: "/api/v1/pos-sessions",
+    CREATE: "/api/v1/pos-sessions",
+    BY_ID: (id: string) => `/api/v1/pos-sessions/${id}`,
+    UPDATE: (id: string) => `/api/v1/pos-sessions/${id}`,
+    DELETE: (id: string) => `/api/v1/pos-sessions/${id}`,
+    CLOSE: (id: string) => `/api/v1/pos-sessions/${id}/close`,
+    SUMMARY: (id: string) => `/api/v1/pos-sessions/${id}/summary`,
+  },
+
   DINING_ZONES: {
     LIST: "/api/v1/dining-zones",
   },

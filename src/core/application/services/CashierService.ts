@@ -9,11 +9,15 @@ import {
   DiningTableFilterDTO,
   FireKdsDTO,
   OpenTableSessionDTO,
+  PosRegisterFilterDTO,
+  PosSessionFilterDTO,
   ProductFilterDTO,
   SalesOrderFilterDTO,
   SeatWaitlistEntryDTO,
   TableSessionCheckoutDTO,
   TableSessionFilterDTO,
+  CreatePosRegisterDTO,
+  CreatePosSessionDTO,
   TipPoolAllocationDTO,
   TipPoolFilterDTO,
   toApiServiceType,
@@ -31,6 +35,8 @@ import {
   InventoryLocation,
   OrderPayment,
   PaymentMethod,
+  PosRegister,
+  PosSession,
   Product,
   ProductVariant,
   SalesOrder,
@@ -159,6 +165,37 @@ export class CashierService implements ICashierService {
 
   async getPaymentMethods(): Promise<PaymentMethod[]> {
     return this.cashierRepository.getPaymentMethods();
+  }
+
+  async getPosRegisters(params?: PosRegisterFilterDTO): Promise<PosRegister[]> {
+    return this.cashierRepository.getPosRegisters(params);
+  }
+
+  async createPosRegister(payload: CreatePosRegisterDTO): Promise<PosRegister> {
+    if (!payload.tenantId?.trim()) throw new Error("Tenant ID is required");
+    if (!payload.locationId?.trim()) throw new Error("Location ID is required");
+    if (!payload.code?.trim()) throw new Error("Register code is required");
+    if (!payload.name?.trim()) throw new Error("Register name is required");
+    return this.cashierRepository.createPosRegister(payload);
+  }
+
+  async getPosSessions(params?: PosSessionFilterDTO): Promise<PosSession[]> {
+    return this.cashierRepository.getPosSessions(params);
+  }
+
+  async createPosSession(payload: CreatePosSessionDTO): Promise<PosSession> {
+    if (!payload.tenantId?.trim()) throw new Error("Tenant ID is required");
+    if (!payload.registerId?.trim()) throw new Error("Register ID is required");
+    if (!payload.cashierId?.trim()) throw new Error("Cashier ID is required");
+    if (!payload.openingCashFloat?.trim()) {
+      throw new Error("Opening cash float is required");
+    }
+    return this.cashierRepository.createPosSession(payload);
+  }
+
+  async closePosSession(sessionId: string): Promise<PosSession> {
+    if (!sessionId?.trim()) throw new Error("POS session ID is required");
+    return this.cashierRepository.closePosSession(sessionId);
   }
 
   async getDiningZones(): Promise<DiningZone[]> {

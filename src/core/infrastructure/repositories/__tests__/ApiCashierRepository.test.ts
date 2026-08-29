@@ -17,6 +17,13 @@ describe("ApiCashierRepository", () => {
               name: "Coffee",
               basePrice: "10.0000",
               baseSku: "COFFEE",
+              isTaxable: true,
+              taxRate: {
+                id: "tax-1",
+                name: "Commercial Tax",
+                ratePercentage: "5.0000",
+                isPriceInclusive: false,
+              },
             },
           ],
         },
@@ -33,6 +40,9 @@ describe("ApiCashierRepository", () => {
       id: "product-1",
       name: "Coffee",
       basePrice: "10.0000",
+      isTaxable: true,
+      taxRate: 5,
+      isPriceInclusive: false,
     });
   });
 

@@ -7,11 +7,15 @@ import {
   DiningTableFilterDTO,
   FireKdsDTO,
   OpenTableSessionDTO,
+  PosRegisterFilterDTO,
+  PosSessionFilterDTO,
   ProductFilterDTO,
   SalesOrderFilterDTO,
   SeatWaitlistEntryDTO,
   TableSessionCheckoutDTO,
   TableSessionFilterDTO,
+  CreatePosRegisterDTO,
+  CreatePosSessionDTO,
   TipPoolAllocationDTO,
   TipPoolFilterDTO,
   fromApiServiceType,
@@ -30,6 +34,8 @@ import {
   InventoryLocation,
   OrderPayment,
   PaymentMethod,
+  PosRegister,
+  PosSession,
   Product,
   ProductVariant,
   SalesOrder,
@@ -52,6 +58,28 @@ const unwrap = <T>(response: ApiEnvelope<T> | T): T => {
   }
   return response as T;
 };
+
+const toNumber = (value: unknown): number | undefined => {
+  if (value === null || value === undefined || value === "") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const toBoolean = (value: unknown): boolean | undefined => {
+  if (value === null || value === undefined || value === "") return undefined;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const lower = value.toLowerCase();
+    if (lower === "true") return true;
+    if (lower === "false") return false;
+  }
+  return undefined;
+};
+
+const asRecord = (value: unknown): Record<string, unknown> | undefined =>
+  value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : undefined;
 
 const asList = <T>(response: unknown): T[] => {
   const value = unwrap(response);
@@ -157,6 +185,40 @@ const toInventoryLocation = (item: Record<string, unknown>) =>
       : null,
   });
 
+const toPosRegister = (item: Record<string, unknown>) =>
+  new PosRegister({
+    id: String(item.id || ""),
+    tenantId: String(item.tenantId || ""),
+    locationId: String(item.locationId || ""),
+    code: String(item.code || ""),
+    name: String(item.name || ""),
+    macAddress: item.macAddress ? String(item.macAddress) : undefined,
+    createdAt: item.createdAt ? String(item.createdAt) : undefined,
+    updatedAt: item.updatedAt ? String(item.updatedAt) : undefined,
+  });
+
+const toPosSession = (item: Record<string, unknown>) =>
+  new PosSession({
+    id: String(item.id || ""),
+    tenantId: String(item.tenantId || ""),
+    registerId: String(item.registerId || ""),
+    cashierId: String(item.cashierId || ""),
+    openedAt: item.openedAt ? String(item.openedAt) : undefined,
+    closedAt: item.closedAt ? String(item.closedAt) : null,
+    openingCashFloat: item.openingCashFloat
+      ? String(item.openingCashFloat)
+      : undefined,
+    expectedClosingCash: item.expectedClosingCash
+      ? String(item.expectedClosingCash)
+      : undefined,
+    actualClosingCash: item.actualClosingCash
+      ? String(item.actualClosingCash)
+      : undefined,
+    cashVariance: item.cashVariance ? String(item.cashVariance) : undefined,
+    status: String(item.status || "OPEN") as PosSession["status"],
+    updatedAt: item.updatedAt ? String(item.updatedAt) : undefined,
+  });
+
 const flattenInventoryLocations = (
   nodes: unknown[]
 ): InventoryLocation[] => {
@@ -210,8 +272,9 @@ export class ApiCashierRepository implements ICashierRepository {
       { params }
     );
     const data = asList<Record<string, unknown>>(response);
-    return data.map((item) =>
-      new Product({
+    return data.map((item) => {
+      const taxRate = asRecord(item.taxRate);
+      return new Product({
         id: String(item.id || ""),
         tenantId: String(item.tenantId || ""),
         categoryId: item.categoryId ? String(item.categoryId) : undefined,
@@ -220,8 +283,20 @@ export class ApiCashierRepository implements ICashierRepository {
         baseSku: item.baseSku ? String(item.baseSku) : undefined,
         imageUrl: item.imageUrl ? String(item.imageUrl) : undefined,
         totalOnHand: item.totalOnHand ? String(item.totalOnHand) : undefined,
-      })
-    );
+        isTaxable: toBoolean(item.isTaxable),
+        taxRate:
+          toNumber(item.taxRateRatePercentage) ??
+          toNumber(item.taxRatePercentage) ??
+          toNumber(item.ratePercentage) ??
+          toNumber(taxRate?.ratePercentage) ??
+          toNumber(item.taxRate),
+        isPriceInclusive:
+          toBoolean(item.taxRateIsPriceInclusive) ??
+          toBoolean(item.isPriceInclusive) ??
+          toBoolean(item.priceInclusive) ??
+          toBoolean(taxRate?.isPriceInclusive),
+      });
+    });
   }
 
   async getVariants(productId: string): Promise<ProductVariant[]> {
@@ -229,8 +304,9 @@ export class ApiCashierRepository implements ICashierRepository {
       API_ENDPOINTS.PRODUCTS.VARIANTS(productId).LIST
     );
     const data = asList<Record<string, unknown>>(response);
-    return data.map((item) =>
-      new ProductVariant({
+    return data.map((item) => {
+      const taxRate = asRecord(item.taxRate);
+      return new ProductVariant({
         id: String(item.id || ""),
         productId: String(item.productId || productId),
         variantSku: item.variantSku ? String(item.variantSku) : undefined,
@@ -241,8 +317,20 @@ export class ApiCashierRepository implements ICashierRepository {
           item.matrixOptions && typeof item.matrixOptions === "object"
             ? (item.matrixOptions as Record<string, unknown>)
             : undefined,
-      })
-    );
+        isTaxable: toBoolean(item.isTaxable),
+        taxRate:
+          toNumber(item.taxRateRatePercentage) ??
+          toNumber(item.taxRatePercentage) ??
+          toNumber(item.ratePercentage) ??
+          toNumber(taxRate?.ratePercentage) ??
+          toNumber(item.taxRate),
+        isPriceInclusive:
+          toBoolean(item.taxRateIsPriceInclusive) ??
+          toBoolean(item.isPriceInclusive) ??
+          toBoolean(item.priceInclusive) ??
+          toBoolean(taxRate?.isPriceInclusive),
+      });
+    });
   }
 
   async getSalesOrders(params?: SalesOrderFilterDTO): Promise<SalesOrder[]> {
@@ -464,6 +552,47 @@ export class ApiCashierRepository implements ICashierRepository {
         name: String(item.name || ""),
       })
     );
+  }
+
+  async getPosRegisters(params?: PosRegisterFilterDTO): Promise<PosRegister[]> {
+    const response = await this.httpClient.get<ApiEnvelope<Record<string, unknown>[]>>(
+      API_ENDPOINTS.POS_REGISTERS.LIST,
+      { params: { page: 1, limit: 100, ...params } }
+    );
+    const data = asList<Record<string, unknown>>(response);
+    return data.map((item) => toPosRegister(item));
+  }
+
+  async createPosRegister(payload: CreatePosRegisterDTO): Promise<PosRegister> {
+    const response = await this.httpClient.post<ApiEnvelope<Record<string, unknown>>>(
+      API_ENDPOINTS.POS_REGISTERS.CREATE,
+      payload
+    );
+    return toPosRegister(unwrap(response));
+  }
+
+  async getPosSessions(params?: PosSessionFilterDTO): Promise<PosSession[]> {
+    const response = await this.httpClient.get<ApiEnvelope<Record<string, unknown>[]>>(
+      API_ENDPOINTS.POS_SESSIONS.LIST,
+      { params: { page: 1, limit: 200, ...params } }
+    );
+    const data = asList<Record<string, unknown>>(response);
+    return data.map((item) => toPosSession(item));
+  }
+
+  async createPosSession(payload: CreatePosSessionDTO): Promise<PosSession> {
+    const response = await this.httpClient.post<ApiEnvelope<Record<string, unknown>>>(
+      API_ENDPOINTS.POS_SESSIONS.CREATE,
+      payload
+    );
+    return toPosSession(unwrap(response));
+  }
+
+  async closePosSession(sessionId: string): Promise<PosSession> {
+    const response = await this.httpClient.post<ApiEnvelope<Record<string, unknown>>>(
+      API_ENDPOINTS.POS_SESSIONS.CLOSE(sessionId)
+    );
+    return toPosSession(unwrap(response));
   }
 
   async getDiningZones(): Promise<DiningZone[]> {

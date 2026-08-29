@@ -7,11 +7,15 @@ import {
   DiningTableFilterDTO,
   FireKdsDTO,
   OpenTableSessionDTO,
+  PosRegisterFilterDTO,
+  PosSessionFilterDTO,
   ProductFilterDTO,
   SalesOrderFilterDTO,
   SeatWaitlistEntryDTO,
   TableSessionCheckoutDTO,
   TableSessionFilterDTO,
+  CreatePosRegisterDTO,
+  CreatePosSessionDTO,
   TipPoolAllocationDTO,
   TipPoolFilterDTO,
   UpdateTableSessionStateDTO,
@@ -28,6 +32,8 @@ import {
   InventoryLocation,
   OrderPayment,
   PaymentMethod,
+  PosRegister,
+  PosSession,
   Product,
   ProductVariant,
   SalesOrder,
@@ -62,6 +68,11 @@ export interface ICashierRepository {
   ): Promise<OrderPayment>;
   getOrderPayments(salesOrderId: string): Promise<OrderPayment[]>;
   getPaymentMethods(): Promise<PaymentMethod[]>;
+  getPosRegisters(params?: PosRegisterFilterDTO): Promise<PosRegister[]>;
+  createPosRegister(payload: CreatePosRegisterDTO): Promise<PosRegister>;
+  getPosSessions(params?: PosSessionFilterDTO): Promise<PosSession[]>;
+  createPosSession(payload: CreatePosSessionDTO): Promise<PosSession>;
+  closePosSession(sessionId: string): Promise<PosSession>;
   getDiningZones(): Promise<DiningZone[]>;
   getDiningTables(params?: DiningTableFilterDTO): Promise<DiningTable[]>;
   updateDiningTableStatus(

@@ -21,6 +21,9 @@ export class Product {
   baseSku?: string;
   imageUrl?: string;
   totalOnHand?: string;
+  isTaxable?: boolean;
+  taxRate?: number;
+  isPriceInclusive?: boolean;
 
   constructor(data: Partial<Product>) {
     Object.assign(this, data);
@@ -35,6 +38,9 @@ export class ProductVariant {
   priceModifier?: string;
   imageUrl?: string;
   matrixOptions?: Record<string, unknown>;
+  isTaxable?: boolean;
+  taxRate?: number;
+  isPriceInclusive?: boolean;
 
   constructor(data: Partial<ProductVariant>) {
     Object.assign(this, data);
@@ -99,6 +105,40 @@ export class PaymentMethod {
   name!: string;
 
   constructor(data: Partial<PaymentMethod>) {
+    Object.assign(this, data);
+  }
+}
+
+export class PosRegister {
+  id!: string;
+  tenantId!: string;
+  locationId!: string;
+  code!: string;
+  name!: string;
+  macAddress?: string;
+  createdAt?: string;
+  updatedAt?: string;
+
+  constructor(data: Partial<PosRegister>) {
+    Object.assign(this, data);
+  }
+}
+
+export class PosSession {
+  id!: string;
+  tenantId!: string;
+  registerId!: string;
+  cashierId!: string;
+  openedAt?: string;
+  closedAt?: string | null;
+  openingCashFloat?: string;
+  expectedClosingCash?: string;
+  actualClosingCash?: string;
+  cashVariance?: string;
+  status!: "OPEN" | "CLOSED";
+  updatedAt?: string;
+
+  constructor(data: Partial<PosSession>) {
     Object.assign(this, data);
   }
 }

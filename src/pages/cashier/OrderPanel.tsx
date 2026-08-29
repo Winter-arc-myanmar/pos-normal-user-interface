@@ -112,7 +112,8 @@ export function OrderPanel({
               {selectedOrderLines.map((line) => {
                 const lineTotal =
                   Number(line.quantity || 0) * Number(line.unitPrice || 0) -
-                  Number(line.lineDiscount || 0);
+                  Number(line.lineDiscount || 0) +
+                  Number(line.taxAmount || 0);
                 return (
                   <div
                     key={line.id}
