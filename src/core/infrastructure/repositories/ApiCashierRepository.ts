@@ -65,6 +65,160 @@ const toNumber = (value: unknown): number | undefined => {
   return Number.isFinite(parsed) ? parsed : undefined;
 };
 
+const toDecimalString = (value: unknown, fallback = "0.0000"): string => {
+  const parsed = toNumber(value);
+  if (parsed === undefined) return fallback;
+  return parsed.toFixed(4);
+};
+
+const normalizePartialLinePayload = (
+  payload: UpdateSalesOrderLineDTO
+): Record<string, unknown> => {
+  const normalized: Record<string, unknown> = {};
+
+  if (payload.variantId !== undefined) normalized.variantId = payload.variantId;
+  if (payload.quantity !== undefined) {
+    normalized.quantity = Math.max(0.0001, toNumber(payload.quantity) ?? 1);
+  }
+  if (payload.unitPrice !== undefined) {
+    normalized.unitPrice = toNumber(payload.unitPrice) ?? 0;
+  }
+  if (payload.lineDiscount !== undefined) {
+    normalized.lineDiscount = toNumber(payload.lineDiscount) ?? 0;
+  }
+  if (payload.taxRateId !== undefined) normalized.taxRateId = payload.taxRateId;
+  if (payload.taxAmount !== undefined) {
+    normalized.taxAmount = toNumber(payload.taxAmount) ?? 0;
+  }
+  if (payload.appliedPromotionId !== undefined) {
+    normalized.appliedPromotionId = payload.appliedPromotionId;
+  }
+  if (payload.courseType !== undefined) normalized.courseType = payload.courseType;
+  if (payload.seatNumber !== undefined) normalized.seatNumber = payload.seatNumber;
+  if (payload.selectedModifiers !== undefined) {
+    normalized.selectedModifiers = payload.selectedModifiers.map((modifier) => ({
+      ...modifier,
+      priceDelta: toNumber(modifier.priceDelta) ?? 0,
+    }));
+  }
+
+  return normalized;
+};
+
+const normalizeUpsertLinePayload = (
+  payload: UpsertSalesOrderLineDTO
+): Record<string, unknown> => {
+  const quantity = Math.max(0.0001, toNumber(payload.quantity) ?? 1);
+  const unitPrice = toNumber(payload.unitPrice) ?? 0;
+  const lineDiscount = toNumber(payload.lineDiscount) ?? 0;
+  const taxAmount =
+    payload.taxAmount !== undefined ? toNumber(payload.taxAmount) : undefined;
+
+  return {
+    variantId: payload.variantId,
+    quantity,
+    unitPrice,
+    lineDiscount,
+    ...(payload.taxRateId ? { taxRateId: payload.taxRateId } : {}),
+    ...(taxAmount !== undefined ? { taxAmount } : {}),
+    ...(payload.appliedPromotionId
+      ? { appliedPromotionId: payload.appliedPromotionId }
+      : {}),
+    ...(payload.courseType ? { courseType: payload.courseType } : {}),
+    ...(payload.selectedModifiers
+      ? {
+          selectedModifiers: payload.selectedModifiers.map((modifier) => ({
+            ...modifier,
+            priceDelta: toNumber(modifier.priceDelta) ?? 0,
+          })),
+        }
+      : {}),
+    ...(payload.seatNumber !== undefined ? { seatNumber: payload.seatNumber } : {}),
+  };
+};
+
+const normalizePaymentEntriesAsNumbers = (
+  payments: Array<{
+    paymentMethodId: string;
+    amount: string;
+    tipAmount?: string;
+    transactionReference?: string;
+  }>
+) =>
+  payments.map((payment) => ({
+    paymentMethodId: payment.paymentMethodId,
+    amount: Math.max(0, toNumber(payment.amount) ?? 0),
+    ...(payment.tipAmount !== undefined
+      ? { tipAmount: Math.max(0, toNumber(payment.tipAmount) ?? 0) }
+      : {}),
+    ...(payment.transactionReference
+      ? { transactionReference: payment.transactionReference }
+      : {}),
+  }));
+
+const normalizePaymentEntriesAsDecimals = (
+  payments: Array<{
+    paymentMethodId: string;
+    amount: string;
+    tipAmount?: string;
+    transactionReference?: string;
+  }>
+) =>
+  payments.map((payment) => ({
+    paymentMethodId: payment.paymentMethodId,
+    amount: toDecimalString(payment.amount),
+    ...(payment.tipAmount !== undefined
+      ? { tipAmount: toDecimalString(payment.tipAmount) }
+      : {}),
+    ...(payment.transactionReference
+      ? { transactionReference: payment.transactionReference }
+      : {}),
+  }));
+
+const normalizeTableSessionCheckoutPayload = (
+  payload: TableSessionCheckoutDTO
+): Record<string, unknown> => ({
+  payments: normalizePaymentEntriesAsNumbers(payload.payments),
+  ...(payload.tipAmount !== undefined ? { tipAmount: payload.tipAmount } : {}),
+  ...(payload.serviceCharge !== undefined
+    ? { serviceCharge: payload.serviceCharge }
+    : {}),
+  ...(payload.discountReasonId
+    ? { discountReasonId: payload.discountReasonId }
+    : {}),
+  ...(payload.totalDiscount !== undefined
+    ? { totalDiscount: payload.totalDiscount }
+    : {}),
+});
+
+const normalizeCheckoutPayload = (
+  payload: CheckoutRequestDTO
+): Record<string, unknown> => ({
+  tenantId: payload.tenantId,
+  locationId: payload.locationId,
+  salesChannel: payload.salesChannel,
+  serviceType: payload.serviceType,
+  ...(payload.customerId ? { customerId: payload.customerId } : {}),
+  ...(payload.posSessionId ? { posSessionId: payload.posSessionId } : {}),
+  ...(payload.lineStatus ? { lineStatus: payload.lineStatus } : {}),
+  ...(payload.idempotencyKey ? { idempotencyKey: payload.idempotencyKey } : {}),
+  ...(payload.discountReasonId
+    ? { discountReasonId: payload.discountReasonId }
+    : {}),
+  ...(payload.tipAmount !== undefined
+    ? { tipAmount: toDecimalString(payload.tipAmount) }
+    : {}),
+  ...(payload.serviceCharge !== undefined
+    ? { serviceCharge: toDecimalString(payload.serviceCharge) }
+    : {}),
+  items: payload.items.map((item) => ({
+    variantId: item.variantId,
+    quantity: toDecimalString(Math.max(0.0001, toNumber(item.quantity) ?? 1)),
+    lineDiscount: toDecimalString(item.lineDiscount ?? "0"),
+  })),
+  payments: normalizePaymentEntriesAsDecimals(payload.payments),
+});
+
 const toBoolean = (value: unknown): boolean | undefined => {
   if (value === null || value === undefined || value === "") return undefined;
   if (typeof value === "boolean") return value;
@@ -424,7 +578,7 @@ export class ApiCashierRepository implements ICashierRepository {
   ): Promise<SalesOrderLine> {
     const response = await this.httpClient.post<ApiEnvelope<Record<string, unknown>>>(
       API_ENDPOINTS.SALES_ORDERS.LINES(salesOrderId).CREATE,
-      payload
+      normalizeUpsertLinePayload(payload)
     );
     const item = unwrap(response);
     return new SalesOrderLine({
@@ -449,7 +603,7 @@ export class ApiCashierRepository implements ICashierRepository {
   ): Promise<SalesOrderLine> {
     const response = await this.httpClient.patch<ApiEnvelope<Record<string, unknown>>>(
       API_ENDPOINTS.SALES_ORDERS.LINES(salesOrderId).UPDATE(lineId),
-      payload
+      normalizePartialLinePayload(payload)
     );
     const item = unwrap(response);
     return new SalesOrderLine({
@@ -740,7 +894,7 @@ export class ApiCashierRepository implements ICashierRepository {
   ): Promise<SalesOrderLine> {
     const response = await this.httpClient.post<ApiEnvelope<Record<string, unknown>>>(
       API_ENDPOINTS.TABLE_SESSIONS.LINES(sessionId),
-      payload
+      normalizeUpsertLinePayload(payload)
     );
     const item = unwrap(response);
     return new SalesOrderLine({
@@ -761,7 +915,7 @@ export class ApiCashierRepository implements ICashierRepository {
   ): Promise<TableSession> {
     const response = await this.httpClient.post<ApiEnvelope<Record<string, unknown>>>(
       API_ENDPOINTS.TABLE_SESSIONS.CHECKOUT(sessionId),
-      payload
+      normalizeTableSessionCheckoutPayload(payload)
     );
     const item = unwrap(response);
     return new TableSession({
@@ -995,7 +1149,7 @@ export class ApiCashierRepository implements ICashierRepository {
   async checkout(payload: CheckoutRequestDTO): Promise<Record<string, unknown>> {
     const response = await this.httpClient.post<ApiEnvelope<Record<string, unknown>>>(
       API_ENDPOINTS.CHECKOUT.PROCESS,
-      payload
+      normalizeCheckoutPayload(payload)
     );
     return unwrap(response);
   }

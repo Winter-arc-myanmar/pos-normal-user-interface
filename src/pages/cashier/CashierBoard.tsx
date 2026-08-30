@@ -114,7 +114,7 @@ export function CashierBoard({
           <ApiLoadingState label={t("cashier.loading")} />
         ) : (
           <div className="grid grid-cols-3 gap-2 min-[900px]:grid-cols-4 min-[1200px]:grid-cols-5">
-            {serviceType === "TABLE"
+            {serviceType === "TABLE" || serviceType === "DINE_IN"
               ? tables.map((table) => {
                   const session = getLatestSession(table.id);
                   const selected =

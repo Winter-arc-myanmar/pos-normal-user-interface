@@ -164,6 +164,7 @@ interface UseCashierReturn {
   pickupCounterOrder: (counterOrderId: string) => Promise<Record<string, unknown>>;
   addPayment: (orderId: string, payload: CreateOrderPaymentDTO) => Promise<void>;
   processCheckout: (payload: CheckoutRequestDTO) => Promise<Record<string, unknown>>;
+  clearOrderSelection: () => void;
   clearError: () => void;
 }
 
@@ -284,6 +285,12 @@ export function useCashier(): UseCashierReturn {
     },
     [cashierService, clearError]
   );
+
+  const clearOrderSelection = useCallback(() => {
+    setSelectedOrder(null);
+    setSelectedOrderLines([]);
+    setSelectedOrderPayments([]);
+  }, []);
 
   const selectOrder = useCallback(
     async (order: SalesOrder) => {
@@ -1101,6 +1108,7 @@ export function useCashier(): UseCashierReturn {
         ]);
         setDiningTables(tables);
         setTableSessions(sessions);
+        clearOrderSelection();
         return session;
       } catch (err) {
         const message =
@@ -1111,7 +1119,7 @@ export function useCashier(): UseCashierReturn {
         setIsLoading(false);
       }
     },
-    [cashierService, clearError]
+    [cashierService, clearError, clearOrderSelection]
   );
 
   const fireToKds = useCallback(
@@ -1161,10 +1169,13 @@ export function useCashier(): UseCashierReturn {
           throw new Error(`No variant found for product ${product.name}`);
         }
 
+        const variantModifier = Number(selectedVariant?.priceModifier || 0);
+        const unitPrice = Number(product.basePrice || 0) + variantModifier;
+
         const line = await cashierService.addTableSessionLine(sessionId, {
           variantId: selectedVariant.id,
           quantity: Math.max(1, quantity).toFixed(4),
-          unitPrice: product.basePrice || "0.0000",
+          unitPrice: unitPrice.toFixed(4),
           lineDiscount: "0.0000",
         });
 
@@ -1227,11 +1238,8 @@ export function useCashier(): UseCashierReturn {
       clearError();
       try {
         const result = await cashierService.checkout(payload);
-        if (selectedOrder) {
-          await fetchSalesOrders({ page: 1, limit: 100 });
-          const refreshedOrder = await cashierService.getSalesOrderById(selectedOrder.id);
-          setSelectedOrder(refreshedOrder);
-        }
+        await fetchSalesOrders({ page: 1, limit: 100 });
+        clearOrderSelection();
         return result;
       } catch (err) {
         const message = err instanceof Error ? err.message : "Checkout failed";
@@ -1241,7 +1249,7 @@ export function useCashier(): UseCashierReturn {
         setIsLoading(false);
       }
     },
-    [cashierService, clearError, fetchSalesOrders, selectedOrder]
+    [cashierService, clearError, clearOrderSelection, fetchSalesOrders]
   );
 
   const value = useMemo(
@@ -1318,6 +1326,7 @@ export function useCashier(): UseCashierReturn {
       pickupCounterOrder,
       addPayment,
       processCheckout,
+      clearOrderSelection,
       clearError,
     }),
     [
@@ -1392,6 +1401,7 @@ export function useCashier(): UseCashierReturn {
       pickupCounterOrder,
       addPayment,
       processCheckout,
+      clearOrderSelection,
       clearError,
     ]
   );

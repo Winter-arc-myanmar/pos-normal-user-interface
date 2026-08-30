@@ -190,11 +190,17 @@
       "quantity": "Quantity",
       "add": "Add to order",
       "selectOrder": "Select or create an order first.",
+      "selectTableTitle": "Choose a table",
+      "selectTableHint": "Select a table below, then add items to the order.",
+      "selectTableOptionalTitle": "Assign a table (optional)",
+      "selectTableOptionalHint": "Pick a table for seated dine-in, or add items without a table.",
       "selectPrompt": "Select a product to choose its variant and quantity."
     },
     "orderPanel": {
       "emptyLines": "Open Menu and add products.",
       "noOrder": "No order selected",
+      "selectTable": "Select table",
+      "newDineInOrder": "New dine-in order",
       "paymentAmount": "Payment amount",
       "paymentMethod": "Payment method",
       "selectPayment": "Select payment method",
@@ -205,8 +211,12 @@
       "remove": "Remove",
       "itemUpdated": "Item quantity updated.",
       "itemRemoved": "Item removed from order.",
-      "checkoutSuccess": "Checkout successful.",
-      "kdsSent": "Order sent to KDS."
+      "checkoutSuccess": "Payment completed successfully.",
+      "kdsSent": "Order sent to kitchen (KDS).",
+      "cartStarted": "New cart started. Add products from the menu.",
+      "dineInStarted": "Dine-in order started. Assign a table or add items from the menu.",
+      "tableStatusUpdated": "Table marked {{status}}.",
+      "sessionStateUpdated": "Session updated to {{state}}."
     },
     "errors": {
       "missingContext": "Missing tenant or inventory location context. Ensure your tenant has at least one inventory location configured.",

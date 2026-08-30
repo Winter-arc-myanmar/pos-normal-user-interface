@@ -29,6 +29,8 @@ interface OrderPanelProps {
   paymentInputRef: RefObject<HTMLInputElement | null>;
   isLoading: boolean;
   canCreateOrder?: boolean;
+  isTableService?: boolean;
+  isDineInService?: boolean;
   feedback?: string | null;
   errorMessage?: string | null;
   onCreateOrder: () => void;
@@ -58,6 +60,8 @@ export function OrderPanel({
   paymentInputRef,
   isLoading,
   canCreateOrder = true,
+  isTableService = false,
+  isDineInService = false,
   feedback,
   errorMessage,
   onCreateOrder,
@@ -280,16 +284,6 @@ export function OrderPanel({
           >
             {t("cashier.payNow")}
           </Button>
-          {feedback ? (
-            <p className="rounded bg-green-50 p-2 text-xs text-green-700">
-              {feedback}
-            </p>
-          ) : null}
-          {errorMessage ? (
-            <p className="rounded bg-red-50 p-2 text-xs text-red-700">
-              {errorMessage}
-            </p>
-          ) : null}
         </div>
       ) : (
         <Button
@@ -298,9 +292,34 @@ export function OrderPanel({
           disabled={!canCreateOrder || isLoading}
           onClick={onCreateOrder}
         >
-          {t("cashier.newOrder")}
+          {isTableService
+            ? t("cashier.orderPanel.selectTable")
+            : isDineInService
+              ? t("cashier.orderPanel.newDineInOrder")
+              : t("cashier.newOrder")}
         </Button>
       )}
+
+      {feedback || errorMessage ? (
+        <div className="mt-3 space-y-2 border-t border-slate-200 pt-3" aria-live="polite">
+          {feedback ? (
+            <p
+              role="status"
+              className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800"
+            >
+              {feedback}
+            </p>
+          ) : null}
+          {errorMessage ? (
+            <p
+              role="alert"
+              className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-800"
+            >
+              {errorMessage}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </aside>
   );
 }
