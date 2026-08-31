@@ -100,6 +100,8 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
     fetchWaitlist: mocks.fetchWaitlist,
     fetchDiningTables: mocks.fetchTables,
     fetchDiningZones: mocks.fetchZones,
+    fetchTableSessions: vi.fn().mockResolvedValue(undefined),
+    getLatestSessionByTableId: vi.fn().mockReturnValue(undefined),
     createWaitlistEntry: mocks.create,
     updateWaitlistEntry: vi.fn(),
     notifyWaitlistEntry: mocks.notify,
@@ -141,9 +143,7 @@ describe("WaitlistPage integration", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "John Smith" }));
     fireEvent.click(screen.getByRole("button", { name: "Notify" }));
-    fireEvent.change(screen.getByLabelText("Table for John Smith"), {
-      target: { value: "table-1" },
-    });
+    fireEvent.click(screen.getByRole("option", { name: /T1/ }));
     fireEvent.click(screen.getByRole("button", { name: "Seat" }));
 
     await waitFor(() => {

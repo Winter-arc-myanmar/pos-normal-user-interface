@@ -11,7 +11,7 @@ const FULL_ACCESS_ROLE = "ROOT_ADMIN";
 export const PAGE_PERMISSIONS = {
   dashboard: [] as string[],
   users: ["MANAGE_USERS"],
-  customers: ["MANAGE_CUSTOMERS"],
+  customers: [] as string[],
   cashier: [] as string[],
   waitlist: [] as string[],
   tipPools: [] as string[],
@@ -21,6 +21,7 @@ export const PAGE_PERMISSIONS = {
 export const PERMISSION_ROUTE_ORDER = [
   { path: "/cashier", permissions: PAGE_PERMISSIONS.cashier },
   { path: "/counter-orders", permissions: PAGE_PERMISSIONS.counterOrders },
+  { path: "/customers", permissions: PAGE_PERMISSIONS.customers },
   { path: "/waitlist", permissions: PAGE_PERMISSIONS.waitlist },
   { path: "/tip-pools", permissions: PAGE_PERMISSIONS.tipPools },
   { path: "/dashboard", permissions: PAGE_PERMISSIONS.dashboard },

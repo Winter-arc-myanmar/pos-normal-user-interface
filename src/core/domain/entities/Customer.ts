@@ -1,68 +1,43 @@
-export interface CustomerData {
-  id: number;
-  name: string;
-  phone: string;
-  email: string;
-  address: string;
-  createdAt: string;
-  updatedAt: string;
+export type CustomerAccountType = "RETAIL";
+export type CustomerLoyaltyTier = "BRONZE" | "SILVER" | "GOLD" | "PLATINUM";
+export type InteractionChannel = "EMAIL" | "PHONE" | "IN_PERSON" | "SMS";
+export type InteractionType = "INQUIRY" | "COMPLAINT" | "FOLLOW_UP" | "NOTE";
+
+export class Customer {
+  id!: string;
+  tenantId!: string;
+  accountType!: CustomerAccountType | string;
+  name!: string;
+  phone!: string;
+  email!: string;
+  hasCreditAccount!: boolean;
+  maxCreditLimit!: string;
+  currentCreditBalance!: string;
+  paymentTermsDays!: number;
+  loyaltyTier!: string;
+  lifetimePointsEarned!: number;
+  createdAt!: string;
+  updatedAt!: string;
+
+  constructor(data: Partial<Customer>) {
+    Object.assign(this, data);
+  }
 }
 
-/**
- * Example domain entity.
- * Copy this pattern when adding a new business resource.
- */
-export class Customer {
-  public id: number;
-  public name: string;
-  public phone: string;
-  public email: string;
-  public address: string;
-  public createdAt: string;
-  public updatedAt: string;
+export class CustomerInteraction {
+  id!: string;
+  tenantId!: string;
+  customerId!: string;
+  agentId?: string;
+  interactionChannel!: string;
+  interactionType!: string;
+  summary!: string;
+  detailedNotes?: string;
+  externalReferenceId?: string;
+  interactionDate!: string;
+  updatedAt!: string;
 
-  [key: string]: unknown;
-
-  constructor(
-    data: CustomerData | Partial<CustomerData> | Record<string, unknown>
-  ) {
-    if (!data) {
-      throw new Error("Customer data is required");
-    }
-
-    const getProperty = (
-      obj: Record<string, unknown>,
-      key: string,
-      defaultValue: unknown
-    ) => (obj[key] !== undefined ? obj[key] : defaultValue);
-
-    const record = data as Record<string, unknown>;
-
-    this.id = Number(getProperty(record, "id", 0));
-    this.name = String(getProperty(record, "name", ""));
-    this.phone = String(getProperty(record, "phone", ""));
-    this.email = String(getProperty(record, "email", ""));
-    this.address = String(getProperty(record, "address", ""));
-    this.createdAt = String(
-      getProperty(record, "createdAt", new Date().toISOString())
-    );
-    this.updatedAt = String(
-      getProperty(record, "updatedAt", new Date().toISOString())
-    );
-  }
-
-  isValid(): boolean {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const phoneRegex = /^[+]?[1-9][\d]{0,15}$/;
-
-    return (
-      !!this.id &&
-      !!this.name &&
-      !!this.phone &&
-      phoneRegex.test(this.phone) &&
-      !!this.email &&
-      emailRegex.test(this.email) &&
-      !!this.address
-    );
+  constructor(data: Partial<CustomerInteraction>) {
+    Object.assign(this, data);
   }
 }

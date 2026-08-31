@@ -1,55 +1,88 @@
 import { useState, useCallback } from "react";
 import { ICustomerService } from "../../domain/services/ICustomerService";
-import { Customer } from "../../domain/entities/Customer";
+import { Customer, CustomerInteraction } from "../../domain/entities/Customer";
 import {
   CreateCustomerDTO,
-  UpdateCustomerDTO,
+  CreateCustomerInteractionDTO,
   CustomerFilterDTO,
   CustomerDomainListResponseDTO,
+  CustomerInteractionFilterDTO,
+  CustomerInteractionListResponseDTO,
+  UpdateCustomerDTO,
+  UpdateCustomerInteractionDTO,
 } from "../../application/dtos/CustomerDTO";
 import container from "../../infrastructure/di/container";
 
 interface UseCustomerManagementReturn {
   customers: Customer[];
   totalCustomers: number;
+  page: number;
+  limit: number;
+  totalPages: number;
   currentCustomer: Customer | null;
+  interactions: CustomerInteraction[];
   isLoading: boolean;
   error: string | null;
   createCustomer: (customerData: CreateCustomerDTO) => Promise<Customer>;
   getCustomers: (
     params?: CustomerFilterDTO
   ) => Promise<CustomerDomainListResponseDTO>;
-  getAllCustomers: () => Promise<Customer[]>;
-  getCustomerById: (id: number) => Promise<Customer>;
+  getCustomerById: (id: string) => Promise<Customer>;
   updateCustomer: (
-    id: number,
+    id: string,
     customerData: UpdateCustomerDTO
   ) => Promise<Customer>;
-  deleteCustomer: (id: number) => Promise<boolean>;
-  searchCustomers: (
-    query: string,
-    take?: number,
-    skip?: number
-  ) => Promise<CustomerDomainListResponseDTO>;
+  deleteCustomer: (id: string) => Promise<boolean>;
+  getInteractionsForCustomer: (
+    customerId: string,
+    params?: CustomerInteractionFilterDTO
+  ) => Promise<CustomerInteractionListResponseDTO>;
+  createCustomerInteraction: (
+    customerId: string,
+    payload: CreateCustomerInteractionDTO
+  ) => Promise<CustomerInteraction>;
+  updateCustomerInteraction: (
+    customerId: string,
+    id: string,
+    payload: UpdateCustomerInteractionDTO
+  ) => Promise<CustomerInteraction>;
+  deleteCustomerInteraction: (
+    customerId: string,
+    id: string
+  ) => Promise<boolean>;
   clearError: () => void;
+  clearCurrentCustomer: () => void;
 }
 
-/**
- * Example presentation hook.
- * UI pages should depend on this hook, not on repositories.
- */
 export function useCustomerManagement(): UseCustomerManagementReturn {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [totalCustomers, setTotalCustomers] = useState(0);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(6);
+  const [totalPages, setTotalPages] = useState(1);
   const [currentCustomer, setCurrentCustomer] = useState<Customer | null>(null);
+  const [interactions, setInteractions] = useState<CustomerInteraction[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const customerService =
     container.resolve<ICustomerService>("customerService");
 
+  const applyList = (result: CustomerDomainListResponseDTO) => {
+    setCustomers(result.customers);
+    setTotalCustomers(result.total);
+    setPage(result.page);
+    setLimit(result.limit);
+    setTotalPages(result.totalPages);
+  };
+
   const clearError = useCallback(() => {
     setError(null);
+  }, []);
+
+  const clearCurrentCustomer = useCallback(() => {
+    setCurrentCustomer(null);
+    setInteractions([]);
   }, []);
 
   const createCustomer = useCallback(
@@ -60,6 +93,7 @@ export function useCustomerManagement(): UseCustomerManagementReturn {
         const customer = await customerService.createCustomer(customerData);
         setCustomers((prev) => [customer, ...prev]);
         setTotalCustomers((prev) => prev + 1);
+        setCurrentCustomer(customer);
         return customer;
       } catch (err) {
         const errorMessage =
@@ -79,8 +113,7 @@ export function useCustomerManagement(): UseCustomerManagementReturn {
         setIsLoading(true);
         clearError();
         const result = await customerService.getCustomers(params);
-        setCustomers(result.customers);
-        setTotalCustomers(result.total);
+        applyList(result);
         return result;
       } catch (err) {
         const errorMessage =
@@ -94,26 +127,8 @@ export function useCustomerManagement(): UseCustomerManagementReturn {
     [clearError, customerService]
   );
 
-  const getAllCustomers = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      clearError();
-      const allCustomers = await customerService.getAllCustomers();
-      setCustomers(allCustomers);
-      setTotalCustomers(allCustomers.length);
-      return allCustomers;
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to fetch all customers";
-      setError(errorMessage);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [clearError, customerService]);
-
   const getCustomerById = useCallback(
-    async (id: number) => {
+    async (id: string) => {
       try {
         setIsLoading(true);
         clearError();
@@ -133,7 +148,7 @@ export function useCustomerManagement(): UseCustomerManagementReturn {
   );
 
   const updateCustomer = useCallback(
-    async (id: number, customerData: UpdateCustomerDTO) => {
+    async (id: string, customerData: UpdateCustomerDTO) => {
       try {
         setIsLoading(true);
         clearError();
@@ -146,9 +161,9 @@ export function useCustomerManagement(): UseCustomerManagementReturn {
             customer.id === id ? updatedCustomer : customer
           )
         );
-        if (currentCustomer?.id === id) {
-          setCurrentCustomer(updatedCustomer);
-        }
+        setCurrentCustomer((current) =>
+          current?.id === id ? updatedCustomer : current
+        );
         return updatedCustomer;
       } catch (err) {
         const errorMessage =
@@ -159,20 +174,23 @@ export function useCustomerManagement(): UseCustomerManagementReturn {
         setIsLoading(false);
       }
     },
-    [clearError, customerService, currentCustomer]
+    [clearError, customerService]
   );
 
   const deleteCustomer = useCallback(
-    async (id: number) => {
+    async (id: string) => {
       try {
         setIsLoading(true);
         clearError();
         const success = await customerService.deleteCustomer(id);
         if (success) {
           setCustomers((prev) => prev.filter((customer) => customer.id !== id));
-          setTotalCustomers((prev) => prev - 1);
+          setTotalCustomers((prev) => Math.max(0, prev - 1));
+          setCurrentCustomer((current) =>
+            current?.id === id ? null : current
+          );
           if (currentCustomer?.id === id) {
-            setCurrentCustomer(null);
+            setInteractions([]);
           }
         }
         return success;
@@ -188,18 +206,98 @@ export function useCustomerManagement(): UseCustomerManagementReturn {
     [clearError, customerService, currentCustomer]
   );
 
-  const searchCustomers = useCallback(
-    async (query: string, take?: number, skip?: number) => {
+  const getInteractionsForCustomer = useCallback(
+    async (customerId: string, params?: CustomerInteractionFilterDTO) => {
       try {
         setIsLoading(true);
         clearError();
-        const result = await customerService.searchCustomers(query, take, skip);
-        setCustomers(result.customers);
-        setTotalCustomers(result.total);
+        const result = await customerService.getInteractionsForCustomer(
+          customerId,
+          params
+        );
+        setInteractions(result.interactions);
         return result;
       } catch (err) {
         const errorMessage =
-          err instanceof Error ? err.message : "Failed to search customers";
+          err instanceof Error ? err.message : "Failed to fetch interactions";
+        setError(errorMessage);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [clearError, customerService]
+  );
+
+  const createCustomerInteraction = useCallback(
+    async (customerId: string, payload: CreateCustomerInteractionDTO) => {
+      try {
+        setIsLoading(true);
+        clearError();
+        const created = await customerService.createCustomerInteraction(
+          customerId,
+          payload
+        );
+        setInteractions((prev) => [created, ...prev]);
+        return created;
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to create interaction";
+        setError(errorMessage);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [clearError, customerService]
+  );
+
+  const updateCustomerInteraction = useCallback(
+    async (
+      customerId: string,
+      id: string,
+      payload: UpdateCustomerInteractionDTO
+    ) => {
+      try {
+        setIsLoading(true);
+        clearError();
+        const updated = await customerService.updateCustomerInteraction(
+          customerId,
+          id,
+          payload
+        );
+        setInteractions((prev) =>
+          prev.map((item) => (item.id === id ? updated : item))
+        );
+        return updated;
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to update interaction";
+        setError(errorMessage);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [clearError, customerService]
+  );
+
+  const deleteCustomerInteraction = useCallback(
+    async (customerId: string, id: string) => {
+      try {
+        setIsLoading(true);
+        clearError();
+        const success = await customerService.deleteCustomerInteraction(
+          customerId,
+          id
+        );
+        if (success) {
+          setInteractions((prev) => prev.filter((item) => item.id !== id));
+        }
+        return success;
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to delete interaction";
         setError(errorMessage);
         throw err;
       } finally {
@@ -212,16 +310,23 @@ export function useCustomerManagement(): UseCustomerManagementReturn {
   return {
     customers,
     totalCustomers,
+    page,
+    limit,
+    totalPages,
     currentCustomer,
+    interactions,
     isLoading,
     error,
     createCustomer,
     getCustomers,
-    getAllCustomers,
     getCustomerById,
     updateCustomer,
     deleteCustomer,
-    searchCustomers,
+    getInteractionsForCustomer,
+    createCustomerInteraction,
+    updateCustomerInteraction,
+    deleteCustomerInteraction,
     clearError,
+    clearCurrentCustomer,
   };
 }

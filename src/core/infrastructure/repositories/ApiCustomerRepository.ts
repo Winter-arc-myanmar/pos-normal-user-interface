@@ -1,237 +1,240 @@
 import { ICustomerRepository } from "../../domain/repositories/ICustomerRepository";
-import { Customer } from "../../domain/entities/Customer";
+import { Customer, CustomerInteraction } from "../../domain/entities/Customer";
 import { HttpClient } from "../api/HttpClient";
 import { API_ENDPOINTS } from "../api/constants";
 import {
   CreateCustomerDTO,
+  CreateCustomerInteractionDTO,
   CustomerFilterDTO,
   CustomerDomainListResponseDTO,
-  CustomerDTOMapper,
+  CustomerInteractionFilterDTO,
+  CustomerInteractionListResponseDTO,
+  UpdateCustomerDTO,
+  UpdateCustomerInteractionDTO,
 } from "../../application/dtos/CustomerDTO";
 
-interface ApiResponseData {
-  data?: unknown;
-  customer?: Record<string, unknown>;
-  customers?:
-    | Record<string, unknown>[]
-    | {
-        data?: Record<string, unknown>[];
-        total?: number;
-        page?: number;
-        limit?: number;
-        totalPages?: number;
-        hasNextPage?: boolean;
-        hasPrevPage?: boolean;
-      };
-  items?: Record<string, unknown>[];
-  id?: number;
-  total?: number;
-  page?: number;
-  limit?: number;
-  totalPages?: number;
-  hasNextPage?: boolean;
-  hasPrevPage?: boolean;
+interface ApiEnvelope<T> {
   success?: boolean;
   message?: string;
-  [key: string]: unknown;
+  meta?: {
+    total?: number;
+    page?: number;
+    limit?: number;
+    totalPages?: number;
+  };
+  data?: T;
 }
 
-function toCustomerList(
-  items: Record<string, unknown>[],
-  total = items.length,
-  page = 1,
-  limit = items.length || 10,
-  totalPages = 1,
-  hasNextPage = false,
-  hasPrevPage = false
-): CustomerDomainListResponseDTO {
-  return CustomerDTOMapper.toDomainListResponseDTO(
-    items.map((item) => new Customer(item)),
-    total,
-    page,
-    limit,
-    totalPages,
-    hasNextPage,
-    hasPrevPage
+const unwrap = <T>(response: ApiEnvelope<T> | T): T => {
+  if (response && typeof response === "object" && "data" in response) {
+    return unwrap((response as ApiEnvelope<T>).data as T);
+  }
+  return response as T;
+};
+
+const asRecord = (value: unknown): Record<string, unknown> | undefined =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+
+const asList = <T>(response: unknown): T[] => {
+  const value = unwrap(response as never);
+  if (Array.isArray(value)) return value as T[];
+  const container = asRecord(value);
+  if (!container) return [];
+  if (Array.isArray(container.data)) return container.data as T[];
+  if (Array.isArray(container.items)) return container.items as T[];
+  if (Array.isArray(container.customers)) return container.customers as T[];
+  if (Array.isArray(container.interactions)) {
+    return container.interactions as T[];
+  }
+  return [];
+};
+
+const toMeta = (response: unknown, fallbackLimit: number, count: number) => {
+  const envelope = asRecord(response);
+  const meta = asRecord(envelope?.meta);
+  const page = Number(meta?.page || 1);
+  const limit = Number(meta?.limit || fallbackLimit);
+  const total = Number(meta?.total ?? count);
+  const totalPages = Number(
+    meta?.totalPages || Math.max(1, Math.ceil((total || 1) / (limit || 1)))
   );
-}
+  return { page, limit, total, totalPages };
+};
 
-function parseCustomer(responseData: ApiResponseData): Customer {
-  if (responseData.customer) {
-    return new Customer(responseData.customer);
-  }
-  if (responseData.data && typeof responseData.data === "object") {
-    return new Customer(responseData.data as Record<string, unknown>);
-  }
-  if (responseData.id) {
-    return new Customer(responseData);
-  }
-  throw new Error(
-    `Unexpected API response structure: ${JSON.stringify(responseData)}`
-  );
-}
+const toCustomer = (item: Record<string, unknown>): Customer =>
+  new Customer({
+    id: String(item.id || ""),
+    tenantId: String(item.tenantId || ""),
+    accountType: String(item.accountType || "RETAIL"),
+    name: String(item.name || ""),
+    phone: String(item.phone || ""),
+    email: String(item.email || ""),
+    hasCreditAccount: Boolean(item.hasCreditAccount),
+    maxCreditLimit: String(item.maxCreditLimit ?? "0.0000"),
+    currentCreditBalance: String(item.currentCreditBalance ?? "0.0000"),
+    paymentTermsDays: Number(item.paymentTermsDays || 0),
+    loyaltyTier: String(item.loyaltyTier || "BRONZE"),
+    lifetimePointsEarned: Number(item.lifetimePointsEarned || 0),
+    createdAt: String(item.createdAt || ""),
+    updatedAt: String(item.updatedAt || ""),
+  });
 
-/**
- * Example API repository implementation for the Customer resource.
- */
+const toInteraction = (item: Record<string, unknown>): CustomerInteraction =>
+  new CustomerInteraction({
+    id: String(item.id || ""),
+    tenantId: String(item.tenantId || ""),
+    customerId: String(item.customerId || ""),
+    agentId: item.agentId ? String(item.agentId) : undefined,
+    interactionChannel: String(item.interactionChannel || ""),
+    interactionType: String(item.interactionType || ""),
+    summary: String(item.summary || ""),
+    detailedNotes: item.detailedNotes ? String(item.detailedNotes) : undefined,
+    externalReferenceId: item.externalReferenceId
+      ? String(item.externalReferenceId)
+      : undefined,
+    interactionDate: String(item.interactionDate || item.createdAt || ""),
+    updatedAt: String(item.updatedAt || ""),
+  });
+
+const toCustomerList = (
+  response: unknown,
+  fallbackLimit: number
+): CustomerDomainListResponseDTO => {
+  const items = asList<Record<string, unknown>>(response).map(toCustomer);
+  const meta = toMeta(response, fallbackLimit, items.length);
+  return {
+    customers: items,
+    total: meta.total,
+    page: meta.page,
+    limit: meta.limit,
+    totalPages: meta.totalPages,
+    hasNextPage: meta.page < meta.totalPages,
+    hasPrevPage: meta.page > 1,
+  };
+};
+
+const toInteractionList = (
+  response: unknown,
+  fallbackLimit: number
+): CustomerInteractionListResponseDTO => {
+  const items = asList<Record<string, unknown>>(response).map(toInteraction);
+  const meta = toMeta(response, fallbackLimit, items.length);
+  return {
+    interactions: items,
+    total: meta.total,
+    page: meta.page,
+    limit: meta.limit,
+    totalPages: meta.totalPages,
+  };
+};
+
 export class ApiCustomerRepository implements ICustomerRepository {
   constructor(private httpClient: HttpClient) {}
 
   async createCustomer(customerData: CreateCustomerDTO): Promise<Customer> {
-    const response = await this.httpClient.post(
-      API_ENDPOINTS.CUSTOMERS.CREATE,
-      customerData
-    );
-    return parseCustomer((response as { data: ApiResponseData }).data);
+    const response = await this.httpClient.post<
+      ApiEnvelope<Record<string, unknown>>
+    >(API_ENDPOINTS.CUSTOMERS.CREATE, customerData);
+    return toCustomer(unwrap(response));
   }
 
   async getCustomers(
     params?: CustomerFilterDTO
   ): Promise<CustomerDomainListResponseDTO> {
-    const queryParams = new URLSearchParams();
-
-    if (params?.skip !== undefined) {
-      queryParams.append("skip", params.skip.toString());
-    }
-    if (params?.take !== undefined) {
-      queryParams.append("take", params.take.toString());
-    }
-    if (params?.name) queryParams.append("name", params.name);
-    if (params?.phone) queryParams.append("phone", params.phone);
-    if (params?.email) queryParams.append("email", params.email);
-    if (params?.address) queryParams.append("address", params.address);
-    if (params?.sortBy) queryParams.append("sortBy", params.sortBy);
-    if (params?.sortOrder) queryParams.append("sortOrder", params.sortOrder);
-
-    const url = `${API_ENDPOINTS.CUSTOMERS.GET_ALL}${
-      queryParams.toString() ? `?${queryParams.toString()}` : ""
-    }`;
-    const response = await this.httpClient.get(url);
-    const responseData = (response as { data: ApiResponseData }).data;
-
-    if (
-      responseData.customers &&
-      !Array.isArray(responseData.customers) &&
-      Array.isArray(responseData.customers.data)
-    ) {
-      const pageData = responseData.customers;
-      return toCustomerList(
-        pageData.data || [],
-        pageData.total || 0,
-        pageData.page || 1,
-        pageData.limit || 10,
-        pageData.totalPages || 1,
-        pageData.hasNextPage || false,
-        pageData.hasPrevPage || false
-      );
-    }
-
-    if (Array.isArray(responseData.customers)) {
-      return toCustomerList(responseData.customers);
-    }
-
-    if (Array.isArray(responseData)) {
-      return toCustomerList(responseData as unknown as Record<string, unknown>[]);
-    }
-
-    if (Array.isArray(responseData.data)) {
-      return toCustomerList(
-        responseData.data as Record<string, unknown>[],
-        responseData.total || (responseData.data as unknown[]).length,
-        responseData.page || 1,
-        responseData.limit || (responseData.data as unknown[]).length,
-        responseData.totalPages || 1,
-        responseData.hasNextPage || false,
-        responseData.hasPrevPage || false
-      );
-    }
-
-    if (Array.isArray(responseData.items)) {
-      return toCustomerList(
-        responseData.items,
-        responseData.total || responseData.items.length,
-        responseData.page || 1,
-        responseData.limit || responseData.items.length,
-        responseData.totalPages || 1,
-        responseData.hasNextPage || false,
-        responseData.hasPrevPage || false
-      );
-    }
-
-    throw new Error(
-      `Unexpected API response structure: ${JSON.stringify(responseData)}`
-    );
+    const response = await this.httpClient.get<
+      ApiEnvelope<Record<string, unknown>[]>
+    >(API_ENDPOINTS.CUSTOMERS.LIST, { params });
+    return toCustomerList(response, params?.limit || 6);
   }
 
-  async getAllCustomers(): Promise<Customer[]> {
-    const response = await this.httpClient.get(
-      API_ENDPOINTS.CUSTOMERS.GET_ALL_NO_PAGINATION
-    );
-    const responseData = (response as { data: ApiResponseData }).data;
-
-    if (Array.isArray(responseData.customers)) {
-      return responseData.customers.map((customer) => new Customer(customer));
-    }
-    if (Array.isArray(responseData)) {
-      return (responseData as unknown as Record<string, unknown>[]).map(
-        (customer) => new Customer(customer)
-      );
-    }
-    if (Array.isArray(responseData.data)) {
-      return (responseData.data as Record<string, unknown>[]).map(
-        (customer) => new Customer(customer)
-      );
-    }
-
-    throw new Error(
-      `Unexpected API response structure for getAllCustomers: ${JSON.stringify(
-        responseData
-      )}`
-    );
-  }
-
-  async getCustomerById(id: number): Promise<Customer> {
-    const response = await this.httpClient.get(
-      API_ENDPOINTS.CUSTOMERS.GET_BY_ID(id.toString())
-    );
-    return parseCustomer((response as { data: ApiResponseData }).data);
+  async getCustomerById(id: string): Promise<Customer> {
+    const response = await this.httpClient.get<
+      ApiEnvelope<Record<string, unknown>>
+    >(API_ENDPOINTS.CUSTOMERS.BY_ID(id));
+    return toCustomer(unwrap(response));
   }
 
   async updateCustomer(
-    id: number,
-    customerData: Partial<Customer>
+    id: string,
+    customerData: UpdateCustomerDTO
   ): Promise<Customer> {
-    const response = await this.httpClient.put(
-      API_ENDPOINTS.CUSTOMERS.UPDATE(id.toString()),
-      customerData
-    );
-    return parseCustomer((response as { data: ApiResponseData }).data);
+    const response = await this.httpClient.patch<
+      ApiEnvelope<Record<string, unknown>>
+    >(API_ENDPOINTS.CUSTOMERS.UPDATE(id), customerData);
+    return toCustomer(unwrap(response));
   }
 
-  async deleteCustomer(id: number): Promise<boolean> {
-    const response = await this.httpClient.delete(
-      API_ENDPOINTS.CUSTOMERS.DELETE(id.toString())
-    );
-    const responseData = (response as { data: ApiResponseData }).data;
-
-    if (typeof responseData === "boolean") return responseData;
-    if (responseData && typeof responseData.success === "boolean") {
-      return responseData.success;
-    }
+  async deleteCustomer(id: string): Promise<boolean> {
+    await this.httpClient.delete(API_ENDPOINTS.CUSTOMERS.DELETE(id));
     return true;
   }
 
-  async getCustomerByEmail(email: string): Promise<Customer> {
-    const response = await this.httpClient.get(
-      API_ENDPOINTS.CUSTOMERS.GET_BY_EMAIL(email)
-    );
-    return parseCustomer((response as { data: ApiResponseData }).data);
+  async getCustomerInteractions(
+    params?: CustomerInteractionFilterDTO
+  ): Promise<CustomerInteractionListResponseDTO> {
+    const response = await this.httpClient.get<
+      ApiEnvelope<Record<string, unknown>[]>
+    >(API_ENDPOINTS.CUSTOMER_INTERACTIONS.LIST, { params });
+    return toInteractionList(response, params?.limit || 10);
   }
 
-  async getCustomerByPhone(phone: string): Promise<Customer> {
-    const response = await this.httpClient.get(
-      API_ENDPOINTS.CUSTOMERS.GET_BY_PHONE(phone)
+  async getCustomerInteractionById(id: string): Promise<CustomerInteraction> {
+    const response = await this.httpClient.get<
+      ApiEnvelope<Record<string, unknown>>
+    >(API_ENDPOINTS.CUSTOMER_INTERACTIONS.BY_ID(id));
+    return toInteraction(unwrap(response));
+  }
+
+  async getInteractionsForCustomer(
+    customerId: string,
+    params?: CustomerInteractionFilterDTO
+  ): Promise<CustomerInteractionListResponseDTO> {
+    const response = await this.httpClient.get<
+      ApiEnvelope<Record<string, unknown>[]>
+    >(API_ENDPOINTS.CUSTOMERS.INTERACTIONS(customerId).LIST, { params });
+    return toInteractionList(response, params?.limit || 10);
+  }
+
+  async getInteractionForCustomer(
+    customerId: string,
+    id: string
+  ): Promise<CustomerInteraction> {
+    const response = await this.httpClient.get<
+      ApiEnvelope<Record<string, unknown>>
+    >(API_ENDPOINTS.CUSTOMERS.INTERACTIONS(customerId).BY_ID(id));
+    return toInteraction(unwrap(response));
+  }
+
+  async createCustomerInteraction(
+    customerId: string,
+    payload: CreateCustomerInteractionDTO
+  ): Promise<CustomerInteraction> {
+    const response = await this.httpClient.post<
+      ApiEnvelope<Record<string, unknown>>
+    >(API_ENDPOINTS.CUSTOMERS.INTERACTIONS(customerId).CREATE, payload);
+    return toInteraction(unwrap(response));
+  }
+
+  async updateCustomerInteraction(
+    customerId: string,
+    id: string,
+    payload: UpdateCustomerInteractionDTO
+  ): Promise<CustomerInteraction> {
+    const response = await this.httpClient.patch<
+      ApiEnvelope<Record<string, unknown>>
+    >(API_ENDPOINTS.CUSTOMERS.INTERACTIONS(customerId).UPDATE(id), payload);
+    return toInteraction(unwrap(response));
+  }
+
+  async deleteCustomerInteraction(
+    customerId: string,
+    id: string
+  ): Promise<boolean> {
+    await this.httpClient.delete(
+      API_ENDPOINTS.CUSTOMERS.INTERACTIONS(customerId).DELETE(id)
     );
-    return parseCustomer((response as { data: ApiResponseData }).data);
+    return true;
   }
 }

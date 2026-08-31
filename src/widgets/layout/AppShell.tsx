@@ -80,6 +80,7 @@ export function AppShell() {
     "/waitlist",
     "/tip-pools",
     "/counter-orders",
+    "/customers",
   ].some((path) => location.pathname.startsWith(path));
 
   const currentUserName =
@@ -106,6 +107,12 @@ export function AppShell() {
       visible: canAccess(PAGE_PERMISSIONS.counterOrders),
     },
     {
+      to: "/customers",
+      label: t("shell.customersTitle"),
+      icon: <CustomersIcon />,
+      visible: canAccess(PAGE_PERMISSIONS.customers),
+    },
+    {
       to: "/waitlist",
       label: t("shell.waitlistTitle"),
       icon: <WaitlistIcon />,
@@ -128,12 +135,6 @@ export function AppShell() {
       label: t("shell.usersTitle"),
       icon: <UsersIcon />,
       visible: canAccess(PAGE_PERMISSIONS.users),
-    },
-    {
-      to: "/customers",
-      label: t("shell.customersTitle"),
-      icon: <CustomersIcon />,
-      visible: canAccess(PAGE_PERMISSIONS.customers),
     },
   ];
 

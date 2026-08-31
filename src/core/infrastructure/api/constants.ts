@@ -29,17 +29,27 @@ export const API_ENDPOINTS = {
     DELETE: (id: string) => `/api/v1/users/${id}`,
   },
 
-  // Example resource — copy this pattern for new features
   CUSTOMERS: {
-    BASE: "/api/v1/customers",
+    LIST: "/api/v1/customers",
     CREATE: "/api/v1/customers",
-    GET_ALL: "/api/v1/customers",
-    GET_ALL_NO_PAGINATION: "/api/v1/customers/all",
-    GET_BY_ID: (id: string) => `/api/v1/customers/${id}`,
+    BY_ID: (id: string) => `/api/v1/customers/${id}`,
     UPDATE: (id: string) => `/api/v1/customers/${id}`,
     DELETE: (id: string) => `/api/v1/customers/${id}`,
-    GET_BY_EMAIL: (email: string) => `/api/v1/customers/email/${email}`,
-    GET_BY_PHONE: (phone: string) => `/api/v1/customers/phone/${phone}`,
+    INTERACTIONS: (customerId: string) => ({
+      LIST: `/api/v1/customers/${customerId}/interactions`,
+      CREATE: `/api/v1/customers/${customerId}/interactions`,
+      BY_ID: (id: string) =>
+        `/api/v1/customers/${customerId}/interactions/${id}`,
+      UPDATE: (id: string) =>
+        `/api/v1/customers/${customerId}/interactions/${id}`,
+      DELETE: (id: string) =>
+        `/api/v1/customers/${customerId}/interactions/${id}`,
+    }),
+  },
+
+  CUSTOMER_INTERACTIONS: {
+    LIST: "/api/v1/customer-interactions",
+    BY_ID: (id: string) => `/api/v1/customer-interactions/${id}`,
   },
 
   LOCATIONS: {

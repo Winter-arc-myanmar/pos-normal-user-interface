@@ -103,6 +103,8 @@ export function WaitlistPage() {
     fetchWaitlist,
     fetchDiningTables,
     fetchDiningZones,
+    fetchTableSessions,
+    getLatestSessionByTableId,
     createWaitlistEntry,
     updateWaitlistEntry,
     notifyWaitlistEntry,
@@ -133,24 +135,27 @@ export function WaitlistPage() {
   useEffect(() => {
     if (!locationId) return;
     void Promise.allSettled([
-      fetchWaitlist({
-        page: 1,
-        limit: 100,
-        locationId,
-        status: statusTab,
-        search: search.trim() || undefined,
-      }),
-      fetchDiningTables({ page: 1, limit: 200, status: "AVAILABLE" }),
+      fetchDiningTables({ page: 1, limit: 200 }),
       fetchDiningZones(),
+      fetchTableSessions({
+        page: 1,
+        limit: 200,
+        sortBy: "openedAt",
+        sortOrder: "desc",
+      }),
     ]);
-  }, [
-    fetchDiningTables,
-    fetchDiningZones,
-    fetchWaitlist,
-    locationId,
-    search,
-    statusTab,
-  ]);
+  }, [fetchDiningTables, fetchDiningZones, fetchTableSessions, locationId]);
+
+  useEffect(() => {
+    if (!locationId) return;
+    void fetchWaitlist({
+      page: 1,
+      limit: 100,
+      locationId,
+      status: statusTab,
+      search: search.trim() || undefined,
+    });
+  }, [fetchWaitlist, locationId, search, statusTab]);
 
   const visibleEntries = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -173,8 +178,18 @@ export function WaitlistPage() {
     [waitlistEntries]
   );
 
-  const availableTables = diningTables.filter(
-    (table) => table.status === "AVAILABLE"
+  const seatableTables = useMemo(() => {
+    return diningTables.filter((table) => {
+      if (table.status.toUpperCase() !== "AVAILABLE") return false;
+      const session = getLatestSessionByTableId(table.id);
+      if (session && !session.closedAt) return false;
+      return true;
+    });
+  }, [diningTables, getLatestSessionByTableId]);
+
+  const tableLabelById = useMemo(
+    () => new Map(diningTables.map((table) => [table.id, table.tableNumber])),
+    [diningTables]
   );
 
   const zoneNameById = useMemo(
@@ -416,7 +431,7 @@ export function WaitlistPage() {
           </p>
         )}
 
-        <div className="flex min-h-0 flex-1 flex-col p-4">
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4">
           {!selectedEntry ? (
             <div className="flex flex-1 flex-col items-center justify-center text-center">
               <DetailEmptyIllustration />
@@ -488,6 +503,17 @@ export function WaitlistPage() {
                     </dd>
                   </div>
                 ) : null}
+                {selectedEntry.assignedTableId ? (
+                  <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3">
+                    <dt className="text-xs uppercase tracking-wide text-slate-500">
+                      {t("cashier.table")}
+                    </dt>
+                    <dd className="mt-1 text-sm">
+                      {tableLabelById.get(selectedEntry.assignedTableId) ||
+                        selectedEntry.assignedTableId}
+                    </dd>
+                  </div>
+                ) : null}
                 {selectedEntry.preferredZoneId ? (
                   <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3">
                     <dt className="text-xs uppercase tracking-wide text-slate-500">
@@ -512,21 +538,53 @@ export function WaitlistPage() {
 
               {isActionable(selectedEntry) ? (
                 <div className="mt-auto space-y-3 border-t border-slate-800 pt-4">
-                  <select
-                    aria-label={t("cashier.waitlist.tableFor", {
-                      guest: selectedEntry.guestName,
-                    })}
-                    className={`${fieldClass} border-slate-700`}
-                    value={selectedTableId}
-                    onChange={(event) => setSelectedTableId(event.target.value)}
-                  >
-                    <option value="">{t("cashier.waitlist.chooseTable")}</option>
-                    {availableTables.map((table) => (
-                      <option key={table.id} value={table.id}>
-                        {table.tableNumber} ({table.maxSeats})
-                      </option>
-                    ))}
-                  </select>
+                  <div>
+                    <p className="text-sm font-medium text-slate-200">
+                      {t("cashier.waitlist.chooseTable")}
+                    </p>
+                    {seatableTables.length === 0 ? (
+                      <p className="mt-2 text-sm text-amber-200">
+                        {t("cashier.errors.noTableAvailable")}
+                      </p>
+                    ) : (
+                      <div
+                        className="mt-3 grid max-h-48 grid-cols-3 gap-2 overflow-y-auto sm:grid-cols-4"
+                        role="listbox"
+                        aria-label={t("cashier.waitlist.tableFor", {
+                          guest: selectedEntry.guestName,
+                        })}
+                      >
+                        {seatableTables.map((table) => {
+                          const isSelected = selectedTableId === table.id;
+                          const fitsParty = table.maxSeats >= selectedEntry.partySize;
+                          return (
+                            <button
+                              key={table.id}
+                              type="button"
+                              role="option"
+                              aria-selected={isSelected}
+                              disabled={!fitsParty}
+                              onClick={() => setSelectedTableId(table.id)}
+                              className={[
+                                "min-h-16 rounded border px-2 py-2 text-sm font-semibold transition",
+                                isSelected
+                                  ? "border-blue-500 bg-blue-950/40 text-white"
+                                  : "border-slate-700 bg-[#181818] text-slate-200 hover:border-blue-500",
+                                !fitsParty
+                                  ? "cursor-not-allowed opacity-40 hover:border-slate-700"
+                                  : "",
+                              ].join(" ")}
+                            >
+                              {table.tableNumber}
+                              <span className="mt-1 block text-[10px] font-normal text-slate-400">
+                                {table.maxSeats} {t("cashier.partySize").toLowerCase()}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     {selectedEntry.status === "WAITING" ? (
                       <Button

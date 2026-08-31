@@ -1,18 +1,19 @@
 import { ICustomerRepository } from "../../domain/repositories/ICustomerRepository";
-import { Customer } from "../../domain/entities/Customer";
+import { Customer, CustomerInteraction } from "../../domain/entities/Customer";
 import {
   CreateCustomerDTO,
-  UpdateCustomerDTO,
+  CreateCustomerInteractionDTO,
   CustomerFilterDTO,
   CustomerDomainListResponseDTO,
-  CustomerDTOMapper,
+  CustomerInteractionFilterDTO,
+  CustomerInteractionListResponseDTO,
+  UpdateCustomerDTO,
+  UpdateCustomerInteractionDTO,
 } from "../dtos/CustomerDTO";
 import { ICustomerService } from "../../domain/services/ICustomerService";
 
-/**
- * Example application service.
- * Orchestrates customer use cases against the repository interface.
- */
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export class CustomerManagementService implements ICustomerService {
   constructor(private customerRepository: ICustomerRepository) {}
 
@@ -20,12 +21,12 @@ export class CustomerManagementService implements ICustomerService {
     if (!customerData.name?.trim()) {
       throw new Error("Name is required");
     }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!customerData.email || !emailRegex.test(customerData.email)) {
+    if (!customerData.tenantId?.trim()) {
+      throw new Error("Tenant is required");
+    }
+    if (customerData.email && !emailRegex.test(customerData.email)) {
       throw new Error("Valid email is required");
     }
-
     return this.customerRepository.createCustomer(customerData);
   }
 
@@ -35,93 +36,113 @@ export class CustomerManagementService implements ICustomerService {
     return this.customerRepository.getCustomers(params);
   }
 
-  async getAllCustomers(): Promise<Customer[]> {
-    return this.customerRepository.getAllCustomers();
-  }
-
-  async getCustomerById(id: number): Promise<Customer> {
-    if (id <= 0) {
+  async getCustomerById(id: string): Promise<Customer> {
+    if (!id) {
       throw new Error("Invalid customer ID");
     }
     return this.customerRepository.getCustomerById(id);
   }
 
   async updateCustomer(
-    id: number,
+    id: string,
     customerData: UpdateCustomerDTO
   ): Promise<Customer> {
-    if (id <= 0) {
+    if (!id) {
       throw new Error("Invalid customer ID");
     }
-
-    const existingCustomer = await this.customerRepository.getCustomerById(id);
-    const updateData = CustomerDTOMapper.fromUpdateDTO(customerData);
-    const updatedCustomer = new Customer({
-      ...existingCustomer,
-      ...updateData,
-    });
-
-    if (!updatedCustomer.isValid()) {
-      throw new Error("Invalid customer data");
+    if (customerData.email && !emailRegex.test(customerData.email)) {
+      throw new Error("Valid email is required");
     }
-
-    return this.customerRepository.updateCustomer(id, updateData);
+    return this.customerRepository.updateCustomer(id, customerData);
   }
 
-  async deleteCustomer(id: number): Promise<boolean> {
-    if (id <= 0) {
+  async deleteCustomer(id: string): Promise<boolean> {
+    if (!id) {
       throw new Error("Invalid customer ID");
     }
     return this.customerRepository.deleteCustomer(id);
   }
 
-  async getCustomerByEmail(email: string): Promise<Customer> {
-    if (!email?.includes("@")) {
-      throw new Error("Invalid email address");
-    }
-    return this.customerRepository.getCustomerByEmail(email);
+  async getCustomerInteractions(
+    params?: CustomerInteractionFilterDTO
+  ): Promise<CustomerInteractionListResponseDTO> {
+    return this.customerRepository.getCustomerInteractions(params);
   }
 
-  async getCustomerByPhone(phone: string): Promise<Customer> {
-    if (!phone || phone.length < 10) {
-      throw new Error("Invalid phone number");
+  async getCustomerInteractionById(id: string): Promise<CustomerInteraction> {
+    if (!id) {
+      throw new Error("Invalid interaction ID");
     }
-    return this.customerRepository.getCustomerByPhone(phone);
+    return this.customerRepository.getCustomerInteractionById(id);
   }
 
-  async searchCustomers(
-    query: string,
-    take?: number,
-    skip?: number
-  ): Promise<CustomerDomainListResponseDTO> {
-    if (!query || query.trim().length < 2) {
-      throw new Error("Search query must be at least 2 characters long");
+  async getInteractionsForCustomer(
+    customerId: string,
+    params?: CustomerInteractionFilterDTO
+  ): Promise<CustomerInteractionListResponseDTO> {
+    if (!customerId) {
+      throw new Error("Invalid customer ID");
     }
+    return this.customerRepository.getInteractionsForCustomer(
+      customerId,
+      params
+    );
+  }
 
-    const trimmedQuery = query.trim();
-
-    const nameResults = await this.customerRepository.getCustomers({
-      name: trimmedQuery,
-      take,
-      skip,
-    });
-    if (nameResults.customers.length > 0) {
-      return nameResults;
+  async getInteractionForCustomer(
+    customerId: string,
+    id: string
+  ): Promise<CustomerInteraction> {
+    if (!customerId || !id) {
+      throw new Error("Invalid interaction ID");
     }
+    return this.customerRepository.getInteractionForCustomer(customerId, id);
+  }
 
-    const emailResults = await this.customerRepository.getCustomers({
-      email: trimmedQuery,
-      take,
-      skip,
-    });
-    if (emailResults.customers.length > 0) {
-      return emailResults;
+  async createCustomerInteraction(
+    customerId: string,
+    payload: CreateCustomerInteractionDTO
+  ): Promise<CustomerInteraction> {
+    if (!customerId) {
+      throw new Error("Invalid customer ID");
     }
+    if (!payload.summary?.trim()) {
+      throw new Error("Summary is required");
+    }
+    if (!payload.interactionChannel?.trim()) {
+      throw new Error("Interaction channel is required");
+    }
+    if (!payload.interactionType?.trim()) {
+      throw new Error("Interaction type is required");
+    }
+    return this.customerRepository.createCustomerInteraction(
+      customerId,
+      payload
+    );
+  }
 
-    return this.customerRepository.getCustomers({
-      phone: trimmedQuery,
-      take,
-      skip,
-    });
+  async updateCustomerInteraction(
+    customerId: string,
+    id: string,
+    payload: UpdateCustomerInteractionDTO
+  ): Promise<CustomerInteraction> {
+    if (!customerId || !id) {
+      throw new Error("Invalid interaction ID");
+    }
+    return this.customerRepository.updateCustomerInteraction(
+      customerId,
+      id,
+      payload
+    );
+  }
+
+  async deleteCustomerInteraction(
+    customerId: string,
+    id: string
+  ): Promise<boolean> {
+    if (!customerId || !id) {
+      throw new Error("Invalid interaction ID");
+    }
+    return this.customerRepository.deleteCustomerInteraction(customerId, id);
   }
 }
