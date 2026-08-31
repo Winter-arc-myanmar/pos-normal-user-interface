@@ -69,6 +69,16 @@ function OrdersIcon() {
   );
 }
 
+function SyncIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass} aria-hidden="true">
+      <path d="M4 7h11a4 4 0 0 1 0 8H9" />
+      <path d="m7 11-3-3 3-3M20 17H9a4 4 0 0 1 0-8h6" />
+      <path d="m17 13 3 3-3 3" />
+    </svg>
+  );
+}
+
 export function AppShell() {
   const { t } = useTranslation();
   const { user, logout, setActiveBranch } = useAuth();
@@ -123,6 +133,12 @@ export function AppShell() {
       label: t("shell.tipPoolsTitle"),
       icon: <TipsIcon />,
       visible: canAccess(PAGE_PERMISSIONS.tipPools),
+    },
+    {
+      to: "/sync",
+      label: t("shell.syncTitle"),
+      icon: <SyncIcon />,
+      visible: canAccess(PAGE_PERMISSIONS.sync),
     },
     {
       to: "/dashboard",

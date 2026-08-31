@@ -15,6 +15,10 @@ import { ICustomerService } from "../../domain/services/ICustomerService";
 import { IUserService } from "../../domain/services/IUserService";
 import { CashierService } from "../../application/services/CashierService";
 import { ApiCashierRepository } from "../repositories/ApiCashierRepository";
+import { IPosSyncRepository } from "../../domain/repositories/IPosSyncRepository";
+import { ApiPosSyncRepository } from "../repositories/ApiPosSyncRepository";
+import { IPosSyncService } from "../../domain/services/IPosSyncService";
+import { PosSyncService } from "../../application/services/PosSyncService";
 
 /**
  * Dependency Injection Container
@@ -48,6 +52,10 @@ class Container {
       "cashierRepository",
       new ApiCashierRepository(this.resolve("httpClient"))
     );
+    this.register<IPosSyncRepository>(
+      "posSyncRepository",
+      new ApiPosSyncRepository(this.resolve("httpClient"))
+    );
 
     this.register<IAuthService>(
       "authService",
@@ -66,6 +74,10 @@ class Container {
     this.register<ICashierService>(
       "cashierService",
       new CashierService(this.resolve("cashierRepository"))
+    );
+    this.register<IPosSyncService>(
+      "posSyncService",
+      new PosSyncService(this.resolve("posSyncRepository"))
     );
   }
 

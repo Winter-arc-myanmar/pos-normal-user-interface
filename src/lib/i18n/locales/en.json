@@ -39,6 +39,7 @@
     "counterOrdersTitle": "Counter orders",
     "waitlistTitle": "Waitlist",
     "tipPoolsTitle": "Tip pools",
+    "syncTitle": "Sync",
     "usersTitle": "Users",
     "usersMeta": "Example list",
     "customersTitle": "CRM",
@@ -143,6 +144,28 @@
     "saveFailed": "Unable to save customer.",
     "deleteFailed": "Unable to delete customer.",
     "interactionFailed": "Unable to save interaction."
+  },
+  "sync": {
+    "title": "Sync & maintenance",
+    "subtitle": "Keep this device aligned with cloud settings, orders, and services.",
+    "lastRun": "Last time {{time}}",
+    "neverRun": "Not run yet on this device",
+    "settings": {
+      "title": "Get latest settings",
+      "description": "After the merchant updates POS parameters in the back office, pull the latest settings so this register can apply them.",
+      "getUpdates": "Get updates",
+      "itemUpdates": "Item updates"
+    },
+    "upload": {
+      "title": "Upload order",
+      "description": "Synchronize orders from this device to the cloud. The system can also auto-sync every 30 minutes once connected.",
+      "uploadNow": "Upload now"
+    },
+    "restart": {
+      "title": "Service restart",
+      "description": "If a linked SubPOS service stops responding, try restarting the local service stack from here.",
+      "restart": "Restart"
+    }
   },
   "customers": {
     "title": "Customers",

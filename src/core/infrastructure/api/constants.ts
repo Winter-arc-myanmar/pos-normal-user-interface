@@ -174,6 +174,15 @@ export const API_ENDPOINTS = {
     PICKUP: (id: string) => `/api/v1/counter-orders/${id}/pickup`,
   },
 
+  // Placeholder POS sync endpoints — replace when backend contract is confirmed.
+  POS_SYNC: {
+    PULL_SETTINGS: "/api/v1/pos-sync/settings/pull",
+    PULL_ITEMS: "/api/v1/pos-sync/items/pull",
+    UPLOAD_ORDERS: "/api/v1/pos-sync/orders/upload",
+    RESTART_SERVICE: "/api/v1/pos-sync/service/restart",
+    STATUS: "/api/v1/pos-sync/status",
+  },
+
   CSRF: {
     TOKEN: "/csrf/token",
   },

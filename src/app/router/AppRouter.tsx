@@ -56,6 +56,11 @@ const CustomersPage = lazy(() =>
     default: module.CustomersPage,
   }))
 );
+const SyncPage = lazy(() =>
+  import("../../pages/SyncPage").then((module) => ({
+    default: module.SyncPage,
+  }))
+);
 const NotFoundPage = lazy(() =>
   import("../../pages/NotFoundPage").then((module) => ({
     default: module.NotFoundPage,
@@ -225,6 +230,16 @@ export function AppRouter() {
                     requiredPermissions={PAGE_PERMISSIONS.customers}
                   >
                     <CustomersPage />
+                  </RequirePermission>
+                }
+              />
+              <Route
+                path="/sync"
+                element={
+                  <RequirePermission
+                    requiredPermissions={PAGE_PERMISSIONS.sync}
+                  >
+                    <SyncPage />
                   </RequirePermission>
                 }
               />

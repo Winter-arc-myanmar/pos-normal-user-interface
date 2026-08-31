@@ -16,6 +16,7 @@ export const PAGE_PERMISSIONS = {
   waitlist: [] as string[],
   tipPools: [] as string[],
   counterOrders: [] as string[],
+  sync: [] as string[],
 } as const;
 
 export const PERMISSION_ROUTE_ORDER = [
@@ -24,9 +25,9 @@ export const PERMISSION_ROUTE_ORDER = [
   { path: "/customers", permissions: PAGE_PERMISSIONS.customers },
   { path: "/waitlist", permissions: PAGE_PERMISSIONS.waitlist },
   { path: "/tip-pools", permissions: PAGE_PERMISSIONS.tipPools },
+  { path: "/sync", permissions: PAGE_PERMISSIONS.sync },
   { path: "/dashboard", permissions: PAGE_PERMISSIONS.dashboard },
   { path: "/users", permissions: PAGE_PERMISSIONS.users },
-  { path: "/customers", permissions: PAGE_PERMISSIONS.customers },
 ] as const;
 
 const normalizePermission = (value: string) => value.trim().toUpperCase();
