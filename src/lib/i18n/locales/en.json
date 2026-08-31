@@ -55,7 +55,8 @@
     "menu": "Menu",
     "orders": "Orders",
     "pay": "Pay",
-    "branch": "Active branch"
+    "branch": "Active branch",
+    "settingsTitle": "Settings"
   },
   "login": {
     "title": "Sign in",
@@ -165,6 +166,89 @@
       "title": "Service restart",
       "description": "If a linked SubPOS service stops responding, try restarting the local service stack from here.",
       "restart": "Restart"
+    }
+  },
+  "settings": {
+    "profileLabel": "Open settings",
+    "tabs": {
+      "cashier": "Cashier Settings",
+      "devices": "Devices & IP",
+      "printer": "Printer",
+      "printTemplate": "Print Template",
+      "posTerminal": "POS terminal",
+      "logout": "Logout"
+    },
+    "cashier": {
+      "shortcutKey": "Shortcut key",
+      "editShortcut": "Edit shortcut key",
+      "behaviorTitle": "Cashier behavior",
+      "autoCheckout": {
+        "title": "Auto Check Out",
+        "description": "Switch on: After paying off the order, the system will automatically check out the order."
+      },
+      "serviceTypes": {
+        "DINE_IN": "Dine In",
+        "TAKE_AWAY": "Take Away",
+        "DELIVERY": "Delivery",
+        "PICK_UP": "Pick Up"
+      },
+      "quickActions": {
+        "soldOut": "Sold Out",
+        "kitchenPrint": "Kitchen Print",
+        "reserve": "Reserve",
+        "seasonalItems": "Seasonal Items",
+        "bookkeeping": "Bookkeeping",
+        "storage": "Storage",
+        "pickUp": "Pick up"
+      },
+      "openNewOrder": {
+        "title": "Open New Order After Check Out",
+        "description": "After checkout completes, start a new order immediately."
+      },
+      "quickOrder": {
+        "title": "Quick Order",
+        "description": "Creating a new order goes directly to the menu."
+      },
+      "priorityMemo": {
+        "title": "Priority display order memo",
+        "description": "Show the order memo before other order details."
+      }
+    },
+    "devices": {
+      "title": "Devices & IP",
+      "deviceName": "Device name",
+      "deviceNamePlaceholder": "POS terminal 01",
+      "ipAddress": "IP address",
+      "subnetMask": "Subnet mask",
+      "gateway": "Gateway",
+      "hint": "Network settings will sync when the device API is connected."
+    },
+    "printer": {
+      "title": "Printer",
+      "name": "Printer name",
+      "namePlaceholder": "Kitchen printer",
+      "connection": "Connection type",
+      "ipAddress": "Printer IP address",
+      "hint": "Printer routing will be configured when the print service is connected."
+    },
+    "printTemplate": {
+      "title": "Print Template",
+      "name": "Template name",
+      "paperWidth": "Paper width",
+      "preview": "Receipt template preview will appear here."
+    },
+    "posTerminal": {
+      "title": "POS terminal",
+      "name": "Terminal name",
+      "namePlaceholder": "Front counter",
+      "registerId": "Register ID",
+      "receiptHeader": "Receipt header",
+      "receiptHeaderPlaceholder": "Store name and address",
+      "hint": "Terminal details will bind to the active POS session when connected."
+    },
+    "logout": {
+      "title": "Sign out",
+      "description": "End your cashier session on this device."
     }
   },
   "customers": {

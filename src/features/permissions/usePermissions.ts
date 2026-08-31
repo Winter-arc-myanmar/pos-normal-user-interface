@@ -17,6 +17,7 @@ export const PAGE_PERMISSIONS = {
   tipPools: [] as string[],
   counterOrders: [] as string[],
   sync: [] as string[],
+  settings: [] as string[],
 } as const;
 
 export const PERMISSION_ROUTE_ORDER = [

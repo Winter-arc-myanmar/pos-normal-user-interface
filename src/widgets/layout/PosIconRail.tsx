@@ -11,15 +11,15 @@ export interface PosRailItem {
 interface PosIconRailProps {
   items: PosRailItem[];
   userName: string;
-  onLogout: () => void;
-  logoutLabel: string;
+  profileLabel: string;
+  onProfileClick: () => void;
 }
 
 export function PosIconRail({
   items,
   userName,
-  onLogout,
-  logoutLabel,
+  profileLabel,
+  onProfileClick,
 }: PosIconRailProps) {
   return (
     <aside className="pos-safe-y flex min-h-0 flex-col items-center border-r border-white/10 bg-black px-1.5 py-2 text-white">
@@ -55,10 +55,10 @@ export function PosIconRail({
 
       <button
         type="button"
-        title={logoutLabel}
-        aria-label={logoutLabel}
-        onClick={onLogout}
-        className="mt-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-white/30 bg-slate-500 text-sm font-bold text-white"
+        title={profileLabel}
+        aria-label={profileLabel}
+        onClick={onProfileClick}
+        className="mt-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-white/30 bg-slate-500 text-sm font-bold text-white transition hover:border-white/60 hover:bg-slate-400"
       >
         {userName.slice(0, 1).toUpperCase()}
       </button>

@@ -61,6 +61,11 @@ const SyncPage = lazy(() =>
     default: module.SyncPage,
   }))
 );
+const PosSettingsPage = lazy(() =>
+  import("../../pages/PosSettingsPage").then((module) => ({
+    default: module.PosSettingsPage,
+  }))
+);
 const NotFoundPage = lazy(() =>
   import("../../pages/NotFoundPage").then((module) => ({
     default: module.NotFoundPage,
@@ -240,6 +245,26 @@ export function AppRouter() {
                     requiredPermissions={PAGE_PERMISSIONS.sync}
                   >
                     <SyncPage />
+                  </RequirePermission>
+                }
+              />
+              <Route
+                path="/settings"
+                element={
+                  <RequirePermission
+                    requiredPermissions={PAGE_PERMISSIONS.settings}
+                  >
+                    <Navigate to="/settings/cashier" replace />
+                  </RequirePermission>
+                }
+              />
+              <Route
+                path="/settings/:tab"
+                element={
+                  <RequirePermission
+                    requiredPermissions={PAGE_PERMISSIONS.settings}
+                  >
+                    <PosSettingsPage />
                   </RequirePermission>
                 }
               />

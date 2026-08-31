@@ -81,7 +81,7 @@ function SyncIcon() {
 
 export function AppShell() {
   const { t } = useTranslation();
-  const { user, logout, setActiveBranch } = useAuth();
+  const { user, setActiveBranch } = useAuth();
   const { canAccess } = usePermissions();
   const navigate = useNavigate();
   const location = useLocation();
@@ -92,6 +92,9 @@ export function AppShell() {
     "/counter-orders",
     "/customers",
   ].some((path) => location.pathname.startsWith(path));
+  const isFullBleedLightPage = ["/settings", "/sync"].some((path) =>
+    location.pathname.startsWith(path)
+  );
 
   const currentUserName =
     user?.nickname || user?.name || t("shell.userFallback");
@@ -154,11 +157,6 @@ export function AppShell() {
     },
   ];
 
-  const handleLogout = async () => {
-    await logout();
-    navigate("/login", { replace: true });
-  };
-
   const openCashierView = (view: "menu" | "orders" | "pay") => {
     navigate(`/cashier?view=${view}`);
   };
@@ -177,8 +175,8 @@ export function AppShell() {
       <PosIconRail
         items={railItems}
         userName={currentUserName}
-        logoutLabel={t("shell.logout")}
-        onLogout={handleLogout}
+        profileLabel={t("settings.profileLabel")}
+        onProfileClick={() => navigate("/settings/cashier")}
       />
 
       <main
@@ -186,7 +184,9 @@ export function AppShell() {
           "min-h-0 min-w-0 overflow-hidden",
           isPosWorkspace
             ? "bg-[#080808]"
-            : "overflow-y-auto bg-slate-100 p-4 text-slate-900 sm:p-5",
+            : isFullBleedLightPage
+              ? "overflow-hidden bg-slate-100"
+              : "overflow-y-auto bg-slate-100 p-4 text-slate-900 sm:p-5",
         ].join(" ")}
       >
         <Outlet />
