@@ -389,7 +389,9 @@
       "checkoutSuccess": "Payment completed successfully.",
       "kdsSent": "Order sent to kitchen (KDS).",
       "cartStarted": "New cart started. Add products from the menu.",
-      "dineInStarted": "Dine-in order started. Assign a table or add items from the menu.",
+      "tableCartStarted": "Add products from the menu, then choose a table.",
+      "assignTableToContinue": "Choose a table on the floor plan to continue.",
+      "dineInStarted": "Dine-in order started. Add items from the menu or assign a table.",
       "tableStatusUpdated": "Table marked {{status}}.",
       "sessionStateUpdated": "Session updated to {{state}}."
     },

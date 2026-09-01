@@ -29,7 +29,6 @@ interface OrderPanelProps {
   paymentInputRef: RefObject<HTMLInputElement | null>;
   isLoading: boolean;
   canCreateOrder?: boolean;
-  isTableService?: boolean;
   isDineInService?: boolean;
   feedback?: string | null;
   errorMessage?: string | null;
@@ -60,7 +59,6 @@ export function OrderPanel({
   paymentInputRef,
   isLoading,
   canCreateOrder = true,
-  isTableService = false,
   isDineInService = false,
   feedback,
   errorMessage,
@@ -292,11 +290,9 @@ export function OrderPanel({
           disabled={!canCreateOrder || isLoading}
           onClick={onCreateOrder}
         >
-          {isTableService
-            ? t("cashier.orderPanel.selectTable")
-            : isDineInService
-              ? t("cashier.orderPanel.newDineInOrder")
-              : t("cashier.newOrder")}
+          {isDineInService
+            ? t("cashier.orderPanel.newDineInOrder")
+            : t("cashier.newOrder")}
         </Button>
       )}
 

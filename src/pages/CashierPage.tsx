@@ -348,33 +348,69 @@ export function CashierPage() {
     if (boardPage > boardPageCount) setBoardPage(boardPageCount);
   }, [boardPage, boardPageCount]);
 
-  useEffect(() => {
-    if (isTableService && isDirectCheckoutMode) {
+  const requiresTableAssignment =
+    isTableService && isDirectCheckoutMode && directCartLines.length > 0;
+
+  const promptTableSelection = useCallback(() => {
+    setNotice(t("cashier.orderPanel.assignTableToContinue"));
+    setSearchParams({ view: "orders" });
+  }, [setSearchParams, t]);
+
+  const flushPendingLinesToSession = useCallback(
+    async (
+      session: (typeof tableSessions)[number],
+      lines: typeof directCartLines
+    ) => {
+      for (const line of lines) {
+        const variant = variantById[line.variantId];
+        const product = variant ? productById[variant.productId] : undefined;
+        if (!product) continue;
+
+        await addProductToTableSession(
+          session.id,
+          product,
+          line.variantId,
+          Number(line.quantity || 1)
+        );
+      }
+
+      if (session.sessionState === "SEATED") {
+        await updateTableSessionState(session.id, { sessionState: "ORDERING" });
+      }
       setIsDirectCheckoutMode(false);
       setDirectCartLines([]);
+    },
+    [
+      addProductToTableSession,
+      productById,
+      updateTableSessionState,
+      variantById,
+    ]
+  );
+
+  const handleCloseMenu = useCallback(() => {
+    if (requiresTableAssignment) {
+      promptTableSelection();
+      return;
     }
-  }, [isDirectCheckoutMode, isTableService]);
+    setSearchParams({ view: "orders" });
+  }, [promptTableSelection, requiresTableAssignment, setSearchParams]);
 
   const handleCreateOrder = async () => {
     setLocalError(null);
     try {
       await requireCashierContext();
-      if (isTableService) {
-        setLocalError(null);
-        setNotice(t("cashier.productMenu.selectTableTitle"));
-        setSearchParams({ view: "menu" });
-        return;
-      }
       setIsDirectCheckoutMode(true);
       setDirectCartLines([]);
       setLocalError(null);
       setNotice(
-        isDineInService
-          ? t("cashier.orderPanel.dineInStarted")
-          : t("cashier.orderPanel.cartStarted")
+        isTableService
+          ? t("cashier.orderPanel.tableCartStarted")
+          : isDineInService
+            ? t("cashier.orderPanel.dineInStarted")
+            : t("cashier.orderPanel.cartStarted")
       );
       setSearchParams({ view: "menu" });
-      return;
     } catch (caught) {
       setLocalError(
         caught instanceof Error
@@ -387,8 +423,11 @@ export function CashierPage() {
   const handleTableTap = async (tableId: string) => {
     setLocalError(null);
     setNotice(null);
-    setIsDirectCheckoutMode(false);
-    setDirectCartLines([]);
+    const pendingLines = isDirectCheckoutMode ? [...directCartLines] : [];
+    if (!pendingLines.length) {
+      setIsDirectCheckoutMode(false);
+      setDirectCartLines([]);
+    }
     const table = diningTables.find((item) => item.id === tableId);
     if (!table) return;
 
@@ -397,6 +436,9 @@ export function CashierPage() {
       const latestSession = getLatestSessionByTableId(table.id);
       if (latestSession && !latestSession.closedAt && latestSession.salesOrderId) {
         await selectOrderById(latestSession.salesOrderId);
+        if (pendingLines.length) {
+          await flushPendingLinesToSession(latestSession, pendingLines);
+        }
         setSearchParams({ view: "menu" });
         return;
       }
@@ -412,6 +454,9 @@ export function CashierPage() {
       });
       if (newSession.salesOrderId) {
         await selectOrderById(newSession.salesOrderId);
+      }
+      if (pendingLines.length) {
+        await flushPendingLinesToSession(newSession, pendingLines);
       }
       setSearchParams({ view: "menu" });
     } catch (caught) {
@@ -447,7 +492,7 @@ export function CashierPage() {
         variantId,
         quantity
       );
-    } else if (!requiresTableSelection) {
+    } else if (!requiresTableSelection || isDirectCheckoutMode) {
       setIsDirectCheckoutMode(true);
       setDirectCartLines((current) => {
         const variants = variantsByProductId[product.id] || [];
@@ -493,6 +538,11 @@ export function CashierPage() {
   const handleCheckout = async () => {
     setLocalError(null);
     setNotice(null);
+
+    if (requiresTableAssignment) {
+      promptTableSelection();
+      return;
+    }
 
     try {
       const context = await requireCashierContext();
@@ -625,6 +675,11 @@ export function CashierPage() {
   const handleFireKds = async () => {
     setLocalError(null);
     setNotice(null);
+
+    if (requiresTableAssignment) {
+      promptTableSelection();
+      return;
+    }
 
     try {
       let salesOrderId = selectedOrder?.id;
@@ -766,7 +821,6 @@ export function CashierPage() {
         paymentInputRef={paymentInputRef}
         isLoading={isLoading || isPosSessionLoading}
         canCreateOrder={isWorkspaceReady && !isPosSessionLoading}
-        isTableService={isTableService}
         isDineInService={isDineInService}
         feedback={notice}
         errorMessage={localError || error}
@@ -788,18 +842,9 @@ export function CashierPage() {
           <ProductMenu
             products={products}
             variantsByProductId={variantsByProductId}
-            disabled={requiresTableSelection && !selectedOrder}
-            needsTableSelection={requiresTableSelection && !selectedOrder}
-            optionalTableSelection={
-              isDineInService && !selectedOrder && !selectedOrderSession
-            }
-            tables={filteredTables}
-            selectedTableId={selectedOrderTable?.id}
-            getLatestSession={getLatestSessionByTableId}
-            onTableSelect={(tableId) => void handleTableTap(tableId)}
             onLoadVariants={fetchProductVariants}
             onAdd={handleAddProduct}
-            onClose={() => setSearchParams({ view: "orders" })}
+            onClose={handleCloseMenu}
           />
         ) : (
           <CashierBoard

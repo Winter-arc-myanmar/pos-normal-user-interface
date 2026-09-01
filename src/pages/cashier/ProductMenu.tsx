@@ -1,23 +1,11 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
-import {
-  DiningTable,
-  Product,
-  ProductVariant,
-  TableSession,
-} from "@/core/domain/entities/Cashier";
+import { Product, ProductVariant } from "@/core/domain/entities/Cashier";
 
 interface ProductMenuProps {
   products: Product[];
   variantsByProductId: Record<string, ProductVariant[]>;
-  disabled?: boolean;
-  needsTableSelection?: boolean;
-  optionalTableSelection?: boolean;
-  tables?: DiningTable[];
-  selectedTableId?: string;
-  getLatestSession?: (tableId: string) => TableSession | undefined;
-  onTableSelect?: (tableId: string) => void;
   onLoadVariants: (productId: string) => Promise<ProductVariant[]>;
   onAdd: (
     product: Product,
@@ -30,13 +18,6 @@ interface ProductMenuProps {
 export function ProductMenu({
   products,
   variantsByProductId,
-  disabled,
-  needsTableSelection = false,
-  optionalTableSelection = false,
-  tables = [],
-  selectedTableId,
-  getLatestSession,
-  onTableSelect,
   onLoadVariants,
   onAdd,
   onClose,
@@ -107,64 +88,6 @@ export function ProductMenu({
           {t("cashier.productMenu.close")}
         </Button>
       </header>
-
-      {(needsTableSelection || optionalTableSelection) ? (
-        <div
-          className={[
-            "mt-2 rounded border p-3",
-            needsTableSelection
-              ? "border-amber-500/40 bg-amber-950/20"
-              : "border-slate-600 bg-slate-900/60",
-          ].join(" ")}
-        >
-          <p
-            className={[
-              "text-sm font-medium",
-              needsTableSelection ? "text-amber-200" : "text-slate-200",
-            ].join(" ")}
-          >
-            {needsTableSelection
-              ? t("cashier.productMenu.selectTableTitle")
-              : t("cashier.productMenu.selectTableOptionalTitle")}
-          </p>
-          <p
-            className={[
-              "mt-1 text-xs",
-              needsTableSelection ? "text-amber-100/80" : "text-slate-400",
-            ].join(" ")}
-          >
-            {needsTableSelection
-              ? t("cashier.productMenu.selectTableHint")
-              : t("cashier.productMenu.selectTableOptionalHint")}
-          </p>
-          <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-6">
-            {tables.map((table) => {
-              const session = getLatestSession?.(table.id);
-              const isSelected = selectedTableId === table.id;
-              return (
-                <button
-                  key={table.id}
-                  type="button"
-                  onClick={() => onTableSelect?.(table.id)}
-                  className={[
-                    "min-h-16 rounded border px-2 py-2 text-sm font-semibold transition",
-                    isSelected
-                      ? "border-blue-500 bg-blue-950/40 text-white"
-                      : "border-slate-700 bg-[#181818] text-slate-200 hover:border-blue-500",
-                  ].join(" ")}
-                >
-                  {table.tableNumber}
-                  {session && !session.closedAt ? (
-                    <span className="mt-1 block text-[10px] font-normal text-slate-400">
-                      {session.sessionState}
-                    </span>
-                  ) : null}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
 
       <div className="mt-2 grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_13rem] gap-2">
         <div className="grid content-start grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3 xl:grid-cols-4">
@@ -244,19 +167,12 @@ export function ProductMenu({
 
               <Button
                 fullWidth
-                disabled={disabled || !selectedVariantId}
+                disabled={!selectedVariantId}
                 isLoading={isAdding}
                 onClick={() => void addSelected()}
               >
                 {t("cashier.productMenu.add")}
               </Button>
-              {disabled ? (
-                <p className="text-xs text-amber-300">
-                  {needsTableSelection
-                    ? t("cashier.productMenu.selectTableHint")
-                    : t("cashier.productMenu.selectOrder")}
-                </p>
-              ) : null}
             </div>
           ) : (
             <p className="text-sm text-slate-400">
