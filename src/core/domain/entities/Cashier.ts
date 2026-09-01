@@ -53,13 +53,20 @@ export class SalesOrder {
   locationId!: string;
   customerId?: string;
   orderNumber!: string;
+  businessDate?: string;
   salesChannel!: string;
   serviceType!: ServiceType;
+  idempotencyKey?: string;
   status!: OrderStatus;
-  grandTotal!: string;
   subtotal!: string;
-  totalTax!: string;
   totalDiscount!: string;
+  totalTax!: string;
+  tipAmount?: string;
+  serviceCharge?: string;
+  grandTotal!: string;
+  pickupNumber?: string;
+  pickedUpAt?: string | null;
+  discountReasonId?: string;
   createdAt!: string;
   updatedAt!: string;
 
@@ -75,10 +82,19 @@ export class SalesOrderLine {
   quantity!: string;
   unitPrice!: string;
   lineDiscount?: string;
+  taxRateId?: string;
   taxAmount?: string;
+  appliedPromotionId?: string;
   status?: string;
+  firedAt?: string;
+  voidedAt?: string;
+  voidReasonId?: string;
+  compReasonId?: string;
+  courseType?: string;
+  selectedModifiers?: Record<string, unknown>;
   seatNumber?: number;
   createdAt?: string;
+  updatedAt?: string;
 
   constructor(data: Partial<SalesOrderLine>) {
     Object.assign(this, data);

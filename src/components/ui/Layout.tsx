@@ -1,8 +1,6 @@
 import { type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Outlet } from "react-router-dom";
-import { useTheme } from "@/theme/useTheme";
-import { ThemeToggle } from "@/components/ThemeToggle";
 
 type LayoutProps = {
   sidebar: ReactNode;
@@ -67,11 +65,9 @@ function UserIcon() {
 
 export function Layout({ sidebar, headerExtra, children }: LayoutProps) {
   const { t } = useTranslation();
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-950">
+    <div className="flex h-screen overflow-hidden bg-slate-50">
       {/* Sidebar */}
       <div className="flex-shrink-0 overflow-y-auto">
         {sidebar}
@@ -80,25 +76,11 @@ export function Layout({ sidebar, headerExtra, children }: LayoutProps) {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header
-          className={[
-            "flex items-center justify-between gap-4 px-6 py-3",
-            "border-b bg-white/95 backdrop-blur-sm",
-            isDark
-              ? "border-slate-800 bg-slate-950/95"
-              : "border-slate-200",
-          ].join(" ")}
-        >
+        <header className="flex items-center justify-between gap-4 border-b border-slate-200 bg-white/95 px-6 py-3 backdrop-blur-sm">
           <div className="flex items-center gap-3">
             <button
               type="button"
-              className={[
-                "inline-flex items-center justify-center w-9 h-9 rounded-lg",
-                "transition-colors duration-150",
-                isDark
-                  ? "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
-                  : "text-slate-500 hover:text-slate-700 hover:bg-slate-100",
-              ].join(" ")}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-700"
               aria-label={t("layout.toggleMenu")}
             >
               <MenuIcon />
@@ -110,34 +92,19 @@ export function Layout({ sidebar, headerExtra, children }: LayoutProps) {
             {/* Notifications */}
             <button
               type="button"
-              className={[
-                "relative inline-flex items-center justify-center w-9 h-9 rounded-lg",
-                "transition-colors duration-150",
-                isDark
-                  ? "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
-                  : "text-slate-500 hover:text-slate-700 hover:bg-slate-100",
-              ].join(" ")}
+              className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-700"
               aria-label={t("layout.notifications")}
             >
               <BellIcon />
-              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-500 text-[9px] font-bold text-white flex items-center justify-center">
+              <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
                 3
               </span>
             </button>
 
-            {/* Theme Toggle */}
-            <ThemeToggle />
-
             {/* User Avatar */}
             <button
               type="button"
-              className={[
-                "inline-flex items-center justify-center w-9 h-9 rounded-lg",
-                "transition-colors duration-150",
-                isDark
-                  ? "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
-                  : "text-slate-500 hover:text-slate-700 hover:bg-slate-100",
-              ].join(" ")}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition-colors duration-150 hover:bg-slate-100 hover:text-slate-700"
               aria-label={t("layout.userMenu")}
             >
               <UserIcon />

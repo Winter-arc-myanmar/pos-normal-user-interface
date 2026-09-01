@@ -19,6 +19,10 @@ import { IPosSyncRepository } from "../../domain/repositories/IPosSyncRepository
 import { ApiPosSyncRepository } from "../repositories/ApiPosSyncRepository";
 import { IPosSyncService } from "../../domain/services/IPosSyncService";
 import { PosSyncService } from "../../application/services/PosSyncService";
+import { ISalesOrderRepository } from "../../domain/repositories/ISalesOrderRepository";
+import { ApiSalesOrderRepository } from "../repositories/ApiSalesOrderRepository";
+import { ISalesOrderService } from "../../domain/services/ISalesOrderService";
+import { SalesOrderService } from "../../application/services/SalesOrderService";
 
 /**
  * Dependency Injection Container
@@ -56,6 +60,10 @@ class Container {
       "posSyncRepository",
       new ApiPosSyncRepository(this.resolve("httpClient"))
     );
+    this.register<ISalesOrderRepository>(
+      "salesOrderRepository",
+      new ApiSalesOrderRepository(this.resolve("httpClient"))
+    );
 
     this.register<IAuthService>(
       "authService",
@@ -78,6 +86,10 @@ class Container {
     this.register<IPosSyncService>(
       "posSyncService",
       new PosSyncService(this.resolve("posSyncRepository"))
+    );
+    this.register<ISalesOrderService>(
+      "salesOrderService",
+      new SalesOrderService(this.resolve("salesOrderRepository"))
     );
   }
 

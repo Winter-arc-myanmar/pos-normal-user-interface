@@ -12,14 +12,39 @@ interface PosIconRailProps {
   items: PosRailItem[];
   userName: string;
   profileLabel: string;
+  printerLabel?: string;
+  printerBadgeCount?: number;
   onProfileClick: () => void;
+  onPrinterClick?: () => void;
+}
+
+function PrinterIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-5 w-5"
+      aria-hidden="true"
+    >
+      <path d="M6 9V3h12v6" />
+      <rect x="6" y="13" width="12" height="8" rx="1" />
+      <path d="M6 17H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+    </svg>
+  );
 }
 
 export function PosIconRail({
   items,
   userName,
   profileLabel,
+  printerLabel,
+  printerBadgeCount = 0,
   onProfileClick,
+  onPrinterClick,
 }: PosIconRailProps) {
   return (
     <aside className="pos-safe-y flex min-h-0 flex-col items-center border-r border-white/10 bg-black px-1.5 py-2 text-white">
@@ -52,6 +77,23 @@ export function PosIconRail({
             </NavLink>
           ))}
       </nav>
+
+      {onPrinterClick ? (
+        <button
+          type="button"
+          title={printerLabel}
+          aria-label={printerLabel}
+          onClick={onPrinterClick}
+          className="relative mb-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-white/85 transition hover:bg-white/10 hover:text-white"
+        >
+          <PrinterIcon />
+          {printerBadgeCount > 0 ? (
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+              {printerBadgeCount > 9 ? "9+" : printerBadgeCount}
+            </span>
+          ) : null}
+        </button>
+      ) : null}
 
       <button
         type="button"

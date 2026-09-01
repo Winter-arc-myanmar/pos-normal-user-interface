@@ -20,10 +20,6 @@ vi.mock("@/components/LanguageSwitcher", () => ({
   LanguageSwitcher: () => <button type="button">Language</button>,
 }));
 
-vi.mock("@/components/ThemeToggle", () => ({
-  ThemeToggle: () => <button type="button">Theme</button>,
-}));
-
 vi.mock("@/core/presentation/hooks/useAuth", () => ({
   useAuth: () => ({
     user: {

@@ -1,5 +1,4 @@
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
-import { ThemeToggle } from "@/components/ThemeToggle";
 
 interface PosActionRailProps {
   drawerLabel: string;
@@ -49,7 +48,6 @@ export function PosActionRail({
           </label>
         ) : null}
         <LanguageSwitcher />
-        <ThemeToggle />
       </div>
 
       <div className="mt-auto grid grid-cols-2 gap-1 text-center text-[10px] font-medium">

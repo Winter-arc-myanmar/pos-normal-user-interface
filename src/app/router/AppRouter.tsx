@@ -46,6 +46,11 @@ const CounterOrdersPage = lazy(() =>
     default: module.CounterOrdersPage,
   }))
 );
+const SalesOrdersPage = lazy(() =>
+  import("../../pages/SalesOrdersPage").then((module) => ({
+    default: module.SalesOrdersPage,
+  }))
+);
 const UsersPage = lazy(() =>
   import("../../pages/UsersPage").then((module) => ({
     default: module.UsersPage,
@@ -215,6 +220,16 @@ export function AppRouter() {
                     requiredPermissions={PAGE_PERMISSIONS.counterOrders}
                   >
                     <CounterOrdersPage />
+                  </RequirePermission>
+                }
+              />
+              <Route
+                path="/sales-orders"
+                element={
+                  <RequirePermission
+                    requiredPermissions={PAGE_PERMISSIONS.salesOrders}
+                  >
+                    <SalesOrdersPage />
                   </RequirePermission>
                 }
               />

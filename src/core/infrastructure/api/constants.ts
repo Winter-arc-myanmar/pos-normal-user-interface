@@ -71,13 +71,27 @@ export const API_ENDPOINTS = {
     LIST: "/api/v1/sales-orders",
     BY_ID: (id: string) => `/api/v1/sales-orders/${id}`,
     CREATE: "/api/v1/sales-orders",
+    UPDATE: (id: string) => `/api/v1/sales-orders/${id}`,
+    DELETE: (id: string) => `/api/v1/sales-orders/${id}`,
     LINES: (salesOrderId: string) => ({
       LIST: `/api/v1/sales-orders/${salesOrderId}/lines`,
       CREATE: `/api/v1/sales-orders/${salesOrderId}/lines`,
+      BY_ID: (lineId: string) =>
+        `/api/v1/sales-orders/${salesOrderId}/lines/${lineId}`,
       UPDATE: (lineId: string) =>
         `/api/v1/sales-orders/${salesOrderId}/lines/${lineId}`,
       DELETE: (lineId: string) =>
         `/api/v1/sales-orders/${salesOrderId}/lines/${lineId}`,
+      FIRE: (lineId: string) =>
+        `/api/v1/sales-orders/${salesOrderId}/lines/${lineId}/fire`,
+      READY: (lineId: string) =>
+        `/api/v1/sales-orders/${salesOrderId}/lines/${lineId}/ready`,
+      SERVE: (lineId: string) =>
+        `/api/v1/sales-orders/${salesOrderId}/lines/${lineId}/serve`,
+      VOID: (lineId: string) =>
+        `/api/v1/sales-orders/${salesOrderId}/lines/${lineId}/void`,
+      COMP: (lineId: string) =>
+        `/api/v1/sales-orders/${salesOrderId}/lines/${lineId}/comp`,
     }),
     PAYMENTS: (salesOrderId: string) => ({
       LIST: `/api/v1/sales-orders/${salesOrderId}/payments`,

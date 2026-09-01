@@ -15,10 +15,6 @@
     "chineseSimplified": "简体中文",
     "switchLanguage": "Switch language"
   },
-  "theme": {
-    "switchToLightMode": "Switch to light mode",
-    "switchToDarkMode": "Switch to dark mode"
-  },
   "networkStatus": {
     "offlineTitle": "You are offline",
     "offlineSubtitle": "Reconnect to continue.",
@@ -37,6 +33,8 @@
     "cashierTitle": "Cashier",
     "cashierMeta": "POS mode",
     "counterOrdersTitle": "Counter orders",
+    "salesOrdersTitle": "Sales orders",
+    "printer": "Printer",
     "waitlistTitle": "Waitlist",
     "tipPoolsTitle": "Tip pools",
     "syncTitle": "Sync",
@@ -415,6 +413,35 @@
       "emptyOrder": "Add at least one item before sending to KDS.",
       "kdsTargetMissing": "Create or select an order before sending to KDS.",
       "kdsFailed": "Failed to send order to KDS."
+    }
+  },
+  "salesOrders": {
+    "tabs": {
+      "storing": "Storing",
+      "takenOut": "Taken out",
+      "invalid": "Invalid"
+    },
+    "search": "Phone number, name, code",
+    "create": "Create sales order",
+    "loading": "Loading sales orders...",
+    "empty": "No data",
+    "selectOrder": "Select an order to view details",
+    "detailTitle": "Sales order",
+    "lines": "Order lines",
+    "noLines": "No lines on this order",
+    "pickup": "Pickup",
+    "total": "Total",
+    "page": "Page {{page}} of {{totalPages}}",
+    "prev": "Previous",
+    "next": "Next",
+    "created": "Order {{number}} created",
+    "deleted": "Order deleted",
+    "lineUpdated": "Line updated",
+    "fire": "Fire",
+    "ready": "Ready",
+    "serve": "Serve",
+    "errors": {
+      "missingContext": "Missing tenant or location context."
     }
   },
   "router": {

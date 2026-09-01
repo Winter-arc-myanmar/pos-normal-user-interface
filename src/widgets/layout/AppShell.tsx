@@ -69,6 +69,16 @@ function OrdersIcon() {
   );
 }
 
+function SalesOrdersIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass} aria-hidden="true">
+      <path d="M4 7h16v13H4z" />
+      <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <path d="M9 12h6M9 16h4" />
+    </svg>
+  );
+}
+
 function SyncIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass} aria-hidden="true">
@@ -87,6 +97,7 @@ export function AppShell() {
   const location = useLocation();
   const isPosWorkspace = [
     "/cashier",
+    "/sales-orders",
     "/waitlist",
     "/tip-pools",
     "/counter-orders",
@@ -118,6 +129,12 @@ export function AppShell() {
       label: t("shell.counterOrdersTitle"),
       icon: <OrdersIcon />,
       visible: canAccess(PAGE_PERMISSIONS.counterOrders),
+    },
+    {
+      to: "/sales-orders",
+      label: t("shell.salesOrdersTitle"),
+      icon: <SalesOrdersIcon />,
+      visible: canAccess(PAGE_PERMISSIONS.salesOrders),
     },
     {
       to: "/customers",
@@ -176,6 +193,9 @@ export function AppShell() {
         items={railItems}
         userName={currentUserName}
         profileLabel={t("settings.profileLabel")}
+        printerLabel={t("shell.printer")}
+        printerBadgeCount={1}
+        onPrinterClick={() => navigate("/settings/printer")}
         onProfileClick={() => navigate("/settings/cashier")}
       />
 
