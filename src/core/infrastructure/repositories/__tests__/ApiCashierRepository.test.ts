@@ -146,6 +146,40 @@ describe("ApiCashierRepository", () => {
     );
   });
 
+  it("sends decimal strings for sales order lines", async () => {
+    const post = vi.fn().mockResolvedValue({
+      success: true,
+      data: {
+        id: "line-1",
+        salesOrderId: "order-2",
+        variantId: "variant-1",
+        quantity: "1.0000",
+        unitPrice: "10.0000",
+      },
+    });
+    const httpClient = { post };
+    const repository = new ApiCashierRepository(
+      httpClient as unknown as HttpClient
+    );
+
+    await repository.addSalesOrderLine("order-2", {
+      variantId: "variant-1",
+      quantity: "1.0000",
+      unitPrice: "10.0000",
+      lineDiscount: "0.0000",
+    });
+
+    expect(post).toHaveBeenCalledWith(
+      "/api/v1/sales-orders/order-2/lines",
+      {
+        variantId: "variant-1",
+        quantity: "1.0000",
+        unitPrice: "10.0000",
+        lineDiscount: "0.0000",
+      }
+    );
+  });
+
   it("sends numeric payment amounts for table session checkout", async () => {
     const post = vi.fn().mockResolvedValue({
       success: true,

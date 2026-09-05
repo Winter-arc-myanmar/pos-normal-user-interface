@@ -158,7 +158,8 @@ interface UseCashierReturn {
     sessionId: string,
     product: Product,
     variantId?: string,
-    quantity?: number
+    quantity?: number,
+    keepSelectedOrderId?: string
   ) => Promise<SalesOrderLine>;
   getCounterOrderById: (counterOrderId: string) => Promise<Record<string, unknown>>;
   pickupCounterOrder: (counterOrderId: string) => Promise<Record<string, unknown>>;
@@ -381,10 +382,13 @@ export function useCashier(): UseCashierReturn {
           throw new Error(`No variant found for product ${product.name}`);
         }
 
+        const variantModifier = Number(selectedVariant?.priceModifier || 0);
+        const unitPrice = Number(product.basePrice || 0) + variantModifier;
+
         await cashierService.addSalesOrderLine(orderId, {
           variantId: selectedVariant.id,
           quantity: Math.max(1, quantity).toFixed(4),
-          unitPrice: product.basePrice || "0.0000",
+          unitPrice: unitPrice.toFixed(4),
           lineDiscount: "0.0000",
         });
         const lines = await cashierService.getSalesOrderLines(orderId);
@@ -1156,7 +1160,8 @@ export function useCashier(): UseCashierReturn {
       sessionId: string,
       product: Product,
       variantId?: string,
-      quantity: number = 1
+      quantity: number = 1,
+      keepSelectedOrderId?: string
     ) => {
       setIsLoading(true);
       clearError();
@@ -1179,7 +1184,10 @@ export function useCashier(): UseCashierReturn {
           lineDiscount: "0.0000",
         });
 
-        if (line.salesOrderId) {
+        if (keepSelectedOrderId && keepSelectedOrderId !== line.salesOrderId) {
+          const lines = await cashierService.getSalesOrderLines(keepSelectedOrderId);
+          setSelectedOrderLines(lines);
+        } else if (line.salesOrderId) {
           await selectOrderById(line.salesOrderId);
         }
 

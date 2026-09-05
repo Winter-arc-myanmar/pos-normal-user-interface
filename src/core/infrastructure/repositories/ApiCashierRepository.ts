@@ -71,40 +71,6 @@ const toDecimalString = (value: unknown, fallback = "0.0000"): string => {
   return parsed.toFixed(4);
 };
 
-const normalizePartialLinePayload = (
-  payload: UpdateSalesOrderLineDTO
-): Record<string, unknown> => {
-  const normalized: Record<string, unknown> = {};
-
-  if (payload.variantId !== undefined) normalized.variantId = payload.variantId;
-  if (payload.quantity !== undefined) {
-    normalized.quantity = Math.max(0.0001, toNumber(payload.quantity) ?? 1);
-  }
-  if (payload.unitPrice !== undefined) {
-    normalized.unitPrice = toNumber(payload.unitPrice) ?? 0;
-  }
-  if (payload.lineDiscount !== undefined) {
-    normalized.lineDiscount = toNumber(payload.lineDiscount) ?? 0;
-  }
-  if (payload.taxRateId !== undefined) normalized.taxRateId = payload.taxRateId;
-  if (payload.taxAmount !== undefined) {
-    normalized.taxAmount = toNumber(payload.taxAmount) ?? 0;
-  }
-  if (payload.appliedPromotionId !== undefined) {
-    normalized.appliedPromotionId = payload.appliedPromotionId;
-  }
-  if (payload.courseType !== undefined) normalized.courseType = payload.courseType;
-  if (payload.seatNumber !== undefined) normalized.seatNumber = payload.seatNumber;
-  if (payload.selectedModifiers !== undefined) {
-    normalized.selectedModifiers = payload.selectedModifiers.map((modifier) => ({
-      ...modifier,
-      priceDelta: toNumber(modifier.priceDelta) ?? 0,
-    }));
-  }
-
-  return normalized;
-};
-
 const normalizeUpsertLinePayload = (
   payload: UpsertSalesOrderLineDTO
 ): Record<string, unknown> => {
@@ -135,6 +101,74 @@ const normalizeUpsertLinePayload = (
       : {}),
     ...(payload.seatNumber !== undefined ? { seatNumber: payload.seatNumber } : {}),
   };
+};
+
+const normalizeSalesOrderLinePayload = (
+  payload: UpsertSalesOrderLineDTO
+): Record<string, unknown> => {
+  const quantity = Math.max(0.0001, toNumber(payload.quantity) ?? 1);
+  const unitPrice = toNumber(payload.unitPrice) ?? 0;
+  const lineDiscount = toNumber(payload.lineDiscount) ?? 0;
+  const taxAmount =
+    payload.taxAmount !== undefined ? toNumber(payload.taxAmount) : undefined;
+
+  return {
+    variantId: payload.variantId,
+    quantity: toDecimalString(quantity),
+    unitPrice: toDecimalString(unitPrice),
+    lineDiscount: toDecimalString(lineDiscount),
+    ...(payload.taxRateId ? { taxRateId: payload.taxRateId } : {}),
+    ...(taxAmount !== undefined ? { taxAmount: toDecimalString(taxAmount) } : {}),
+    ...(payload.appliedPromotionId
+      ? { appliedPromotionId: payload.appliedPromotionId }
+      : {}),
+    ...(payload.courseType ? { courseType: payload.courseType } : {}),
+    ...(payload.selectedModifiers
+      ? {
+          selectedModifiers: payload.selectedModifiers.map((modifier) => ({
+            ...modifier,
+            priceDelta: toDecimalString(toNumber(modifier.priceDelta) ?? 0),
+          })),
+        }
+      : {}),
+    ...(payload.seatNumber !== undefined ? { seatNumber: payload.seatNumber } : {}),
+  };
+};
+
+const normalizeSalesOrderPartialLinePayload = (
+  payload: UpdateSalesOrderLineDTO
+): Record<string, unknown> => {
+  const normalized: Record<string, unknown> = {};
+
+  if (payload.variantId !== undefined) normalized.variantId = payload.variantId;
+  if (payload.quantity !== undefined) {
+    normalized.quantity = toDecimalString(
+      Math.max(0.0001, toNumber(payload.quantity) ?? 1)
+    );
+  }
+  if (payload.unitPrice !== undefined) {
+    normalized.unitPrice = toDecimalString(toNumber(payload.unitPrice) ?? 0);
+  }
+  if (payload.lineDiscount !== undefined) {
+    normalized.lineDiscount = toDecimalString(toNumber(payload.lineDiscount) ?? 0);
+  }
+  if (payload.taxRateId !== undefined) normalized.taxRateId = payload.taxRateId;
+  if (payload.taxAmount !== undefined) {
+    normalized.taxAmount = toDecimalString(toNumber(payload.taxAmount) ?? 0);
+  }
+  if (payload.appliedPromotionId !== undefined) {
+    normalized.appliedPromotionId = payload.appliedPromotionId;
+  }
+  if (payload.courseType !== undefined) normalized.courseType = payload.courseType;
+  if (payload.seatNumber !== undefined) normalized.seatNumber = payload.seatNumber;
+  if (payload.selectedModifiers !== undefined) {
+    normalized.selectedModifiers = payload.selectedModifiers.map((modifier) => ({
+      ...modifier,
+      priceDelta: toDecimalString(toNumber(modifier.priceDelta) ?? 0),
+    }));
+  }
+
+  return normalized;
 };
 
 const normalizePaymentEntriesAsNumbers = (
@@ -578,7 +612,7 @@ export class ApiCashierRepository implements ICashierRepository {
   ): Promise<SalesOrderLine> {
     const response = await this.httpClient.post<ApiEnvelope<Record<string, unknown>>>(
       API_ENDPOINTS.SALES_ORDERS.LINES(salesOrderId).CREATE,
-      normalizeUpsertLinePayload(payload)
+      normalizeSalesOrderLinePayload(payload)
     );
     const item = unwrap(response);
     return new SalesOrderLine({
@@ -603,7 +637,7 @@ export class ApiCashierRepository implements ICashierRepository {
   ): Promise<SalesOrderLine> {
     const response = await this.httpClient.patch<ApiEnvelope<Record<string, unknown>>>(
       API_ENDPOINTS.SALES_ORDERS.LINES(salesOrderId).UPDATE(lineId),
-      normalizePartialLinePayload(payload)
+      normalizeSalesOrderPartialLinePayload(payload)
     );
     const item = unwrap(response);
     return new SalesOrderLine({

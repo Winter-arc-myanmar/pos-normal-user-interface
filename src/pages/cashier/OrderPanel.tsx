@@ -14,6 +14,7 @@ import {
   SalesOrderLine,
   TableSession,
 } from "@/core/domain/entities/Cashier";
+import { OrderTabs } from "./OrderTabs";
 
 interface OrderPanelProps {
   selectedOrder: SalesOrder | null;
@@ -32,7 +33,11 @@ interface OrderPanelProps {
   isDineInService?: boolean;
   feedback?: string | null;
   errorMessage?: string | null;
+  tableOrderIds?: string[];
   onCreateOrder: () => void;
+  onSelectTableOrder?: (orderId: string) => void;
+  onAddTableOrder?: () => void;
+  onManageTableOrders?: () => void;
   onIncreaseLineQuantity: (line: SalesOrderLine) => void;
   onDecreaseLineQuantity: (line: SalesOrderLine) => void;
   onRemoveLine: (line: SalesOrderLine) => void;
@@ -62,7 +67,11 @@ export function OrderPanel({
   isDineInService = false,
   feedback,
   errorMessage,
+  tableOrderIds = [],
   onCreateOrder,
+  onSelectTableOrder,
+  onAddTableOrder,
+  onManageTableOrders,
   onIncreaseLineQuantity,
   onDecreaseLineQuantity,
   onRemoveLine,
@@ -88,6 +97,16 @@ export function OrderPanel({
 
   return (
     <aside className="flex min-h-0 flex-col border-r border-slate-200 bg-white p-3 text-slate-900 min-[1100px]:p-4">
+      {tableOrderIds.length && onSelectTableOrder && onAddTableOrder && onManageTableOrders ? (
+        <OrderTabs
+          orderIds={tableOrderIds}
+          activeOrderId={selectedOrder?.id}
+          disabled={isLoading}
+          onSelect={onSelectTableOrder}
+          onAdd={onAddTableOrder}
+          onManage={onManageTableOrders}
+        />
+      ) : null}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {hasActiveOrder ? (
           <>

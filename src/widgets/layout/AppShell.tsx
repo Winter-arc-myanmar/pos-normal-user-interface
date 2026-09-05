@@ -195,6 +195,8 @@ export function AppShell() {
         profileLabel={t("settings.profileLabel")}
         printerLabel={t("shell.printer")}
         printerBadgeCount={1}
+        notificationLabel={t("shell.notifications")}
+        onNotificationsClick={() => navigate("/cashier?view=orders")}
         onPrinterClick={() => navigate("/settings/printer")}
         onProfileClick={() => navigate("/settings/cashier")}
       />

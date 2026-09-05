@@ -15,7 +15,9 @@ import {
 } from "@/core/application/dtos/CashierDTO";
 import { useCashier } from "@/core/presentation/hooks/useCashier";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
+import { useSalesOrderManagement } from "@/core/presentation/hooks/useSalesOrderManagement";
 import { CashierBoard } from "./cashier/CashierBoard";
+import { MultiOrderingView } from "./cashier/MultiOrderingView";
 import { OrderPanel } from "./cashier/OrderPanel";
 import { ProductMenu } from "./cashier/ProductMenu";
 import {
@@ -24,6 +26,12 @@ import {
   SalesOrderLine,
 } from "@/core/domain/entities/Cashier";
 import { calcLineTotals } from "@/lib/pos/checkoutCalculations";
+import {
+  clearTableOrderIds,
+  mergeTableOrderIds,
+  readTableOrderIds,
+  writeTableOrderIds,
+} from "@/lib/pos/multiOrdering";
 
 const BOARD_PAGE_SIZE = 15;
 
@@ -64,12 +72,19 @@ export function CashierPage() {
     updateOrderLine,
     removeOrderLine,
     addProductToTableSession,
+    addPayment,
     getCounterOrderById,
     pickupCounterOrder,
     processCheckout,
     clearOrderSelection,
     clearError,
   } = useCashier();
+  const {
+    fetchOrderLines: fetchManagedOrderLines,
+    addOrderLine: addManagedOrderLine,
+    deleteOrderLine: deleteManagedOrderLine,
+    deleteOrder: deleteManagedOrder,
+  } = useSalesOrderManagement();
   const {
     activeLocationId,
     isWorkspaceReady,
@@ -86,6 +101,15 @@ export function CashierPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [directCartLines, setDirectCartLines] = useState<typeof selectedOrderLines>([]);
   const [isDirectCheckoutMode, setIsDirectCheckoutMode] = useState(false);
+  const [activeTableId, setActiveTableId] = useState<string | null>(null);
+  const [tableOrderIds, setTableOrderIds] = useState<string[]>([]);
+  const [multiOrderLines, setMultiOrderLines] = useState<
+    Record<string, SalesOrderLine[]>
+  >({});
+  const [selectedMergeOrderIds, setSelectedMergeOrderIds] = useState<string[]>(
+    []
+  );
+  const [isMultiOrderMutating, setIsMultiOrderMutating] = useState(false);
   const paymentInputRef = useRef<HTMLInputElement>(null);
 
   const locationId = activeLocationId;
@@ -169,6 +193,31 @@ export function CashierPage() {
           ) || null
         : null,
     [diningTables, selectedOrderSession]
+  );
+
+  const activeMultiOrderTable = useMemo(
+    () =>
+      activeTableId
+        ? diningTables.find((table) => table.id === activeTableId) || null
+        : null,
+    [activeTableId, diningTables]
+  );
+
+  const displayedOrderTable = selectedOrderTable || activeMultiOrderTable;
+
+  const activeTableSession = useMemo(
+    () =>
+      activeTableId
+        ? getLatestSessionByTableId(activeTableId) || null
+        : selectedOrderSession,
+    [activeTableId, getLatestSessionByTableId, selectedOrderSession]
+  );
+
+  const primaryTableOrderId = activeTableSession?.salesOrderId;
+  const isPrimaryTableOrder = Boolean(
+    selectedOrder?.id &&
+      primaryTableOrderId &&
+      selectedOrder.id === primaryTableOrderId
   );
 
   const productById = useMemo(
@@ -327,6 +376,89 @@ export function CashierPage() {
     zoneFilter,
   ]);
 
+  const tablesInZone = useMemo(
+    () =>
+      diningTables.filter(
+        (table) => zoneFilter === "ALL" || table.zoneId === zoneFilter
+      ),
+    [diningTables, zoneFilter]
+  );
+
+  const boardMetrics = useMemo(() => {
+    const mapSessionStatus = (
+      sessionState?: TableSessionState
+    ): OrderStatus | null => {
+      if (!sessionState) return null;
+      if (["SEATED", "ORDERING"].includes(sessionState)) return "DRAFT";
+      if (["SERVED", "PAYMENT_PENDING"].includes(sessionState)) {
+        return "CONFIRMED";
+      }
+      if (sessionState === "CLOSED") return "COMPLETED";
+      return null;
+    };
+
+    const countTablesByStatus = (status: "ALL" | OrderStatus) =>
+      tablesInZone.filter((table) => {
+        const sessionState = getLatestSessionByTableId(table.id)?.sessionState;
+        if (status === "ALL") return true;
+        return mapSessionStatus(sessionState) === status;
+      }).length;
+
+    const activeTableCount = tablesInZone.filter((table) => {
+      const session = getLatestSessionByTableId(table.id);
+      return session && !session.closedAt;
+    }).length;
+
+    const countOrdersForService = (serviceType: ServiceType) =>
+      salesOrders.filter((order) => {
+        const serviceMatches =
+          serviceType === "TABLE"
+            ? order.serviceType === "DINE_IN"
+            : order.serviceType === serviceType;
+        return serviceMatches;
+      });
+
+    const ordersForActiveService = countOrdersForService(activeServiceType);
+
+    const statusTabCounts = usesTableBoard
+      ? {
+          ALL: tablesInZone.length,
+          DRAFT: countTablesByStatus("DRAFT"),
+          CONFIRMED: countTablesByStatus("CONFIRMED"),
+          COMPLETED: countTablesByStatus("COMPLETED"),
+        }
+      : {
+          ALL: ordersForActiveService.length,
+          DRAFT: ordersForActiveService.filter(
+            (order) => order.status === "DRAFT"
+          ).length,
+          CONFIRMED: ordersForActiveService.filter(
+            (order) => order.status === "CONFIRMED"
+          ).length,
+          COMPLETED: ordersForActiveService.filter(
+            (order) => order.status === "COMPLETED"
+          ).length,
+        };
+
+    return {
+      notificationCount: statusTabCounts.DRAFT,
+      serviceTabCounts: {
+        TABLE: activeTableCount,
+        DINE_IN: countOrdersForService("DINE_IN").length,
+        TAKE_AWAY: countOrdersForService("TAKE_AWAY").length,
+        DELIVERY: countOrdersForService("DELIVERY").length,
+        PICK_UP: countOrdersForService("PICK_UP").length,
+      },
+      statusTabCounts,
+    };
+  }, [
+    activeServiceType,
+    getLatestSessionByTableId,
+    salesOrders,
+    tablesInZone,
+    usesTableBoard,
+  ]);
+
   const boardItems = usesTableBoard ? filteredTables : filteredOrders;
   const boardPageCount = Math.max(
     1,
@@ -347,6 +479,42 @@ export function CashierPage() {
   useEffect(() => {
     if (boardPage > boardPageCount) setBoardPage(boardPageCount);
   }, [boardPage, boardPageCount]);
+
+  const refreshMultiOrderLines = useCallback(
+    async (orderIds: string[]) => {
+      const entries = await Promise.all(
+        orderIds.map(async (orderId) => {
+          const result = await fetchManagedOrderLines(orderId, {
+            page: 1,
+            limit: 100,
+          });
+          return [orderId, result.lines] as const;
+        })
+      );
+      setMultiOrderLines(Object.fromEntries(entries));
+    },
+    [fetchManagedOrderLines]
+  );
+
+  const bindOrdersToTable = useCallback(
+    async (tableId: string, primaryOrderId: string) => {
+      const orderIds = mergeTableOrderIds(tableId, primaryOrderId);
+      setActiveTableId(tableId);
+      setTableOrderIds(orderIds);
+      setSelectedMergeOrderIds([]);
+      await refreshMultiOrderLines(orderIds);
+      return orderIds;
+    },
+    [refreshMultiOrderLines]
+  );
+
+  const getTableOrderCount = useCallback(
+    (tableId: string) => {
+      if (tableId === activeTableId) return tableOrderIds.length;
+      return readTableOrderIds(tableId).length;
+    },
+    [activeTableId, tableOrderIds.length]
+  );
 
   const requiresTableAssignment =
     isTableService && isDirectCheckoutMode && directCartLines.length > 0;
@@ -439,6 +607,7 @@ export function CashierPage() {
         if (pendingLines.length) {
           await flushPendingLinesToSession(latestSession, pendingLines);
         }
+        await bindOrdersToTable(table.id, latestSession.salesOrderId);
         setSearchParams({ view: "menu" });
         return;
       }
@@ -458,6 +627,9 @@ export function CashierPage() {
       if (pendingLines.length) {
         await flushPendingLinesToSession(newSession, pendingLines);
       }
+      if (newSession.salesOrderId) {
+        await bindOrdersToTable(table.id, newSession.salesOrderId);
+      }
       setSearchParams({ view: "menu" });
     } catch (caught) {
       setLocalError(
@@ -468,17 +640,207 @@ export function CashierPage() {
     }
   };
 
+  const handleSelectTableOrder = useCallback(
+    async (orderId: string) => {
+      setLocalError(null);
+      setNotice(null);
+      try {
+        await selectOrderById(orderId);
+        setSearchParams({ view: "menu" });
+      } catch (caught) {
+        setLocalError(
+          caught instanceof Error
+            ? caught.message
+            : t("cashier.multiOrder.errors.openOrder")
+        );
+      }
+    },
+    [selectOrderById, setSearchParams, t]
+  );
+
+  const handleAddTableOrder = useCallback(async () => {
+    if (!activeTableId || !activeTableSession?.salesOrderId) {
+      setLocalError(t("cashier.multiOrder.errors.selectTable"));
+      setSearchParams({ view: "orders" });
+      return;
+    }
+
+    setLocalError(null);
+    setNotice(null);
+    try {
+      const context = await requireCashierContext();
+      const order = await createOrder({
+        tenantId: context.tenantId,
+        locationId: context.locationId,
+        salesChannel: "POS",
+        idempotencyKey: `table-${activeTableId}-${Date.now()}`,
+        subtotal: "0.0000",
+        totalDiscount: "0.0000",
+        totalTax: "0.0000",
+        grandTotal: "0.0000",
+        status: "DRAFT",
+      });
+      const nextIds = mergeTableOrderIds(
+        activeTableId,
+        activeTableSession.salesOrderId,
+        [order.id]
+      );
+      setTableOrderIds(nextIds);
+      await selectOrderById(order.id);
+      await refreshMultiOrderLines(nextIds);
+      setNotice(
+        t("cashier.multiOrder.orderCreated", { number: nextIds.length })
+      );
+      setSearchParams({ view: "menu" });
+    } catch (caught) {
+      setLocalError(
+        caught instanceof Error
+          ? caught.message
+          : t("cashier.multiOrder.errors.createOrder")
+      );
+    }
+  }, [
+    activeTableId,
+    activeTableSession?.salesOrderId,
+    createOrder,
+    refreshMultiOrderLines,
+    requireCashierContext,
+    selectOrderById,
+    setSearchParams,
+    t,
+  ]);
+
+  const transferOrderLines = useCallback(
+    async (
+      sourceOrderId: string,
+      targetOrderId: string,
+      lineIds?: string[]
+    ) => {
+      const sourceResult = await fetchManagedOrderLines(sourceOrderId, {
+        page: 1,
+        limit: 100,
+      });
+      const lines = lineIds
+        ? sourceResult.lines.filter((line) => lineIds.includes(line.id))
+        : sourceResult.lines;
+
+      for (const line of lines) {
+        await addManagedOrderLine(targetOrderId, {
+          variantId: line.variantId,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice,
+          lineDiscount: line.lineDiscount || "0.0000",
+          taxRateId: line.taxRateId,
+          taxAmount: line.taxAmount,
+          appliedPromotionId: line.appliedPromotionId,
+          courseType: line.courseType,
+          seatNumber: line.seatNumber,
+        });
+        await deleteManagedOrderLine(sourceOrderId, line.id);
+      }
+    },
+    [
+      addManagedOrderLine,
+      deleteManagedOrderLine,
+      fetchManagedOrderLines,
+    ]
+  );
+
+  const mergeOrders = useCallback(
+    async (sourceOrderIds: string[]) => {
+      if (!activeTableId || tableOrderIds.length < 2) return;
+      const targetOrderId = tableOrderIds[0];
+      const sources = sourceOrderIds.filter(
+        (id) => id !== targetOrderId && tableOrderIds.includes(id)
+      );
+      if (!sources.length) return;
+
+      setIsMultiOrderMutating(true);
+      setLocalError(null);
+      setNotice(null);
+      try {
+        for (const sourceOrderId of sources) {
+          await transferOrderLines(sourceOrderId, targetOrderId);
+          await deleteManagedOrder(sourceOrderId);
+        }
+        const nextIds = tableOrderIds.filter((id) => !sources.includes(id));
+        writeTableOrderIds(activeTableId, nextIds);
+        setTableOrderIds(nextIds);
+        setSelectedMergeOrderIds([]);
+        await selectOrderById(targetOrderId);
+        await refreshMultiOrderLines(nextIds);
+        setNotice(t("cashier.multiOrder.ordersMerged"));
+      } catch (caught) {
+        setLocalError(
+          caught instanceof Error
+            ? caught.message
+            : t("cashier.multiOrder.errors.merge")
+        );
+      } finally {
+        setIsMultiOrderMutating(false);
+      }
+    },
+    [
+      activeTableId,
+      deleteManagedOrder,
+      refreshMultiOrderLines,
+      selectOrderById,
+      t,
+      tableOrderIds,
+      transferOrderLines,
+    ]
+  );
+
+  const handleSplitItems = useCallback(
+    async (
+      sourceOrderId: string,
+      targetOrderId: string,
+      lineIds: string[]
+    ) => {
+      if (!lineIds.length) return;
+      setIsMultiOrderMutating(true);
+      setLocalError(null);
+      setNotice(null);
+      try {
+        await transferOrderLines(sourceOrderId, targetOrderId, lineIds);
+        await selectOrderById(targetOrderId);
+        await refreshMultiOrderLines(tableOrderIds);
+        setNotice(t("cashier.multiOrder.itemsMoved"));
+      } catch (caught) {
+        setLocalError(
+          caught instanceof Error
+            ? caught.message
+            : t("cashier.multiOrder.errors.split")
+        );
+      } finally {
+        setIsMultiOrderMutating(false);
+      }
+    },
+    [
+      refreshMultiOrderLines,
+      selectOrderById,
+      t,
+      tableOrderIds,
+      transferOrderLines,
+    ]
+  );
+
   const handleAddProduct = async (
     product: (typeof products)[number],
     variantId: string,
     quantity: number
   ) => {
-    if (selectedOrderSession) {
+    const shouldUseTableSession = Boolean(
+      selectedOrderSession && isPrimaryTableOrder
+    );
+
+    if (shouldUseTableSession && selectedOrderSession) {
       await addProductToTableSession(
         selectedOrderSession.id,
         product,
         variantId,
-        quantity
+        quantity,
+        tableOrderIds.length > 1 ? selectedOrder?.id : undefined
       );
       if (selectedOrderSession.sessionState === "SEATED") {
         await updateTableSessionState(selectedOrderSession.id, {
@@ -533,6 +895,21 @@ export function CashierPage() {
     } else {
       throw new Error(t("cashier.errors.selectOrder"));
     }
+
+    if (selectedOrder && tableOrderIds.includes(selectedOrder.id)) {
+      try {
+        const result = await fetchManagedOrderLines(selectedOrder.id, {
+          page: 1,
+          limit: 100,
+        });
+        setMultiOrderLines((current) => ({
+          ...current,
+          [selectedOrder.id]: result.lines,
+        }));
+      } catch {
+        // Cart lines are already updated via useCashier; keep multi-order sync best-effort.
+      }
+    }
   };
 
   const handleCheckout = async () => {
@@ -556,9 +933,25 @@ export function CashierPage() {
         throw new Error("Payment amount must be greater than zero");
       }
 
-      if (selectedOrderSession && selectedOrder) {
+      const isMultiOrderSecondary =
+        Boolean(
+          activeTableId &&
+            selectedOrder &&
+            primaryTableOrderId &&
+            tableOrderIds.includes(selectedOrder.id) &&
+            selectedOrder.id !== primaryTableOrderId
+        );
+
+      if (selectedOrderSession && isPrimaryTableOrder && selectedOrder) {
         await checkoutTableSession(selectedOrderSession.id, {
           payments: [{ paymentMethodId, amount: paymentAmount }],
+        });
+      } else if (isMultiOrderSecondary && selectedOrder) {
+        await addPayment(selectedOrder.id, {
+          tenantId: context.tenantId,
+          paymentMethodId,
+          posSessionId: context.posSessionId,
+          amount: paymentAmount,
         });
       } else {
         const selectedServiceType = selectedOrder
@@ -578,6 +971,37 @@ export function CashierPage() {
           })),
           payments: [{ paymentMethodId, amount: paymentAmount }],
         });
+      }
+
+      if (activeTableId && selectedOrder) {
+        if (selectedOrderSession && isPrimaryTableOrder) {
+          clearTableOrderIds(activeTableId);
+          setTableOrderIds([]);
+          setMultiOrderLines({});
+          setActiveTableId(null);
+          await resetWorkspaceAfterTransaction(t("cashier.orderPanel.checkoutSuccess"));
+          return;
+        }
+
+        const nextIds = tableOrderIds.filter((id) => id !== selectedOrder.id);
+        writeTableOrderIds(activeTableId, nextIds);
+        setTableOrderIds(nextIds);
+        setMultiOrderLines((current) => {
+          const next = { ...current };
+          delete next[selectedOrder.id];
+          return next;
+        });
+
+        if (nextIds.length > 0) {
+          const nextActiveOrderId = nextIds[nextIds.length - 1];
+          await selectOrderById(nextActiveOrderId);
+          await refreshMultiOrderLines(nextIds);
+          setNotice(t("cashier.orderPanel.checkoutSuccess"));
+          setSearchParams({ view: "menu" });
+          return;
+        }
+
+        setActiveTableId(null);
       }
 
       await resetWorkspaceAfterTransaction(t("cashier.orderPanel.checkoutSuccess"));
@@ -728,6 +1152,19 @@ export function CashierPage() {
       await fireToKds(
         sessionId ? { sessionId } : { salesOrderId: salesOrderId! }
       );
+
+      if (activeTableId && tableOrderIds.length > 0 && selectedOrder) {
+        await selectOrderById(selectedOrder.id);
+        try {
+          await refreshMultiOrderLines(tableOrderIds);
+        } catch {
+          // Keep the active tab even if the grid refresh fails.
+        }
+        setNotice(t("cashier.orderPanel.kdsSent"));
+        setSearchParams({ view: "menu" });
+        return;
+      }
+
       await resetWorkspaceAfterTransaction(t("cashier.orderPanel.kdsSent"));
     } catch (caught) {
       setLocalError(
@@ -792,21 +1229,55 @@ export function CashierPage() {
     setActiveServiceType(type);
     setIsDirectCheckoutMode(false);
     setDirectCartLines([]);
+    setActiveTableId(null);
+    setTableOrderIds([]);
+    setMultiOrderLines({});
+    setSelectedMergeOrderIds([]);
     clearOrderSelection();
     setLocalError(null);
     setNotice(null);
     setSearchParams({ view: "orders" });
   };
 
+  const handleShowPendingNotifications = useCallback(() => {
+    setStatusFilter("DRAFT");
+    setNotice(t("cashier.notifications.pendingFilter"));
+    setSearchParams({ view: "orders" });
+  }, [setSearchParams, t]);
+
   const handleOrderSelect = async (order: (typeof salesOrders)[number]) => {
     setIsDirectCheckoutMode(false);
     setDirectCartLines([]);
+    setActiveTableId(null);
+    setTableOrderIds([]);
+    setMultiOrderLines({});
     setNotice(null);
     await selectOrder(order);
   };
 
+  const multiOrders = useMemo(() => {
+    const candidates = selectedOrder
+      ? [selectedOrder, ...salesOrders]
+      : salesOrders;
+    const unique = new Map(candidates.map((order) => [order.id, order]));
+    return tableOrderIds
+      .map((id) => unique.get(id))
+      .filter((order): order is NonNullable<typeof order> => !!order);
+  }, [salesOrders, selectedOrder, tableOrderIds]);
+
+  const activeTableLabel = activeMultiOrderTable
+    ? `${t("cashier.table")} ${activeMultiOrderTable.tableNumber}`
+    : t("cashier.multiOrder.tableOrders");
+
   return (
-    <section className="grid h-full min-h-0 min-w-0 grid-cols-[13rem_minmax(0,1fr)_5.5rem] overflow-hidden bg-[#070707] text-white min-[1100px]:grid-cols-[18rem_minmax(0,1fr)_8rem]">
+    <section
+      className={[
+        "grid h-full min-h-0 min-w-0 overflow-hidden bg-[#070707] text-white",
+        activeView === "multi-order"
+          ? "grid-cols-[13rem_minmax(0,1fr)] min-[1100px]:grid-cols-[18rem_minmax(0,1fr)]"
+          : "grid-cols-[13rem_minmax(0,1fr)_5.5rem] min-[1100px]:grid-cols-[18rem_minmax(0,1fr)_8rem]",
+      ].join(" ")}
+    >
       <OrderPanel
         selectedOrder={selectedOrder}
         selectedOrderLines={displayOrderLines}
@@ -816,7 +1287,7 @@ export function CashierPage() {
         paymentMethodId={paymentMethodId}
         paymentAmount={paymentAmount}
         total={orderTotal}
-        selectedTable={selectedOrderTable}
+        selectedTable={displayedOrderTable}
         selectedSession={selectedOrderSession}
         paymentInputRef={paymentInputRef}
         isLoading={isLoading || isPosSessionLoading}
@@ -824,7 +1295,14 @@ export function CashierPage() {
         isDineInService={isDineInService}
         feedback={notice}
         errorMessage={localError || error}
+        tableOrderIds={tableOrderIds}
         onCreateOrder={() => void handleCreateOrder()}
+        onSelectTableOrder={(orderId) => void handleSelectTableOrder(orderId)}
+        onAddTableOrder={() => void handleAddTableOrder()}
+        onManageTableOrders={() => {
+          void refreshMultiOrderLines(tableOrderIds);
+          setSearchParams({ view: "multi-order" });
+        }}
         onIncreaseLineQuantity={(line) => void handleIncreaseLineQuantity(line)}
         onDecreaseLineQuantity={(line) => void handleDecreaseLineQuantity(line)}
         onRemoveLine={(line) => void handleRemoveLine(line)}
@@ -846,6 +1324,27 @@ export function CashierPage() {
             onAdd={handleAddProduct}
             onClose={handleCloseMenu}
           />
+        ) : activeView === "multi-order" && activeTableId ? (
+          <MultiOrderingView
+            tableLabel={activeTableLabel}
+            orderIds={tableOrderIds}
+            orders={multiOrders}
+            linesByOrderId={multiOrderLines}
+            activeOrderId={selectedOrder?.id}
+            selectedOrderIds={selectedMergeOrderIds}
+            isLoading={
+              isLoading || isPosSessionLoading || isMultiOrderMutating
+            }
+            onBack={() => setSearchParams({ view: "menu" })}
+            onOpenOrder={(orderId) => void handleSelectTableOrder(orderId)}
+            onAddOrder={() => void handleAddTableOrder()}
+            onSelectionChange={setSelectedMergeOrderIds}
+            onMergeAll={() => void mergeOrders(tableOrderIds.slice(1))}
+            onMergeSelected={() => void mergeOrders(selectedMergeOrderIds)}
+            onSplitItems={(sourceOrderId, targetOrderId, lineIds) =>
+              void handleSplitItems(sourceOrderId, targetOrderId, lineIds)
+            }
+          />
         ) : (
           <CashierBoard
             serviceType={activeServiceType}
@@ -858,6 +1357,11 @@ export function CashierPage() {
             page={boardPage}
             pageCount={boardPageCount}
             getLatestSession={getLatestSessionByTableId}
+            getOrderCount={getTableOrderCount}
+            notificationCount={boardMetrics.notificationCount}
+            serviceTabCounts={boardMetrics.serviceTabCounts}
+            statusTabCounts={boardMetrics.statusTabCounts}
+            onNotificationsClick={handleShowPendingNotifications}
             onServiceTypeChange={handleServiceTypeChange}
             onStatusFilterChange={setStatusFilter}
             onTableSelect={(tableId) => void handleTableTap(tableId)}
@@ -867,7 +1371,8 @@ export function CashierPage() {
         )}
       </main>
 
-      <aside className="flex min-h-0 flex-col border-l border-slate-800 bg-[#222] p-1.5 min-[1100px]:p-2">
+      {activeView !== "multi-order" ? (
+        <aside className="flex min-h-0 flex-col border-l border-slate-800 bg-[#222] p-1.5 min-[1100px]:p-2">
         <button
           type="button"
           onClick={() => setZoneFilter("ALL")}
@@ -893,7 +1398,8 @@ export function CashierPage() {
             </button>
           ))}
         </div>
-      </aside>
+        </aside>
+      ) : null}
     </section>
   );
 }

@@ -17,6 +17,10 @@ const mocks = vi.hoisted(() => ({
   pickupCounterOrder: vi.fn(),
   updateDiningTableStatus: vi.fn(),
   updateTableSessionState: vi.fn(),
+  fetchManagedOrderLines: vi.fn(),
+  addManagedOrderLine: vi.fn(),
+  deleteManagedOrderLine: vi.fn(),
+  deleteManagedOrder: vi.fn(),
 }));
 
 const product = {
@@ -168,10 +172,26 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
   }),
 }));
 
+vi.mock("@/core/presentation/hooks/useSalesOrderManagement", () => ({
+  useSalesOrderManagement: () => ({
+    fetchOrderLines: mocks.fetchManagedOrderLines,
+    addOrderLine: mocks.addManagedOrderLine,
+    deleteOrderLine: mocks.deleteManagedOrderLine,
+    deleteOrder: mocks.deleteManagedOrder,
+  }),
+}));
+
 describe("CashierPage integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.fetchProductVariants.mockResolvedValue([variant]);
+    mocks.fetchManagedOrderLines.mockResolvedValue({
+      lines: [],
+      total: 0,
+      page: 1,
+      limit: 100,
+      totalPages: 1,
+    });
     mocks.fetchPosRegisters.mockResolvedValue([
       {
         id: "register-1",
@@ -255,7 +275,8 @@ describe("CashierPage integration", () => {
         "session-1",
         product,
         "variant-1",
-        1
+        1,
+        undefined
       )
     );
     expect(mocks.updateTableSessionState).toHaveBeenCalledWith("session-1", {

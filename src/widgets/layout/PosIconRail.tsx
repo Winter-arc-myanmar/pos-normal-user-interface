@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
+import { NotificationBell } from "@/components/ui/NotificationBell";
 
 export interface PosRailItem {
   to: string;
@@ -14,8 +15,11 @@ interface PosIconRailProps {
   profileLabel: string;
   printerLabel?: string;
   printerBadgeCount?: number;
+  notificationLabel?: string;
+  notificationBadgeCount?: number;
   onProfileClick: () => void;
   onPrinterClick?: () => void;
+  onNotificationsClick?: () => void;
 }
 
 function PrinterIcon() {
@@ -43,8 +47,11 @@ export function PosIconRail({
   profileLabel,
   printerLabel,
   printerBadgeCount = 0,
+  notificationLabel,
+  notificationBadgeCount = 0,
   onProfileClick,
   onPrinterClick,
+  onNotificationsClick,
 }: PosIconRailProps) {
   return (
     <aside className="pos-safe-y flex min-h-0 flex-col items-center border-r border-white/10 bg-black px-1.5 py-2 text-white">
@@ -77,6 +84,16 @@ export function PosIconRail({
             </NavLink>
           ))}
       </nav>
+
+      {onNotificationsClick ? (
+        <NotificationBell
+          count={notificationBadgeCount}
+          onClick={onNotificationsClick}
+          className="mb-2 h-11 w-11"
+          iconClassName="h-5 w-5"
+          label={notificationLabel}
+        />
+      ) : null}
 
       {onPrinterClick ? (
         <button

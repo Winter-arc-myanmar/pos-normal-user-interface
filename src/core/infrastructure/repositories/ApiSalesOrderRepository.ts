@@ -55,6 +55,12 @@ const toNumber = (value: unknown): number | undefined => {
   return Number.isFinite(parsed) ? parsed : undefined;
 };
 
+const toDecimalString = (value: unknown, fallback = "0.0000"): string => {
+  const parsed = toNumber(value);
+  if (parsed === undefined) return fallback;
+  return parsed.toFixed(4);
+};
+
 const toMeta = (response: unknown, fallbackLimit: number, count: number) => {
   const envelope = asRecord(response);
   const meta = asRecord(envelope?.meta);
@@ -141,17 +147,17 @@ const normalizeUpsertLinePayload = (
 
   return {
     variantId: payload.variantId,
-    quantity,
-    unitPrice,
-    lineDiscount,
+    quantity: toDecimalString(quantity),
+    unitPrice: toDecimalString(unitPrice),
+    lineDiscount: toDecimalString(lineDiscount),
     taxRateId: payload.taxRateId,
-    taxAmount,
+    ...(taxAmount !== undefined ? { taxAmount: toDecimalString(taxAmount) } : {}),
     appliedPromotionId: payload.appliedPromotionId,
     courseType: payload.courseType,
     seatNumber: payload.seatNumber,
     selectedModifiers: payload.selectedModifiers?.map((modifier) => ({
       ...modifier,
-      priceDelta: toNumber(modifier.priceDelta) ?? 0,
+      priceDelta: toDecimalString(toNumber(modifier.priceDelta) ?? 0),
     })),
   };
 };
@@ -162,17 +168,19 @@ const normalizePartialLinePayload = (
   const normalized: Record<string, unknown> = {};
   if (payload.variantId !== undefined) normalized.variantId = payload.variantId;
   if (payload.quantity !== undefined) {
-    normalized.quantity = Math.max(0.0001, toNumber(payload.quantity) ?? 1);
+    normalized.quantity = toDecimalString(
+      Math.max(0.0001, toNumber(payload.quantity) ?? 1)
+    );
   }
   if (payload.unitPrice !== undefined) {
-    normalized.unitPrice = toNumber(payload.unitPrice) ?? 0;
+    normalized.unitPrice = toDecimalString(toNumber(payload.unitPrice) ?? 0);
   }
   if (payload.lineDiscount !== undefined) {
-    normalized.lineDiscount = toNumber(payload.lineDiscount) ?? 0;
+    normalized.lineDiscount = toDecimalString(toNumber(payload.lineDiscount) ?? 0);
   }
   if (payload.taxRateId !== undefined) normalized.taxRateId = payload.taxRateId;
   if (payload.taxAmount !== undefined) {
-    normalized.taxAmount = toNumber(payload.taxAmount) ?? 0;
+    normalized.taxAmount = toDecimalString(toNumber(payload.taxAmount) ?? 0);
   }
   if (payload.appliedPromotionId !== undefined) {
     normalized.appliedPromotionId = payload.appliedPromotionId;
@@ -182,7 +190,7 @@ const normalizePartialLinePayload = (
   if (payload.selectedModifiers !== undefined) {
     normalized.selectedModifiers = payload.selectedModifiers.map((modifier) => ({
       ...modifier,
-      priceDelta: toNumber(modifier.priceDelta) ?? 0,
+      priceDelta: toDecimalString(toNumber(modifier.priceDelta) ?? 0),
     }));
   }
   return normalized;

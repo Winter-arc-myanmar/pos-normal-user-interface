@@ -9,6 +9,7 @@ import {
   TableSession,
 } from "@/core/domain/entities/Cashier";
 import { ApiLoadingState } from "@/components/ApiLoadingState";
+import { NotificationBell } from "@/components/ui/NotificationBell";
 
 const serviceTabs: Array<{ key: ServiceType; labelKey: string }> = [
   { key: "TABLE", labelKey: "cashier.serviceTypes.table" },
@@ -36,6 +37,11 @@ interface CashierBoardProps {
   page: number;
   pageCount: number;
   getLatestSession: (tableId: string) => TableSession | undefined;
+  getOrderCount?: (tableId: string) => number;
+  notificationCount?: number;
+  serviceTabCounts?: Partial<Record<ServiceType, number>>;
+  statusTabCounts?: Partial<Record<"ALL" | OrderStatus, number>>;
+  onNotificationsClick?: () => void;
   onServiceTypeChange: (type: ServiceType) => void;
   onStatusFilterChange: (status: "ALL" | OrderStatus) => void;
   onTableSelect: (tableId: string) => void;
@@ -57,6 +63,11 @@ export function CashierBoard({
   page,
   pageCount,
   getLatestSession,
+  getOrderCount,
+  notificationCount = 0,
+  serviceTabCounts,
+  statusTabCounts,
+  onNotificationsClick,
   onServiceTypeChange,
   onStatusFilterChange,
   onTableSelect,
@@ -67,40 +78,56 @@ export function CashierBoard({
 
   return (
     <section className="flex h-full min-h-0 flex-col p-2 min-[1100px]:p-3">
-      <div className="flex flex-wrap items-center gap-2">
-        {serviceTabs.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => onServiceTypeChange(tab.key)}
-            className={[
-              "min-h-10 rounded px-3 py-1.5 text-sm",
-              serviceType === tab.key
-                ? "bg-blue-600 text-white"
-                : "text-slate-200 hover:bg-slate-800",
-            ].join(" ")}
-          >
-            {t(tab.labelKey)}
-          </button>
-        ))}
+      <div className="relative flex flex-wrap items-center gap-2 pr-11">
+        {serviceTabs.map((tab) => {
+          const tabCount = serviceTabCounts?.[tab.key];
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => onServiceTypeChange(tab.key)}
+              className={[
+                "min-h-10 rounded px-3 py-1.5 text-sm font-medium",
+                serviceType === tab.key
+                  ? "bg-blue-600 text-white"
+                  : "text-slate-200 hover:bg-slate-800",
+              ].join(" ")}
+            >
+              {t(tab.labelKey)}
+              {typeof tabCount === "number" ? (
+                <span className="ml-1 opacity-90">{tabCount}</span>
+              ) : null}
+            </button>
+          );
+        })}
+        <div className="absolute right-0 top-0">
+          <NotificationBell
+            count={notificationCount}
+            onClick={onNotificationsClick}
+          />
+        </div>
       </div>
 
       <div className="mt-1 flex flex-wrap items-center gap-1.5">
-        {statusTabs.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => onStatusFilterChange(tab.key)}
-            className={[
-              "min-h-8 rounded px-2 py-1 text-xs",
-              statusFilter === tab.key
-                ? "bg-blue-600 text-white"
-                : "bg-slate-800 text-slate-300",
-            ].join(" ")}
-          >
-            {t(tab.labelKey)}
-          </button>
-        ))}
+        {statusTabs.map((tab) => {
+          const tabCount = statusTabCounts?.[tab.key];
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => onStatusFilterChange(tab.key)}
+              className={[
+                "min-h-8 rounded px-2 py-1 text-xs",
+                statusFilter === tab.key
+                  ? "bg-blue-600 text-white"
+                  : "bg-slate-800 text-slate-300",
+              ].join(" ")}
+            >
+              {t(tab.labelKey)}
+              {typeof tabCount === "number" ? ` (${tabCount})` : ""}
+            </button>
+          );
+        })}
       </div>
 
       {error ? (
@@ -117,6 +144,7 @@ export function CashierBoard({
             {serviceType === "TABLE" || serviceType === "DINE_IN"
               ? tables.map((table) => {
                   const session = getLatestSession(table.id);
+                  const orderCount = getOrderCount?.(table.id) || 0;
                   const selected =
                     !!selectedOrderId && session?.salesOrderId === selectedOrderId;
                   const isCircle =
@@ -137,6 +165,13 @@ export function CashierBoard({
                         {table.tableNumber}
                       </span>
                       <span className="text-4xl leading-none text-white/90">+</span>
+                      {orderCount > 1 ? (
+                        <span className="absolute left-2 bottom-2 rounded bg-emerald-500 px-1.5 py-0.5 text-[9px] font-bold text-slate-950">
+                          {t("cashier.multiOrder.orderCount", {
+                            count: orderCount,
+                          })}
+                        </span>
+                      ) : null}
                       <span className="absolute bottom-2 right-2 text-[10px] text-slate-300">
                         {session?.sessionState || table.status}
                       </span>
