@@ -10,6 +10,7 @@ import { useSearchParams } from "react-router-dom";
 import {
   OrderStatus,
   ServiceType,
+  SplitPaymentTenderDTO,
   TableSessionState,
   toApiServiceType,
 } from "@/core/application/dtos/CashierDTO";
@@ -19,6 +20,7 @@ import { useSalesOrderManagement } from "@/core/presentation/hooks/useSalesOrder
 import { CashierBoard } from "./cashier/CashierBoard";
 import { MultiOrderingView } from "./cashier/MultiOrderingView";
 import { OrderPanel } from "./cashier/OrderPanel";
+import { PaymentView } from "./cashier/PaymentView";
 import { ProductMenu } from "./cashier/ProductMenu";
 import {
   Product,
@@ -32,6 +34,12 @@ import {
   readTableOrderIds,
   writeTableOrderIds,
 } from "@/lib/pos/multiOrdering";
+import { ensureMemberCardPaymentMethod } from "@/lib/pos/paymentMethods";
+import {
+  assertCheckoutPaymentsReady,
+  buildCheckoutPayments,
+  remainingReceivable,
+} from "@/lib/pos/splitPayments";
 
 const BOARD_PAGE_SIZE = 15;
 
@@ -77,6 +85,7 @@ export function CashierPage() {
     pickupCounterOrder,
     processCheckout,
     clearOrderSelection,
+    resolveTableWarning,
     clearError,
   } = useCashier();
   const {
@@ -110,6 +119,9 @@ export function CashierPage() {
     []
   );
   const [isMultiOrderMutating, setIsMultiOrderMutating] = useState(false);
+  const [isSplitMode, setIsSplitMode] = useState(false);
+  const [splitTenders, setSplitTenders] = useState<SplitPaymentTenderDTO[]>([]);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const paymentInputRef = useRef<HTMLInputElement>(null);
 
   const locationId = activeLocationId;
@@ -161,6 +173,8 @@ export function CashierPage() {
       setIsDirectCheckoutMode(false);
       setDirectCartLines([]);
       setPaymentAmount("0.0000");
+      setIsSplitMode(false);
+      setSplitTenders([]);
       setLocalError(null);
       setNotice(message);
       setSearchParams({ view: "orders" });
@@ -173,6 +187,11 @@ export function CashierPage() {
     if (!paymentMethods.length || paymentMethodId) return;
     setPaymentMethodId(paymentMethods[0].id);
   }, [paymentMethodId, paymentMethods]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 30000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const selectedOrderSession = useMemo(
     () =>
@@ -323,9 +342,15 @@ export function CashierPage() {
     selectedOrder?.grandTotal,
   ]);
 
+  const checkoutPaymentMethods = useMemo(
+    () => ensureMemberCardPaymentMethod(paymentMethods),
+    [paymentMethods]
+  );
+
   useEffect(() => {
+    if (isSplitMode) return;
     setPaymentAmount(orderTotal);
-  }, [isDirectCheckoutMode, orderTotal, selectedOrder?.id]);
+  }, [isDirectCheckoutMode, isSplitMode, orderTotal, selectedOrder?.id]);
 
   useEffect(() => {
     if (activeView === "pay") {
@@ -926,12 +951,18 @@ export function CashierPage() {
       if (!activeOrderLines.length) {
         throw new Error("Add at least one item before checkout");
       }
-      if (!paymentMethodId) {
-        throw new Error(t("cashier.errors.paymentMethodRequired"));
-      }
-      if (!Number.isFinite(Number(paymentAmount)) || Number(paymentAmount) <= 0) {
-        throw new Error("Payment amount must be greater than zero");
-      }
+
+      const checkoutPayments = buildCheckoutPayments({
+        total: orderTotal,
+        paymentMethodId,
+        paymentAmount,
+        splitTenders,
+        isSplitMode,
+      });
+      assertCheckoutPaymentsReady({
+        total: orderTotal,
+        payments: checkoutPayments,
+      });
 
       const isMultiOrderSecondary =
         Boolean(
@@ -944,15 +975,17 @@ export function CashierPage() {
 
       if (selectedOrderSession && isPrimaryTableOrder && selectedOrder) {
         await checkoutTableSession(selectedOrderSession.id, {
-          payments: [{ paymentMethodId, amount: paymentAmount }],
+          payments: checkoutPayments,
         });
       } else if (isMultiOrderSecondary && selectedOrder) {
-        await addPayment(selectedOrder.id, {
-          tenantId: context.tenantId,
-          paymentMethodId,
-          posSessionId: context.posSessionId,
-          amount: paymentAmount,
-        });
+        for (const payment of checkoutPayments) {
+          await addPayment(selectedOrder.id, {
+            tenantId: context.tenantId,
+            paymentMethodId: payment.paymentMethodId,
+            posSessionId: context.posSessionId,
+            amount: payment.amount,
+          });
+        }
       } else {
         const selectedServiceType = selectedOrder
           ? selectedOrder.serviceType
@@ -969,7 +1002,7 @@ export function CashierPage() {
             quantity: line.quantity,
             lineDiscount: line.lineDiscount || "0.0000",
           })),
-          payments: [{ paymentMethodId, amount: paymentAmount }],
+          payments: checkoutPayments,
         });
       }
 
@@ -1051,6 +1084,56 @@ export function CashierPage() {
       taxAmount: targetLine.taxAmount || "0.0000",
       seatNumber: targetLine.seatNumber,
     });
+  };
+
+  const handleToggleSplit = () => {
+    setIsSplitMode((current) => {
+      const next = !current;
+      if (next) {
+        setSplitTenders([]);
+        setPaymentAmount(orderTotal);
+        setSearchParams({ view: "pay" });
+      } else {
+        setSplitTenders([]);
+        setPaymentAmount(orderTotal);
+      }
+      return next;
+    });
+  };
+
+  const handleAddSplitTender = () => {
+    if (!paymentMethodId) {
+      setLocalError(t("cashier.errors.paymentMethodRequired"));
+      return;
+    }
+    const amount = Number(paymentAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setLocalError(t("cashier.errors.splitAmount"));
+      return;
+    }
+    const remaining = remainingReceivable(orderTotal, splitTenders);
+    const tenderAmount = Math.min(amount, remaining);
+    if (tenderAmount <= 0) {
+      setLocalError(t("cashier.errors.splitComplete"));
+      return;
+    }
+    const nextTenders = [
+      ...splitTenders,
+      {
+        id: `split-${Date.now()}-${splitTenders.length}`,
+        paymentMethodId,
+        amount: tenderAmount.toFixed(4),
+      },
+    ];
+    setSplitTenders(nextTenders);
+    setPaymentAmount(remainingReceivable(orderTotal, nextTenders).toFixed(4));
+    setLocalError(null);
+  };
+
+  const handleRemoveSplitTender = (tenderId: string) => {
+    const nextTenders = splitTenders.filter((tender) => tender.id !== tenderId);
+    setSplitTenders(nextTenders);
+    setPaymentAmount(remainingReceivable(orderTotal, nextTenders).toFixed(4));
   };
 
   const handleIncreaseLineQuantity = async (line: (typeof activeOrderLines)[number]) => {
@@ -1273,7 +1356,7 @@ export function CashierPage() {
     <section
       className={[
         "grid h-full min-h-0 min-w-0 overflow-hidden bg-[#070707] text-white",
-        activeView === "multi-order"
+        activeView === "multi-order" || activeView === "pay"
           ? "grid-cols-[13rem_minmax(0,1fr)] min-[1100px]:grid-cols-[18rem_minmax(0,1fr)]"
           : "grid-cols-[13rem_minmax(0,1fr)_5.5rem] min-[1100px]:grid-cols-[18rem_minmax(0,1fr)_8rem]",
       ].join(" ")}
@@ -1283,7 +1366,7 @@ export function CashierPage() {
         selectedOrderLines={displayOrderLines}
         products={products}
         variantsByProductId={variantsByProductId}
-        paymentMethods={paymentMethods}
+        paymentMethods={checkoutPaymentMethods}
         paymentMethodId={paymentMethodId}
         paymentAmount={paymentAmount}
         total={orderTotal}
@@ -1308,6 +1391,9 @@ export function CashierPage() {
         onRemoveLine={(line) => void handleRemoveLine(line)}
         onPaymentAmountChange={setPaymentAmount}
         onPaymentMethodChange={setPaymentMethodId}
+        onToggleSplit={handleToggleSplit}
+        isSplitMode={isSplitMode}
+        showSplitButton={activeView !== "pay"}
         onCheckout={() => void handleCheckout()}
         onFireKds={() => void handleFireKds()}
         onPickup={() => void handlePickup()}
@@ -1323,6 +1409,22 @@ export function CashierPage() {
             onLoadVariants={fetchProductVariants}
             onAdd={handleAddProduct}
             onClose={handleCloseMenu}
+          />
+        ) : activeView === "pay" ? (
+          <PaymentView
+            methods={checkoutPaymentMethods}
+            selectedMethodId={paymentMethodId}
+            paymentAmount={paymentAmount}
+            total={orderTotal}
+            subtotal={selectedOrder?.subtotal || orderTotal}
+            isSplitMode={isSplitMode}
+            splitTenders={splitTenders}
+            isLoading={isLoading || isPosSessionLoading}
+            onSelectMethod={setPaymentMethodId}
+            onPaymentAmountChange={setPaymentAmount}
+            onToggleSplit={handleToggleSplit}
+            onAddTender={handleAddSplitTender}
+            onRemoveTender={handleRemoveSplitTender}
           />
         ) : activeView === "multi-order" && activeTableId ? (
           <MultiOrderingView
@@ -1358,6 +1460,7 @@ export function CashierPage() {
             pageCount={boardPageCount}
             getLatestSession={getLatestSessionByTableId}
             getOrderCount={getTableOrderCount}
+            getTableWarning={(openedAt) => resolveTableWarning(openedAt, nowMs)}
             notificationCount={boardMetrics.notificationCount}
             serviceTabCounts={boardMetrics.serviceTabCounts}
             statusTabCounts={boardMetrics.statusTabCounts}
@@ -1371,7 +1474,7 @@ export function CashierPage() {
         )}
       </main>
 
-      {activeView !== "multi-order" ? (
+      {activeView !== "multi-order" && activeView !== "pay" ? (
         <aside className="flex min-h-0 flex-col border-l border-slate-800 bg-[#222] p-1.5 min-[1100px]:p-2">
         <button
           type="button"

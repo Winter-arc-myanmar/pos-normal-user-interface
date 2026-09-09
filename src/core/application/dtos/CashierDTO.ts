@@ -191,6 +191,32 @@ export interface UpdateTableSessionStateDTO {
   sessionState: TableSessionState;
 }
 
+export type TableWarningLevel = "OK" | "WARNING" | "CRITICAL";
+
+export interface TableWarningPolicyDTO {
+  warningAfterMinutes: number;
+  criticalAfterMinutes: number;
+}
+
+export interface TableWarningStatusDTO {
+  level: TableWarningLevel;
+  elapsedMinutes: number;
+  elapsedLabel: string;
+}
+
+export interface CheckoutPaymentEntryDTO {
+  paymentMethodId: string;
+  amount: string;
+  tipAmount?: string;
+  transactionReference?: string;
+}
+
+export interface SplitPaymentTenderDTO {
+  id: string;
+  paymentMethodId: string;
+  amount: string;
+}
+
 export interface TableSessionCheckoutDTO {
   payments: Array<{
     paymentMethodId: string;

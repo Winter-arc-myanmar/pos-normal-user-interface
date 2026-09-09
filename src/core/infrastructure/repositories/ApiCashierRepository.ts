@@ -737,7 +737,9 @@ export class ApiCashierRepository implements ICashierRepository {
       new PaymentMethod({
         id: String(item.id || ""),
         tenantId: String(item.tenantId || ""),
-        name: String(item.name || ""),
+        name: String(item.name || item.label || ""),
+        code: item.code ? String(item.code) : item.methodCode ? String(item.methodCode) : undefined,
+        type: item.type ? String(item.type) : item.methodType ? String(item.methodType) : undefined,
       })
     );
   }

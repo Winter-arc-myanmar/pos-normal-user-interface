@@ -406,6 +406,24 @@
       "selectTableOptionalHint": "Pick a table for seated dine-in, or add items without a table.",
       "selectPrompt": "Select a product to choose its variant and quantity."
     },
+    "payment": {
+      "remaining": "Remaining receivable {{amount}}",
+      "bill": "Bill",
+      "subtotal": "Subtotal",
+      "split": "Split",
+      "splitOn": "Split on",
+      "splitAmount": "Split amount",
+      "addTender": "Add tender",
+      "splitHint": "Select CASH or MEMBER CARD, enter an amount, then add each tender.",
+      "splitRailHint": "Use Split to divide this bill across payment methods.",
+      "memberCard": "MEMBER CARD",
+      "localFallback": "Demo"
+    },
+    "tableWarning": {
+      "ok": "On time",
+      "warning": "Warning",
+      "critical": "Overdue"
+    },
     "orderPanel": {
       "emptyLines": "Open Menu and add products.",
       "noOrder": "No order selected",
@@ -444,6 +462,8 @@
       "missingPosSession": "No active POS session. Open a session and try again.",
       "posSessionControl": "Unable to update POS session.",
       "paymentMethodRequired": "Choose a payment method first.",
+      "splitAmount": "Enter a split amount greater than zero.",
+      "splitComplete": "Split payments already cover this bill.",
       "noTableAvailable": "No available table for this waitlist party.",
       "seatWaitlist": "Unable to seat waitlist entry.",
       "pickupFailed": "Unable to mark pickup.",

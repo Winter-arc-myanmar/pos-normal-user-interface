@@ -8,6 +8,7 @@ import {
   SalesOrder,
   TableSession,
 } from "@/core/domain/entities/Cashier";
+import { TableWarningStatusDTO } from "@/core/application/dtos/CashierDTO";
 import { ApiLoadingState } from "@/components/ApiLoadingState";
 import { NotificationBell } from "@/components/ui/NotificationBell";
 
@@ -38,6 +39,7 @@ interface CashierBoardProps {
   pageCount: number;
   getLatestSession: (tableId: string) => TableSession | undefined;
   getOrderCount?: (tableId: string) => number;
+  getTableWarning?: (openedAt?: string | null) => TableWarningStatusDTO | null;
   notificationCount?: number;
   serviceTabCounts?: Partial<Record<ServiceType, number>>;
   statusTabCounts?: Partial<Record<"ALL" | OrderStatus, number>>;
@@ -64,6 +66,7 @@ export function CashierBoard({
   pageCount,
   getLatestSession,
   getOrderCount,
+  getTableWarning,
   notificationCount = 0,
   serviceTabCounts,
   statusTabCounts,
@@ -149,6 +152,16 @@ export function CashierBoard({
                     !!selectedOrderId && session?.salesOrderId === selectedOrderId;
                   const isCircle =
                     String(table.shape || "").toUpperCase() === "CIRCLE";
+                  const warning =
+                    session && !session.closedAt
+                      ? getTableWarning?.(session.openedAt)
+                      : null;
+                  const warningClass =
+                    warning?.level === "CRITICAL"
+                      ? "border-red-500 bg-red-950/40"
+                      : warning?.level === "WARNING"
+                        ? "border-amber-400 bg-amber-950/30"
+                        : "";
 
                   return (
                     <button
@@ -158,13 +171,29 @@ export function CashierBoard({
                         boardTileClass,
                         isCircle ? "rounded-full" : "rounded-md",
                         selected ? "border-blue-500" : "",
+                        warningClass,
                       ].join(" ")}
                       onClick={() => onTableSelect(table.id)}
                     >
                       <span className="absolute left-2 top-2 text-sm font-semibold">
                         {table.tableNumber}
                       </span>
-                      <span className="text-4xl leading-none text-white/90">+</span>
+                      {warning ? (
+                        <span
+                          className={[
+                            "absolute right-2 top-2 rounded px-1.5 py-0.5 text-[9px] font-bold",
+                            warning.level === "CRITICAL"
+                              ? "bg-red-500 text-white"
+                              : warning.level === "WARNING"
+                                ? "bg-amber-400 text-slate-950"
+                                : "bg-emerald-500 text-slate-950",
+                          ].join(" ")}
+                        >
+                          {warning.elapsedLabel}
+                        </span>
+                      ) : (
+                        <span className="text-4xl leading-none text-white/90">+</span>
+                      )}
                       {orderCount > 1 ? (
                         <span className="absolute left-2 bottom-2 rounded bg-emerald-500 px-1.5 py-0.5 text-[9px] font-bold text-slate-950">
                           {t("cashier.multiOrder.orderCount", {
@@ -173,7 +202,9 @@ export function CashierBoard({
                         </span>
                       ) : null}
                       <span className="absolute bottom-2 right-2 text-[10px] text-slate-300">
-                        {session?.sessionState || table.status}
+                        {warning
+                          ? t(`cashier.tableWarning.${warning.level.toLowerCase()}`)
+                          : session?.sessionState || table.status}
                       </span>
                     </button>
                   );

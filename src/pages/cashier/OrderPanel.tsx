@@ -43,6 +43,9 @@ interface OrderPanelProps {
   onRemoveLine: (line: SalesOrderLine) => void;
   onPaymentAmountChange: (value: string) => void;
   onPaymentMethodChange: (value: string) => void;
+  onToggleSplit?: () => void;
+  isSplitMode?: boolean;
+  showSplitButton?: boolean;
   onCheckout: () => void;
   onFireKds: () => void;
   onPickup: () => void;
@@ -77,6 +80,9 @@ export function OrderPanel({
   onRemoveLine,
   onPaymentAmountChange,
   onPaymentMethodChange,
+  onToggleSplit,
+  isSplitMode = false,
+  showSplitButton = true,
   onCheckout,
   onFireKds,
   onPickup,
@@ -227,6 +233,17 @@ export function OrderPanel({
               </option>
             ))}
           </select>
+          {showSplitButton && onToggleSplit ? (
+            <Button
+              variant="secondary"
+              disabled={isLoading}
+              onClick={onToggleSplit}
+            >
+              {isSplitMode
+                ? t("cashier.payment.splitOn")
+                : t("cashier.payment.split")}
+            </Button>
+          ) : null}
           {selectedTable ? (
             <select
               aria-label="Table status"

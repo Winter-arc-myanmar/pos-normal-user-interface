@@ -119,6 +119,9 @@ export class PaymentMethod {
   id!: string;
   tenantId!: string;
   name!: string;
+  code?: string;
+  type?: string;
+  isLocalFallback?: boolean;
 
   constructor(data: Partial<PaymentMethod>) {
     Object.assign(this, data);

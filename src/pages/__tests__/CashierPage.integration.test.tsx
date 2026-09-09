@@ -168,6 +168,7 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
     getCounterOrderById: mocks.getCounterOrderById,
     pickupCounterOrder: mocks.pickupCounterOrder,
     processCheckout: vi.fn(),
+    resolveTableWarning: vi.fn().mockReturnValue(null),
     clearError: vi.fn(),
   }),
 }));
@@ -295,7 +296,7 @@ describe("CashierPage integration", () => {
       (screen.getByLabelText("cashier.orderPanel.paymentAmount") as HTMLInputElement)
         .value
     ).toBe("10.5000");
-    expect(screen.queryByText("10.50")).not.toBeNull();
+    expect(screen.queryAllByText("10.50").length).toBeGreaterThan(0);
 
     fireEvent.click(
       screen.getByRole("button", { name: "cashier.orderPanel.sendKds" })

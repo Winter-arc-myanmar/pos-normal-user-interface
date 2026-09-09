@@ -24,6 +24,7 @@ import {
   UpdateSalesOrderLineDTO,
   UpsertSalesOrderLineDTO,
   WaitlistFilterDTO,
+  TableWarningStatusDTO,
 } from "../../application/dtos/CashierDTO";
 import {
   AdjustmentReason,
@@ -68,6 +69,10 @@ export interface ICashierService {
   ): Promise<OrderPayment>;
   getOrderPayments(salesOrderId: string): Promise<OrderPayment[]>;
   getPaymentMethods(): Promise<PaymentMethod[]>;
+  getTableWarningStatus(
+    openedAt?: string | null,
+    nowMs?: number
+  ): TableWarningStatusDTO | null;
   getPosRegisters(params?: PosRegisterFilterDTO): Promise<PosRegister[]>;
   createPosRegister(payload: CreatePosRegisterDTO): Promise<PosRegister>;
   getPosSessions(params?: PosSessionFilterDTO): Promise<PosSession[]>;

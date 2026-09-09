@@ -24,6 +24,7 @@ import {
   UpdateTableSessionStateDTO,
   UpdateTipPoolDTO,
   UpdateWaitlistEntryDTO,
+  TableWarningStatusDTO,
   WaitlistFilterDTO,
 } from "../../application/dtos/CashierDTO";
 import {
@@ -165,6 +166,10 @@ interface UseCashierReturn {
   pickupCounterOrder: (counterOrderId: string) => Promise<Record<string, unknown>>;
   addPayment: (orderId: string, payload: CreateOrderPaymentDTO) => Promise<void>;
   processCheckout: (payload: CheckoutRequestDTO) => Promise<Record<string, unknown>>;
+  resolveTableWarning: (
+    openedAt?: string | null,
+    nowMs?: number
+  ) => TableWarningStatusDTO | null;
   clearOrderSelection: () => void;
   clearError: () => void;
 }
@@ -1260,6 +1265,12 @@ export function useCashier(): UseCashierReturn {
     [cashierService, clearError, clearOrderSelection, fetchSalesOrders]
   );
 
+  const resolveTableWarning = useCallback(
+    (openedAt?: string | null, nowMs?: number) =>
+      cashierService.getTableWarningStatus(openedAt, nowMs),
+    [cashierService]
+  );
+
   const value = useMemo(
     () => ({
       products,
@@ -1334,6 +1345,7 @@ export function useCashier(): UseCashierReturn {
       pickupCounterOrder,
       addPayment,
       processCheckout,
+      resolveTableWarning,
       clearOrderSelection,
       clearError,
     }),
@@ -1409,6 +1421,7 @@ export function useCashier(): UseCashierReturn {
       pickupCounterOrder,
       addPayment,
       processCheckout,
+      resolveTableWarning,
       clearOrderSelection,
       clearError,
     ]

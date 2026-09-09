@@ -27,6 +27,8 @@ import {
   UpdateWaitlistEntryDTO,
   UpsertSalesOrderLineDTO,
   WaitlistFilterDTO,
+  TableWarningPolicyDTO,
+  TableWarningStatusDTO,
 } from "../dtos/CashierDTO";
 import {
   AdjustmentReason,
@@ -46,6 +48,8 @@ import {
   TipPoolAllocation,
   WaitlistEntry,
 } from "../../domain/entities/Cashier";
+import { PosPaymentCatalog } from "./PosPaymentCatalog";
+import { TableWarningPolicy } from "./TableWarningPolicy";
 
 export class CashierService implements ICashierService {
   constructor(private readonly cashierRepository: ICashierRepository) {}
@@ -164,7 +168,16 @@ export class CashierService implements ICashierService {
   }
 
   async getPaymentMethods(): Promise<PaymentMethod[]> {
-    return this.cashierRepository.getPaymentMethods();
+    const methods = await this.cashierRepository.getPaymentMethods();
+    return PosPaymentCatalog.withMemberCard(methods);
+  }
+
+  getTableWarningStatus(
+    openedAt?: string | null,
+    nowMs: number = Date.now(),
+    policy?: TableWarningPolicyDTO
+  ): TableWarningStatusDTO | null {
+    return TableWarningPolicy.resolve(openedAt, nowMs, policy);
   }
 
   async getPosRegisters(params?: PosRegisterFilterDTO): Promise<PosRegister[]> {
@@ -265,6 +278,8 @@ export class CashierService implements ICashierService {
     ) {
       throw new Error("Every payment requires a method and positive amount");
     }
+    const methods = await this.getPaymentMethods();
+    PosPaymentCatalog.assertNoLocalFallbackPayments(payload.payments, methods);
     return this.cashierRepository.checkoutTableSession(sessionId, payload);
   }
 
@@ -462,6 +477,9 @@ export class CashierService implements ICashierService {
     ) {
       throw new Error("Every payment requires a method and positive amount");
     }
+
+    const methods = await this.getPaymentMethods();
+    PosPaymentCatalog.assertNoLocalFallbackPayments(payload.payments, methods);
 
     return this.cashierRepository.checkout({
       ...payload,
