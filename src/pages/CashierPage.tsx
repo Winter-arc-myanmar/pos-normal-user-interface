@@ -184,11 +184,6 @@ export function CashierPage() {
   );
 
   useEffect(() => {
-    if (!paymentMethods.length || paymentMethodId) return;
-    setPaymentMethodId(paymentMethods[0].id);
-  }, [paymentMethodId, paymentMethods]);
-
-  useEffect(() => {
     const timer = window.setInterval(() => setNowMs(Date.now()), 30000);
     return () => window.clearInterval(timer);
   }, []);
@@ -348,16 +343,38 @@ export function CashierPage() {
   );
 
   useEffect(() => {
+    if (!checkoutPaymentMethods.length) return;
+    const stillValid = checkoutPaymentMethods.some(
+      (method) => method.id === paymentMethodId
+    );
+    if (stillValid) return;
+    setPaymentMethodId(checkoutPaymentMethods[0].id);
+  }, [checkoutPaymentMethods, paymentMethodId]);
+
+  useEffect(() => {
     if (isSplitMode) return;
     setPaymentAmount(orderTotal);
   }, [isDirectCheckoutMode, isSplitMode, orderTotal, selectedOrder?.id]);
 
+  const previousOrderIdRef = useRef(selectedOrder?.id);
   useEffect(() => {
-    if (activeView === "pay") {
-      paymentInputRef.current?.focus();
-      paymentInputRef.current?.select();
+    const nextId = selectedOrder?.id;
+    if (
+      previousOrderIdRef.current &&
+      nextId &&
+      previousOrderIdRef.current !== nextId
+    ) {
+      setIsSplitMode(false);
+      setSplitTenders([]);
     }
-  }, [activeView, selectedOrder?.id]);
+    previousOrderIdRef.current = nextId;
+  }, [selectedOrder?.id]);
+
+  useEffect(() => {
+    if (activeView !== "pay" || isSplitMode) return;
+    paymentInputRef.current?.focus();
+    paymentInputRef.current?.select();
+  }, [activeView, isSplitMode, selectedOrder?.id]);
 
   const filteredOrders = useMemo(
     () =>
@@ -1086,19 +1103,23 @@ export function CashierPage() {
     });
   };
 
-  const handleToggleSplit = () => {
-    setIsSplitMode((current) => {
-      const next = !current;
-      if (next) {
-        setSplitTenders([]);
-        setPaymentAmount(orderTotal);
-        setSearchParams({ view: "pay" });
-      } else {
-        setSplitTenders([]);
-        setPaymentAmount(orderTotal);
-      }
-      return next;
-    });
+  const handleOpenSplit = () => {
+    setSearchParams({ view: "pay" });
+    if (isSplitMode) return;
+    setIsSplitMode(true);
+    setSplitTenders([]);
+    setPaymentAmount(orderTotal);
+    setLocalError(null);
+    setNotice(t("cashier.payment.splitOpened"));
+  };
+
+  const handleCloseSplit = () => {
+    if (!isSplitMode) return;
+    setIsSplitMode(false);
+    setSplitTenders([]);
+    setPaymentAmount(orderTotal);
+    setLocalError(null);
+    setNotice(t("cashier.payment.splitClosed"));
   };
 
   const handleAddSplitTender = () => {
@@ -1391,8 +1412,14 @@ export function CashierPage() {
         onRemoveLine={(line) => void handleRemoveLine(line)}
         onPaymentAmountChange={setPaymentAmount}
         onPaymentMethodChange={setPaymentMethodId}
-        onToggleSplit={handleToggleSplit}
+        onOpenSplit={handleOpenSplit}
+        onCloseSplit={handleCloseSplit}
         isSplitMode={isSplitMode}
+        splitTenderCount={splitTenders.length}
+        splitRemaining={remainingReceivable(
+          orderTotal,
+          isSplitMode ? splitTenders : []
+        )}
         showSplitButton={activeView !== "pay"}
         onCheckout={() => void handleCheckout()}
         onFireKds={() => void handleFireKds()}
@@ -1422,7 +1449,8 @@ export function CashierPage() {
             isLoading={isLoading || isPosSessionLoading}
             onSelectMethod={setPaymentMethodId}
             onPaymentAmountChange={setPaymentAmount}
-            onToggleSplit={handleToggleSplit}
+            onOpenSplit={handleOpenSplit}
+            onCloseSplit={handleCloseSplit}
             onAddTender={handleAddSplitTender}
             onRemoveTender={handleRemoveSplitTender}
           />

@@ -152,16 +152,17 @@ export function CashierBoard({
                     !!selectedOrderId && session?.salesOrderId === selectedOrderId;
                   const isCircle =
                     String(table.shape || "").toUpperCase() === "CIRCLE";
-                  const warning =
-                    session && !session.closedAt
-                      ? getTableWarning?.(session.openedAt)
-                      : null;
+                  const occupied = Boolean(session && !session.closedAt);
+                  const warning = occupied
+                    ? getTableWarning?.(session?.openedAt)
+                    : null;
                   const warningClass =
                     warning?.level === "CRITICAL"
                       ? "border-red-500 bg-red-950/40"
                       : warning?.level === "WARNING"
                         ? "border-amber-400 bg-amber-950/30"
                         : "";
+                  const showCircle = isCircle && !occupied && orderCount <= 1;
 
                   return (
                     <button
@@ -169,13 +170,13 @@ export function CashierBoard({
                       type="button"
                       className={[
                         boardTileClass,
-                        isCircle ? "rounded-full" : "rounded-md",
-                        selected ? "border-blue-500" : "",
+                        showCircle ? "rounded-full" : "rounded-md",
+                        selected ? "ring-2 ring-blue-400 ring-offset-2 ring-offset-[#070707]" : "",
                         warningClass,
                       ].join(" ")}
                       onClick={() => onTableSelect(table.id)}
                     >
-                      <span className="absolute left-2 top-2 text-sm font-semibold">
+                      <span className="absolute left-2 top-2 max-w-[45%] truncate text-sm font-semibold">
                         {table.tableNumber}
                       </span>
                       {warning ? (
@@ -191,9 +192,10 @@ export function CashierBoard({
                         >
                           {warning.elapsedLabel}
                         </span>
-                      ) : (
+                      ) : null}
+                      {!occupied ? (
                         <span className="text-4xl leading-none text-white/90">+</span>
-                      )}
+                      ) : null}
                       {orderCount > 1 ? (
                         <span className="absolute left-2 bottom-2 rounded bg-emerald-500 px-1.5 py-0.5 text-[9px] font-bold text-slate-950">
                           {t("cashier.multiOrder.orderCount", {
@@ -201,7 +203,7 @@ export function CashierBoard({
                           })}
                         </span>
                       ) : null}
-                      <span className="absolute bottom-2 right-2 text-[10px] text-slate-300">
+                      <span className="absolute bottom-2 right-2 max-w-[55%] truncate text-[10px] text-slate-300">
                         {warning
                           ? t(`cashier.tableWarning.${warning.level.toLowerCase()}`)
                           : session?.sessionState || table.status}

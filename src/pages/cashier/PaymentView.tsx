@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { SplitPaymentTenderDTO } from "@/core/application/dtos/CashierDTO";
@@ -17,7 +17,8 @@ interface PaymentViewProps {
   isLoading?: boolean;
   onSelectMethod: (methodId: string) => void;
   onPaymentAmountChange: (value: string) => void;
-  onToggleSplit: () => void;
+  onOpenSplit: () => void;
+  onCloseSplit: () => void;
   onAddTender: () => void;
   onRemoveTender: (tenderId: string) => void;
 }
@@ -67,6 +68,23 @@ function SplitIcon() {
   );
 }
 
+function CloseSplitIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
+      <path
+        d="M7 7l10 10M17 7 7 17"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function formatMoney(value: number): string {
+  return (Number.isFinite(value) ? value : 0).toFixed(2);
+}
+
 function methodLabel(method: PaymentMethod, memberCardLabel: string): string {
   if (isMemberCardPaymentMethod(method)) return memberCardLabel;
   return method.name.toUpperCase();
@@ -89,13 +107,18 @@ export function PaymentView({
   isLoading,
   onSelectMethod,
   onPaymentAmountChange,
-  onToggleSplit,
+  onOpenSplit,
+  onCloseSplit,
   onAddTender,
   onRemoveTender,
 }: PaymentViewProps) {
   const { t } = useTranslation();
+  const [confirmClose, setConfirmClose] = useState(false);
+  const splitAmountRef = useRef<HTMLInputElement>(null);
   const remaining = remainingReceivable(total, isSplitMode ? splitTenders : []);
   const displayRemaining = isSplitMode ? remaining : Number(total || 0);
+  const splitCovered =
+    isSplitMode && splitTenders.length > 0 && remaining <= 0.009;
   const billSubtotal = Number(subtotal || total || 0);
   const billTotal = Number(total || 0);
   const memberCardLabel = t("cashier.payment.memberCard");
@@ -103,56 +126,147 @@ export function PaymentView({
     () => [...methods].sort((a, b) => methodRank(a) - methodRank(b)),
     [methods]
   );
+  const selectedMethod = sortedMethods.find((method) => method.id === selectedMethodId);
+  const requestCloseSplit = useCallback(() => {
+    if (splitTenders.length) {
+      setConfirmClose(true);
+      return;
+    }
+    onCloseSplit();
+  }, [onCloseSplit, splitTenders.length]);
+
+  useEffect(() => {
+    if (!isSplitMode) setConfirmClose(false);
+  }, [isSplitMode]);
+
+  useEffect(() => {
+    if (!isSplitMode || confirmClose) return;
+    splitAmountRef.current?.focus();
+    splitAmountRef.current?.select();
+  }, [confirmClose, isSplitMode, selectedMethodId]);
+
+  useEffect(() => {
+    if (!isSplitMode) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      if (confirmClose) {
+        setConfirmClose(false);
+        return;
+      }
+      requestCloseSplit();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [confirmClose, isSplitMode, requestCloseSplit]);
 
   return (
-    <section className="grid h-full min-h-0 grid-cols-[minmax(11rem,16rem)_3.75rem_minmax(0,1fr)] overflow-hidden bg-[#202020] text-white">
+    <section className="grid h-full min-h-0 grid-cols-[minmax(11rem,16rem)_4.5rem_minmax(0,1fr)] overflow-hidden bg-[#202020] text-white">
       <aside className="flex min-h-0 flex-col border-r border-white/10 p-2">
         <div className="rounded bg-white p-3 text-slate-900">
           <p className="text-sm font-semibold">{t("cashier.payment.bill")}</p>
           <div className="mt-3 flex justify-between text-sm">
             <span className="text-slate-500">{t("cashier.payment.subtotal")}</span>
-            <span>{billSubtotal.toFixed(2)}</span>
+            <span>{formatMoney(billSubtotal)}</span>
           </div>
           <div className="mt-2 flex justify-between text-sm font-semibold">
             <span>{t("cashier.total")}</span>
-            <span>{billTotal.toFixed(2)}</span>
+            <span>{formatMoney(billTotal)}</span>
           </div>
         </div>
 
         {isSplitMode ? (
-          <div className="mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto rounded border border-white/10 bg-black/25 p-2">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-              {t("cashier.payment.split")}
-            </p>
-            <input
-              inputMode="decimal"
-              value={paymentAmount}
-              onChange={(event) => onPaymentAmountChange(event.target.value)}
-              aria-label={t("cashier.payment.splitAmount")}
-              className="min-h-9 w-full rounded border border-slate-600 bg-slate-800 px-2 text-sm"
-            />
-            <Button
-              size="sm"
-              fullWidth
-              disabled={!selectedMethodId || Number(paymentAmount) <= 0 || isLoading}
-              onClick={onAddTender}
-            >
-              {t("cashier.payment.addTender")}
-            </Button>
+          <div className="mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto rounded border border-blue-500/40 bg-black/25 p-2">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-300">
+                  {t("cashier.payment.splitOn")}
+                </p>
+                {splitTenders.length ? (
+                  <p className="text-[10px] text-slate-400">
+                    {t("cashier.payment.splitTenderCount", {
+                      count: splitTenders.length,
+                    })}
+                  </p>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={requestCloseSplit}
+                aria-label={t("cashier.payment.closeSplitTitle")}
+                className="rounded p-1 text-slate-400 hover:bg-white/10 hover:text-white"
+              >
+                <CloseSplitIcon />
+              </button>
+            </div>
+            {confirmClose ? (
+              <div className="space-y-2 rounded border border-amber-400/40 bg-amber-950/50 p-2">
+                <p className="text-xs text-amber-100">
+                  {t("cashier.payment.closeSplitConfirm", {
+                    count: splitTenders.length,
+                  })}
+                </p>
+                <Button
+                  size="sm"
+                  fullWidth
+                  variant="secondary"
+                  onClick={() => setConfirmClose(false)}
+                >
+                  {t("cashier.payment.keepSplit")}
+                </Button>
+                <Button size="sm" fullWidth onClick={onCloseSplit}>
+                  {t("cashier.payment.confirmCloseSplit")}
+                </Button>
+              </div>
+            ) : (
+              <>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                  {t("cashier.payment.nextMethod")}
+                </p>
+                <p className="rounded bg-white/10 px-2 py-1.5 text-xs font-semibold">
+                  {selectedMethod
+                    ? methodLabel(selectedMethod, memberCardLabel)
+                    : t("cashier.orderPanel.selectPayment")}
+                </p>
+                <input
+                  ref={splitAmountRef}
+                  inputMode="decimal"
+                  value={paymentAmount}
+                  onChange={(event) => onPaymentAmountChange(event.target.value)}
+                  aria-label={t("cashier.payment.splitAmount")}
+                  className="min-h-9 w-full rounded border border-slate-600 bg-slate-800 px-2 text-sm"
+                />
+                <Button
+                  size="sm"
+                  fullWidth
+                  disabled={
+                    !selectedMethodId ||
+                    Number(paymentAmount) <= 0 ||
+                    isLoading ||
+                    remaining <= 0.009
+                  }
+                  onClick={onAddTender}
+                >
+                  {t("cashier.payment.addTender")}
+                </Button>
+              </>
+            )}
             {splitTenders.map((tender) => {
               const method = methods.find((item) => item.id === tender.paymentMethodId);
               return (
                 <div
                   key={tender.id}
-                  className="flex items-center justify-between rounded bg-white/5 px-2 py-1.5 text-xs"
+                  className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 rounded bg-white/5 px-2 py-1.5 text-xs"
                 >
                   <span className="truncate">
                     {method ? methodLabel(method, memberCardLabel) : tender.paymentMethodId}
                   </span>
-                  <span className="ml-2 shrink-0">{Number(tender.amount).toFixed(2)}</span>
+                  <span className="tabular-nums text-slate-200">
+                    {formatMoney(Number(tender.amount))}
+                  </span>
                   <button
                     type="button"
-                    className="ml-2 text-red-300"
+                    className="text-red-300 hover:text-red-200"
                     onClick={() => onRemoveTender(tender.id)}
                   >
                     {t("cashier.orderPanel.remove")}
@@ -160,7 +274,7 @@ export function PaymentView({
                 </div>
               );
             })}
-            {!splitTenders.length ? (
+            {!splitTenders.length && !confirmClose ? (
               <p className="text-xs text-slate-400">{t("cashier.payment.splitHint")}</p>
             ) : null}
           </div>
@@ -169,40 +283,65 @@ export function PaymentView({
         )}
       </aside>
 
-      <div className="flex flex-col items-center gap-1 border-r border-white/10 bg-[#171717] p-1">
+      <div className="flex min-h-0 flex-col items-center gap-1 overflow-y-auto border-r border-white/10 bg-[#171717] p-1">
         <button
           type="button"
-          onClick={onToggleSplit}
+          onClick={() => {
+            if (!isSplitMode) onOpenSplit();
+          }}
           aria-pressed={isSplitMode}
           aria-label={t("cashier.payment.split")}
           className={[
-            "flex min-h-24 w-full flex-col items-center justify-center rounded px-1 py-2 text-[11px] font-semibold",
-            isSplitMode ? "bg-blue-700 text-white" : "bg-blue-600 text-white hover:bg-blue-500",
+            "flex min-h-20 w-full flex-col items-center justify-center rounded px-1 py-2 text-[11px] font-semibold",
+            isSplitMode
+              ? "cursor-default bg-blue-700 text-white ring-2 ring-blue-300"
+              : "bg-blue-600 text-white hover:bg-blue-500",
           ].join(" ")}
         >
           <SplitIcon />
           <span className="mt-1">{t("cashier.payment.split")}</span>
         </button>
+        {isSplitMode ? (
+          <button
+            type="button"
+            onClick={requestCloseSplit}
+            className="flex min-h-16 w-full flex-col items-center justify-center rounded bg-slate-700 px-1 py-2 text-[11px] font-semibold text-white hover:bg-slate-600"
+          >
+            <CloseSplitIcon />
+            <span className="mt-1">{t("cashier.payment.closeSplit")}</span>
+          </button>
+        ) : null}
       </div>
 
       <div className="flex min-h-0 flex-col p-2">
-        <div className="flex min-h-12 items-center rounded bg-blue-600 px-3 text-sm font-semibold">
-          {t("cashier.payment.remaining", {
-            amount: displayRemaining.toFixed(2),
-          })}
+        <div
+          className={[
+            "flex min-h-12 items-center rounded px-3 text-sm font-semibold",
+            splitCovered ? "bg-emerald-600" : "bg-blue-600",
+          ].join(" ")}
+        >
+          {splitCovered
+            ? t("cashier.payment.splitCovered")
+            : t("cashier.payment.remaining", {
+                amount: formatMoney(displayRemaining),
+              })}
         </div>
-        <div className="mt-2 grid min-h-0 flex-1 auto-rows-[6.5rem] grid-cols-2 gap-2 overflow-y-auto">
+        <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-slate-300">
+          {t("cashier.payment.chooseMethod")}
+        </p>
+        <div className="mt-1 grid min-h-0 flex-1 grid-cols-2 content-start gap-2 overflow-y-auto">
           {sortedMethods.map((method) => {
             const selected = selectedMethodId === method.id;
             const memberCard = isMemberCardPaymentMethod(method);
-            const cash = /cash/i.test(method.name);
+            const cash =
+              /cash/i.test(method.name) || /cash/i.test(method.code || "");
             return (
               <button
                 key={method.id}
                 type="button"
                 onClick={() => onSelectMethod(method.id)}
                 className={[
-                  "flex flex-col items-center justify-center rounded border bg-white px-2 text-slate-900 transition",
+                  "flex min-h-[6.5rem] flex-col items-center justify-center rounded border bg-white px-2 text-slate-900 transition",
                   selected
                     ? "border-blue-500 ring-2 ring-blue-400"
                     : "border-slate-200 hover:border-blue-300",

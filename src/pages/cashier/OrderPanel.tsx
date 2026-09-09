@@ -1,4 +1,4 @@
-import type { RefObject } from "react";
+import { useEffect, useState, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import {
@@ -43,8 +43,11 @@ interface OrderPanelProps {
   onRemoveLine: (line: SalesOrderLine) => void;
   onPaymentAmountChange: (value: string) => void;
   onPaymentMethodChange: (value: string) => void;
-  onToggleSplit?: () => void;
+  onOpenSplit?: () => void;
+  onCloseSplit?: () => void;
   isSplitMode?: boolean;
+  splitTenderCount?: number;
+  splitRemaining?: number;
   showSplitButton?: boolean;
   onCheckout: () => void;
   onFireKds: () => void;
@@ -80,8 +83,11 @@ export function OrderPanel({
   onRemoveLine,
   onPaymentAmountChange,
   onPaymentMethodChange,
-  onToggleSplit,
+  onOpenSplit,
+  onCloseSplit,
   isSplitMode = false,
+  splitTenderCount = 0,
+  splitRemaining = 0,
   showSplitButton = true,
   onCheckout,
   onFireKds,
@@ -90,8 +96,16 @@ export function OrderPanel({
   onSessionStateChange,
 }: OrderPanelProps) {
   const { t } = useTranslation();
+  const [confirmCloseSplit, setConfirmCloseSplit] = useState(false);
   const variants = Object.values(variantsByProductId).flat();
   const hasActiveOrder = !!selectedOrder || selectedOrderLines.length > 0;
+  const checkoutReady = isSplitMode
+    ? splitTenderCount > 0 && splitRemaining <= 0.009
+    : Boolean(paymentMethodId) && Number(paymentAmount) > 0;
+
+  useEffect(() => {
+    if (!isSplitMode) setConfirmCloseSplit(false);
+  }, [isSplitMode]);
 
   const resolveLineName = (line: SalesOrderLine) => {
     const variant = variants.find((item) => item.id === line.variantId);
@@ -207,11 +221,20 @@ export function OrderPanel({
       </div>
 
       {hasActiveOrder ? (
-        <div className="space-y-2 border-t border-slate-200 pt-3">
+        <div className="max-h-[48vh] shrink-0 space-y-2 overflow-y-auto border-t border-slate-200 pt-3">
           <div className="flex items-center justify-between font-semibold">
             <span>{t("cashier.total")}</span>
             <span>{total}</span>
           </div>
+          {isSplitMode ? (
+            <p className="text-xs text-slate-500">
+              {splitTenderCount > 0 && splitRemaining <= 0.009
+                ? t("cashier.payment.splitCovered")
+                : t("cashier.payment.splitTenderCount", {
+                    count: splitTenderCount,
+                  })}
+            </p>
+          ) : null}
           <input
             ref={paymentInputRef}
             inputMode="decimal"
@@ -233,16 +256,68 @@ export function OrderPanel({
               </option>
             ))}
           </select>
-          {showSplitButton && onToggleSplit ? (
-            <Button
-              variant="secondary"
-              disabled={isLoading}
-              onClick={onToggleSplit}
-            >
-              {isSplitMode
-                ? t("cashier.payment.splitOn")
-                : t("cashier.payment.split")}
-            </Button>
+          {showSplitButton && onOpenSplit ? (
+            isSplitMode ? (
+              <div className="space-y-2">
+                <Button
+                  variant="secondary"
+                  disabled={isLoading}
+                  onClick={onOpenSplit}
+                >
+                  {t("cashier.payment.continueSplit")}
+                </Button>
+                {confirmCloseSplit ? (
+                  <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-2">
+                    <p className="text-xs text-amber-900">
+                      {t("cashier.payment.closeSplitConfirm", {
+                        count: splitTenderCount,
+                      })}
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => setConfirmCloseSplit(false)}
+                      >
+                        {t("cashier.payment.keepSplit")}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => {
+                          setConfirmCloseSplit(false);
+                          onCloseSplit?.();
+                        }}
+                      >
+                        {t("cashier.payment.confirmCloseSplit")}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button
+                    variant="secondary"
+                    disabled={isLoading || !onCloseSplit}
+                    onClick={() => {
+                      if (splitTenderCount > 0) {
+                        setConfirmCloseSplit(true);
+                        return;
+                      }
+                      onCloseSplit?.();
+                    }}
+                  >
+                    {t("cashier.payment.closeSplitTitle")}
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <Button
+                variant="secondary"
+                disabled={isLoading}
+                onClick={onOpenSplit}
+              >
+                {t("cashier.payment.split")}
+              </Button>
+            )
           ) : null}
           {selectedTable ? (
             <select
@@ -308,11 +383,7 @@ export function OrderPanel({
           </div>
           <Button
             fullWidth
-            disabled={
-              !selectedOrderLines.length ||
-              !paymentMethodId ||
-              Number(paymentAmount) <= 0
-            }
+            disabled={!selectedOrderLines.length || !checkoutReady}
             isLoading={isLoading}
             onClick={onCheckout}
           >
