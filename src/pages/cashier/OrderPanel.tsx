@@ -234,28 +234,31 @@ export function OrderPanel({
                     count: splitTenderCount,
                   })}
             </p>
-          ) : null}
-          <input
-            ref={paymentInputRef}
-            inputMode="decimal"
-            value={paymentAmount}
-            onChange={(event) => onPaymentAmountChange(event.target.value)}
-            aria-label={t("cashier.orderPanel.paymentAmount")}
-            className="min-h-10 w-full rounded border border-slate-300 px-3 text-sm focus:border-blue-500 focus:outline-none"
-          />
-          <select
-            value={paymentMethodId}
-            onChange={(event) => onPaymentMethodChange(event.target.value)}
-            aria-label={t("cashier.orderPanel.paymentMethod")}
-            className="min-h-10 w-full rounded border border-slate-300 px-3 text-sm"
-          >
-            <option value="">{t("cashier.orderPanel.selectPayment")}</option>
-            {paymentMethods.map((method) => (
-              <option key={method.id} value={method.id}>
-                {method.name}
-              </option>
-            ))}
-          </select>
+          ) : (
+            <>
+              <input
+                ref={paymentInputRef}
+                inputMode="decimal"
+                value={paymentAmount}
+                onChange={(event) => onPaymentAmountChange(event.target.value)}
+                aria-label={t("cashier.orderPanel.paymentAmount")}
+                className="min-h-10 w-full rounded border border-slate-300 px-3 text-sm focus:border-blue-500 focus:outline-none"
+              />
+              <select
+                value={paymentMethodId}
+                onChange={(event) => onPaymentMethodChange(event.target.value)}
+                aria-label={t("cashier.orderPanel.paymentMethod")}
+                className="min-h-10 w-full rounded border border-slate-300 px-3 text-sm"
+              >
+                <option value="">{t("cashier.orderPanel.selectPayment")}</option>
+                {paymentMethods.map((method) => (
+                  <option key={method.id} value={method.id}>
+                    {method.name}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
           {showSplitButton && onOpenSplit ? (
             isSplitMode ? (
               <div className="space-y-2">

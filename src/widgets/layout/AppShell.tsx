@@ -117,6 +117,10 @@ export function AppShell() {
     )
   );
 
+  const cashierView = location.pathname.startsWith("/cashier")
+    ? new URLSearchParams(location.search).get("view")
+    : null;
+
   const railItems: PosRailItem[] = [
     {
       to: "/cashier",
@@ -225,7 +229,12 @@ export function AppShell() {
         onBranchChange={(branchId) => void handleBranchChange(branchId)}
         onMenu={() => openCashierView("menu")}
         onOrders={() => navigate("/counter-orders")}
-        onPay={() => openCashierView("pay")}
+        onPay={() =>
+          openCashierView(cashierView === "pay" ? "menu" : "pay")
+        }
+        activeView={
+          cashierView === "menu" || cashierView === "pay" ? cashierView : null
+        }
       />
     </div>
   );

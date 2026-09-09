@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { SplitPaymentTenderDTO } from "@/core/application/dtos/CashierDTO";
@@ -18,7 +18,7 @@ interface PaymentViewProps {
   onSelectMethod: (methodId: string) => void;
   onPaymentAmountChange: (value: string) => void;
   onOpenSplit: () => void;
-  onCloseSplit: () => void;
+  onClosePay: () => void;
   onAddTender: () => void;
   onRemoveTender: (tenderId: string) => void;
 }
@@ -108,13 +108,12 @@ export function PaymentView({
   onSelectMethod,
   onPaymentAmountChange,
   onOpenSplit,
-  onCloseSplit,
+  onClosePay,
   onAddTender,
   onRemoveTender,
 }: PaymentViewProps) {
   const { t } = useTranslation();
   const [confirmClose, setConfirmClose] = useState(false);
-  const splitAmountRef = useRef<HTMLInputElement>(null);
   const remaining = remainingReceivable(total, isSplitMode ? splitTenders : []);
   const displayRemaining = isSplitMode ? remaining : Number(total || 0);
   const splitCovered =
@@ -126,27 +125,19 @@ export function PaymentView({
     () => [...methods].sort((a, b) => methodRank(a) - methodRank(b)),
     [methods]
   );
-  const selectedMethod = sortedMethods.find((method) => method.id === selectedMethodId);
-  const requestCloseSplit = useCallback(() => {
-    if (splitTenders.length) {
+  const requestClosePay = useCallback(() => {
+    if (isSplitMode && splitTenders.length) {
       setConfirmClose(true);
       return;
     }
-    onCloseSplit();
-  }, [onCloseSplit, splitTenders.length]);
+    onClosePay();
+  }, [isSplitMode, onClosePay, splitTenders.length]);
 
   useEffect(() => {
     if (!isSplitMode) setConfirmClose(false);
   }, [isSplitMode]);
 
   useEffect(() => {
-    if (!isSplitMode || confirmClose) return;
-    splitAmountRef.current?.focus();
-    splitAmountRef.current?.select();
-  }, [confirmClose, isSplitMode, selectedMethodId]);
-
-  useEffect(() => {
-    if (!isSplitMode) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.preventDefault();
@@ -154,11 +145,11 @@ export function PaymentView({
         setConfirmClose(false);
         return;
       }
-      requestCloseSplit();
+      requestClosePay();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [confirmClose, isSplitMode, requestCloseSplit]);
+  }, [confirmClose, requestClosePay]);
 
   return (
     <section className="grid h-full min-h-0 grid-cols-[minmax(11rem,16rem)_4.5rem_minmax(0,1fr)] overflow-hidden bg-[#202020] text-white">
@@ -177,27 +168,17 @@ export function PaymentView({
 
         {isSplitMode ? (
           <div className="mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto rounded border border-blue-500/40 bg-black/25 p-2">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-300">
-                  {t("cashier.payment.splitOn")}
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-300">
+                {t("cashier.payment.splitOn")}
+              </p>
+              {splitTenders.length ? (
+                <p className="text-[10px] text-slate-400">
+                  {t("cashier.payment.splitTenderCount", {
+                    count: splitTenders.length,
+                  })}
                 </p>
-                {splitTenders.length ? (
-                  <p className="text-[10px] text-slate-400">
-                    {t("cashier.payment.splitTenderCount", {
-                      count: splitTenders.length,
-                    })}
-                  </p>
-                ) : null}
-              </div>
-              <button
-                type="button"
-                onClick={requestCloseSplit}
-                aria-label={t("cashier.payment.closeSplitTitle")}
-                className="rounded p-1 text-slate-400 hover:bg-white/10 hover:text-white"
-              >
-                <CloseSplitIcon />
-              </button>
+              ) : null}
             </div>
             {confirmClose ? (
               <div className="space-y-2 rounded border border-amber-400/40 bg-amber-950/50 p-2">
@@ -214,22 +195,13 @@ export function PaymentView({
                 >
                   {t("cashier.payment.keepSplit")}
                 </Button>
-                <Button size="sm" fullWidth onClick={onCloseSplit}>
+                <Button size="sm" fullWidth onClick={onClosePay}>
                   {t("cashier.payment.confirmCloseSplit")}
                 </Button>
               </div>
             ) : (
               <>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                  {t("cashier.payment.nextMethod")}
-                </p>
-                <p className="rounded bg-white/10 px-2 py-1.5 text-xs font-semibold">
-                  {selectedMethod
-                    ? methodLabel(selectedMethod, memberCardLabel)
-                    : t("cashier.orderPanel.selectPayment")}
-                </p>
                 <input
-                  ref={splitAmountRef}
                   inputMode="decimal"
                   value={paymentAmount}
                   onChange={(event) => onPaymentAmountChange(event.target.value)}
@@ -301,16 +273,15 @@ export function PaymentView({
           <SplitIcon />
           <span className="mt-1">{t("cashier.payment.split")}</span>
         </button>
-        {isSplitMode ? (
-          <button
-            type="button"
-            onClick={requestCloseSplit}
-            className="flex min-h-16 w-full flex-col items-center justify-center rounded bg-slate-700 px-1 py-2 text-[11px] font-semibold text-white hover:bg-slate-600"
-          >
-            <CloseSplitIcon />
-            <span className="mt-1">{t("cashier.payment.closeSplit")}</span>
-          </button>
-        ) : null}
+        <button
+          type="button"
+          onClick={requestClosePay}
+          aria-label={t("cashier.payment.closePayTitle")}
+          className="flex min-h-16 w-full flex-col items-center justify-center rounded bg-slate-800 px-1 py-2 text-[11px] font-semibold text-white hover:bg-slate-600"
+        >
+          <CloseSplitIcon />
+          <span className="mt-1">{t("cashier.payment.closePay")}</span>
+        </button>
       </div>
 
       <div className="flex min-h-0 flex-col p-2">
@@ -326,10 +297,7 @@ export function PaymentView({
                 amount: formatMoney(displayRemaining),
               })}
         </div>
-        <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-slate-300">
-          {t("cashier.payment.chooseMethod")}
-        </p>
-        <div className="mt-1 grid min-h-0 flex-1 grid-cols-2 content-start gap-2 overflow-y-auto">
+        <div className="mt-2 grid min-h-0 flex-1 grid-cols-2 content-start gap-2 overflow-y-auto">
           {sortedMethods.map((method) => {
             const selected = selectedMethodId === method.id;
             const memberCard = isMemberCardPaymentMethod(method);

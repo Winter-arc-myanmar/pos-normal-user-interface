@@ -12,6 +12,7 @@ interface PosActionRailProps {
   onMenu: () => void;
   onOrders: () => void;
   onPay: () => void;
+  activeView?: "menu" | "orders" | "pay" | null;
 }
 
 export function PosActionRail({
@@ -26,6 +27,7 @@ export function PosActionRail({
   onMenu,
   onOrders,
   onPay,
+  activeView = null,
 }: PosActionRailProps) {
   return (
     <aside className="pos-safe-y flex min-h-0 flex-col border-l border-white/10 bg-[#202020] p-1.5 text-white">
@@ -62,7 +64,11 @@ export function PosActionRail({
         <button
           type="button"
           onClick={onMenu}
-          className="min-h-14 rounded bg-[#287fe7] px-1 py-2"
+          aria-pressed={activeView === "menu"}
+          className={[
+            "min-h-14 rounded px-1 py-2",
+            activeView === "menu" ? "bg-[#1a6fd4] ring-2 ring-white/70" : "bg-[#287fe7]",
+          ].join(" ")}
         >
           {menuLabel}
         </button>
@@ -76,7 +82,11 @@ export function PosActionRail({
         <button
           type="button"
           onClick={onPay}
-          className="min-h-14 rounded bg-[#39c786] px-1 py-2 text-slate-950"
+          aria-pressed={activeView === "pay"}
+          className={[
+            "min-h-14 rounded px-1 py-2 text-slate-950",
+            activeView === "pay" ? "bg-[#2eae74] ring-2 ring-white/80" : "bg-[#39c786]",
+          ].join(" ")}
         >
           {payLabel}
         </button>
