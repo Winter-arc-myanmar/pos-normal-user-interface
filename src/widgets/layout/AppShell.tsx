@@ -43,6 +43,15 @@ function CustomersIcon() {
   );
 }
 
+function CardsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass} aria-hidden="true">
+      <rect x="3" y="6" width="18" height="12" rx="2" />
+      <path d="M7 12h4M15 12h2M7 9h10" />
+    </svg>
+  );
+}
+
 function WaitlistIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass} aria-hidden="true">
@@ -102,6 +111,7 @@ export function AppShell() {
     "/tip-pools",
     "/counter-orders",
     "/customers",
+    "/cards",
   ].some((path) => location.pathname.startsWith(path));
   const isFullBleedLightPage = ["/settings", "/sync"].some((path) =>
     location.pathname.startsWith(path)
@@ -145,6 +155,12 @@ export function AppShell() {
       label: t("shell.customersTitle"),
       icon: <CustomersIcon />,
       visible: canAccess(PAGE_PERMISSIONS.customers),
+    },
+    {
+      to: "/cards",
+      label: t("shell.cardsTitle"),
+      icon: <CardsIcon />,
+      visible: canAccess(PAGE_PERMISSIONS.cards),
     },
     {
       to: "/waitlist",

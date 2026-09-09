@@ -55,6 +55,17 @@ export const API_ENDPOINTS = {
     }),
   },
 
+  MEMBERSHIP_CARDS: {
+    DETECT: "/api/v1/membership-cards/detect",
+    VERIFY_PIN: "/api/v1/membership-cards/verify-pin",
+    TOPUP: "/api/v1/membership-cards/topup",
+    REFUND: "/api/v1/membership-cards/refund",
+    TOPUP_AMOUNT_OPTIONS: "/api/v1/membership-card-topup-amounts",
+    REFUND_AMOUNT_OPTIONS: "/api/v1/membership-card-refund-amounts",
+    TOPUP_RECEIPT: "/api/v1/membership-cards/topup-receipt",
+    REFUND_RECEIPT: "/api/v1/membership-cards/refund-receipt",
+  },
+
   CUSTOMER_INTERACTIONS: {
     LIST: "/api/v1/customer-interactions",
     BY_ID: (id: string) => `/api/v1/customer-interactions/${id}`,

@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CustomersPage } from "../CustomersPage";
 
@@ -118,7 +119,11 @@ describe("CRM page integration", () => {
   });
 
   it("lists customers, opens a member, and creates a new customer", async () => {
-    render(<CustomersPage />);
+    render(
+      <MemoryRouter>
+        <CustomersPage />
+      </MemoryRouter>
+    );
 
     expect(screen.getByText("Please select a member")).toBeInTheDocument();
     expect(screen.getByText("Test1")).toBeInTheDocument();

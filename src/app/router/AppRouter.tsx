@@ -61,6 +61,16 @@ const CustomersPage = lazy(() =>
     default: module.CustomersPage,
   }))
 );
+const CardsPage = lazy(() =>
+  import("../../pages/CardsPage").then((module) => ({
+    default: module.CardsPage,
+  }))
+);
+const CardRefundPage = lazy(() =>
+  import("../../pages/CardRefundPage").then((module) => ({
+    default: module.CardRefundPage,
+  }))
+);
 const SyncPage = lazy(() =>
   import("../../pages/SyncPage").then((module) => ({
     default: module.SyncPage,
@@ -252,6 +262,30 @@ export function AppRouter() {
                     <CustomersPage />
                   </RequirePermission>
                 }
+              />
+              <Route
+                path="/cards"
+                element={
+                  <RequirePermission requiredPermissions={PAGE_PERMISSIONS.cards}>
+                    <CardsPage />
+                  </RequirePermission>
+                }
+              />
+              <Route
+                path="/cards/refund"
+                element={
+                  <RequirePermission requiredPermissions={PAGE_PERMISSIONS.cards}>
+                    <CardRefundPage />
+                  </RequirePermission>
+                }
+              />
+              <Route
+                path="/card-topup"
+                element={<Navigate to="/cards" replace />}
+              />
+              <Route
+                path="/card-refund"
+                element={<Navigate to="/cards/refund" replace />}
               />
               <Route
                 path="/sync"

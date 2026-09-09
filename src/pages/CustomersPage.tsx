@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/Button";
 import { SearchInput } from "@/components/ui/SearchInput";
 import {
@@ -35,7 +36,7 @@ const emptyInteractionForm = {
   detailedNotes: "",
 };
 
-type CardAction = "topup" | "refund" | "bind" | "unbind" | "close" | null;
+type CardAction = "bind" | "unbind" | "close" | null;
 
 const keyboardRows = [
   ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
@@ -162,6 +163,7 @@ function PosKeyboard({
 export function CustomersPage() {
   const { t } = useTranslation();
   const { formatDateTime } = useDateFormatter();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const {
     customers,
@@ -186,8 +188,6 @@ export function CustomersPage() {
     isLoading: isCardLoading,
     error: cardError,
     loadMembershipCard,
-    topupMembershipCard,
-    refundMembershipCard,
     bindMembershipCard,
     unbindMembershipCard,
     closeMembershipCard,
@@ -204,9 +204,7 @@ export function CustomersPage() {
   const [localError, setLocalError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [cardAction, setCardAction] = useState<CardAction>(null);
-  const [cardAmount, setCardAmount] = useState("");
   const [cardNumber, setCardNumber] = useState("");
-  const [cardReference, setCardReference] = useState("");
   const [cardReason, setCardReason] = useState("");
 
   const tenantId = String(user?.tenantId || "");
@@ -370,17 +368,13 @@ export function CustomersPage() {
 
   const resetCardForm = () => {
     setCardAction(null);
-    setCardAmount("");
     setCardNumber("");
-    setCardReference("");
     setCardReason("");
   };
 
   const openCardAction = (action: CardAction) => {
     setCardAction(action);
-    setCardAmount("");
     setCardNumber(membershipCard?.cardNumber || "");
-    setCardReference("");
     setCardReason("");
     setLocalError(null);
   };
@@ -390,21 +384,7 @@ export function CustomersPage() {
     if (!selectedCustomer || !cardAction) return;
     setLocalError(null);
     try {
-      if (cardAction === "topup") {
-        await topupMembershipCard(selectedCustomer.id, {
-          tenantId,
-          amount: cardAmount,
-          reference: cardReference.trim() || undefined,
-        });
-        setNotice(t("crm.topupSuccess"));
-      } else if (cardAction === "refund") {
-        await refundMembershipCard(selectedCustomer.id, {
-          tenantId,
-          amount: cardAmount,
-          reference: cardReference.trim() || undefined,
-        });
-        setNotice(t("crm.refundSuccess"));
-      } else if (cardAction === "bind") {
+      if (cardAction === "bind") {
         await bindMembershipCard(selectedCustomer.id, {
           tenantId,
           cardNumber: cardNumber.trim(),
@@ -431,6 +411,34 @@ export function CustomersPage() {
   const cardIsClosed = membershipCard?.status === "CLOSED";
   const cardIsBound =
     membershipCard?.status === "BOUND" || membershipCard?.status === "ACTIVE";
+
+  const openCardTopup = () => {
+    if (!selectedCustomer || !membershipCard?.cardNumber) return;
+    navigate("/cards", {
+      state: {
+        cardNumber: membershipCard.cardNumber,
+        balance: membershipCard.balance,
+        customerId: selectedCustomer.id,
+        customerName: selectedCustomer.name,
+        customerPhone: selectedCustomer.phone,
+        tenantId,
+      },
+    });
+  };
+
+  const openCardRefund = () => {
+    if (!selectedCustomer || !membershipCard?.cardNumber) return;
+    navigate("/cards/refund", {
+      state: {
+        cardNumber: membershipCard.cardNumber,
+        balance: membershipCard.balance,
+        customerId: selectedCustomer.id,
+        customerName: selectedCustomer.name,
+        customerPhone: selectedCustomer.phone,
+        tenantId,
+      },
+    });
+  };
 
   return (
     <section className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)] overflow-hidden bg-slate-100">
@@ -559,7 +567,7 @@ export function CustomersPage() {
                 <Button
                   size="sm"
                   disabled={!cardIsBound || cardIsClosed || isCardLoading}
-                  onClick={() => openCardAction("topup")}
+                  onClick={openCardTopup}
                 >
                   {t("crm.topup")}
                 </Button>
@@ -567,7 +575,7 @@ export function CustomersPage() {
                   size="sm"
                   variant="secondary"
                   disabled={!cardIsBound || cardIsClosed || isCardLoading}
-                  onClick={() => openCardAction("refund")}
+                  onClick={openCardRefund}
                 >
                   {t("crm.refund")}
                 </Button>
@@ -823,15 +831,11 @@ export function CustomersPage() {
             className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-xl"
           >
             <h2 className="text-lg font-bold text-slate-900">
-              {cardAction === "topup"
-                ? t("crm.topupTitle")
-                : cardAction === "refund"
-                  ? t("crm.refundTitle")
-                  : cardAction === "bind"
-                    ? t("crm.bindTitle")
-                    : cardAction === "unbind"
-                      ? t("crm.unbindCard")
-                      : t("crm.closeCardTitle")}
+              {cardAction === "bind"
+                ? t("crm.bindTitle")
+                : cardAction === "unbind"
+                  ? t("crm.unbindCard")
+                  : t("crm.closeCardTitle")}
             </h2>
             <div className="mt-4 space-y-3">
               {cardAction === "bind" ? (
@@ -843,26 +847,6 @@ export function CustomersPage() {
                   value={cardNumber}
                   onChange={(event) => setCardNumber(event.target.value)}
                 />
-              ) : null}
-              {cardAction === "topup" || cardAction === "refund" ? (
-                <>
-                  <input
-                    required
-                    inputMode="decimal"
-                    aria-label={t("crm.amount")}
-                    placeholder={t("crm.amount")}
-                    className={fieldClass}
-                    value={cardAmount}
-                    onChange={(event) => setCardAmount(event.target.value)}
-                  />
-                  <input
-                    aria-label={t("crm.reference")}
-                    placeholder={t("crm.reference")}
-                    className={fieldClass}
-                    value={cardReference}
-                    onChange={(event) => setCardReference(event.target.value)}
-                  />
-                </>
               ) : null}
               {cardAction === "close" ? (
                 <>
@@ -883,15 +867,11 @@ export function CustomersPage() {
               ) : null}
               <div className="flex gap-2 pt-1">
                 <Button fullWidth type="submit" isLoading={isCardLoading}>
-                  {cardAction === "topup"
-                    ? t("crm.confirmTopup")
-                    : cardAction === "refund"
-                      ? t("crm.confirmRefund")
-                      : cardAction === "bind"
-                        ? t("crm.confirmBind")
-                        : cardAction === "unbind"
-                          ? t("crm.confirmUnbind")
-                          : t("crm.confirmCloseCard")}
+                  {cardAction === "bind"
+                    ? t("crm.confirmBind")
+                    : cardAction === "unbind"
+                      ? t("crm.confirmUnbind")
+                      : t("crm.confirmCloseCard")}
                 </Button>
                 <Button
                   fullWidth
