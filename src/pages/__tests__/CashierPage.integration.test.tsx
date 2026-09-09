@@ -292,10 +292,6 @@ describe("CashierPage integration", () => {
       </MemoryRouter>
     );
 
-    expect(
-      (screen.getByLabelText("cashier.orderPanel.paymentAmount") as HTMLInputElement)
-        .value
-    ).toBe("10.5000");
     expect(screen.queryAllByText("10.50").length).toBeGreaterThan(0);
 
     fireEvent.click(
@@ -304,7 +300,7 @@ describe("CashierPage integration", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "cashier.orderPanel.pickedUp" })
     );
-    fireEvent.click(screen.getByRole("button", { name: "cashier.payNow" }));
+    fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
 
     await waitFor(() => {
       expect(mocks.fireToKds).toHaveBeenCalledWith({

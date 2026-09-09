@@ -1126,6 +1126,15 @@ export function CashierPage() {
     setSearchParams({ view: nextView });
   };
 
+  const handleOpenPay = () => {
+    if (activeView !== "pay") {
+      payReturnViewRef.current = activeView;
+    }
+    setSearchParams({ view: "pay" });
+    setLocalError(null);
+    setNotice(null);
+  };
+
   const handleOpenSplit = () => {
     if (activeView !== "pay") {
       payReturnViewRef.current = activeView;
@@ -1450,6 +1459,8 @@ export function CashierPage() {
           isSplitMode ? splitTenders : []
         )}
         showSplitButton={activeView !== "pay"}
+        isPayView={activeView === "pay"}
+        onOpenPay={handleOpenPay}
         onCheckout={() => void handleCheckout()}
         onFireKds={() => void handleFireKds()}
         onPickup={() => void handlePickup()}

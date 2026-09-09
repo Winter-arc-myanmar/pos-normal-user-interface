@@ -278,6 +278,7 @@
     "table": "Table",
     "sessionState": "Session",
     "payNow": "Pay",
+    "confirmPay": "Confirm pay",
     "pickupOrder": "Mark Pickup",
     "emptySelection": "Select an order tile or create a new one.",
     "searchProducts": "Search products...",
@@ -427,7 +428,8 @@
       "splitOpened": "Split is on. Add each tender, then checkout.",
       "splitClosed": "Split closed.",
       "splitTenderCount": "{{count}} tenders",
-      "splitCovered": "Bill covered. Pay now when ready.",
+      "splitCovered": "Bill covered. Confirm pay when ready.",
+      "chooseMethod": "Choose a payment method, then confirm pay.",
       "memberCard": "MEMBER CARD",
       "localFallback": "Demo"
     },

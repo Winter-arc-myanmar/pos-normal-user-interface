@@ -49,6 +49,8 @@ interface OrderPanelProps {
   splitTenderCount?: number;
   splitRemaining?: number;
   showSplitButton?: boolean;
+  isPayView?: boolean;
+  onOpenPay?: () => void;
   onCheckout: () => void;
   onFireKds: () => void;
   onPickup: () => void;
@@ -89,6 +91,8 @@ export function OrderPanel({
   splitTenderCount = 0,
   splitRemaining = 0,
   showSplitButton = true,
+  isPayView = false,
+  onOpenPay,
   onCheckout,
   onFireKds,
   onPickup,
@@ -226,13 +230,15 @@ export function OrderPanel({
             <span>{t("cashier.total")}</span>
             <span>{total}</span>
           </div>
-          {isSplitMode ? (
+          {isSplitMode || isPayView ? (
             <p className="text-xs text-slate-500">
-              {splitTenderCount > 0 && splitRemaining <= 0.009
-                ? t("cashier.payment.splitCovered")
-                : t("cashier.payment.splitTenderCount", {
-                    count: splitTenderCount,
-                  })}
+              {isSplitMode
+                ? splitTenderCount > 0 && splitRemaining <= 0.009
+                  ? t("cashier.payment.splitCovered")
+                  : t("cashier.payment.splitTenderCount", {
+                      count: splitTenderCount,
+                    })
+                : t("cashier.payment.chooseMethod")}
             </p>
           ) : (
             <>
@@ -386,11 +392,21 @@ export function OrderPanel({
           </div>
           <Button
             fullWidth
-            disabled={!selectedOrderLines.length || !checkoutReady}
+            disabled={
+              !selectedOrderLines.length ||
+              isLoading ||
+              (isPayView && !checkoutReady)
+            }
             isLoading={isLoading}
-            onClick={onCheckout}
+            onClick={() => {
+              if (!isPayView && onOpenPay) {
+                onOpenPay();
+                return;
+              }
+              onCheckout();
+            }}
           >
-            {t("cashier.payNow")}
+            {isPayView ? t("cashier.confirmPay") : t("cashier.payNow")}
           </Button>
         </div>
       ) : (
