@@ -23,6 +23,10 @@ import { ISalesOrderRepository } from "../../domain/repositories/ISalesOrderRepo
 import { ApiSalesOrderRepository } from "../repositories/ApiSalesOrderRepository";
 import { ISalesOrderService } from "../../domain/services/ISalesOrderService";
 import { SalesOrderService } from "../../application/services/SalesOrderService";
+import { IMembershipCardRepository } from "../../domain/repositories/IMembershipCardRepository";
+import { ApiMembershipCardRepository } from "../repositories/ApiMembershipCardRepository";
+import { IMembershipCardService } from "../../domain/services/IMembershipCardService";
+import { MembershipCardService } from "../../application/services/MembershipCardService";
 
 /**
  * Dependency Injection Container
@@ -52,6 +56,10 @@ class Container {
       "customerRepository",
       new ApiCustomerRepository(this.resolve("httpClient"))
     );
+    this.register<IMembershipCardRepository>(
+      "membershipCardRepository",
+      new ApiMembershipCardRepository(this.resolve("httpClient"))
+    );
     this.register<ICashierRepository>(
       "cashierRepository",
       new ApiCashierRepository(this.resolve("httpClient"))
@@ -78,6 +86,10 @@ class Container {
     this.register<ICustomerService>(
       "customerService",
       new CustomerManagementService(this.resolve("customerRepository"))
+    );
+    this.register<IMembershipCardService>(
+      "membershipCardService",
+      new MembershipCardService(this.resolve("membershipCardRepository"))
     );
     this.register<ICashierService>(
       "cashierService",

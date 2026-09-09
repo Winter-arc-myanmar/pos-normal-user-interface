@@ -45,6 +45,14 @@ export const API_ENDPOINTS = {
       DELETE: (id: string) =>
         `/api/v1/customers/${customerId}/interactions/${id}`,
     }),
+    MEMBERSHIP_CARD: (customerId: string) => ({
+      GET: `/api/v1/customers/${customerId}/membership-card`,
+      TOPUP: `/api/v1/customers/${customerId}/membership-card/topup`,
+      REFUND: `/api/v1/customers/${customerId}/membership-card/refund`,
+      BIND: `/api/v1/customers/${customerId}/membership-card/bind`,
+      UNBIND: `/api/v1/customers/${customerId}/membership-card/unbind`,
+      CLOSE: `/api/v1/customers/${customerId}/membership-card/close`,
+    }),
   },
 
   CUSTOMER_INTERACTIONS: {

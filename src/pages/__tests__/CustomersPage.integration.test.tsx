@@ -49,6 +49,22 @@ vi.mock("@/core/presentation/hooks/useAuth", () => ({
   }),
 }));
 
+vi.mock("@/core/presentation/hooks/useMembershipCardManagement", () => ({
+  useMembershipCardManagement: () => ({
+    membershipCard: null,
+    isLoading: false,
+    error: null,
+    loadMembershipCard: vi.fn().mockResolvedValue(null),
+    topupMembershipCard: vi.fn(),
+    refundMembershipCard: vi.fn(),
+    bindMembershipCard: vi.fn(),
+    unbindMembershipCard: vi.fn(),
+    closeMembershipCard: vi.fn(),
+    clearMembershipCard: vi.fn(),
+    clearError: vi.fn(),
+  }),
+}));
+
 vi.mock("@/core/presentation/hooks/useCustomerManagement", () => ({
   useCustomerManagement: () => ({
     customers: [

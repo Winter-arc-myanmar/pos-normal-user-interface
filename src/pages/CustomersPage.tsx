@@ -9,6 +9,7 @@ import {
 import { Customer } from "@/core/domain/entities/Customer";
 import { useAuth } from "@/core/presentation/hooks/useAuth";
 import { useCustomerManagement } from "@/core/presentation/hooks/useCustomerManagement";
+import { useMembershipCardManagement } from "@/core/presentation/hooks/useMembershipCardManagement";
 import { useDateFormatter } from "@/lib/i18n/formatters";
 
 const PAGE_SIZE = 6;
@@ -33,6 +34,8 @@ const emptyInteractionForm = {
   summary: "",
   detailedNotes: "",
 };
+
+type CardAction = "topup" | "refund" | "bind" | "unbind" | "close" | null;
 
 const keyboardRows = [
   ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
@@ -178,6 +181,18 @@ export function CustomersPage() {
     deleteCustomerInteraction,
     clearCurrentCustomer,
   } = useCustomerManagement();
+  const {
+    membershipCard,
+    isLoading: isCardLoading,
+    error: cardError,
+    loadMembershipCard,
+    topupMembershipCard,
+    refundMembershipCard,
+    bindMembershipCard,
+    unbindMembershipCard,
+    closeMembershipCard,
+    clearMembershipCard,
+  } = useMembershipCardManagement();
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -188,6 +203,11 @@ export function CustomersPage() {
   const [interactionForm, setInteractionForm] = useState(emptyInteractionForm);
   const [localError, setLocalError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [cardAction, setCardAction] = useState<CardAction>(null);
+  const [cardAmount, setCardAmount] = useState("");
+  const [cardNumber, setCardNumber] = useState("");
+  const [cardReference, setCardReference] = useState("");
+  const [cardReason, setCardReason] = useState("");
 
   const tenantId = String(user?.tenantId || "");
   const agentId = String(user?.id || "");
@@ -253,6 +273,7 @@ export function CustomersPage() {
         sortBy: "createdAt",
         sortOrder: "desc",
       });
+      await loadMembershipCard(customer.id);
     } catch (caught) {
       setLocalError(
         caught instanceof Error ? caught.message : t("crm.loadFailed")
@@ -304,6 +325,7 @@ export function CustomersPage() {
     try {
       await deleteCustomer(selectedCustomer.id);
       clearCurrentCustomer();
+      clearMembershipCard();
       setNotice(t("crm.deleted"));
       await getCustomers({
         page: currentPage,
@@ -346,12 +368,76 @@ export function CustomersPage() {
     setSearch((current) => current + value);
   };
 
+  const resetCardForm = () => {
+    setCardAction(null);
+    setCardAmount("");
+    setCardNumber("");
+    setCardReference("");
+    setCardReason("");
+  };
+
+  const openCardAction = (action: CardAction) => {
+    setCardAction(action);
+    setCardAmount("");
+    setCardNumber(membershipCard?.cardNumber || "");
+    setCardReference("");
+    setCardReason("");
+    setLocalError(null);
+  };
+
+  const handleCardAction = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!selectedCustomer || !cardAction) return;
+    setLocalError(null);
+    try {
+      if (cardAction === "topup") {
+        await topupMembershipCard(selectedCustomer.id, {
+          tenantId,
+          amount: cardAmount,
+          reference: cardReference.trim() || undefined,
+        });
+        setNotice(t("crm.topupSuccess"));
+      } else if (cardAction === "refund") {
+        await refundMembershipCard(selectedCustomer.id, {
+          tenantId,
+          amount: cardAmount,
+          reference: cardReference.trim() || undefined,
+        });
+        setNotice(t("crm.refundSuccess"));
+      } else if (cardAction === "bind") {
+        await bindMembershipCard(selectedCustomer.id, {
+          tenantId,
+          cardNumber: cardNumber.trim(),
+        });
+        setNotice(t("crm.bindSuccess"));
+      } else if (cardAction === "unbind") {
+        await unbindMembershipCard(selectedCustomer.id, { tenantId });
+        setNotice(t("crm.unbindSuccess"));
+      } else if (cardAction === "close") {
+        await closeMembershipCard(selectedCustomer.id, {
+          tenantId,
+          reason: cardReason.trim() || undefined,
+        });
+        setNotice(t("crm.closeCardSuccess"));
+      }
+      resetCardForm();
+    } catch (caught) {
+      setLocalError(
+        caught instanceof Error ? caught.message : t("crm.cardActionFailed")
+      );
+    }
+  };
+
+  const cardIsClosed = membershipCard?.status === "CLOSED";
+  const cardIsBound =
+    membershipCard?.status === "BOUND" || membershipCard?.status === "ACTIVE";
+
   return (
     <section className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)] overflow-hidden bg-slate-100">
       <aside className="flex min-h-0 flex-col bg-white">
-        {(error || localError) && (
+        {(error || localError || cardError) && (
           <p className="m-4 rounded bg-red-50 p-3 text-sm text-red-700">
-            {localError || error}
+            {localError || cardError || error}
           </p>
         )}
         {notice ? (
@@ -434,6 +520,83 @@ export function CustomersPage() {
                 </dd>
               </div>
             </dl>
+
+            <section className="mt-8 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                {t("crm.membershipCard")}
+              </h3>
+              {membershipCard ? (
+                <dl className="mt-3 grid gap-3 sm:grid-cols-3">
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-slate-500">
+                      {t("crm.cardNumber")}
+                    </dt>
+                    <dd className="mt-1 text-sm font-medium">
+                      {membershipCard.cardNumber || "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-slate-500">
+                      {t("crm.cardBalance")}
+                    </dt>
+                    <dd className="mt-1 text-sm font-medium">
+                      {membershipCard.balance}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-slate-500">
+                      {t("crm.cardStatus")}
+                    </dt>
+                    <dd className="mt-1 text-sm font-medium">
+                      {membershipCard.status}
+                    </dd>
+                  </div>
+                </dl>
+              ) : (
+                <p className="mt-3 text-sm text-slate-500">{t("crm.noCard")}</p>
+              )}
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  disabled={!cardIsBound || cardIsClosed || isCardLoading}
+                  onClick={() => openCardAction("topup")}
+                >
+                  {t("crm.topup")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={!cardIsBound || cardIsClosed || isCardLoading}
+                  onClick={() => openCardAction("refund")}
+                >
+                  {t("crm.refund")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={cardIsBound || cardIsClosed || isCardLoading}
+                  onClick={() => openCardAction("bind")}
+                >
+                  {t("crm.bindCard")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={!cardIsBound || cardIsClosed || isCardLoading}
+                  onClick={() => openCardAction("unbind")}
+                >
+                  {t("crm.unbindCard")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={!membershipCard || cardIsClosed || isCardLoading}
+                  onClick={() => openCardAction("close")}
+                >
+                  {t("crm.closeCard")}
+                </Button>
+              </div>
+            </section>
 
             <section className="mt-8">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
@@ -652,6 +815,97 @@ export function CustomersPage() {
           onEnter={() => setDebouncedSearch(search.trim())}
         />
       </main>
+
+      {cardAction ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <form
+            onSubmit={handleCardAction}
+            className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-xl"
+          >
+            <h2 className="text-lg font-bold text-slate-900">
+              {cardAction === "topup"
+                ? t("crm.topupTitle")
+                : cardAction === "refund"
+                  ? t("crm.refundTitle")
+                  : cardAction === "bind"
+                    ? t("crm.bindTitle")
+                    : cardAction === "unbind"
+                      ? t("crm.unbindCard")
+                      : t("crm.closeCardTitle")}
+            </h2>
+            <div className="mt-4 space-y-3">
+              {cardAction === "bind" ? (
+                <input
+                  required
+                  aria-label={t("crm.cardNumber")}
+                  placeholder={t("crm.cardNumber")}
+                  className={fieldClass}
+                  value={cardNumber}
+                  onChange={(event) => setCardNumber(event.target.value)}
+                />
+              ) : null}
+              {cardAction === "topup" || cardAction === "refund" ? (
+                <>
+                  <input
+                    required
+                    inputMode="decimal"
+                    aria-label={t("crm.amount")}
+                    placeholder={t("crm.amount")}
+                    className={fieldClass}
+                    value={cardAmount}
+                    onChange={(event) => setCardAmount(event.target.value)}
+                  />
+                  <input
+                    aria-label={t("crm.reference")}
+                    placeholder={t("crm.reference")}
+                    className={fieldClass}
+                    value={cardReference}
+                    onChange={(event) => setCardReference(event.target.value)}
+                  />
+                </>
+              ) : null}
+              {cardAction === "close" ? (
+                <>
+                  <p className="text-sm text-slate-600">
+                    {t("crm.closeCardConfirm")}
+                  </p>
+                  <input
+                    aria-label={t("crm.reason")}
+                    placeholder={t("crm.reason")}
+                    className={fieldClass}
+                    value={cardReason}
+                    onChange={(event) => setCardReason(event.target.value)}
+                  />
+                </>
+              ) : null}
+              {cardAction === "unbind" ? (
+                <p className="text-sm text-slate-600">{t("crm.unbindConfirm")}</p>
+              ) : null}
+              <div className="flex gap-2 pt-1">
+                <Button fullWidth type="submit" isLoading={isCardLoading}>
+                  {cardAction === "topup"
+                    ? t("crm.confirmTopup")
+                    : cardAction === "refund"
+                      ? t("crm.confirmRefund")
+                      : cardAction === "bind"
+                        ? t("crm.confirmBind")
+                        : cardAction === "unbind"
+                          ? t("crm.confirmUnbind")
+                          : t("crm.confirmCloseCard")}
+                </Button>
+                <Button
+                  fullWidth
+                  variant="outline"
+                  type="button"
+                  onClick={resetCardForm}
+                >
+                  {t("common.cancel")}
+                </Button>
+              </div>
+            </div>
+          </form>
+        </div>
+      ) : null}
 
       {isFormOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
