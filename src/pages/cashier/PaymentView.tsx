@@ -256,6 +256,7 @@ export function PaymentView({
                 >
                   <span className="truncate">
                     {method ? methodLabel(method, memberCardLabel) : tender.paymentMethodId}
+                    {tender.guestCardId ? ` · ${tender.guestCardId}` : ""}
                   </span>
                   <span className="tabular-nums text-slate-200">
                     {formatMoney(Number(tender.amount))}

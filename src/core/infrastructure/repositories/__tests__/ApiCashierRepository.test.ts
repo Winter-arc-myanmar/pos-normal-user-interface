@@ -245,4 +245,62 @@ describe("ApiCashierRepository", () => {
       payments: [{ paymentMethodId: "cash", amount: "10.5000" }],
     });
   });
+
+  it("sends guestCardId on member-card checkout payments", async () => {
+    const post = vi.fn().mockResolvedValue({
+      success: true,
+      data: { id: "checkout-1" },
+    });
+    const httpClient = { post };
+    const repository = new ApiCashierRepository(
+      httpClient as unknown as HttpClient
+    );
+
+    await repository.checkout({
+      tenantId: "tenant-1",
+      locationId: "location-1",
+      salesChannel: "POS",
+      serviceType: "DINE_IN",
+      items: [
+        {
+          variantId: "variant-1",
+          quantity: "1.0000",
+          lineDiscount: "0.0000",
+        },
+      ],
+      payments: [
+        {
+          paymentMethodId: "cash",
+          amount: "4.0000",
+        },
+        {
+          paymentMethodId: "member",
+          amount: "6.5000",
+          guestCardId: "card-1",
+        },
+      ],
+    });
+
+    expect(post).toHaveBeenCalledWith("/api/v1/checkout", {
+      tenantId: "tenant-1",
+      locationId: "location-1",
+      salesChannel: "POS",
+      serviceType: "DINE_IN",
+      items: [
+        {
+          variantId: "variant-1",
+          quantity: "1.0000",
+          lineDiscount: "0.0000",
+        },
+      ],
+      payments: [
+        { paymentMethodId: "cash", amount: "4.0000" },
+        {
+          paymentMethodId: "member",
+          amount: "6.5000",
+          guestCardId: "card-1",
+        },
+      ],
+    });
+  });
 });

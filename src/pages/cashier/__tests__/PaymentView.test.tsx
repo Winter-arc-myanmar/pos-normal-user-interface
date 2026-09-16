@@ -181,4 +181,21 @@ describe("PaymentView", () => {
     expect(screen.getByText("Ko Aung")).toBeInTheDocument();
     expect(screen.getByText("W-000041")).toBeInTheDocument();
   });
+
+  it("shows the guest card id on a split member-card tender", () => {
+    renderPaymentView({
+      isSplitMode: true,
+      selectedMethodId: "local-member-card",
+      splitTenders: [
+        {
+          id: "t1",
+          paymentMethodId: "local-member-card",
+          amount: "4.0000",
+          guestCardId: "card-1",
+        },
+      ],
+    });
+
+    expect(screen.getByText(/card-1/)).toBeInTheDocument();
+  });
 });

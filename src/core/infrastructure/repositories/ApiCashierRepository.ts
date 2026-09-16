@@ -175,6 +175,7 @@ const normalizePaymentEntriesAsNumbers = (
   payments: Array<{
     paymentMethodId: string;
     amount: string;
+    guestCardId?: string;
     tipAmount?: string;
     transactionReference?: string;
   }>
@@ -182,6 +183,9 @@ const normalizePaymentEntriesAsNumbers = (
   payments.map((payment) => ({
     paymentMethodId: payment.paymentMethodId,
     amount: Math.max(0, toNumber(payment.amount) ?? 0),
+    ...(payment.guestCardId?.trim()
+      ? { guestCardId: payment.guestCardId.trim() }
+      : {}),
     ...(payment.tipAmount !== undefined
       ? { tipAmount: Math.max(0, toNumber(payment.tipAmount) ?? 0) }
       : {}),
@@ -194,6 +198,7 @@ const normalizePaymentEntriesAsDecimals = (
   payments: Array<{
     paymentMethodId: string;
     amount: string;
+    guestCardId?: string;
     tipAmount?: string;
     transactionReference?: string;
   }>
@@ -201,6 +206,9 @@ const normalizePaymentEntriesAsDecimals = (
   payments.map((payment) => ({
     paymentMethodId: payment.paymentMethodId,
     amount: toDecimalString(payment.amount),
+    ...(payment.guestCardId?.trim()
+      ? { guestCardId: payment.guestCardId.trim() }
+      : {}),
     ...(payment.tipAmount !== undefined
       ? { tipAmount: toDecimalString(payment.tipAmount) }
       : {}),

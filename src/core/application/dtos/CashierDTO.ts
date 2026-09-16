@@ -130,6 +130,7 @@ export interface CreateOrderPaymentDTO {
   paymentMethodId: string;
   posSessionId?: string;
   amount: string;
+  guestCardId?: string;
   tipAmount?: string;
   transactionReference?: string;
 }
@@ -168,12 +169,7 @@ export interface CheckoutRequestDTO {
     quantity: string;
     lineDiscount?: string;
   }>;
-  payments: Array<{
-    paymentMethodId: string;
-    amount: string;
-    tipAmount?: string;
-    transactionReference?: string;
-  }>;
+  payments: CheckoutPaymentEntryDTO[];
 }
 
 export interface OpenTableSessionDTO {
@@ -207,6 +203,7 @@ export interface TableWarningStatusDTO {
 export interface CheckoutPaymentEntryDTO {
   paymentMethodId: string;
   amount: string;
+  guestCardId?: string;
   tipAmount?: string;
   transactionReference?: string;
 }
@@ -215,15 +212,11 @@ export interface SplitPaymentTenderDTO {
   id: string;
   paymentMethodId: string;
   amount: string;
+  guestCardId?: string;
 }
 
 export interface TableSessionCheckoutDTO {
-  payments: Array<{
-    paymentMethodId: string;
-    amount: string;
-    tipAmount?: string;
-    transactionReference?: string;
-  }>;
+  payments: CheckoutPaymentEntryDTO[];
   tipAmount?: number;
   serviceCharge?: number;
   discountReasonId?: string;

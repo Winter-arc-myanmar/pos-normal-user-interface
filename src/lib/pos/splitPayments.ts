@@ -1,5 +1,6 @@
 export {
   assertCheckoutPaymentsReady,
+  attachGuestCardIdToMemberPayments,
   buildCheckoutPayments,
   formatPaymentAmount,
   remainingReceivable,

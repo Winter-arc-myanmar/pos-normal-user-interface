@@ -4,6 +4,7 @@ export interface SplitTenderInput {
   id: string;
   paymentMethodId: string;
   amount: string;
+  guestCardId?: string;
 }
 
 const toAmount = (value: unknown): number => {
@@ -22,30 +23,67 @@ export const remainingReceivable = (
   tenders: Array<{ amount: string | number }>
 ): number => Math.max(0, toAmount(total) - sumTenderAmounts(tenders));
 
+const withOptionalGuestCard = (
+  payment: CheckoutPaymentEntryDTO,
+  guestCardId?: string
+): CheckoutPaymentEntryDTO => {
+  const cardId = guestCardId?.trim();
+  if (!cardId) return payment;
+  return { ...payment, guestCardId: cardId };
+};
+
 export const buildCheckoutPayments = (args: {
   total: string | number;
   paymentMethodId?: string;
   paymentAmount?: string;
+  guestCardId?: string;
   splitTenders?: SplitTenderInput[];
   isSplitMode?: boolean;
 }): CheckoutPaymentEntryDTO[] => {
   if (args.isSplitMode && (args.splitTenders?.length || 0) > 0) {
     return (args.splitTenders || [])
       .filter((tender) => tender.paymentMethodId && toAmount(tender.amount) > 0)
-      .map((tender) => ({
-        paymentMethodId: tender.paymentMethodId,
-        amount: formatPaymentAmount(toAmount(tender.amount)),
-      }));
+      .map((tender) =>
+        withOptionalGuestCard(
+          {
+            paymentMethodId: tender.paymentMethodId,
+            amount: formatPaymentAmount(toAmount(tender.amount)),
+          },
+          tender.guestCardId
+        )
+      );
   }
 
   if (!args.paymentMethodId) return [];
   return [
-    {
-      paymentMethodId: args.paymentMethodId,
-      amount: formatPaymentAmount(toAmount(args.paymentAmount ?? args.total)),
-    },
+    withOptionalGuestCard(
+      {
+        paymentMethodId: args.paymentMethodId,
+        amount: formatPaymentAmount(toAmount(args.paymentAmount ?? args.total)),
+      },
+      args.guestCardId
+    ),
   ];
 };
+
+export const attachGuestCardIdToMemberPayments = (
+  payments: CheckoutPaymentEntryDTO[],
+  guestCardId: string | undefined,
+  isMemberCardMethod: (paymentMethodId: string) => boolean
+): CheckoutPaymentEntryDTO[] =>
+  payments.map((payment) => {
+    if (!isMemberCardMethod(payment.paymentMethodId)) {
+      return {
+        paymentMethodId: payment.paymentMethodId,
+        amount: payment.amount,
+        ...(payment.tipAmount ? { tipAmount: payment.tipAmount } : {}),
+        ...(payment.transactionReference
+          ? { transactionReference: payment.transactionReference }
+          : {}),
+      };
+    }
+    return withOptionalGuestCard(payment, payment.guestCardId || guestCardId);
+  });
 
 export const assertCheckoutPaymentsReady = (args: {
   total: string | number;

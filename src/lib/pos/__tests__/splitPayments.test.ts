@@ -40,4 +40,44 @@ describe("splitPayments", () => {
       })
     ).toThrow(/equal the remaining receivable/i);
   });
+
+  it("attaches guestCardId only to member-card tenders", () => {
+    expect(
+      buildCheckoutPayments({
+        total: "10.5000",
+        paymentMethodId: "member",
+        paymentAmount: "10.5000",
+        guestCardId: "card-1",
+      })
+    ).toEqual([
+      {
+        paymentMethodId: "member",
+        amount: "10.5000",
+        guestCardId: "card-1",
+      },
+    ]);
+
+    expect(
+      buildCheckoutPayments({
+        total: "10.5000",
+        isSplitMode: true,
+        splitTenders: [
+          { id: "1", paymentMethodId: "cash", amount: "4.0000" },
+          {
+            id: "2",
+            paymentMethodId: "member",
+            amount: "6.5000",
+            guestCardId: "card-1",
+          },
+        ],
+      })
+    ).toEqual([
+      { paymentMethodId: "cash", amount: "4.0000" },
+      {
+        paymentMethodId: "member",
+        amount: "6.5000",
+        guestCardId: "card-1",
+      },
+    ]);
+  });
 });

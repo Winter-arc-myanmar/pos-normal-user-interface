@@ -45,6 +45,7 @@ import {
 } from "@/lib/pos/paymentMethods";
 import {
   assertCheckoutPaymentsReady,
+  attachGuestCardIdToMemberPayments,
   buildCheckoutPayments,
   remainingReceivable,
 } from "@/lib/pos/splitPayments";
@@ -1073,13 +1074,21 @@ export function CashierPage() {
         throw new Error("Add at least one item before checkout");
       }
 
-      const checkoutPayments = buildCheckoutPayments({
-        total: orderTotal,
-        paymentMethodId,
-        paymentAmount,
-        splitTenders,
-        isSplitMode,
-      });
+      const checkoutPayments = attachGuestCardIdToMemberPayments(
+        buildCheckoutPayments({
+          total: orderTotal,
+          paymentMethodId,
+          paymentAmount,
+          guestCardId: memberCard?.id,
+          splitTenders,
+          isSplitMode,
+        }),
+        memberCard?.id,
+        (methodId) => {
+          const method = checkoutPaymentMethods.find((item) => item.id === methodId);
+          return Boolean(method && isMemberCardPaymentMethod(method));
+        }
+      );
       assertCheckoutPaymentsReady({
         total: orderTotal,
         payments: checkoutPayments,
@@ -1119,6 +1128,7 @@ export function CashierPage() {
             paymentMethodId: payment.paymentMethodId,
             posSessionId: context.posSessionId,
             amount: payment.amount,
+            guestCardId: payment.guestCardId,
           });
         }
       } else {
@@ -1297,6 +1307,11 @@ export function CashierPage() {
         id: `split-${Date.now()}-${splitTenders.length}`,
         paymentMethodId,
         amount: tenderAmount.toFixed(4),
+        ...(selectedPaymentMethod &&
+        isMemberCardPaymentMethod(selectedPaymentMethod) &&
+        memberCard?.id
+          ? { guestCardId: memberCard.id }
+          : {}),
       },
     ];
     setSplitTenders(nextTenders);

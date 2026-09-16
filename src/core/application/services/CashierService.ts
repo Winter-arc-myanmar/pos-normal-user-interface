@@ -280,6 +280,7 @@ export class CashierService implements ICashierService {
     }
     const methods = await this.getPaymentMethods();
     PosPaymentCatalog.assertNoLocalFallbackPayments(payload.payments, methods);
+    PosPaymentCatalog.assertGuestCardPayments(payload.payments, methods);
     return this.cashierRepository.checkoutTableSession(sessionId, payload);
   }
 
@@ -480,6 +481,7 @@ export class CashierService implements ICashierService {
 
     const methods = await this.getPaymentMethods();
     PosPaymentCatalog.assertNoLocalFallbackPayments(payload.payments, methods);
+    PosPaymentCatalog.assertGuestCardPayments(payload.payments, methods);
 
     return this.cashierRepository.checkout({
       ...payload,

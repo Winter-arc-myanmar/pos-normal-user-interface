@@ -79,4 +79,21 @@ export class PosPaymentCatalog {
       );
     }
   }
+
+  static assertGuestCardPayments(
+    payments: CheckoutPaymentEntryDTO[],
+    methods: PaymentMethod[]
+  ): void {
+    const methodById = new Map(methods.map((method) => [method.id, method]));
+    const missingGuestCard = payments.some((payment) => {
+      const method = methodById.get(payment.paymentMethodId);
+      return isMemberCardPaymentMethod(method) && !payment.guestCardId?.trim();
+    });
+
+    if (missingGuestCard) {
+      throw new Error(
+        "Look up a guest card before taking Member Card payment."
+      );
+    }
+  }
 }
