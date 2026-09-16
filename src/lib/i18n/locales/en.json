@@ -610,7 +610,6 @@
       "splitCovered": "Bill covered. Confirm pay when ready.",
       "chooseMethod": "Choose a payment method, then confirm pay.",
       "memberCard": "MEMBER CARD",
-      "localFallback": "Demo",
       "tapMemberCard": "Tap, swipe, or enter the guest card UID.",
       "lookupMemberCard": "Look up card",
       "lookingUpMemberCard": "Looking up...",

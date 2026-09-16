@@ -303,4 +303,53 @@ describe("ApiCashierRepository", () => {
       ],
     });
   });
+
+  it("maps payment-methods list from kind/isActive/glAccountId", async () => {
+    const httpClient = {
+      get: vi.fn().mockResolvedValue({
+        success: true,
+        message: "Request successful",
+        meta: { total: 2, page: 1, limit: 100, totalPages: 1 },
+        data: [
+          {
+            id: "pm-cash",
+            tenantId: "tenant-1",
+            name: "Cash",
+            kind: "CASH",
+            isActive: true,
+            glAccountId: "gl-1",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+          },
+          {
+            id: "pm-card",
+            tenantId: "tenant-1",
+            name: "Member Card",
+            kind: "MEMBER_CARD",
+            isActive: false,
+            glAccountId: "gl-2",
+          },
+        ],
+      }),
+    };
+    const repository = new ApiCashierRepository(
+      httpClient as unknown as HttpClient
+    );
+
+    const methods = await repository.getPaymentMethods();
+
+    expect(httpClient.get).toHaveBeenCalledWith("/api/v1/payment-methods", {
+      params: { page: 1, limit: 100 },
+    });
+    expect(methods).toHaveLength(1);
+    expect(methods[0]).toMatchObject({
+      id: "pm-cash",
+      tenantId: "tenant-1",
+      name: "Cash",
+      kind: "CASH",
+      code: "CASH",
+      isActive: true,
+      glAccountId: "gl-1",
+    });
+  });
 });

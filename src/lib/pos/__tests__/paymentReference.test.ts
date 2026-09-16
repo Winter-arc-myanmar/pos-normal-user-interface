@@ -14,18 +14,20 @@ describe("paymentRequiresReference", () => {
     ).toBe(true);
     expect(
       paymentRequiresReference(
-        new PaymentMethod({ id: "pm-2", name: "Wave Money", type: "WALLET" })
+        new PaymentMethod({ id: "pm-2", name: "Wave Money", kind: "WALLET" })
       )
     ).toBe(true);
   });
 
   it("does not require a reference for cash or member card", () => {
     expect(
-      paymentRequiresReference(new PaymentMethod({ id: "cash", name: "Cash" }))
+      paymentRequiresReference(
+        new PaymentMethod({ id: "cash", name: "Cash", kind: "CASH" })
+      )
     ).toBe(false);
     expect(
       paymentRequiresReference(
-        new PaymentMethod({ id: "mc", name: "Member Card", code: "MEMBER_CARD" })
+        new PaymentMethod({ id: "mc", name: "Member Card", kind: "MEMBER_CARD" })
       )
     ).toBe(false);
   });

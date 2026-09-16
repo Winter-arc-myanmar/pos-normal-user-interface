@@ -439,6 +439,28 @@ const flattenInventoryLocations = (
   return results;
 };
 
+const toPaymentMethod = (item: Record<string, unknown>): PaymentMethod => {
+  const kind = item.kind != null && String(item.kind).trim()
+    ? String(item.kind)
+    : item.code
+      ? String(item.code)
+      : item.type
+        ? String(item.type)
+        : undefined;
+  return new PaymentMethod({
+    id: String(item.id || ""),
+    tenantId: String(item.tenantId || ""),
+    name: String(item.name || item.label || ""),
+    kind,
+    code: kind,
+    type: kind,
+    isActive: item.isActive === false ? false : true,
+    glAccountId: item.glAccountId ? String(item.glAccountId) : undefined,
+    createdAt: item.createdAt ? String(item.createdAt) : undefined,
+    updatedAt: item.updatedAt ? String(item.updatedAt) : undefined,
+  });
+};
+
 export class ApiCashierRepository implements ICashierRepository {
   constructor(private readonly httpClient: HttpClient) {}
 
@@ -740,16 +762,9 @@ export class ApiCashierRepository implements ICashierRepository {
       API_ENDPOINTS.PAYMENT_METHODS.LIST,
       { params: { page: 1, limit: 100 } }
     );
-    const data = unwrap(response);
-    return (Array.isArray(data) ? data : []).map((item) =>
-      new PaymentMethod({
-        id: String(item.id || ""),
-        tenantId: String(item.tenantId || ""),
-        name: String(item.name || item.label || ""),
-        code: item.code ? String(item.code) : item.methodCode ? String(item.methodCode) : undefined,
-        type: item.type ? String(item.type) : item.methodType ? String(item.methodType) : undefined,
-      })
-    );
+    return asList<Record<string, unknown>>(response)
+      .map((item) => toPaymentMethod(item))
+      .filter((method) => method.isActive !== false);
   }
 
   async getPosRegisters(params?: PosRegisterFilterDTO): Promise<PosRegister[]> {

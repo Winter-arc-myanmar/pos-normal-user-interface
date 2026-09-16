@@ -19,8 +19,12 @@ const normalize = (value?: string): string =>
 
 export function paymentRequiresReference(method?: PaymentMethod | null): boolean {
   if (!method) return false;
-  const haystack = `${normalize(method.name)} ${normalize(method.code)} ${normalize(method.type)}`;
-  if (haystack.includes("member card") || haystack.includes("membership")) {
+  const haystack = `${normalize(method.name)} ${normalize(method.code)} ${normalize(method.type)} ${normalize(method.kind)}`;
+  if (
+    haystack.includes("member card") ||
+    haystack.includes("membership") ||
+    haystack.includes("guest card")
+  ) {
     return false;
   }
   return MOBILE_WALLET_TOKENS.some((token) => haystack.includes(token));

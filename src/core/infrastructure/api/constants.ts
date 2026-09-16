@@ -165,6 +165,7 @@ export const API_ENDPOINTS = {
 
   PAYMENT_METHODS: {
     LIST: "/api/v1/payment-methods",
+    BY_ID: (id: string) => `/api/v1/payment-methods/${id}`,
   },
 
   POS_REGISTERS: {

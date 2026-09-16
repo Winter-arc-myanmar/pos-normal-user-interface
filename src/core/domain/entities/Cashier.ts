@@ -119,8 +119,13 @@ export class PaymentMethod {
   id!: string;
   tenantId!: string;
   name!: string;
+  kind?: string;
   code?: string;
   type?: string;
+  isActive?: boolean;
+  glAccountId?: string;
+  createdAt?: string;
+  updatedAt?: string;
   isLocalFallback?: boolean;
 
   constructor(data: Partial<PaymentMethod>) {

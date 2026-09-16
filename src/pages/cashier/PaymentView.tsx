@@ -110,7 +110,8 @@ function methodLabel(method: PaymentMethod, memberCardLabel: string): string {
 }
 
 function methodRank(method: PaymentMethod): number {
-  if (/cash/i.test(method.name) || /cash/i.test(method.code || "")) return 0;
+  const kind = String(method.kind || method.code || "").toUpperCase();
+  if (kind === "CASH" || /cash/i.test(method.name)) return 0;
   if (isMemberCardPaymentMethod(method)) return 1;
   return 2;
 }
@@ -392,7 +393,8 @@ export function PaymentView({
             const selected = selectedMethodId === method.id;
             const memberCard = isMemberCardPaymentMethod(method);
             const cash =
-              /cash/i.test(method.name) || /cash/i.test(method.code || "");
+              String(method.kind || method.code || "").toUpperCase() === "CASH" ||
+              /cash/i.test(method.name);
             return (
               <button
                 key={method.id}
@@ -409,11 +411,6 @@ export function PaymentView({
                 <span className="mt-1 text-center text-[11px] font-bold leading-tight">
                   {methodLabel(method, memberCardLabel)}
                 </span>
-                {method.isLocalFallback ? (
-                  <span className="mt-0.5 text-[9px] uppercase text-amber-600">
-                    {t("cashier.payment.localFallback")}
-                  </span>
-                ) : null}
               </button>
             );
           })}

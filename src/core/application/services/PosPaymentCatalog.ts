@@ -9,7 +9,9 @@ const MEMBER_CARD_TOKENS = [
   "membership card",
   "membercard",
   "membership",
-  "member",
+  "guest card",
+  "guest wallet",
+  "guestcard",
 ];
 
 const normalize = (value?: string): string =>
@@ -21,10 +23,20 @@ const normalize = (value?: string): string =>
 export const isMemberCardPaymentMethod = (method?: PaymentMethod | null): boolean => {
   if (!method) return false;
   if (method.id === LOCAL_MEMBER_CARD_METHOD_ID) return true;
-  if (normalize(method.code) === "member card" || method.code === MEMBER_CARD_METHOD_CODE) {
+  const kind = normalize(method.kind);
+  const code = normalize(method.code);
+  const type = normalize(method.type);
+  if (
+    kind === "member card" ||
+    kind === "guest card" ||
+    kind === "membership card" ||
+    code === "member card" ||
+    code === "guest card" ||
+    type === "member card" ||
+    type === "guest card"
+  ) {
     return true;
   }
-  if (normalize(method.type) === "member card") return true;
   const name = normalize(method.name);
   return MEMBER_CARD_TOKENS.some((token) => name.includes(token));
 };
@@ -34,19 +46,14 @@ export const createLocalMemberCardMethod = (): PaymentMethod =>
     id: LOCAL_MEMBER_CARD_METHOD_ID,
     tenantId: "",
     name: "Member Card",
+    kind: MEMBER_CARD_METHOD_CODE,
     code: MEMBER_CARD_METHOD_CODE,
     type: MEMBER_CARD_METHOD_CODE,
-    isLocalFallback: true,
   });
 
 export const ensureMemberCardPaymentMethod = (
   methods: PaymentMethod[]
-): PaymentMethod[] => {
-  if (methods.some((method) => isMemberCardPaymentMethod(method))) {
-    return methods;
-  }
-  return [...methods, createLocalMemberCardMethod()];
-};
+): PaymentMethod[] => methods;
 
 export const findMemberCardPaymentMethod = (
   methods: PaymentMethod[]
