@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import {
   BindGuestCardDTO,
+  GuestCardListResponseDTO,
   GuestWalletFilterDTO,
   GuestWalletLedgerListResponseDTO,
   GuestWalletListResponseDTO,
@@ -28,7 +29,12 @@ interface UseGuestWalletManagementReturn {
   limit: number;
   totalPages: number;
   currentWallet: GuestWallet | null;
+  currentGuestCard: GuestCard | null;
   cards: GuestCard[];
+  guestCards: GuestCard[];
+  guestCardsTotal: number;
+  guestCardsPage: number;
+  guestCardsTotalPages: number;
   ledger: GuestWalletLedgerEntry[];
   ledgerTotal: number;
   ledgerPage: number;
@@ -65,11 +71,14 @@ interface UseGuestWalletManagementReturn {
   voidWallet: (id: string, payload: VoidGuestWalletDTO) => Promise<GuestWallet>;
   auditWallet: (id: string) => Promise<GuestWalletAudit>;
   lookupCard: (cardUid: string) => Promise<GuestCard>;
+  listCards: (params?: GuestWalletFilterDTO) => Promise<GuestCardListResponseDTO>;
+  getCard: (id: string) => Promise<GuestCard>;
   loadLedger: (
     id: string,
     params?: GuestWalletFilterDTO
   ) => Promise<GuestWalletLedgerListResponseDTO>;
   clearCurrentWallet: () => void;
+  clearCurrentGuestCard: () => void;
   clearError: () => void;
 }
 
@@ -94,7 +103,12 @@ export function useGuestWalletManagement(): UseGuestWalletManagementReturn {
   const [limit, setLimit] = useState(6);
   const [totalPages, setTotalPages] = useState(1);
   const [currentWallet, setCurrentWallet] = useState<GuestWallet | null>(null);
+  const [currentGuestCard, setCurrentGuestCard] = useState<GuestCard | null>(null);
   const [cards, setCards] = useState<GuestCard[]>([]);
+  const [guestCards, setGuestCards] = useState<GuestCard[]>([]);
+  const [guestCardsTotal, setGuestCardsTotal] = useState(0);
+  const [guestCardsPage, setGuestCardsPage] = useState(1);
+  const [guestCardsTotalPages, setGuestCardsTotalPages] = useState(1);
   const [ledger, setLedger] = useState<GuestWalletLedgerEntry[]>([]);
   const [ledgerTotal, setLedgerTotal] = useState(0);
   const [ledgerPage, setLedgerPage] = useState(1);
@@ -107,8 +121,13 @@ export function useGuestWalletManagement(): UseGuestWalletManagementReturn {
 
   const clearError = useCallback(() => setError(null), []);
 
+  const clearCurrentGuestCard = useCallback(() => {
+    setCurrentGuestCard(null);
+  }, []);
+
   const clearCurrentWallet = useCallback(() => {
     setCurrentWallet(null);
+    setCurrentGuestCard(null);
     setCards([]);
     setLedger([]);
     setLedgerTotal(0);
@@ -131,6 +150,13 @@ export function useGuestWalletManagement(): UseGuestWalletManagementReturn {
     setLedgerTotal(result.total);
     setLedgerPage(result.page);
     setLedgerTotalPages(result.totalPages);
+  };
+
+  const applyGuestCards = (result: GuestCardListResponseDTO) => {
+    setGuestCards(result.cards);
+    setGuestCardsTotal(result.total);
+    setGuestCardsPage(result.page);
+    setGuestCardsTotalPages(result.totalPages);
   };
 
   const listWallets = useCallback(
@@ -182,7 +208,12 @@ export function useGuestWalletManagement(): UseGuestWalletManagementReturn {
         const [wallet, walletCards, ledgerResult] = await Promise.all([
           guestWalletService.getWallet(id),
           guestWalletService.listWalletCards(id),
-          guestWalletService.listWalletLedger(id, { page: 1, limit: 20 }),
+          guestWalletService.listWalletLedger(id, {
+            page: 1,
+            limit: 10,
+            sortBy: "createdAt",
+            sortOrder: "desc",
+          }),
         ]);
         setCurrentWallet(wallet);
         setCards(walletCards);
@@ -223,11 +254,16 @@ export function useGuestWalletManagement(): UseGuestWalletManagementReturn {
   );
 
   const refreshDetails = useCallback(
-    async (id: string) => {
+    async (id: string, ledgerParams?: GuestWalletFilterDTO) => {
       const [wallet, walletCards, ledgerResult] = await Promise.all([
         guestWalletService.getWallet(id),
         guestWalletService.listWalletCards(id),
-        guestWalletService.listWalletLedger(id, { page: 1, limit: 20 }),
+        guestWalletService.listWalletLedger(id, {
+          page: ledgerParams?.page || ledgerPage,
+          limit: ledgerParams?.limit || 10,
+          sortBy: "createdAt",
+          sortOrder: "desc",
+        }),
       ]);
       setCurrentWallet(wallet);
       setCards(walletCards);
@@ -237,7 +273,7 @@ export function useGuestWalletManagement(): UseGuestWalletManagementReturn {
       );
       return wallet;
     },
-    [guestWalletService]
+    [guestWalletService, ledgerPage]
   );
 
   const topUpWallet = useCallback(
@@ -246,7 +282,7 @@ export function useGuestWalletManagement(): UseGuestWalletManagementReturn {
         setIsLoading(true);
         clearError();
         const entry = await guestWalletService.topUpWallet(id, payload);
-        await refreshDetails(id);
+        await refreshDetails(id, { page: 1, limit: 10 });
         return entry;
       } catch (err) {
         const message = toErrorMessage(err, "Unable to top up wallet");
@@ -265,7 +301,7 @@ export function useGuestWalletManagement(): UseGuestWalletManagementReturn {
         setIsLoading(true);
         clearError();
         const wallet = await guestWalletService.refundWallet(id, payload);
-        await refreshDetails(id);
+        await refreshDetails(id, { page: 1, limit: 10 });
         return wallet;
       } catch (err) {
         const message = toErrorMessage(err, "Unable to refund wallet");
@@ -284,7 +320,9 @@ export function useGuestWalletManagement(): UseGuestWalletManagementReturn {
         setIsLoading(true);
         clearError();
         const card = await guestWalletService.bindCard(payload);
-        if (payload.walletId) await refreshDetails(payload.walletId);
+        if (payload.walletId) {
+          await refreshDetails(payload.walletId, { page: 1, limit: 10 });
+        }
         return card;
       } catch (err) {
         const message = toErrorMessage(err, "Unable to bind card");
@@ -303,7 +341,9 @@ export function useGuestWalletManagement(): UseGuestWalletManagementReturn {
         setIsLoading(true);
         clearError();
         const card = await guestWalletService.unbindCard(id);
-        if (currentWallet?.id) await refreshDetails(currentWallet.id);
+        if (currentWallet?.id) {
+          await refreshDetails(currentWallet.id, { page: 1, limit: 10 });
+        }
         return card;
       } catch (err) {
         const message = toErrorMessage(err, "Unable to unbind card");
@@ -322,7 +362,9 @@ export function useGuestWalletManagement(): UseGuestWalletManagementReturn {
         setIsLoading(true);
         clearError();
         const card = await guestWalletService.reportCardLost(id);
-        if (currentWallet?.id) await refreshDetails(currentWallet.id);
+        if (currentWallet?.id) {
+          await refreshDetails(currentWallet.id, { page: 1, limit: 10 });
+        }
         return card;
       } catch (err) {
         const message = toErrorMessage(err, "Unable to report lost card");
@@ -341,7 +383,9 @@ export function useGuestWalletManagement(): UseGuestWalletManagementReturn {
         setIsLoading(true);
         clearError();
         const card = await guestWalletService.replaceCard(id, payload);
-        if (currentWallet?.id) await refreshDetails(currentWallet.id);
+        if (currentWallet?.id) {
+          await refreshDetails(currentWallet.id, { page: 1, limit: 10 });
+        }
         return card;
       } catch (err) {
         const message = toErrorMessage(err, "Unable to replace card");
@@ -380,6 +424,9 @@ export function useGuestWalletManagement(): UseGuestWalletManagementReturn {
         clearError();
         const wallet = await guestWalletService.beginSettlement(id);
         setCurrentWallet(wallet);
+        setWallets((current) =>
+          current.map((item) => (item.id === wallet.id ? wallet : item))
+        );
         return wallet;
       } catch (err) {
         const message = toErrorMessage(err, "Unable to begin settlement");
@@ -398,7 +445,7 @@ export function useGuestWalletManagement(): UseGuestWalletManagementReturn {
         setIsLoading(true);
         clearError();
         const wallet = await guestWalletService.cancelSettlement(id);
-        await refreshDetails(id);
+        await refreshDetails(id, { page: 1, limit: 10 });
         return wallet;
       } catch (err) {
         const message = toErrorMessage(err, "Unable to cancel settlement");
@@ -416,9 +463,8 @@ export function useGuestWalletManagement(): UseGuestWalletManagementReturn {
       try {
         setIsLoading(true);
         clearError();
-        await guestWalletService.beginSettlement(id).catch(() => undefined);
         const wallet = await guestWalletService.settleWallet(id, payload);
-        await refreshDetails(id);
+        await refreshDetails(id, { page: 1, limit: 10 });
         return wallet;
       } catch (err) {
         const message = toErrorMessage(err, "Unable to close wallet");
@@ -437,7 +483,7 @@ export function useGuestWalletManagement(): UseGuestWalletManagementReturn {
         setIsLoading(true);
         clearError();
         const wallet = await guestWalletService.voidWallet(id, payload);
-        await refreshDetails(id);
+        await refreshDetails(id, { page: 1, limit: 10 });
         return wallet;
       } catch (err) {
         const message = toErrorMessage(err, "Unable to void wallet");
@@ -491,11 +537,54 @@ export function useGuestWalletManagement(): UseGuestWalletManagementReturn {
       try {
         setIsLoading(true);
         clearError();
-        const result = await guestWalletService.listWalletLedger(id, params);
+        const result = await guestWalletService.listWalletLedger(id, {
+          page: params?.page || 1,
+          limit: params?.limit || 10,
+          sortBy: params?.sortBy || "createdAt",
+          sortOrder: params?.sortOrder || "desc",
+        });
         applyLedger(result);
         return result;
       } catch (err) {
         const message = toErrorMessage(err, "Unable to load wallet ledger");
+        setError(message);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [clearError, guestWalletService]
+  );
+
+  const listCards = useCallback(
+    async (params?: GuestWalletFilterDTO) => {
+      try {
+        setIsLoading(true);
+        clearError();
+        const result = await guestWalletService.listCards(params);
+        applyGuestCards(result);
+        return result;
+      } catch (err) {
+        const message = toErrorMessage(err, "Unable to load guest cards");
+        setError(message);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [clearError, guestWalletService]
+  );
+
+  const getCard = useCallback(
+    async (id: string) => {
+      try {
+        setIsLoading(true);
+        clearError();
+        const card = await guestWalletService.getCard(id);
+        setCurrentGuestCard(card);
+        return card;
+      } catch (err) {
+        const message = toErrorMessage(err, "Unable to load guest card");
         setError(message);
         throw err;
       } finally {
@@ -512,7 +601,12 @@ export function useGuestWalletManagement(): UseGuestWalletManagementReturn {
     limit,
     totalPages,
     currentWallet,
+    currentGuestCard,
     cards,
+    guestCards,
+    guestCardsTotal,
+    guestCardsPage,
+    guestCardsTotalPages,
     ledger,
     ledgerTotal,
     ledgerPage,
@@ -538,8 +632,11 @@ export function useGuestWalletManagement(): UseGuestWalletManagementReturn {
     voidWallet,
     auditWallet,
     lookupCard,
+    listCards,
+    getCard,
     loadLedger,
     clearCurrentWallet,
+    clearCurrentGuestCard,
     clearError,
   };
 }

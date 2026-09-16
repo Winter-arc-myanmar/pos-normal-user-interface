@@ -1,5 +1,6 @@
 import {
   BindGuestCardDTO,
+  GuestCardListResponseDTO,
   GuestWalletFilterDTO,
   GuestWalletLedgerListResponseDTO,
   GuestWalletListResponseDTO,
@@ -43,4 +44,6 @@ export interface IGuestWalletService {
   unbindCard(id: string): Promise<GuestCard>;
   reportCardLost(id: string): Promise<GuestCard>;
   replaceCard(id: string, payload: ReplaceGuestCardDTO): Promise<GuestCard>;
+  listCards(params?: GuestWalletFilterDTO): Promise<GuestCardListResponseDTO>;
+  getCard(id: string): Promise<GuestCard>;
 }

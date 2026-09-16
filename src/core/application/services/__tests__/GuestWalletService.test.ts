@@ -76,6 +76,32 @@ describe("GuestWalletService", () => {
     ).rejects.toThrow("Approver authorization is required");
   });
 
+  it("loads guest cards and fetches a card by id", async () => {
+    vi.mocked(repository.listCards).mockResolvedValue({
+      cards: [],
+      total: 0,
+      page: 1,
+      limit: 10,
+      totalPages: 1,
+    });
+    vi.mocked(repository.getCard).mockResolvedValue({
+      id: "card-1",
+      cardUid: "04A3B2C1",
+      walletId: "wallet-1",
+      status: "ACTIVE",
+    } as never);
+
+    await service.listCards({ page: 1, limit: 10 });
+    await service.getCard("card-1");
+
+    expect(repository.listCards).toHaveBeenCalledWith({ page: 1, limit: 10 });
+    expect(repository.getCard).toHaveBeenCalledWith("card-1");
+  });
+
+  it("rejects getCard without an id", async () => {
+    await expect(service.getCard(" ")).rejects.toThrow("Invalid card ID");
+  });
+
   it("adds an idempotency key when topping up", async () => {
     await service.topUpWallet("wallet-1", {
       amount: "60000",

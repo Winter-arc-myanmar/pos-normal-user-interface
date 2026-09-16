@@ -1,5 +1,6 @@
 import {
   BindGuestCardDTO,
+  GuestCardListResponseDTO,
   GuestWalletFilterDTO,
   GuestWalletLedgerListResponseDTO,
   GuestWalletListResponseDTO,
@@ -40,7 +41,7 @@ export interface IGuestWalletRepository {
   voidWallet(id: string, payload: VoidGuestWalletDTO): Promise<GuestWallet>;
   lookupCard(cardUid: string): Promise<GuestCard>;
   bindCard(payload: BindGuestCardDTO): Promise<GuestCard>;
-  listCards(params?: GuestWalletFilterDTO): Promise<GuestCard[]>;
+  listCards(params?: GuestWalletFilterDTO): Promise<GuestCardListResponseDTO>;
   getCard(id: string): Promise<GuestCard>;
   unbindCard(id: string): Promise<GuestCard>;
   reportCardLost(id: string): Promise<GuestCard>;

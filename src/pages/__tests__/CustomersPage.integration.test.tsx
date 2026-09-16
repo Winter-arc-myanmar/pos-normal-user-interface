@@ -13,6 +13,10 @@ const mocks = vi.hoisted(() => ({
   loadWalletDetails: vi.fn(),
   issueWallet: vi.fn(),
   lookupCard: vi.fn(),
+  listCards: vi.fn(),
+  getCard: vi.fn(),
+  loadLedger: vi.fn(),
+  beginSettlement: vi.fn(),
   requireCashierContext: vi.fn(),
 }));
 
@@ -97,7 +101,18 @@ vi.mock("@/core/presentation/hooks/useGuestWalletManagement", () => ({
     voidWallet: vi.fn(),
     auditWallet: vi.fn(),
     lookupCard: mocks.lookupCard,
+    listCards: mocks.listCards,
+    getCard: mocks.getCard,
+    loadLedger: mocks.loadLedger,
+    beginSettlement: mocks.beginSettlement,
+    ledgerPage: 1,
+    ledgerTotalPages: 1,
+    guestCards: [],
+    guestCardsPage: 1,
+    guestCardsTotalPages: 1,
+    currentGuestCard: null,
     clearCurrentWallet: vi.fn(),
+    clearCurrentGuestCard: vi.fn(),
   }),
 }));
 
@@ -169,6 +184,24 @@ describe("CRM page integration", () => {
       walletId: "wallet-1",
       status: "ACTIVE",
       wallet: { id: "wallet-1", guestPhone: "09123456789", guestName: "Test1" },
+    });
+    mocks.listCards.mockResolvedValue({
+      cards: [],
+      total: 0,
+      page: 1,
+      totalPages: 1,
+    });
+    mocks.getCard.mockResolvedValue({
+      id: "card-1",
+      cardUid: "04A3B2C1",
+      walletId: "wallet-1",
+      status: "ACTIVE",
+    });
+    mocks.loadLedger.mockResolvedValue({
+      entries: [],
+      total: 0,
+      page: 1,
+      totalPages: 1,
     });
     mocks.requireCashierContext.mockResolvedValue({
       tenantId: "tenant-1",

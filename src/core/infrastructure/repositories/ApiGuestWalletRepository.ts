@@ -3,6 +3,7 @@ import { HttpClient } from "../api/HttpClient";
 import { API_ENDPOINTS } from "../api/constants";
 import {
   BindGuestCardDTO,
+  GuestCardListResponseDTO,
   GuestWalletFilterDTO,
   GuestWalletLedgerListResponseDTO,
   GuestWalletListResponseDTO,
@@ -372,12 +373,16 @@ export class ApiGuestWalletRepository implements IGuestWalletRepository {
     return requireCard(response);
   }
 
-  async listCards(params?: GuestWalletFilterDTO): Promise<GuestCard[]> {
+  async listCards(
+    params?: GuestWalletFilterDTO
+  ): Promise<GuestCardListResponseDTO> {
     const response = await this.httpClient.get<ApiEnvelope<unknown>>(
       API_ENDPOINTS.GUEST_CARDS.LIST,
       { params }
     );
-    return asList(response).map(toCard);
+    const cards = asList(response).map(toCard);
+    const meta = toMeta(response, params?.limit || 10, cards.length);
+    return { cards, ...meta };
   }
 
   async getCard(id: string): Promise<GuestCard> {

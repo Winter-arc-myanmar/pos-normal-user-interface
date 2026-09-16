@@ -19,6 +19,8 @@ import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
 import { useDateFormatter } from "@/lib/i18n/formatters";
 
 const PAGE_SIZE = 6;
+const LEDGER_PAGE_SIZE = 10;
+const GUEST_CARDS_PAGE_SIZE = 6;
 
 const fieldClass =
   "min-h-11 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-500";
@@ -82,6 +84,10 @@ function initials(name: string): string {
 function isClosedStatus(status: string): boolean {
   const value = status.toUpperCase();
   return value === "CLOSED" || value === "SETTLED" || value === "VOIDED";
+}
+
+function isSettlingStatus(status: string): boolean {
+  return status.toUpperCase() === "SETTLING";
 }
 
 function MemberEmptyIllustration() {
@@ -269,8 +275,14 @@ export function CustomersPage() {
   } = useCustomerManagement();
   const {
     currentWallet,
+    currentGuestCard,
     cards,
+    guestCards,
+    guestCardsPage,
+    guestCardsTotalPages,
     ledger,
+    ledgerPage,
+    ledgerTotalPages,
     settlementQuote,
     audit,
     isLoading: isWalletLoading,
@@ -285,12 +297,17 @@ export function CustomersPage() {
     reportCardLost,
     replaceCard,
     getSettlementQuote,
+    beginSettlement,
     cancelSettlement,
     settleWallet,
     voidWallet,
     auditWallet,
     lookupCard,
+    listCards,
+    getCard,
+    loadLedger,
     clearCurrentWallet,
+    clearCurrentGuestCard,
   } = useGuestWalletManagement();
 
   const [search, setSearch] = useState("");
@@ -316,6 +333,10 @@ export function CustomersPage() {
   const [roomNumber, setRoomNumber] = useState("");
   const [selectedCardId, setSelectedCardId] = useState("");
   const [newCardUid, setNewCardUid] = useState("");
+  const [settlementBegun, setSettlementBegun] = useState(false);
+  const [guestCardSearch, setGuestCardSearch] = useState("");
+  const [debouncedGuestCardSearch, setDebouncedGuestCardSearch] = useState("");
+  const [guestCardsCurrentPage, setGuestCardsCurrentPage] = useState(1);
   const captureModeRef = useRef<
     "lookup" | "issue" | "bind" | "replace" | "ignore"
   >("lookup");
@@ -330,6 +351,11 @@ export function CustomersPage() {
     [cards]
   );
   const walletClosed = selectedWallet ? isClosedStatus(selectedWallet.status) : true;
+  const walletSettling = selectedWallet
+    ? isSettlingStatus(selectedWallet.status) || settlementBegun
+    : false;
+  const canConfirmClose =
+    walletSettling && !Boolean(settlementQuote?.blockers.length);
   const creditLabel = useMemo(() => {
     if (!selectedCustomer) return "";
     return selectedCustomer.hasCreditAccount
@@ -348,6 +374,30 @@ export function CustomersPage() {
     }, 300);
     return () => window.clearTimeout(timer);
   }, [search]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedGuestCardSearch(guestCardSearch.trim());
+      setGuestCardsCurrentPage(1);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [guestCardSearch]);
+
+  useEffect(() => {
+    if (!selectedCustomer) return;
+    void listCards({
+      page: guestCardsCurrentPage,
+      limit: GUEST_CARDS_PAGE_SIZE,
+      search: debouncedGuestCardSearch || undefined,
+      sortBy: "createdAt",
+      sortOrder: "desc",
+    }).catch(() => undefined);
+  }, [
+    debouncedGuestCardSearch,
+    guestCardsCurrentPage,
+    listCards,
+    selectedCustomer,
+  ]);
 
   useEffect(() => {
     void getCustomers({
@@ -387,6 +437,17 @@ export function CustomersPage() {
       page: currentPage,
       limit: PAGE_SIZE,
       search: debouncedSearch || undefined,
+      sortBy: "createdAt",
+      sortOrder: "desc",
+    });
+  };
+
+  const refreshGuestCards = async () => {
+    if (!selectedCustomer) return;
+    await listCards({
+      page: guestCardsCurrentPage,
+      limit: GUEST_CARDS_PAGE_SIZE,
+      search: debouncedGuestCardSearch || undefined,
       sortBy: "createdAt",
       sortOrder: "desc",
     });
@@ -589,6 +650,7 @@ export function CustomersPage() {
 
   const resetActionForm = () => {
     setWalletAction(null);
+    setSettlementBegun(false);
     setAmount("");
     setReference("");
     setNotes("");
@@ -630,6 +692,7 @@ export function CustomersPage() {
     setRoomNumber(card?.roomNumber || "");
     setSelectedCardId(card?.id || activeCards[0]?.id || "");
     setNewCardUid("");
+    setSettlementBegun(isSettlingStatus(selectedWallet.status));
     if (action === "close") {
       try {
         await getSettlementQuote(selectedWallet.id);
@@ -638,6 +701,66 @@ export function CustomersPage() {
           caught instanceof Error ? caught.message : t("crm.cardActionFailed")
         );
       }
+    }
+  };
+
+  const handleBeginSettlement = async () => {
+    if (!selectedWallet) return;
+    setLocalError(null);
+    try {
+      await beginSettlement(selectedWallet.id);
+      setSettlementBegun(true);
+      setNotice(t("crm.beginSettlementSuccess"));
+    } catch (caught) {
+      setLocalError(
+        caught instanceof Error ? caught.message : t("crm.cardActionFailed")
+      );
+    }
+  };
+
+  const handleLedgerPageChange = async (nextPage: number) => {
+    if (!selectedWallet) return;
+    await loadLedger(selectedWallet.id, {
+      page: nextPage,
+      limit: LEDGER_PAGE_SIZE,
+      sortBy: "createdAt",
+      sortOrder: "desc",
+    });
+  };
+
+  const handleGuestCardSelect = async (cardId: string) => {
+    setLocalError(null);
+    try {
+      const card = await getCard(cardId);
+      if (card.walletId) {
+        await loadWalletDetails(card.walletId);
+        const phone = card.wallet?.guestPhone?.trim();
+        if (phone) {
+          const result = await getCustomers({
+            page: 1,
+            limit: PAGE_SIZE,
+            search: phone,
+            sortBy: "createdAt",
+            sortOrder: "desc",
+          });
+          const match =
+            result.customers.find((customer) => customer.phone === phone) ||
+            result.customers[0];
+          if (match) {
+            await getCustomerById(match.id);
+            await getInteractionsForCustomer(match.id, {
+              page: 1,
+              limit: 20,
+              sortBy: "createdAt",
+              sortOrder: "desc",
+            });
+          }
+        }
+      }
+    } catch (caught) {
+      setLocalError(
+        caught instanceof Error ? caught.message : t("crm.cardActionFailed")
+      );
     }
   };
 
@@ -679,6 +802,7 @@ export function CustomersPage() {
       setIsIssueFormOpen(false);
       setNotice(t("crm.walletIssued"));
       await loadWalletDetails(wallet.id);
+      await refreshGuestCards();
     } catch (caught) {
       setLocalError(
         caught instanceof Error ? caught.message : t("crm.saveFailed")
@@ -745,6 +869,9 @@ export function CustomersPage() {
         });
         setNotice(t("crm.voidSuccess"));
       } else if (walletAction === "close") {
+        if (!walletSettling) {
+          throw new Error(t("crm.settlementRequired"));
+        }
         const context = await requireWorkspace();
         const refundable = Number(settlementQuote?.refundable || 0);
         const collectable = Number(settlementQuote?.collectable || 0);
@@ -771,6 +898,7 @@ export function CustomersPage() {
         });
         setNotice(t("crm.closeCardSuccess"));
       }
+      await refreshGuestCards();
       resetActionForm();
     } catch (caught) {
       setLocalError(
@@ -796,6 +924,8 @@ export function CustomersPage() {
     setLocalError(null);
     try {
       await cancelSettlement(selectedWallet.id);
+      setSettlementBegun(false);
+      clearCurrentGuestCard();
       setNotice(t("crm.cancelSettlement"));
     } catch (caught) {
       setLocalError(
@@ -907,10 +1037,18 @@ export function CustomersPage() {
                     <Button
                       size="sm"
                       variant="secondary"
-                      disabled={selectedWallet.status.toUpperCase() === "ACTIVE"}
+                      disabled={!walletSettling || isWalletLoading}
                       onClick={() => void handleCancelSettlement()}
                     >
                       {t("crm.cancelSettlement")}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={walletClosed || walletSettling || isWalletLoading}
+                      onClick={() => void handleBeginSettlement()}
+                    >
+                      {t("crm.beginSettlement")}
                     </Button>
                     <Button
                       size="sm"
@@ -1104,6 +1242,121 @@ export function CustomersPage() {
                       ))
                     )}
                   </ul>
+                  {ledgerTotalPages > 1 ? (
+                    <div className="mt-3 flex items-center justify-center gap-3 text-xs text-slate-500">
+                      <button
+                        type="button"
+                        className="min-h-8 min-w-8 rounded border border-slate-200 disabled:opacity-40"
+                        disabled={ledgerPage <= 1 || isWalletLoading}
+                        onClick={() => void handleLedgerPageChange(ledgerPage - 1)}
+                        aria-label={t("crm.prevPage")}
+                      >
+                        ‹
+                      </button>
+                      <span>
+                        {ledgerPage} / {ledgerTotalPages}
+                      </span>
+                      <button
+                        type="button"
+                        className="min-h-8 min-w-8 rounded border border-slate-200 disabled:opacity-40"
+                        disabled={ledgerPage >= ledgerTotalPages || isWalletLoading}
+                        onClick={() => void handleLedgerPageChange(ledgerPage + 1)}
+                        aria-label={t("crm.nextPage")}
+                      >
+                        ›
+                      </button>
+                    </div>
+                  ) : null}
+
+                  <section className="mt-8 rounded-xl border border-slate-200 bg-white p-4">
+                    <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      {t("crm.allGuestCards")}
+                    </h4>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {t("crm.guestCardRegistryHint")}
+                    </p>
+                    <input
+                      aria-label={t("crm.search")}
+                      placeholder={t("crm.search")}
+                      className={`${fieldClass} mt-3`}
+                      value={guestCardSearch}
+                      onChange={(event) => setGuestCardSearch(event.target.value)}
+                    />
+                    <ul className="mt-3 space-y-2">
+                      {guestCards.length === 0 ? (
+                        <li className="text-sm text-slate-500">
+                          {t("crm.noGuestCards")}
+                        </li>
+                      ) : (
+                        guestCards.map((card) => (
+                          <li
+                            key={card.id}
+                            className="rounded-lg border border-slate-200 p-3"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="text-sm font-semibold">{card.cardUid}</p>
+                                <p className="text-xs text-slate-500">
+                                  {card.label || "—"} · {card.roomNumber || "—"} ·{" "}
+                                  {card.status}
+                                </p>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => void handleGuestCardSelect(card.id)}
+                              >
+                                {t("crm.viewCard")}
+                              </Button>
+                            </div>
+                          </li>
+                        ))
+                      )}
+                    </ul>
+                    {guestCardsTotalPages > 1 ? (
+                      <div className="mt-3 flex items-center justify-center gap-3 text-xs text-slate-500">
+                        <button
+                          type="button"
+                          className="min-h-8 min-w-8 rounded border border-slate-200 disabled:opacity-40"
+                          disabled={guestCardsPage <= 1 || isWalletLoading}
+                          onClick={() =>
+                            setGuestCardsCurrentPage((current) => Math.max(1, current - 1))
+                          }
+                          aria-label={t("crm.prevPage")}
+                        >
+                          ‹
+                        </button>
+                        <span>
+                          {guestCardsPage} / {guestCardsTotalPages}
+                        </span>
+                        <button
+                          type="button"
+                          className="min-h-8 min-w-8 rounded border border-slate-200 disabled:opacity-40"
+                          disabled={
+                            guestCardsPage >= guestCardsTotalPages || isWalletLoading
+                          }
+                          onClick={() =>
+                            setGuestCardsCurrentPage((current) =>
+                              Math.min(guestCardsTotalPages, current + 1)
+                            )
+                          }
+                          aria-label={t("crm.nextPage")}
+                        >
+                          ›
+                        </button>
+                      </div>
+                    ) : null}
+                    {currentGuestCard ? (
+                      <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
+                        <p className="font-semibold">{currentGuestCard.cardUid}</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {currentGuestCard.label || "—"} ·{" "}
+                          {currentGuestCard.roomNumber || "—"} ·{" "}
+                          {currentGuestCard.status}
+                        </p>
+                      </div>
+                    ) : null}
+                  </section>
                 </>
               ) : (
                 <>
@@ -1530,6 +1783,18 @@ export function CustomersPage() {
               {walletAction === "close" ? (
                 <>
                   <p className="text-sm text-slate-600">{t("crm.closeCardConfirm")}</p>
+                  <p className="text-xs text-slate-500">{t("crm.beginSettlementHint")}</p>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={walletSettling || isWalletLoading}
+                    onClick={() => void handleBeginSettlement()}
+                  >
+                    {t("crm.beginSettlement")}
+                  </Button>
+                  {!walletSettling ? (
+                    <p className="text-xs text-amber-600">{t("crm.settlementRequired")}</p>
+                  ) : null}
                   {settlementQuote ? (
                     <div className="space-y-1 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
                       <p>
@@ -1592,10 +1857,7 @@ export function CustomersPage() {
                   fullWidth
                   type="submit"
                   isLoading={isWalletLoading}
-                  disabled={
-                    walletAction === "close" &&
-                    Boolean(settlementQuote?.blockers.length)
-                  }
+                  disabled={walletAction === "close" && !canConfirmClose}
                 >
                   {walletAction === "topup"
                     ? t("crm.confirmTopup")

@@ -1,4 +1,5 @@
 import {
+  GuestCard,
   GuestWallet,
   GuestWalletLedgerEntry,
 } from "../../domain/entities/GuestWallet";
@@ -21,6 +22,14 @@ export interface GuestWalletListResponseDTO {
 
 export interface GuestWalletLedgerListResponseDTO {
   entries: GuestWalletLedgerEntry[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface GuestCardListResponseDTO {
+  cards: GuestCard[];
   total: number;
   page: number;
   limit: number;

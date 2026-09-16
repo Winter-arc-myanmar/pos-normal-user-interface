@@ -2,6 +2,7 @@ import { IGuestWalletRepository } from "../../domain/repositories/IGuestWalletRe
 import { IGuestWalletService } from "../../domain/services/IGuestWalletService";
 import {
   BindGuestCardDTO,
+  GuestCardListResponseDTO,
   GuestWalletFilterDTO,
   GuestWalletLedgerListResponseDTO,
   GuestWalletListResponseDTO,
@@ -190,6 +191,17 @@ export class GuestWalletService implements IGuestWalletService {
     this.assertId(id, "Invalid card ID");
     if (!payload.newCardUid?.trim()) throw new Error("New card UID is required");
     return this.guestWalletRepository.replaceCard(id, payload);
+  }
+
+  async listCards(
+    params?: GuestWalletFilterDTO
+  ): Promise<GuestCardListResponseDTO> {
+    return this.guestWalletRepository.listCards(params);
+  }
+
+  async getCard(id: string): Promise<GuestCard> {
+    this.assertId(id, "Invalid card ID");
+    return this.guestWalletRepository.getCard(id);
   }
 
   private assertId(id: string, message: string): void {
