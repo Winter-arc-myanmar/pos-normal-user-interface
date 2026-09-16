@@ -1,16 +1,21 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/Button";
+import { CardCaptureStatus } from "@/components/ui/CardCaptureStatus";
 import { SearchInput } from "@/components/ui/SearchInput";
 import {
   CreateCustomerDTO,
   CreateCustomerInteractionDTO,
 } from "@/core/application/dtos/CustomerDTO";
+import { PaymentMethod } from "@/core/domain/entities/Cashier";
 import { Customer } from "@/core/domain/entities/Customer";
+import { GuestCard, GuestWallet } from "@/core/domain/entities/GuestWallet";
 import { useAuth } from "@/core/presentation/hooks/useAuth";
+import { useCashier } from "@/core/presentation/hooks/useCashier";
 import { useCustomerManagement } from "@/core/presentation/hooks/useCustomerManagement";
-import { useMembershipCardManagement } from "@/core/presentation/hooks/useMembershipCardManagement";
+import { useCardCapture } from "@/core/presentation/hooks/useCardCapture";
+import { useGuestWalletManagement } from "@/core/presentation/hooks/useGuestWalletManagement";
+import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
 import { useDateFormatter } from "@/lib/i18n/formatters";
 
 const PAGE_SIZE = 6;
@@ -36,7 +41,29 @@ const emptyInteractionForm = {
   detailedNotes: "",
 };
 
-type CardAction = "bind" | "unbind" | "close" | null;
+const emptyIssueForm = {
+  guestName: "",
+  guestPhone: "",
+  guestIdNumber: "",
+  tierId: "",
+  cardUid: "",
+  cardLabel: "",
+  roomNumber: "",
+  paymentMethodId: "",
+  paymentAmount: "",
+  paymentReference: "",
+};
+
+type WalletAction =
+  | "topup"
+  | "refund"
+  | "bind"
+  | "unbind"
+  | "close"
+  | "void"
+  | "lost"
+  | "replace"
+  | null;
 
 const keyboardRows = [
   ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
@@ -50,6 +77,11 @@ function initials(name: string): string {
   if (parts.length === 0) return "?";
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+}
+
+function isClosedStatus(status: string): boolean {
+  const value = status.toUpperCase();
+  return value === "CLOSED" || value === "SETTLED" || value === "VOIDED";
 }
 
 function MemberEmptyIllustration() {
@@ -160,11 +192,63 @@ function PosKeyboard({
   );
 }
 
+function Detail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-slate-200 p-3">
+      <dt className="text-xs uppercase tracking-wide text-slate-500">{label}</dt>
+      <dd className="mt-1 text-sm">{value || "—"}</dd>
+    </div>
+  );
+}
+
+function PaymentMethodSelect({
+  label,
+  methods,
+  value,
+  onChange,
+}: {
+  label: string;
+  methods: PaymentMethod[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <select
+      required
+      aria-label={label}
+      className={fieldClass}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+    >
+      <option value="">{label}</option>
+      {methods.map((method) => (
+        <option key={method.id} value={method.id}>
+          {method.name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function pickWalletForCustomer(
+  wallets: GuestWallet[],
+  phone: string
+): GuestWallet | undefined {
+  const active = wallets.filter((wallet) => !isClosedStatus(wallet.status));
+  return (
+    active.find((wallet) => wallet.guestPhone === phone) ||
+    wallets.find((wallet) => wallet.guestPhone === phone) ||
+    active[0] ||
+    wallets[0]
+  );
+}
+
 export function CustomersPage() {
   const { t } = useTranslation();
   const { formatDateTime } = useDateFormatter();
-  const navigate = useNavigate();
   const { user } = useAuth();
+  const { requireCashierContext } = usePosWorkspace();
+  const { paymentMethods, fetchPaymentMethods } = useCashier();
   const {
     customers,
     page,
@@ -184,15 +268,30 @@ export function CustomersPage() {
     clearCurrentCustomer,
   } = useCustomerManagement();
   const {
-    membershipCard,
-    isLoading: isCardLoading,
-    error: cardError,
-    loadMembershipCard,
-    bindMembershipCard,
-    unbindMembershipCard,
-    closeMembershipCard,
-    clearMembershipCard,
-  } = useMembershipCardManagement();
+    currentWallet,
+    cards,
+    ledger,
+    settlementQuote,
+    audit,
+    isLoading: isWalletLoading,
+    error: walletError,
+    listWallets,
+    loadWalletDetails,
+    issueWallet,
+    topUpWallet,
+    refundWallet,
+    bindCard,
+    unbindCard,
+    reportCardLost,
+    replaceCard,
+    getSettlementQuote,
+    cancelSettlement,
+    settleWallet,
+    voidWallet,
+    auditWallet,
+    lookupCard,
+    clearCurrentWallet,
+  } = useGuestWalletManagement();
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -201,14 +300,46 @@ export function CustomersPage() {
   const [editing, setEditing] = useState<Customer | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [interactionForm, setInteractionForm] = useState(emptyInteractionForm);
+  const [issueForm, setIssueForm] = useState(emptyIssueForm);
+  const [isIssueFormOpen, setIsIssueFormOpen] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [cardAction, setCardAction] = useState<CardAction>(null);
-  const [cardNumber, setCardNumber] = useState("");
-  const [cardReason, setCardReason] = useState("");
+  const [walletAction, setWalletAction] = useState<WalletAction>(null);
+  const [amount, setAmount] = useState("");
+  const [reference, setReference] = useState("");
+  const [notes, setNotes] = useState("");
+  const [paymentMethodId, setPaymentMethodId] = useState("");
+  const [collectPaymentMethodId, setCollectPaymentMethodId] = useState("");
+  const [approverToken, setApproverToken] = useState("");
+  const [cardUid, setCardUid] = useState("");
+  const [cardLabel, setCardLabel] = useState("");
+  const [roomNumber, setRoomNumber] = useState("");
+  const [selectedCardId, setSelectedCardId] = useState("");
+  const [newCardUid, setNewCardUid] = useState("");
+  const captureModeRef = useRef<
+    "lookup" | "issue" | "bind" | "replace" | "ignore"
+  >("lookup");
 
   const tenantId = String(user?.tenantId || "");
   const agentId = String(user?.id || "");
+  const selectedCustomer = currentCustomer;
+  const selectedWallet = currentWallet;
+  const defaultPaymentMethodId = paymentMethods[0]?.id || "";
+  const activeCards = useMemo(
+    () => cards.filter((card) => card.status.toUpperCase() === "ACTIVE"),
+    [cards]
+  );
+  const walletClosed = selectedWallet ? isClosedStatus(selectedWallet.status) : true;
+  const creditLabel = useMemo(() => {
+    if (!selectedCustomer) return "";
+    return selectedCustomer.hasCreditAccount
+      ? t("crm.creditOn")
+      : t("crm.creditOff");
+  }, [selectedCustomer, t]);
+
+  useEffect(() => {
+    void fetchPaymentMethods().catch(() => undefined);
+  }, [fetchPaymentMethods]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -228,14 +359,55 @@ export function CustomersPage() {
     }).catch(() => undefined);
   }, [currentPage, debouncedSearch, getCustomers]);
 
-  const selectedCustomer = currentCustomer;
+  useEffect(() => {
+    if (
+      isFormOpen ||
+      (walletAction && walletAction !== "bind" && walletAction !== "replace")
+    ) {
+      captureModeRef.current = "ignore";
+      return;
+    }
+    if (isIssueFormOpen) {
+      captureModeRef.current = "issue";
+      return;
+    }
+    if (walletAction === "bind") {
+      captureModeRef.current = "bind";
+      return;
+    }
+    if (walletAction === "replace") {
+      captureModeRef.current = "replace";
+      return;
+    }
+    captureModeRef.current = "lookup";
+  }, [isFormOpen, isIssueFormOpen, walletAction]);
 
-  const creditLabel = useMemo(() => {
-    if (!selectedCustomer) return "";
-    return selectedCustomer.hasCreditAccount
-      ? t("crm.creditOn")
-      : t("crm.creditOff");
-  }, [selectedCustomer, t]);
+  const refreshCustomers = async () => {
+    await getCustomers({
+      page: currentPage,
+      limit: PAGE_SIZE,
+      search: debouncedSearch || undefined,
+      sortBy: "createdAt",
+      sortOrder: "desc",
+    });
+  };
+
+  const loadWalletForCustomer = async (customer: Customer) => {
+    clearCurrentWallet();
+    const phone = customer.phone?.trim();
+    if (!phone) return;
+    const result = await listWallets({
+      page: 1,
+      limit: 20,
+      search: phone,
+      sortBy: "createdAt",
+      sortOrder: "desc",
+    });
+    const match = pickWalletForCustomer(result.wallets, phone);
+    if (match) {
+      await loadWalletDetails(match.id);
+    }
+  };
 
   const openCreateForm = () => {
     setEditing(null);
@@ -263,6 +435,7 @@ export function CustomersPage() {
   const handleSelect = async (customer: Customer) => {
     setLocalError(null);
     setNotice(null);
+    resetActionForm();
     try {
       await getCustomerById(customer.id);
       await getInteractionsForCustomer(customer.id, {
@@ -271,13 +444,77 @@ export function CustomersPage() {
         sortBy: "createdAt",
         sortOrder: "desc",
       });
-      await loadMembershipCard(customer.id);
+      await loadWalletForCustomer(customer);
     } catch (caught) {
       setLocalError(
         caught instanceof Error ? caught.message : t("crm.loadFailed")
       );
     }
   };
+
+  const handleCardRead = async (uid: string) => {
+    const mode = captureModeRef.current;
+    if (mode === "ignore") return;
+    if (mode === "issue") {
+      setIssueForm((current) => ({ ...current, cardUid: uid }));
+      setNotice(t("crm.cardCaptured", { uid }));
+      return;
+    }
+    if (mode === "bind") {
+      setCardUid(uid);
+      setNotice(t("crm.cardCaptured", { uid }));
+      return;
+    }
+    if (mode === "replace") {
+      setNewCardUid(uid);
+      setNotice(t("crm.cardCaptured", { uid }));
+      return;
+    }
+
+    setLocalError(null);
+    try {
+      const card = await lookupCard(uid);
+      if (card.walletId) {
+        await loadWalletDetails(card.walletId);
+      }
+      const phone = card.wallet?.guestPhone?.trim();
+      if (!phone) {
+        setNotice(t("crm.cardCaptured", { uid }));
+        return;
+      }
+      setCurrentPage(1);
+      setSearch(phone);
+      setDebouncedSearch(phone);
+      const result = await getCustomers({
+        page: 1,
+        limit: PAGE_SIZE,
+        search: phone,
+        sortBy: "createdAt",
+        sortOrder: "desc",
+      });
+      const match =
+        result.customers.find((customer) => customer.phone === phone) ||
+        result.customers[0];
+      if (match) {
+        await getCustomerById(match.id);
+        await getInteractionsForCustomer(match.id, {
+          page: 1,
+          limit: 20,
+          sortBy: "createdAt",
+          sortOrder: "desc",
+        });
+      }
+      setNotice(t("crm.cardCaptured", { uid }));
+    } catch {
+      setLocalError(t("crm.unknownCard"));
+    }
+  };
+
+  const { nfcSupported, nfcActive, nfcError, lastUid, startNfc } = useCardCapture({
+    onRead: (uid) => {
+      void handleCardRead(uid);
+    },
+  });
 
   const handleSubmitCustomer = async (event: FormEvent) => {
     event.preventDefault();
@@ -302,13 +539,7 @@ export function CustomersPage() {
         : await createCustomer(payload);
       setIsFormOpen(false);
       setNotice(editing ? t("crm.updated") : t("crm.created"));
-      await getCustomers({
-        page: currentPage,
-        limit: PAGE_SIZE,
-        search: debouncedSearch || undefined,
-        sortBy: "createdAt",
-        sortOrder: "desc",
-      });
+      await refreshCustomers();
       await handleSelect(saved);
     } catch (caught) {
       setLocalError(
@@ -323,15 +554,9 @@ export function CustomersPage() {
     try {
       await deleteCustomer(selectedCustomer.id);
       clearCurrentCustomer();
-      clearMembershipCard();
+      clearCurrentWallet();
       setNotice(t("crm.deleted"));
-      await getCustomers({
-        page: currentPage,
-        limit: PAGE_SIZE,
-        search: debouncedSearch || undefined,
-        sortBy: "createdAt",
-        sortOrder: "desc",
-      });
+      await refreshCustomers();
     } catch (caught) {
       setLocalError(
         caught instanceof Error ? caught.message : t("crm.deleteFailed")
@@ -362,45 +587,191 @@ export function CustomersPage() {
     }
   };
 
-  const typeSearch = (value: string) => {
-    setSearch((current) => current + value);
+  const resetActionForm = () => {
+    setWalletAction(null);
+    setAmount("");
+    setReference("");
+    setNotes("");
+    setPaymentMethodId("");
+    setCollectPaymentMethodId("");
+    setApproverToken("");
+    setCardUid("");
+    setCardLabel("");
+    setRoomNumber("");
+    setSelectedCardId("");
+    setNewCardUid("");
   };
 
-  const resetCardForm = () => {
-    setCardAction(null);
-    setCardNumber("");
-    setCardReason("");
-  };
-
-  const openCardAction = (action: CardAction) => {
-    setCardAction(action);
-    setCardNumber(membershipCard?.cardNumber || "");
-    setCardReason("");
+  const openIssueForm = () => {
+    if (!selectedCustomer) return;
+    setIssueForm({
+      ...emptyIssueForm,
+      guestName: selectedCustomer.name,
+      guestPhone: selectedCustomer.phone || "",
+      cardLabel: selectedCustomer.name,
+      paymentMethodId: defaultPaymentMethodId,
+    });
+    setIsIssueFormOpen(true);
     setLocalError(null);
   };
 
-  const handleCardAction = async (event: FormEvent) => {
+  const openAction = async (action: WalletAction, card?: GuestCard) => {
+    if (!selectedWallet || !action) return;
+    setLocalError(null);
+    setWalletAction(action);
+    setAmount("");
+    setReference("");
+    setNotes("");
+    setApproverToken("");
+    setPaymentMethodId(defaultPaymentMethodId);
+    setCollectPaymentMethodId(defaultPaymentMethodId);
+    setCardUid("");
+    setCardLabel(card?.label || selectedWallet.guestName);
+    setRoomNumber(card?.roomNumber || "");
+    setSelectedCardId(card?.id || activeCards[0]?.id || "");
+    setNewCardUid("");
+    if (action === "close") {
+      try {
+        await getSettlementQuote(selectedWallet.id);
+      } catch (caught) {
+        setLocalError(
+          caught instanceof Error ? caught.message : t("crm.cardActionFailed")
+        );
+      }
+    }
+  };
+
+  const requireWorkspace = async () => {
+    try {
+      return await requireCashierContext();
+    } catch (caught) {
+      throw new Error(
+        caught instanceof Error ? caught.message : t("crm.workspaceRequired")
+      );
+    }
+  };
+
+  const handleIssueWallet = async (event: FormEvent) => {
     event.preventDefault();
-    if (!selectedCustomer || !cardAction) return;
     setLocalError(null);
     try {
-      if (cardAction === "bind") {
-        await bindMembershipCard(selectedCustomer.id, {
-          tenantId,
-          cardNumber: cardNumber.trim(),
+      const context = await requireWorkspace();
+      const wallet = await issueWallet({
+        tierId: issueForm.tierId.trim(),
+        guestName: issueForm.guestName.trim(),
+        guestPhone: issueForm.guestPhone.trim(),
+        guestIdNumber: issueForm.guestIdNumber.trim() || undefined,
+        locationId: context.locationId,
+        posSessionId: context.posSessionId,
+        cards: [
+          {
+            cardUid: issueForm.cardUid.trim(),
+            label: issueForm.cardLabel.trim() || undefined,
+            roomNumber: issueForm.roomNumber.trim() || undefined,
+          },
+        ],
+        payment: {
+          paymentMethodId: issueForm.paymentMethodId,
+          amount: issueForm.paymentAmount.trim(),
+          reference: issueForm.paymentReference.trim() || undefined,
+        },
+      });
+      setIsIssueFormOpen(false);
+      setNotice(t("crm.walletIssued"));
+      await loadWalletDetails(wallet.id);
+    } catch (caught) {
+      setLocalError(
+        caught instanceof Error ? caught.message : t("crm.saveFailed")
+      );
+    }
+  };
+
+  const handleWalletAction = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!selectedWallet || !walletAction) return;
+    setLocalError(null);
+    try {
+      if (walletAction === "topup") {
+        const context = await requireWorkspace();
+        await topUpWallet(selectedWallet.id, {
+          amount: amount.trim(),
+          paymentMethodId,
+          posSessionId: context.posSessionId,
+          locationId: context.locationId,
+          reference: reference.trim() || undefined,
+          guestCardId: selectedCardId || undefined,
+          notes: notes.trim() || undefined,
+        });
+        setNotice(t("crm.topupSuccess"));
+      } else if (walletAction === "refund") {
+        const context = await requireWorkspace();
+        await refundWallet(selectedWallet.id, {
+          amount: amount.trim(),
+          paymentMethodId,
+          posSessionId: context.posSessionId,
+          locationId: context.locationId,
+          reference: reference.trim() || undefined,
+          notes: notes.trim() || undefined,
+          approverAuthorization: approverToken.trim(),
+        });
+        setNotice(t("crm.refundSuccess"));
+      } else if (walletAction === "bind") {
+        await bindCard({
+          walletId: selectedWallet.id,
+          cardUid: cardUid.trim(),
+          label: cardLabel.trim() || undefined,
+          roomNumber: roomNumber.trim() || undefined,
         });
         setNotice(t("crm.bindSuccess"));
-      } else if (cardAction === "unbind") {
-        await unbindMembershipCard(selectedCustomer.id, { tenantId });
+      } else if (walletAction === "unbind") {
+        if (!selectedCardId) throw new Error(t("crm.noCards"));
+        await unbindCard(selectedCardId);
         setNotice(t("crm.unbindSuccess"));
-      } else if (cardAction === "close") {
-        await closeMembershipCard(selectedCustomer.id, {
-          tenantId,
-          reason: cardReason.trim() || undefined,
+      } else if (walletAction === "lost") {
+        if (!selectedCardId) throw new Error(t("crm.noCards"));
+        await reportCardLost(selectedCardId);
+        setNotice(t("crm.lostSuccess"));
+      } else if (walletAction === "replace") {
+        if (!selectedCardId) throw new Error(t("crm.noCards"));
+        await replaceCard(selectedCardId, {
+          newCardUid: newCardUid.trim(),
+          label: cardLabel.trim() || undefined,
+          roomNumber: roomNumber.trim() || undefined,
+        });
+        setNotice(t("crm.replaceSuccess"));
+      } else if (walletAction === "void") {
+        await voidWallet(selectedWallet.id, {
+          approverAuthorization: approverToken.trim(),
+        });
+        setNotice(t("crm.voidSuccess"));
+      } else if (walletAction === "close") {
+        const context = await requireWorkspace();
+        const refundable = Number(settlementQuote?.refundable || 0);
+        const collectable = Number(settlementQuote?.collectable || 0);
+        await settleWallet(selectedWallet.id, {
+          posSessionId: context.posSessionId,
+          locationId: context.locationId,
+          refund:
+            refundable > 0
+              ? {
+                  paymentMethodId,
+                  reference: reference.trim() || undefined,
+                }
+              : undefined,
+          collect:
+            collectable > 0
+              ? {
+                  paymentMethodId: collectPaymentMethodId || paymentMethodId,
+                  reference: reference.trim() || undefined,
+                  amount: settlementQuote?.collectable || amount.trim(),
+                }
+              : undefined,
+          notes: notes.trim() || undefined,
+          approverAuthorization: approverToken.trim(),
         });
         setNotice(t("crm.closeCardSuccess"));
       }
-      resetCardForm();
+      resetActionForm();
     } catch (caught) {
       setLocalError(
         caught instanceof Error ? caught.message : t("crm.cardActionFailed")
@@ -408,44 +779,54 @@ export function CustomersPage() {
     }
   };
 
-  const cardIsClosed = membershipCard?.status === "CLOSED";
-  const cardIsBound =
-    membershipCard?.status === "BOUND" || membershipCard?.status === "ACTIVE";
-
-  const openCardTopup = () => {
-    if (!selectedCustomer || !membershipCard?.cardNumber) return;
-    navigate("/cards", {
-      state: {
-        cardNumber: membershipCard.cardNumber,
-        balance: membershipCard.balance,
-        customerId: selectedCustomer.id,
-        customerName: selectedCustomer.name,
-        customerPhone: selectedCustomer.phone,
-        tenantId,
-      },
-    });
+  const handleAudit = async () => {
+    if (!selectedWallet) return;
+    setLocalError(null);
+    try {
+      await auditWallet(selectedWallet.id);
+    } catch (caught) {
+      setLocalError(
+        caught instanceof Error ? caught.message : t("crm.cardActionFailed")
+      );
+    }
   };
 
-  const openCardRefund = () => {
-    if (!selectedCustomer || !membershipCard?.cardNumber) return;
-    navigate("/cards/refund", {
-      state: {
-        cardNumber: membershipCard.cardNumber,
-        balance: membershipCard.balance,
-        customerId: selectedCustomer.id,
-        customerName: selectedCustomer.name,
-        customerPhone: selectedCustomer.phone,
-        tenantId,
-      },
-    });
+  const handleCancelSettlement = async () => {
+    if (!selectedWallet) return;
+    setLocalError(null);
+    try {
+      await cancelSettlement(selectedWallet.id);
+      setNotice(t("crm.cancelSettlement"));
+    } catch (caught) {
+      setLocalError(
+        caught instanceof Error ? caught.message : t("crm.cardActionFailed")
+      );
+    }
   };
+
+  const actionTitle =
+    walletAction === "topup"
+      ? t("crm.topupTitle")
+      : walletAction === "refund"
+        ? t("crm.refundTitle")
+        : walletAction === "bind"
+          ? t("crm.bindTitle")
+          : walletAction === "unbind"
+            ? t("crm.unbindCard")
+            : walletAction === "lost"
+              ? t("crm.reportLost")
+              : walletAction === "replace"
+                ? t("crm.replaceCard")
+                : walletAction === "void"
+                  ? t("crm.voidWallet")
+                  : t("crm.closeCardTitle");
 
   return (
     <section className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)] overflow-hidden bg-slate-100">
       <aside className="flex min-h-0 flex-col bg-white">
-        {(error || localError || cardError) && (
+        {(error || localError || walletError) && (
           <p className="m-4 rounded bg-red-50 p-3 text-sm text-red-700">
-            {localError || cardError || error}
+            {localError || walletError || error}
           </p>
         )}
         {notice ? (
@@ -474,136 +855,266 @@ export function CustomersPage() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button size="sm" variant="secondary" onClick={() => openEditForm(selectedCustomer)}>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => openEditForm(selectedCustomer)}
+                >
                   {t("crm.edit")}
                 </Button>
-                <Button size="sm" variant="destructive" onClick={() => void handleDelete()}>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => void handleDelete()}
+                >
                   {t("common.delete")}
                 </Button>
               </div>
             </div>
 
             <dl className="mt-6 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-lg border border-slate-200 p-3">
-                <dt className="text-xs uppercase tracking-wide text-slate-500">
-                  {t("crm.email")}
-                </dt>
-                <dd className="mt-1 text-sm">{selectedCustomer.email || "—"}</dd>
-              </div>
-              <div className="rounded-lg border border-slate-200 p-3">
-                <dt className="text-xs uppercase tracking-wide text-slate-500">
-                  {t("crm.accountType")}
-                </dt>
-                <dd className="mt-1 text-sm">{selectedCustomer.accountType}</dd>
-              </div>
-              <div className="rounded-lg border border-slate-200 p-3">
-                <dt className="text-xs uppercase tracking-wide text-slate-500">
-                  {t("crm.loyaltyTier")}
-                </dt>
-                <dd className="mt-1 text-sm">{selectedCustomer.loyaltyTier}</dd>
-              </div>
-              <div className="rounded-lg border border-slate-200 p-3">
-                <dt className="text-xs uppercase tracking-wide text-slate-500">
-                  {t("crm.points")}
-                </dt>
-                <dd className="mt-1 text-sm">
-                  {selectedCustomer.lifetimePointsEarned}
-                </dd>
-              </div>
-              <div className="rounded-lg border border-slate-200 p-3">
-                <dt className="text-xs uppercase tracking-wide text-slate-500">
-                  {t("crm.credit")}
-                </dt>
-                <dd className="mt-1 text-sm">
-                  {creditLabel} · {selectedCustomer.currentCreditBalance} /{" "}
-                  {selectedCustomer.maxCreditLimit}
-                </dd>
-              </div>
-              <div className="rounded-lg border border-slate-200 p-3">
-                <dt className="text-xs uppercase tracking-wide text-slate-500">
-                  {t("crm.terms")}
-                </dt>
-                <dd className="mt-1 text-sm">
-                  {t("crm.termsDays", { days: selectedCustomer.paymentTermsDays })}
-                </dd>
-              </div>
+              <Detail label={t("crm.email")} value={selectedCustomer.email || ""} />
+              <Detail label={t("crm.accountType")} value={selectedCustomer.accountType} />
+              <Detail label={t("crm.loyaltyTier")} value={selectedCustomer.loyaltyTier} />
+              <Detail
+                label={t("crm.points")}
+                value={String(selectedCustomer.lifetimePointsEarned)}
+              />
+              <Detail
+                label={t("crm.credit")}
+                value={`${creditLabel} · ${selectedCustomer.currentCreditBalance} / ${selectedCustomer.maxCreditLimit}`}
+              />
+              <Detail
+                label={t("crm.terms")}
+                value={t("crm.termsDays", { days: selectedCustomer.paymentTermsDays })}
+              />
             </dl>
 
             <section className="mt-8 rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-                {t("crm.membershipCard")}
-              </h3>
-              {membershipCard ? (
-                <dl className="mt-3 grid gap-3 sm:grid-cols-3">
-                  <div>
-                    <dt className="text-xs uppercase tracking-wide text-slate-500">
-                      {t("crm.cardNumber")}
-                    </dt>
-                    <dd className="mt-1 text-sm font-medium">
-                      {membershipCard.cardNumber || "—"}
-                    </dd>
+              <div className="flex items-start justify-between gap-3">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                  {t("crm.membershipCard")}
+                </h3>
+                {selectedWallet ? (
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => void handleAudit()}
+                    >
+                      {t("crm.audit")}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={selectedWallet.status.toUpperCase() === "ACTIVE"}
+                      onClick={() => void handleCancelSettlement()}
+                    >
+                      {t("crm.cancelSettlement")}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      disabled={walletClosed}
+                      onClick={() => void openAction("void")}
+                    >
+                      {t("crm.voidWallet")}
+                    </Button>
                   </div>
-                  <div>
-                    <dt className="text-xs uppercase tracking-wide text-slate-500">
-                      {t("crm.cardBalance")}
-                    </dt>
-                    <dd className="mt-1 text-sm font-medium">
-                      {membershipCard.balance}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs uppercase tracking-wide text-slate-500">
-                      {t("crm.cardStatus")}
-                    </dt>
-                    <dd className="mt-1 text-sm font-medium">
-                      {membershipCard.status}
-                    </dd>
-                  </div>
-                </dl>
-              ) : (
-                <p className="mt-3 text-sm text-slate-500">{t("crm.noCard")}</p>
-              )}
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  disabled={!cardIsBound || cardIsClosed || isCardLoading}
-                  onClick={openCardTopup}
-                >
-                  {t("crm.topup")}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={!cardIsBound || cardIsClosed || isCardLoading}
-                  onClick={openCardRefund}
-                >
-                  {t("crm.refund")}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={cardIsBound || cardIsClosed || isCardLoading}
-                  onClick={() => openCardAction("bind")}
-                >
-                  {t("crm.bindCard")}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={!cardIsBound || cardIsClosed || isCardLoading}
-                  onClick={() => openCardAction("unbind")}
-                >
-                  {t("crm.unbindCard")}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  disabled={!membershipCard || cardIsClosed || isCardLoading}
-                  onClick={() => openCardAction("close")}
-                >
-                  {t("crm.closeCard")}
-                </Button>
+                ) : null}
               </div>
+
+              {selectedWallet ? (
+                <>
+                  <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <Detail
+                      label={t("crm.walletNumber")}
+                      value={selectedWallet.walletNumber}
+                    />
+                    <Detail
+                      label={t("crm.guestIdNumber")}
+                      value={selectedWallet.guestIdNumber || ""}
+                    />
+                    <Detail
+                      label={t("crm.tier")}
+                      value={selectedWallet.tierNameSnapshot}
+                    />
+                    <Detail
+                      label={t("crm.discount")}
+                      value={t("crm.discountBps", {
+                        bps: selectedWallet.discountBpsSnapshot,
+                      })}
+                    />
+                    <Detail
+                      label={t("crm.accountType")}
+                      value={
+                        selectedWallet.isPostpaidSnapshot
+                          ? t("crm.postpaid")
+                          : t("crm.prepaid")
+                      }
+                    />
+                    <Detail
+                      label={t("crm.cardBalance")}
+                      value={String(selectedWallet.balance)}
+                    />
+                    <Detail
+                      label={t("crm.purchasedBalance")}
+                      value={String(selectedWallet.purchasedBalance)}
+                    />
+                    <Detail
+                      label={t("crm.grantedBalance")}
+                      value={String(selectedWallet.grantedBalance)}
+                    />
+                    <Detail
+                      label={t("crm.cardStatus")}
+                      value={selectedWallet.status}
+                    />
+                    <Detail
+                      label={t("crm.openedAt")}
+                      value={
+                        selectedWallet.openedAt
+                          ? formatDateTime(selectedWallet.openedAt)
+                          : ""
+                      }
+                    />
+                  </dl>
+
+                  {audit ? (
+                    <p className="mt-3 rounded bg-white p-3 text-sm text-slate-700">
+                      {t("crm.auditResult", {
+                        stored: audit.storedBalance || "—",
+                        replayed: audit.replayedBalance || "—",
+                        drift: audit.drifted ? t("crm.auditDrift") : "",
+                      })}
+                    </p>
+                  ) : null}
+
+                  {cards.length === 0 ? (
+                    <p className="mt-3 text-sm text-slate-500">{t("crm.noCards")}</p>
+                  ) : (
+                    <ul className="mt-3 space-y-2">
+                      {cards.map((card) => (
+                        <li
+                          key={card.id}
+                          className="rounded-lg border border-slate-200 bg-white p-3"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <p className="text-sm font-semibold">{card.cardUid}</p>
+                              <p className="text-xs text-slate-500">
+                                {card.label || "—"} · {card.roomNumber || "—"} ·{" "}
+                                {card.status}
+                              </p>
+                            </div>
+                            {card.status.toUpperCase() === "ACTIVE" ? (
+                              <div className="flex flex-wrap gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => void openAction("lost", card)}
+                                >
+                                  {t("crm.reportLost")}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => void openAction("replace", card)}
+                                >
+                                  {t("crm.replaceCard")}
+                                </Button>
+                              </div>
+                            ) : null}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      disabled={walletClosed || isWalletLoading}
+                      onClick={() => void openAction("topup")}
+                    >
+                      {t("crm.topup")}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={walletClosed || isWalletLoading}
+                      onClick={() => void openAction("refund")}
+                    >
+                      {t("crm.refund")}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={walletClosed || isWalletLoading}
+                      onClick={() => void openAction("bind")}
+                    >
+                      {t("crm.bindCard")}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={
+                        walletClosed || activeCards.length === 0 || isWalletLoading
+                      }
+                      onClick={() => void openAction("unbind")}
+                    >
+                      {t("crm.unbindCard")}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      disabled={walletClosed || isWalletLoading}
+                      onClick={() => void openAction("close")}
+                    >
+                      {t("crm.closeCard")}
+                    </Button>
+                  </div>
+
+                  <h4 className="mt-6 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {t("crm.ledger")}
+                  </h4>
+                  <ul className="mt-3 space-y-2">
+                    {ledger.length === 0 ? (
+                      <li className="text-sm text-slate-500">{t("crm.noLedger")}</li>
+                    ) : (
+                      ledger.map((entry) => (
+                        <li
+                          key={entry.id}
+                          className="rounded-lg border border-slate-200 bg-white p-3"
+                        >
+                          <p className="text-sm font-semibold text-slate-900">
+                            {entry.entryType} · {entry.amount}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {t("crm.cardBalance")} {entry.balanceAfter}
+                            {entry.reference ? ` · ${entry.reference}` : ""}
+                            {entry.businessDate ? ` · ${entry.businessDate}` : ""}
+                            {entry.createdAt
+                              ? ` · ${formatDateTime(entry.createdAt)}`
+                              : ""}
+                          </p>
+                          {entry.notes ? (
+                            <p className="mt-2 text-sm text-slate-600">{entry.notes}</p>
+                          ) : null}
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                </>
+              ) : (
+                <>
+                  <p className="mt-3 text-sm text-slate-500">{t("crm.noWallet")}</p>
+                  <div className="mt-4">
+                    <Button size="sm" onClick={openIssueForm}>
+                      {t("crm.issueWallet")}
+                    </Button>
+                  </div>
+                </>
+              )}
             </section>
 
             <section className="mt-8">
@@ -740,6 +1251,15 @@ export function CustomersPage() {
             +
           </Button>
         </div>
+        <div className="mt-2">
+          <CardCaptureStatus
+            nfcSupported={nfcSupported}
+            nfcActive={nfcActive}
+            nfcError={nfcError}
+            lastUid={lastUid}
+            onEnableNfc={() => void startNfc()}
+          />
+        </div>
 
         <div className="mt-4 grid min-h-0 flex-1 grid-cols-2 content-start gap-2 overflow-y-auto">
           {customers.length === 0 ? (
@@ -818,66 +1338,449 @@ export function CustomersPage() {
         </div>
 
         <PosKeyboard
-          onInput={typeSearch}
+          onInput={(value) => setSearch((current) => current + value)}
           onBackspace={() => setSearch((current) => current.slice(0, -1))}
           onEnter={() => setDebouncedSearch(search.trim())}
         />
       </main>
 
-      {cardAction ? (
+      {walletAction ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
           <form
-            onSubmit={handleCardAction}
+            onSubmit={handleWalletAction}
             className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-xl"
           >
-            <h2 className="text-lg font-bold text-slate-900">
-              {cardAction === "bind"
-                ? t("crm.bindTitle")
-                : cardAction === "unbind"
-                  ? t("crm.unbindCard")
-                  : t("crm.closeCardTitle")}
-            </h2>
+            <h2 className="text-lg font-bold text-slate-900">{actionTitle}</h2>
             <div className="mt-4 space-y-3">
-              {cardAction === "bind" ? (
-                <input
-                  required
-                  aria-label={t("crm.cardNumber")}
-                  placeholder={t("crm.cardNumber")}
-                  className={fieldClass}
-                  value={cardNumber}
-                  onChange={(event) => setCardNumber(event.target.value)}
-                />
-              ) : null}
-              {cardAction === "close" ? (
+              {walletAction === "topup" || walletAction === "refund" ? (
                 <>
-                  <p className="text-sm text-slate-600">
-                    {t("crm.closeCardConfirm")}
-                  </p>
                   <input
-                    aria-label={t("crm.reason")}
-                    placeholder={t("crm.reason")}
+                    required
+                    inputMode="decimal"
+                    aria-label={t("crm.amount")}
+                    placeholder={t("crm.amount")}
                     className={fieldClass}
-                    value={cardReason}
-                    onChange={(event) => setCardReason(event.target.value)}
+                    value={amount}
+                    onChange={(event) => setAmount(event.target.value)}
+                  />
+                  <PaymentMethodSelect
+                    label={t("crm.paymentMethod")}
+                    methods={paymentMethods}
+                    value={paymentMethodId}
+                    onChange={setPaymentMethodId}
+                  />
+                  {walletAction === "topup" && activeCards.length > 0 ? (
+                    <select
+                      aria-label={t("crm.cardUid")}
+                      className={fieldClass}
+                      value={selectedCardId}
+                      onChange={(event) => setSelectedCardId(event.target.value)}
+                    >
+                      <option value="">{t("crm.cardUid")}</option>
+                      {activeCards.map((card) => (
+                        <option key={card.id} value={card.id}>
+                          {card.cardUid}
+                        </option>
+                      ))}
+                    </select>
+                  ) : null}
+                  <input
+                    aria-label={t("crm.reference")}
+                    placeholder={t("crm.reference")}
+                    className={fieldClass}
+                    value={reference}
+                    onChange={(event) => setReference(event.target.value)}
+                  />
+                  <input
+                    aria-label={t("crm.notes")}
+                    placeholder={t("crm.notes")}
+                    className={fieldClass}
+                    value={notes}
+                    onChange={(event) => setNotes(event.target.value)}
                   />
                 </>
               ) : null}
-              {cardAction === "unbind" ? (
-                <p className="text-sm text-slate-600">{t("crm.unbindConfirm")}</p>
+
+              {walletAction === "refund" ||
+              walletAction === "close" ||
+              walletAction === "void" ? (
+                <>
+                  <input
+                    required
+                    aria-label={t("crm.approverToken")}
+                    placeholder={t("crm.approverToken")}
+                    className={fieldClass}
+                    value={approverToken}
+                    onChange={(event) => setApproverToken(event.target.value)}
+                  />
+                  <p className="text-xs text-slate-500">{t("crm.approverHint")}</p>
+                </>
               ) : null}
+
+              {walletAction === "bind" ? (
+                <>
+                  <input
+                    required
+                    aria-label={t("crm.cardUid")}
+                    placeholder={t("crm.cardUid")}
+                    className={fieldClass}
+                    value={cardUid}
+                    onChange={(event) => setCardUid(event.target.value)}
+                  />
+                  <CardCaptureStatus
+                    variant="light"
+                    nfcSupported={nfcSupported}
+                    nfcActive={nfcActive}
+                    nfcError={nfcError}
+                    lastUid={lastUid}
+                    onEnableNfc={() => void startNfc()}
+                  />
+                  <input
+                    aria-label={t("crm.cardLabel")}
+                    placeholder={t("crm.cardLabel")}
+                    className={fieldClass}
+                    value={cardLabel}
+                    onChange={(event) => setCardLabel(event.target.value)}
+                  />
+                  <input
+                    aria-label={t("crm.roomNumber")}
+                    placeholder={t("crm.roomNumber")}
+                    className={fieldClass}
+                    value={roomNumber}
+                    onChange={(event) => setRoomNumber(event.target.value)}
+                  />
+                </>
+              ) : null}
+
+              {walletAction === "unbind" || walletAction === "lost" ? (
+                <>
+                  <p className="text-sm text-slate-600">
+                    {walletAction === "unbind"
+                      ? t("crm.unbindConfirm")
+                      : t("crm.reportLost")}
+                  </p>
+                  <select
+                    required
+                    aria-label={t("crm.cardUid")}
+                    className={fieldClass}
+                    value={selectedCardId}
+                    onChange={(event) => setSelectedCardId(event.target.value)}
+                  >
+                    {activeCards.map((card) => (
+                      <option key={card.id} value={card.id}>
+                        {card.cardUid}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              ) : null}
+
+              {walletAction === "replace" ? (
+                <>
+                  <select
+                    required
+                    aria-label={t("crm.cardUid")}
+                    className={fieldClass}
+                    value={selectedCardId}
+                    onChange={(event) => setSelectedCardId(event.target.value)}
+                  >
+                    {cards.map((card) => (
+                      <option key={card.id} value={card.id}>
+                        {card.cardUid}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    required
+                    aria-label={t("crm.newCardUid")}
+                    placeholder={t("crm.newCardUid")}
+                    className={fieldClass}
+                    value={newCardUid}
+                    onChange={(event) => setNewCardUid(event.target.value)}
+                  />
+                  <CardCaptureStatus
+                    variant="light"
+                    nfcSupported={nfcSupported}
+                    nfcActive={nfcActive}
+                    nfcError={nfcError}
+                    lastUid={lastUid}
+                    onEnableNfc={() => void startNfc()}
+                  />
+                  <input
+                    aria-label={t("crm.cardLabel")}
+                    placeholder={t("crm.cardLabel")}
+                    className={fieldClass}
+                    value={cardLabel}
+                    onChange={(event) => setCardLabel(event.target.value)}
+                  />
+                  <input
+                    aria-label={t("crm.roomNumber")}
+                    placeholder={t("crm.roomNumber")}
+                    className={fieldClass}
+                    value={roomNumber}
+                    onChange={(event) => setRoomNumber(event.target.value)}
+                  />
+                </>
+              ) : null}
+
+              {walletAction === "void" ? (
+                <p className="text-sm text-slate-600">{t("crm.voidConfirm")}</p>
+              ) : null}
+
+              {walletAction === "close" ? (
+                <>
+                  <p className="text-sm text-slate-600">{t("crm.closeCardConfirm")}</p>
+                  {settlementQuote ? (
+                    <div className="space-y-1 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
+                      <p>
+                        {t("crm.settlementAction")}: {settlementQuote.action}
+                      </p>
+                      <p>
+                        {t("crm.refundable")}: {settlementQuote.refundable}
+                      </p>
+                      <p>
+                        {t("crm.forfeitable")}: {settlementQuote.forfeitable}
+                      </p>
+                      <p>
+                        {t("crm.collectable")}: {settlementQuote.collectable}
+                      </p>
+                      {settlementQuote.blockers.length > 0 ? (
+                        <p>
+                          {t("crm.blockers")}:{" "}
+                          {settlementQuote.blockers
+                            .map((blocker) => blocker.label || blocker.type)
+                            .join(", ")}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {Number(settlementQuote?.refundable || 0) > 0 ? (
+                    <PaymentMethodSelect
+                      label={t("crm.paymentMethod")}
+                      methods={paymentMethods}
+                      value={paymentMethodId}
+                      onChange={setPaymentMethodId}
+                    />
+                  ) : null}
+                  {Number(settlementQuote?.collectable || 0) > 0 ? (
+                    <PaymentMethodSelect
+                      label={t("crm.paymentMethod")}
+                      methods={paymentMethods}
+                      value={collectPaymentMethodId}
+                      onChange={setCollectPaymentMethodId}
+                    />
+                  ) : null}
+                  <input
+                    aria-label={t("crm.reference")}
+                    placeholder={t("crm.reference")}
+                    className={fieldClass}
+                    value={reference}
+                    onChange={(event) => setReference(event.target.value)}
+                  />
+                  <input
+                    aria-label={t("crm.notes")}
+                    placeholder={t("crm.notes")}
+                    className={fieldClass}
+                    value={notes}
+                    onChange={(event) => setNotes(event.target.value)}
+                  />
+                </>
+              ) : null}
+
               <div className="flex gap-2 pt-1">
-                <Button fullWidth type="submit" isLoading={isCardLoading}>
-                  {cardAction === "bind"
-                    ? t("crm.confirmBind")
-                    : cardAction === "unbind"
-                      ? t("crm.confirmUnbind")
-                      : t("crm.confirmCloseCard")}
+                <Button
+                  fullWidth
+                  type="submit"
+                  isLoading={isWalletLoading}
+                  disabled={
+                    walletAction === "close" &&
+                    Boolean(settlementQuote?.blockers.length)
+                  }
+                >
+                  {walletAction === "topup"
+                    ? t("crm.confirmTopup")
+                    : walletAction === "refund"
+                      ? t("crm.confirmRefund")
+                      : walletAction === "bind"
+                        ? t("crm.confirmBind")
+                        : walletAction === "unbind"
+                          ? t("crm.confirmUnbind")
+                          : walletAction === "lost"
+                            ? t("crm.confirmLost")
+                            : walletAction === "replace"
+                              ? t("crm.confirmReplace")
+                              : walletAction === "void"
+                                ? t("crm.confirmVoid")
+                                : t("crm.confirmCloseCard")}
                 </Button>
                 <Button
                   fullWidth
                   variant="outline"
                   type="button"
-                  onClick={resetCardForm}
+                  onClick={resetActionForm}
+                >
+                  {t("common.cancel")}
+                </Button>
+              </div>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
+      {isIssueFormOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <form
+            onSubmit={handleIssueWallet}
+            className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-xl"
+          >
+            <h2 className="text-lg font-bold text-slate-900">
+              {t("crm.registerTitle")}
+            </h2>
+            <div className="mt-4 space-y-3">
+              <input
+                required
+                aria-label={t("crm.name")}
+                placeholder={t("crm.name")}
+                className={fieldClass}
+                value={issueForm.guestName}
+                onChange={(event) =>
+                  setIssueForm((current) => ({
+                    ...current,
+                    guestName: event.target.value,
+                  }))
+                }
+              />
+              <input
+                required
+                aria-label={t("crm.phone")}
+                placeholder={t("crm.phone")}
+                className={fieldClass}
+                value={issueForm.guestPhone}
+                onChange={(event) =>
+                  setIssueForm((current) => ({
+                    ...current,
+                    guestPhone: event.target.value,
+                  }))
+                }
+              />
+              <input
+                aria-label={t("crm.guestIdNumber")}
+                placeholder={t("crm.guestIdNumber")}
+                className={fieldClass}
+                value={issueForm.guestIdNumber}
+                onChange={(event) =>
+                  setIssueForm((current) => ({
+                    ...current,
+                    guestIdNumber: event.target.value,
+                  }))
+                }
+              />
+              <input
+                required
+                aria-label={t("crm.tierId")}
+                placeholder={t("crm.tierId")}
+                className={fieldClass}
+                value={issueForm.tierId}
+                onChange={(event) =>
+                  setIssueForm((current) => ({
+                    ...current,
+                    tierId: event.target.value,
+                  }))
+                }
+              />
+              <input
+                required
+                aria-label={t("crm.cardUid")}
+                placeholder={t("crm.cardUid")}
+                className={fieldClass}
+                value={issueForm.cardUid}
+                onChange={(event) =>
+                  setIssueForm((current) => ({
+                    ...current,
+                    cardUid: event.target.value,
+                  }))
+                }
+              />
+              <CardCaptureStatus
+                variant="light"
+                nfcSupported={nfcSupported}
+                nfcActive={nfcActive}
+                nfcError={nfcError}
+                lastUid={lastUid}
+                onEnableNfc={() => void startNfc()}
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  aria-label={t("crm.cardLabel")}
+                  placeholder={t("crm.cardLabel")}
+                  className={fieldClass}
+                  value={issueForm.cardLabel}
+                  onChange={(event) =>
+                    setIssueForm((current) => ({
+                      ...current,
+                      cardLabel: event.target.value,
+                    }))
+                  }
+                />
+                <input
+                  aria-label={t("crm.roomNumber")}
+                  placeholder={t("crm.roomNumber")}
+                  className={fieldClass}
+                  value={issueForm.roomNumber}
+                  onChange={(event) =>
+                    setIssueForm((current) => ({
+                      ...current,
+                      roomNumber: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <PaymentMethodSelect
+                label={t("crm.paymentMethod")}
+                methods={paymentMethods}
+                value={issueForm.paymentMethodId}
+                onChange={(value) =>
+                  setIssueForm((current) => ({
+                    ...current,
+                    paymentMethodId: value,
+                  }))
+                }
+              />
+              <input
+                required
+                inputMode="decimal"
+                aria-label={t("crm.paymentAmount")}
+                placeholder={t("crm.paymentAmount")}
+                className={fieldClass}
+                value={issueForm.paymentAmount}
+                onChange={(event) =>
+                  setIssueForm((current) => ({
+                    ...current,
+                    paymentAmount: event.target.value,
+                  }))
+                }
+              />
+              <input
+                aria-label={t("crm.reference")}
+                placeholder={t("crm.reference")}
+                className={fieldClass}
+                value={issueForm.paymentReference}
+                onChange={(event) =>
+                  setIssueForm((current) => ({
+                    ...current,
+                    paymentReference: event.target.value,
+                  }))
+                }
+              />
+              <div className="flex gap-2 pt-1">
+                <Button fullWidth type="submit" isLoading={isWalletLoading}>
+                  {t("crm.issueWallet")}
+                </Button>
+                <Button
+                  fullWidth
+                  variant="outline"
+                  type="button"
+                  onClick={() => setIsIssueFormOpen(false)}
                 >
                   {t("common.cancel")}
                 </Button>

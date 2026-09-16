@@ -105,4 +105,24 @@ describe("CardsPage", () => {
       expect(window.print).toHaveBeenCalled();
     });
   });
+
+  it("detects a card from a USB reader swipe", async () => {
+    render(
+      <MemoryRouter>
+        <CardsPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByText("cards.menuTopup"));
+    for (const key of "MC-001") {
+      fireEvent.keyDown(window, { key, bubbles: true });
+    }
+    fireEvent.keyDown(window, { key: "Enter", bubbles: true });
+
+    await waitFor(() => {
+      expect(mocks.detectMembershipCard).toHaveBeenCalledWith({
+        cardNumber: "MC-001",
+      });
+    });
+  });
 });

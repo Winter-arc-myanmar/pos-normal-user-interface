@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/Button";
+import { CardCaptureStatus } from "@/components/ui/CardCaptureStatus";
 import { useAuth } from "@/core/presentation/hooks/useAuth";
+import { useCardCapture } from "@/core/presentation/hooks/useCardCapture";
 import {
   CardRefundPrefill,
   useCardRefundFlow,
@@ -135,6 +137,14 @@ export function CardRefundPage() {
     confirmAndPrint,
     resetFlow,
   } = useCardRefundFlow();
+  const pendingDetectRef = useRef(false);
+  const { nfcSupported, nfcActive, nfcError, lastUid, startNfc } = useCardCapture({
+    enabled: step === "detect",
+    onRead: (uid) => {
+      pendingDetectRef.current = true;
+      setCardNumber(uid);
+    },
+  });
 
   const tenantId = user?.tenantId || "";
   const activeAmount = selectedAmount || customAmount;
@@ -148,6 +158,14 @@ export function CardRefundPage() {
     prefillAppliedRef.current = true;
     startRefundFromPrefill(prefill);
   }, [location.state, startRefundFromPrefill]);
+
+  useEffect(() => {
+    if (step !== "detect" || !pendingDetectRef.current || !cardNumber.trim()) {
+      return;
+    }
+    pendingDetectRef.current = false;
+    void detectCard();
+  }, [cardNumber, detectCard, step]);
 
   const previewReceipt = useMemo(() => {
     if (receipt) return receipt;
@@ -242,6 +260,13 @@ export function CardRefundPage() {
                   autoFocus
                 />
               </div>
+              <CardCaptureStatus
+                nfcSupported={nfcSupported}
+                nfcActive={nfcActive}
+                nfcError={nfcError}
+                lastUid={lastUid}
+                onEnableNfc={() => void startNfc()}
+              />
               <p className="text-sm text-slate-400">{t("cardRefund.detectHint")}</p>
               <div className="flex flex-wrap gap-2">
                 <Button

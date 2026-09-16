@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/Button";
+import { CardCaptureStatus } from "@/components/ui/CardCaptureStatus";
 import { useAuth } from "@/core/presentation/hooks/useAuth";
+import { useCardCapture } from "@/core/presentation/hooks/useCardCapture";
 import {
   CardTopupPrefill,
   useCardTopupFlow,
@@ -126,6 +128,14 @@ export function CardsPage() {
     confirmAndPrint,
     resetFlow,
   } = useCardTopupFlow();
+  const pendingDetectRef = useRef(false);
+  const { nfcSupported, nfcActive, nfcError, lastUid, startNfc } = useCardCapture({
+    enabled: step === "detect",
+    onRead: (uid) => {
+      pendingDetectRef.current = true;
+      setCardNumber(uid);
+    },
+  });
 
   const tenantId = user?.tenantId || "";
   const activeAmount = selectedAmount || customAmount;
@@ -137,6 +147,14 @@ export function CardsPage() {
     prefillAppliedRef.current = true;
     startTopupFromPrefill(prefill);
   }, [location.state, startTopupFromPrefill]);
+
+  useEffect(() => {
+    if (step !== "detect" || !pendingDetectRef.current || !cardNumber.trim()) {
+      return;
+    }
+    pendingDetectRef.current = false;
+    void detectCard();
+  }, [cardNumber, detectCard, step]);
 
   const stepIndex = ["menu", "detect", "amount", "print"].indexOf(step);
 
@@ -234,6 +252,13 @@ export function CardsPage() {
                   autoFocus
                 />
               </div>
+              <CardCaptureStatus
+                nfcSupported={nfcSupported}
+                nfcActive={nfcActive}
+                nfcError={nfcError}
+                lastUid={lastUid}
+                onEnableNfc={() => void startNfc()}
+              />
               <p className="text-sm text-slate-400">{t("cardTopup.detectHint")}</p>
               <div className="flex flex-wrap gap-2">
                 <Button

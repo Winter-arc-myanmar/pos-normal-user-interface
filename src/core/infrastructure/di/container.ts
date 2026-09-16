@@ -27,6 +27,10 @@ import { IMembershipCardRepository } from "../../domain/repositories/IMembership
 import { ApiMembershipCardRepository } from "../repositories/ApiMembershipCardRepository";
 import { IMembershipCardService } from "../../domain/services/IMembershipCardService";
 import { MembershipCardService } from "../../application/services/MembershipCardService";
+import { IGuestWalletRepository } from "../../domain/repositories/IGuestWalletRepository";
+import { ApiGuestWalletRepository } from "../repositories/ApiGuestWalletRepository";
+import { IGuestWalletService } from "../../domain/services/IGuestWalletService";
+import { GuestWalletService } from "../../application/services/GuestWalletService";
 
 /**
  * Dependency Injection Container
@@ -60,6 +64,10 @@ class Container {
       "membershipCardRepository",
       new ApiMembershipCardRepository(this.resolve("httpClient"))
     );
+    this.register<IGuestWalletRepository>(
+      "guestWalletRepository",
+      new ApiGuestWalletRepository(this.resolve("httpClient"))
+    );
     this.register<ICashierRepository>(
       "cashierRepository",
       new ApiCashierRepository(this.resolve("httpClient"))
@@ -90,6 +98,10 @@ class Container {
     this.register<IMembershipCardService>(
       "membershipCardService",
       new MembershipCardService(this.resolve("membershipCardRepository"))
+    );
+    this.register<IGuestWalletService>(
+      "guestWalletService",
+      new GuestWalletService(this.resolve("guestWalletRepository"))
     );
     this.register<ICashierService>(
       "cashierService",

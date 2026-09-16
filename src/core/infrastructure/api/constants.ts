@@ -71,6 +71,35 @@ export const API_ENDPOINTS = {
     BY_ID: (id: string) => `/api/v1/customer-interactions/${id}`,
   },
 
+  GUEST_WALLETS: {
+    LIST: "/api/v1/guest-wallets",
+    CREATE: "/api/v1/guest-wallets",
+    BY_ID: (id: string) => `/api/v1/guest-wallets/${id}`,
+    CARDS: (id: string) => `/api/v1/guest-wallets/${id}/cards`,
+    LEDGER: (id: string) => `/api/v1/guest-wallets/${id}/ledger`,
+    AUDIT: (id: string) => `/api/v1/guest-wallets/${id}/audit`,
+    TOP_UP: (id: string) => `/api/v1/guest-wallets/${id}/top-up`,
+    SETTLEMENT_QUOTE: (id: string) =>
+      `/api/v1/guest-wallets/${id}/settlement-quote`,
+    BEGIN_SETTLEMENT: (id: string) =>
+      `/api/v1/guest-wallets/${id}/begin-settlement`,
+    CANCEL_SETTLEMENT: (id: string) =>
+      `/api/v1/guest-wallets/${id}/cancel-settlement`,
+    SETTLE: (id: string) => `/api/v1/guest-wallets/${id}/settle`,
+    REFUND: (id: string) => `/api/v1/guest-wallets/${id}/refund`,
+    VOID: (id: string) => `/api/v1/guest-wallets/${id}/void`,
+  },
+
+  GUEST_CARDS: {
+    LOOKUP: "/api/v1/guest-cards/lookup",
+    LIST: "/api/v1/guest-cards",
+    CREATE: "/api/v1/guest-cards",
+    BY_ID: (id: string) => `/api/v1/guest-cards/${id}`,
+    DELETE: (id: string) => `/api/v1/guest-cards/${id}`,
+    REPORT_LOST: (id: string) => `/api/v1/guest-cards/${id}/report-lost`,
+    REPLACE: (id: string) => `/api/v1/guest-cards/${id}/replace`,
+  },
+
   LOCATIONS: {
     LIST: "/api/v1/locations",
     TREE: "/api/v1/locations/tree",
