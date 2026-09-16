@@ -156,4 +156,29 @@ describe("PaymentView", () => {
       screen.getByRole("button", { name: "cashier.payment.addTender" })
     ).toBeDisabled();
   });
+
+  it("shows guest card lookup when member card is selected", () => {
+    renderPaymentView({
+      selectedMethodId: "local-member-card",
+      memberCardLookup: {
+        cardUid: "MC-001",
+        guestName: "Ko Aung",
+        walletNumber: "W-000041",
+        balance: "88600",
+        status: "ACTIVE",
+        error: null,
+        isLoading: false,
+        nfcSupported: false,
+        nfcActive: false,
+        nfcError: null,
+        onEnableNfc: vi.fn(),
+        onCardUidChange: vi.fn(),
+        onDetect: vi.fn(),
+      },
+    });
+
+    expect(screen.getByText("cashier.payment.lookupMemberCard")).toBeInTheDocument();
+    expect(screen.getByText("Ko Aung")).toBeInTheDocument();
+    expect(screen.getByText("W-000041")).toBeInTheDocument();
+  });
 });

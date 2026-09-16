@@ -205,6 +205,11 @@
     "roomNumber": "Room number",
     "paymentMethod": "Payment method",
     "paymentAmount": "Payment amount",
+    "referenceRequired": "Payment reference (required)",
+    "addAnotherCard": "Add another card",
+    "removeCard": "Remove card",
+    "extraCardUid": "Additional card UID",
+    "tierSelect": "Select loyalty tier",
     "approverToken": "Approver token",
     "approverHint": "Manager bearer token from a different signed-in user.",
     "ledger": "Wallet statement",
@@ -248,7 +253,7 @@
     "menuTopup": "Card top up",
     "menuTopupHint": "Swipe or enter a membership card, add value, and print a receipt.",
     "menuRefund": "Card refund",
-    "menuRefundHint": "Detect card, verify PIN, choose amount, and print a receipt.",
+    "menuRefundHint": "Detect a guest card, choose amount, approve, and print a receipt.",
     "backToMenu": "Back to cards"
   },
   "cardTopup": {
@@ -278,13 +283,14 @@
     "printing": "Processing...",
     "printAgain": "Print again",
     "newTopup": "New top up",
+    "confirmFailed": "Unable to complete card top up.",
     "back": "Back",
     "keypad": "Keypad",
     "keypadHint": "Use the keypad for card number or custom amount entry."
   },
   "cardRefund": {
     "title": "Card refund",
-    "subtitle": "Detect card, verify PIN, choose amount, and print receipt.",
+    "subtitle": "Detect guest card, choose amount, approve, and print receipt.",
     "steps": {
       "menu": "Menu",
       "detect": "Detect",
@@ -293,7 +299,7 @@
       "print": "Print"
     },
     "menuRefund": "Card refund",
-    "menuRefundHint": "Swipe or enter a membership card, verify PIN, and refund value.",
+    "menuRefundHint": "Swipe or enter a guest card, approve, and refund value.",
     "cardNumber": "Card number",
     "cardNumberPlaceholder": "Swipe card or enter number",
     "detectHint": "Tap NFC, swipe the USB reader, or type the card number, then detect.",
@@ -313,6 +319,7 @@
     "printing": "Processing...",
     "printAgain": "Print again",
     "newRefund": "New refund",
+    "confirmFailed": "Unable to complete card refund.",
     "back": "Back",
     "keypad": "Keypad",
     "keypadHint": "Use the keypad for card number, PIN, or custom amount entry."
@@ -603,7 +610,13 @@
       "splitCovered": "Bill covered. Confirm pay when ready.",
       "chooseMethod": "Choose a payment method, then confirm pay.",
       "memberCard": "MEMBER CARD",
-      "localFallback": "Demo"
+      "localFallback": "Demo",
+      "tapMemberCard": "Tap, swipe, or enter the guest card UID.",
+      "lookupMemberCard": "Look up card",
+      "lookingUpMemberCard": "Looking up...",
+      "memberWallet": "Guest wallet",
+      "memberBalanceHint": "Balance is shown for reference. The till rechecks it at tender.",
+      "memberCardReady": "Card linked. Confirm pay when ready."
     },
     "tableWarning": {
       "ok": "On time",
@@ -648,6 +661,8 @@
       "missingPosSession": "No active POS session. Open a session and try again.",
       "posSessionControl": "Unable to update POS session.",
       "paymentMethodRequired": "Choose a payment method first.",
+      "memberCardRequired": "Look up a guest card before taking Member Card payment.",
+      "memberCardInactive": "This guest wallet cannot be used for payment right now.",
       "splitAmount": "Enter a split amount greater than zero.",
       "splitComplete": "Split payments already cover this bill.",
       "noTableAvailable": "No available table for this waitlist party.",

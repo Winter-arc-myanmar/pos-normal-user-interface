@@ -42,7 +42,8 @@ export class GuestWalletService implements IGuestWalletService {
     if (!payload.guestPhone?.trim()) throw new Error("Guest phone is required");
     if (!payload.locationId?.trim()) throw new Error("Location is required");
     if (!payload.posSessionId?.trim()) throw new Error("POS session is required");
-    if (!payload.cards?.length || !payload.cards[0]?.cardUid?.trim()) {
+    const cards = (payload.cards || []).filter((card) => card.cardUid?.trim());
+    if (!cards.length) {
       throw new Error("At least one card UID is required");
     }
     if (!payload.payment?.paymentMethodId?.trim()) {
@@ -53,6 +54,11 @@ export class GuestWalletService implements IGuestWalletService {
     }
     return this.guestWalletRepository.issueWallet({
       ...payload,
+      cards: cards.map((card) => ({
+        cardUid: card.cardUid.trim(),
+        label: card.label?.trim() || undefined,
+        roomNumber: card.roomNumber?.trim() || undefined,
+      })),
       idempotencyKey: payload.idempotencyKey || newIdempotencyKey(),
     });
   }

@@ -1,15 +1,21 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/Button";
 import { CardCaptureStatus } from "@/components/ui/CardCaptureStatus";
-import { useAuth } from "@/core/presentation/hooks/useAuth";
+import { PaymentMethod } from "@/core/domain/entities/Cashier";
 import { useCardCapture } from "@/core/presentation/hooks/useCardCapture";
+import { useCashier } from "@/core/presentation/hooks/useCashier";
 import {
   CardTopupPrefill,
   useCardTopupFlow,
 } from "@/core/presentation/hooks/useCardTopupFlow";
+import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
 import { useNumberFormatter } from "@/lib/i18n/formatters";
+import {
+  assertPaymentReference,
+  paymentRequiresReference,
+} from "@/lib/pos/paymentReference";
 
 const numpadRows = [
   ["1", "2", "3"],
@@ -98,17 +104,50 @@ function ReceiptPreview({
   );
 }
 
+function DarkPaymentSelect({
+  label,
+  methods,
+  value,
+  onChange,
+}: {
+  label: string;
+  methods: PaymentMethod[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <select
+      aria-label={label}
+      className="min-h-12 w-full rounded-lg border border-slate-700 bg-slate-900 px-4 text-white outline-none focus:border-emerald-500"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+    >
+      <option value="">{label}</option>
+      {methods.map((method) => (
+        <option key={method.id} value={method.id}>
+          {method.name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 export function CardsPage() {
   const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
-  const { user } = useAuth();
   const { formatCurrency } = useNumberFormatter();
+  const { requireCashierContext } = usePosWorkspace();
+  const { paymentMethods, fetchPaymentMethods } = useCashier();
   const prefillAppliedRef = useRef(false);
+  const [paymentMethodId, setPaymentMethodId] = useState("");
+  const [paymentReference, setPaymentReference] = useState("");
+  const [actionError, setActionError] = useState<string | null>(null);
   const {
     step,
     cardNumber,
     detectedCard,
+    detectedWallet,
     customerName,
     customerPhone,
     amountOptions,
@@ -137,8 +176,20 @@ export function CardsPage() {
     },
   });
 
-  const tenantId = user?.tenantId || "";
+  const selectedPaymentMethod = paymentMethods.find(
+    (method) => method.id === paymentMethodId
+  );
   const activeAmount = selectedAmount || customAmount;
+  const displayError = actionError || error;
+
+  useEffect(() => {
+    void fetchPaymentMethods().catch(() => undefined);
+  }, [fetchPaymentMethods]);
+
+  useEffect(() => {
+    if (!paymentMethods.length || paymentMethodId) return;
+    setPaymentMethodId(paymentMethods[0].id);
+  }, [paymentMethodId, paymentMethods]);
 
   useEffect(() => {
     if (prefillAppliedRef.current) return;
@@ -163,13 +214,31 @@ export function CardsPage() {
     if (!detectedCard || !activeAmount) return null;
     return {
       receiptId: "preview",
-      cardNumber: detectedCard.cardNumber,
+      cardNumber: detectedCard.cardUid,
       customerName: customerName || undefined,
       amount: activeAmount,
-      balanceAfter: detectedCard.balance,
+      balanceAfter: detectedWallet?.balance || "0.0000",
       printedAt: new Date().toISOString(),
     };
-  }, [activeAmount, customerName, detectedCard, receipt]);
+  }, [activeAmount, customerName, detectedCard, detectedWallet, receipt]);
+
+  const handleConfirmPrint = async () => {
+    setActionError(null);
+    try {
+      const context = await requireCashierContext();
+      assertPaymentReference(selectedPaymentMethod, paymentReference);
+      await confirmAndPrint({
+        locationId: context.locationId,
+        posSessionId: context.posSessionId,
+        paymentMethodId,
+        reference: paymentReference,
+      });
+    } catch (caught) {
+      setActionError(
+        caught instanceof Error ? caught.message : t("cardTopup.confirmFailed")
+      );
+    }
+  };
 
   const appendInput = (value: string) => {
     if (value === "back") {
@@ -283,7 +352,7 @@ export function CardsPage() {
             <div className="flex h-full flex-col gap-5">
               <div className="rounded-lg border border-slate-700 bg-slate-900/60 p-4">
                 <p className="text-sm text-slate-400">{t("cardTopup.detectedCard")}</p>
-                <p className="mt-1 text-xl font-semibold">{detectedCard.cardNumber}</p>
+                <p className="mt-1 text-xl font-semibold">{detectedCard.cardUid}</p>
                 {customerName ? (
                   <p className="mt-1 text-sm text-slate-300">{customerName}</p>
                 ) : null}
@@ -293,7 +362,7 @@ export function CardsPage() {
                 <p className="mt-3 text-sm text-slate-400">
                   {t("cardTopup.currentBalance")}{" "}
                   <span className="font-semibold text-white">
-                    {formatCurrency(Number(detectedCard.balance))}
+                    {formatCurrency(Number(detectedWallet?.balance || 0))}
                   </span>
                 </p>
               </div>
@@ -367,6 +436,27 @@ export function CardsPage() {
                 receiptId={previewReceipt.receiptId}
                 printedAt={previewReceipt.printedAt}
               />
+              {!receipt ? (
+                <div className="space-y-3 print:hidden">
+                  <DarkPaymentSelect
+                    label={t("crm.paymentMethod")}
+                    methods={paymentMethods}
+                    value={paymentMethodId}
+                    onChange={setPaymentMethodId}
+                  />
+                  <input
+                    aria-label={t("crm.reference")}
+                    placeholder={
+                      paymentRequiresReference(selectedPaymentMethod)
+                        ? t("crm.referenceRequired")
+                        : t("crm.reference")
+                    }
+                    className="min-h-12 w-full rounded-lg border border-slate-700 bg-slate-900 px-4 text-white outline-none focus:border-emerald-500"
+                    value={paymentReference}
+                    onChange={(event) => setPaymentReference(event.target.value)}
+                  />
+                </div>
+              ) : null}
               <div className="flex flex-wrap gap-2 print:hidden">
                 <Button type="button" variant="secondary" onClick={() => goToStep("amount")}>
                   {t("cardTopup.back")}
@@ -374,8 +464,8 @@ export function CardsPage() {
                 {!receipt ? (
                   <Button
                     type="button"
-                    onClick={() => confirmAndPrint(tenantId)}
-                    disabled={isLoading || !tenantId}
+                    onClick={() => void handleConfirmPrint()}
+                    disabled={isLoading || !paymentMethodId}
                   >
                     {isLoading ? t("cardTopup.printing") : t("cardTopup.confirmPrint")}
                   </Button>
@@ -393,9 +483,9 @@ export function CardsPage() {
             </div>
           ) : null}
 
-          {error ? (
+          {displayError ? (
             <p className="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-              {error}
+              {displayError}
             </p>
           ) : null}
         </section>

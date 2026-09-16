@@ -22,7 +22,7 @@ export function CardCaptureStatus({
   return (
     <div
       className={[
-        "flex items-center justify-between gap-2 rounded-lg border px-3 py-2",
+        "flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5",
         dark
           ? "border-slate-800 bg-slate-900 text-slate-300"
           : "border-slate-200 bg-slate-50 text-slate-600",

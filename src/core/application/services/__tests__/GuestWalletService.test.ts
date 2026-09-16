@@ -102,6 +102,30 @@ describe("GuestWalletService", () => {
     await expect(service.getCard(" ")).rejects.toThrow("Invalid card ID");
   });
 
+  it("issues a wallet with every non-empty card UID", async () => {
+    await service.issueWallet({
+      tierId: "tier-1",
+      guestName: "Ko Aung",
+      guestPhone: "09123456789",
+      locationId: "loc-1",
+      posSessionId: "session-1",
+      cards: [
+        { cardUid: "UID-1", label: "A" },
+        { cardUid: "  " },
+        { cardUid: "UID-2", label: "B" },
+      ],
+      payment: { paymentMethodId: "pm-1", amount: "100000" },
+    });
+    expect(repository.issueWallet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cards: [
+          { cardUid: "UID-1", label: "A", roomNumber: undefined },
+          { cardUid: "UID-2", label: "B", roomNumber: undefined },
+        ],
+      })
+    );
+  });
+
   it("adds an idempotency key when topping up", async () => {
     await service.topUpWallet("wallet-1", {
       amount: "60000",

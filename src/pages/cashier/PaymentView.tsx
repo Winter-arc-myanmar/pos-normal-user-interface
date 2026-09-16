@@ -1,10 +1,28 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
+import { CardCaptureStatus } from "@/components/ui/CardCaptureStatus";
 import { SplitPaymentTenderDTO } from "@/core/application/dtos/CashierDTO";
 import { PaymentMethod } from "@/core/domain/entities/Cashier";
 import { isMemberCardPaymentMethod } from "@/lib/pos/paymentMethods";
 import { remainingReceivable } from "@/lib/pos/splitPayments";
+
+interface MemberCardLookupProps {
+  cardUid: string;
+  guestName?: string;
+  walletNumber?: string;
+  balance?: string;
+  status?: string;
+  error?: string | null;
+  isLoading?: boolean;
+  nfcSupported: boolean;
+  nfcActive: boolean;
+  nfcError: string | null;
+  lastUid?: string;
+  onEnableNfc: () => void;
+  onCardUidChange: (value: string) => void;
+  onDetect: () => void;
+}
 
 interface PaymentViewProps {
   methods: PaymentMethod[];
@@ -15,6 +33,7 @@ interface PaymentViewProps {
   isSplitMode: boolean;
   splitTenders: SplitPaymentTenderDTO[];
   isLoading?: boolean;
+  memberCardLookup?: MemberCardLookupProps;
   onSelectMethod: (methodId: string) => void;
   onPaymentAmountChange: (value: string) => void;
   onOpenSplit: () => void;
@@ -105,6 +124,7 @@ export function PaymentView({
   isSplitMode,
   splitTenders,
   isLoading,
+  memberCardLookup,
   onSelectMethod,
   onPaymentAmountChange,
   onOpenSplit,
@@ -121,6 +141,10 @@ export function PaymentView({
   const billSubtotal = Number(subtotal || total || 0);
   const billTotal = Number(total || 0);
   const memberCardLabel = t("cashier.payment.memberCard");
+  const selectedMethod = methods.find((method) => method.id === selectedMethodId);
+  const showMemberCardLookup =
+    Boolean(memberCardLookup) &&
+    Boolean(selectedMethod && isMemberCardPaymentMethod(selectedMethod));
   const sortedMethods = useMemo(
     () => [...methods].sort((a, b) => methodRank(a) - methodRank(b)),
     [methods]
@@ -297,6 +321,71 @@ export function PaymentView({
                 amount: formatMoney(displayRemaining),
               })}
         </div>
+        {showMemberCardLookup && memberCardLookup ? (
+          <div className="mt-2 rounded border border-blue-400/40 bg-[#111111] p-3 text-sm">
+            <p className="text-xs text-slate-400">{t("cashier.payment.tapMemberCard")}</p>
+            <input
+              value={memberCardLookup.cardUid}
+              onChange={(event) =>
+                memberCardLookup.onCardUidChange(event.target.value)
+              }
+              placeholder={t("crm.cardUid")}
+              className="mt-2 min-h-10 w-full rounded border border-slate-600 bg-slate-900 px-3 text-white outline-none focus:border-blue-400"
+            />
+            <div className="mt-2">
+              <CardCaptureStatus
+                nfcSupported={memberCardLookup.nfcSupported}
+                nfcActive={memberCardLookup.nfcActive}
+                nfcError={memberCardLookup.nfcError}
+                lastUid={memberCardLookup.lastUid}
+                onEnableNfc={memberCardLookup.onEnableNfc}
+              />
+            </div>
+            <Button
+              type="button"
+              className="mt-2"
+              onClick={memberCardLookup.onDetect}
+              disabled={
+                memberCardLookup.isLoading || !memberCardLookup.cardUid.trim()
+              }
+            >
+              {memberCardLookup.isLoading
+                ? t("cashier.payment.lookingUpMemberCard")
+                : t("cashier.payment.lookupMemberCard")}
+            </Button>
+            {memberCardLookup.guestName || memberCardLookup.walletNumber ? (
+              <div className="mt-3 rounded border border-emerald-500/30 bg-emerald-500/10 p-2 text-emerald-100">
+                <p className="text-xs uppercase tracking-wide">
+                  {t("cashier.payment.memberWallet")}
+                </p>
+                <p className="mt-1 font-semibold">
+                  {memberCardLookup.guestName || memberCardLookup.walletNumber}
+                </p>
+                {memberCardLookup.walletNumber ? (
+                  <p className="text-xs text-emerald-200">
+                    {memberCardLookup.walletNumber}
+                  </p>
+                ) : null}
+                {memberCardLookup.balance ? (
+                  <p className="mt-1 text-sm">
+                    {formatMoney(Number(memberCardLookup.balance))}
+                  </p>
+                ) : null}
+                {memberCardLookup.status ? (
+                  <p className="text-xs uppercase text-emerald-200">
+                    {memberCardLookup.status}
+                  </p>
+                ) : null}
+                <p className="mt-2 text-[11px] text-emerald-200/80">
+                  {t("cashier.payment.memberBalanceHint")}
+                </p>
+              </div>
+            ) : null}
+            {memberCardLookup.error ? (
+              <p className="mt-2 text-xs text-red-300">{memberCardLookup.error}</p>
+            ) : null}
+          </div>
+        ) : null}
         <div className="mt-2 grid min-h-0 flex-1 grid-cols-2 content-start gap-2 overflow-y-auto">
           {sortedMethods.map((method) => {
             const selected = selectedMethodId === method.id;

@@ -1,28 +1,27 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/Button";
 import { CardCaptureStatus } from "@/components/ui/CardCaptureStatus";
-import { useAuth } from "@/core/presentation/hooks/useAuth";
+import { PaymentMethod } from "@/core/domain/entities/Cashier";
 import { useCardCapture } from "@/core/presentation/hooks/useCardCapture";
+import { useCashier } from "@/core/presentation/hooks/useCashier";
 import {
   CardRefundPrefill,
   useCardRefundFlow,
 } from "@/core/presentation/hooks/useCardRefundFlow";
+import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
 import { useNumberFormatter } from "@/lib/i18n/formatters";
+import {
+  assertPaymentReference,
+  paymentRequiresReference,
+} from "@/lib/pos/paymentReference";
 
 const amountNumpadRows = [
   ["1", "2", "3"],
   ["4", "5", "6"],
   ["7", "8", "9"],
   [".", "0", "back"],
-];
-
-const pinNumpadRows = [
-  ["1", "2", "3"],
-  ["4", "5", "6"],
-  ["7", "8", "9"],
-  ["", "0", "back"],
 ];
 
 function StepBadge({
@@ -105,18 +104,51 @@ function ReceiptPreview({
   );
 }
 
+function DarkPaymentSelect({
+  label,
+  methods,
+  value,
+  onChange,
+}: {
+  label: string;
+  methods: PaymentMethod[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <select
+      aria-label={label}
+      className="min-h-12 w-full rounded-lg border border-slate-700 bg-slate-900 px-4 text-white outline-none focus:border-amber-500"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+    >
+      <option value="">{label}</option>
+      {methods.map((method) => (
+        <option key={method.id} value={method.id}>
+          {method.name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 export function CardRefundPage() {
   const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
-  const { user } = useAuth();
   const { formatCurrency } = useNumberFormatter();
+  const { requireCashierContext } = usePosWorkspace();
+  const { paymentMethods, fetchPaymentMethods } = useCashier();
   const prefillAppliedRef = useRef(false);
+  const [paymentMethodId, setPaymentMethodId] = useState("");
+  const [paymentReference, setPaymentReference] = useState("");
+  const [approverToken, setApproverToken] = useState("");
+  const [actionError, setActionError] = useState<string | null>(null);
   const {
     step,
     cardNumber,
-    pin,
     detectedCard,
+    detectedWallet,
     customerName,
     customerPhone,
     amountOptions,
@@ -126,13 +158,11 @@ export function CardRefundPage() {
     isLoading,
     error,
     setCardNumber,
-    setPin,
     setSelectedAmount,
     setCustomAmount,
     goToStep,
     startRefundFromPrefill,
     detectCard,
-    verifyPin,
     confirmAmount,
     confirmAndPrint,
     resetFlow,
@@ -146,9 +176,12 @@ export function CardRefundPage() {
     },
   });
 
-  const tenantId = user?.tenantId || "";
+  const selectedPaymentMethod = paymentMethods.find(
+    (method) => method.id === paymentMethodId
+  );
   const activeAmount = selectedAmount || customAmount;
-  const stepOrder = ["detect", "pin", "amount", "print"];
+  const displayError = actionError || error;
+  const stepOrder = ["detect", "amount", "print"];
   const stepIndex = stepOrder.indexOf(step);
 
   useEffect(() => {
@@ -158,6 +191,15 @@ export function CardRefundPage() {
     prefillAppliedRef.current = true;
     startRefundFromPrefill(prefill);
   }, [location.state, startRefundFromPrefill]);
+
+  useEffect(() => {
+    void fetchPaymentMethods().catch(() => undefined);
+  }, [fetchPaymentMethods]);
+
+  useEffect(() => {
+    if (!paymentMethods.length || paymentMethodId) return;
+    setPaymentMethodId(paymentMethods[0].id);
+  }, [paymentMethodId, paymentMethods]);
 
   useEffect(() => {
     if (step !== "detect" || !pendingDetectRef.current || !cardNumber.trim()) {
@@ -172,20 +214,37 @@ export function CardRefundPage() {
     if (!detectedCard || !activeAmount) return null;
     return {
       receiptId: "preview",
-      cardNumber: detectedCard.cardNumber,
+      cardNumber: detectedCard.cardUid,
       customerName: customerName || undefined,
       amount: activeAmount,
-      balanceAfter: detectedCard.balance,
+      balanceAfter: detectedWallet?.balance || "0.0000",
       printedAt: new Date().toISOString(),
     };
-  }, [activeAmount, customerName, detectedCard, receipt]);
+  }, [activeAmount, customerName, detectedCard, detectedWallet, receipt]);
+
+  const handleConfirmPrint = async () => {
+    setActionError(null);
+    try {
+      const context = await requireCashierContext();
+      assertPaymentReference(selectedPaymentMethod, paymentReference);
+      await confirmAndPrint({
+        locationId: context.locationId,
+        posSessionId: context.posSessionId,
+        paymentMethodId,
+        approverAuthorization: approverToken,
+        reference: paymentReference,
+      });
+    } catch (caught) {
+      setActionError(
+        caught instanceof Error ? caught.message : t("cardRefund.confirmFailed")
+      );
+    }
+  };
 
   const appendKeypadInput = (value: string) => {
     if (value === "back") {
       if (step === "detect") {
         setCardNumber(cardNumber.slice(0, -1));
-      } else if (step === "pin") {
-        setPin(pin.slice(0, -1));
       } else if (step === "amount") {
         setCustomAmount(customAmount.slice(0, -1));
         setSelectedAmount("");
@@ -198,18 +257,11 @@ export function CardRefundPage() {
       setCardNumber(`${cardNumber}${value}`);
       return;
     }
-    if (step === "pin") {
-      setPin(`${pin}${value}`);
-      return;
-    }
     if (step === "amount") {
       setSelectedAmount("");
       setCustomAmount(`${customAmount}${value}`);
     }
   };
-
-  const keypadRows =
-    step === "pin" ? pinNumpadRows : amountNumpadRows;
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#0f1115] text-white">
@@ -226,14 +278,9 @@ export function CardRefundPage() {
               done={stepIndex > 0}
             />
             <StepBadge
-              label={t("cardRefund.steps.pin")}
-              active={step === "pin"}
-              done={stepIndex > 1}
-            />
-            <StepBadge
               label={t("cardRefund.steps.amount")}
               active={step === "amount"}
-              done={stepIndex > 2}
+              done={stepIndex > 1}
             />
             <StepBadge
               label={t("cardRefund.steps.print")}
@@ -287,49 +334,11 @@ export function CardRefundPage() {
             </div>
           ) : null}
 
-          {step === "pin" && detectedCard ? (
-            <div className="mx-auto flex max-w-xl flex-col gap-4">
-              <div className="rounded-lg border border-slate-700 bg-slate-900/60 p-4">
-                <p className="text-sm text-slate-400">{t("cardRefund.detectedCard")}</p>
-                <p className="mt-1 text-xl font-semibold">{detectedCard.cardNumber}</p>
-                {customerName ? (
-                  <p className="mt-1 text-sm text-slate-300">{customerName}</p>
-                ) : null}
-              </div>
-              <div>
-                <label className="mb-2 block text-sm text-slate-300">
-                  {t("cardRefund.pin")}
-                </label>
-                <input
-                  type="password"
-                  value={pin}
-                  onChange={(event) => setPin(event.target.value)}
-                  placeholder={t("cardRefund.pinPlaceholder")}
-                  className="min-h-12 w-full rounded-lg border border-slate-700 bg-slate-900 px-4 text-lg text-white outline-none focus:border-amber-500"
-                  autoFocus
-                />
-              </div>
-              <p className="text-sm text-slate-400">{t("cardRefund.pinHint")}</p>
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="secondary" onClick={() => goToStep("detect")}>
-                  {t("cardRefund.back")}
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => verifyPin()}
-                  disabled={isLoading || !pin.trim()}
-                >
-                  {isLoading ? t("cardRefund.verifyingPin") : t("cardRefund.verifyPin")}
-                </Button>
-              </div>
-            </div>
-          ) : null}
-
           {step === "amount" && detectedCard ? (
             <div className="flex h-full flex-col gap-5">
               <div className="rounded-lg border border-slate-700 bg-slate-900/60 p-4">
                 <p className="text-sm text-slate-400">{t("cardRefund.detectedCard")}</p>
-                <p className="mt-1 text-xl font-semibold">{detectedCard.cardNumber}</p>
+                <p className="mt-1 text-xl font-semibold">{detectedCard.cardUid}</p>
                 {customerName ? (
                   <p className="mt-1 text-sm text-slate-300">{customerName}</p>
                 ) : null}
@@ -339,7 +348,13 @@ export function CardRefundPage() {
                 <p className="mt-3 text-sm text-slate-400">
                   {t("cardRefund.currentBalance")}{" "}
                   <span className="font-semibold text-white">
-                    {formatCurrency(Number(detectedCard.balance))}
+                    {formatCurrency(Number(detectedWallet?.balance || 0))}
+                  </span>
+                </p>
+                <p className="mt-1 text-sm text-slate-400">
+                  {t("crm.purchasedBalance")}{" "}
+                  <span className="font-semibold text-white">
+                    {formatCurrency(Number(detectedWallet?.purchasedBalance || 0))}
                   </span>
                 </p>
               </div>
@@ -385,7 +400,7 @@ export function CardRefundPage() {
               </div>
 
               <div className="mt-auto flex flex-wrap gap-2">
-                <Button type="button" variant="secondary" onClick={() => goToStep("pin")}>
+                <Button type="button" variant="secondary" onClick={() => goToStep("detect")}>
                   {t("cardRefund.back")}
                 </Button>
                 <Button
@@ -409,6 +424,35 @@ export function CardRefundPage() {
                 receiptId={previewReceipt.receiptId}
                 printedAt={previewReceipt.printedAt}
               />
+              {!receipt ? (
+                <div className="space-y-3 print:hidden">
+                  <DarkPaymentSelect
+                    label={t("crm.paymentMethod")}
+                    methods={paymentMethods}
+                    value={paymentMethodId}
+                    onChange={setPaymentMethodId}
+                  />
+                  <input
+                    aria-label={t("crm.reference")}
+                    placeholder={
+                      paymentRequiresReference(selectedPaymentMethod)
+                        ? t("crm.referenceRequired")
+                        : t("crm.reference")
+                    }
+                    className="min-h-12 w-full rounded-lg border border-slate-700 bg-slate-900 px-4 text-white outline-none focus:border-amber-500"
+                    value={paymentReference}
+                    onChange={(event) => setPaymentReference(event.target.value)}
+                  />
+                  <input
+                    type="password"
+                    aria-label={t("crm.approverToken")}
+                    placeholder={t("crm.approverToken")}
+                    className="min-h-12 w-full rounded-lg border border-slate-700 bg-slate-900 px-4 text-white outline-none focus:border-amber-500"
+                    value={approverToken}
+                    onChange={(event) => setApproverToken(event.target.value)}
+                  />
+                </div>
+              ) : null}
               <div className="flex flex-wrap gap-2 print:hidden">
                 <Button type="button" variant="secondary" onClick={() => goToStep("amount")}>
                   {t("cardRefund.back")}
@@ -416,8 +460,8 @@ export function CardRefundPage() {
                 {!receipt ? (
                   <Button
                     type="button"
-                    onClick={() => confirmAndPrint(tenantId)}
-                    disabled={isLoading || !tenantId}
+                    onClick={() => void handleConfirmPrint()}
+                    disabled={isLoading || !paymentMethodId || !approverToken.trim()}
                   >
                     {isLoading ? t("cardRefund.printing") : t("cardRefund.confirmPrint")}
                   </Button>
@@ -442,20 +486,20 @@ export function CardRefundPage() {
             </div>
           ) : null}
 
-          {error ? (
+          {displayError ? (
             <p className="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-              {error}
+              {displayError}
             </p>
           ) : null}
         </section>
 
-        {step === "detect" || step === "pin" || step === "amount" ? (
+        {step === "detect" || step === "amount" ? (
           <aside className="rounded-xl border border-slate-800 bg-[#111111] p-4 print:hidden">
             <p className="mb-3 text-sm font-semibold text-slate-300">
               {t("cardRefund.keypad")}
             </p>
             <div className="grid grid-cols-3 gap-2">
-              {keypadRows.flat().map((key, index) =>
+              {amountNumpadRows.flat().map((key, index) =>
                 key ? (
                   <button
                     key={`${key}-${index}`}

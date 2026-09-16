@@ -1,11 +1,16 @@
-import { useCallback, useEffect, useState } from "react";
-import { MembershipCard } from "../../domain/entities/MembershipCard";
+import { useCallback, useState } from "react";
 import {
-  MembershipCardTopupAmountOptionDTO,
-  MembershipCardTopupReceiptDTO,
-} from "../../application/dtos/MembershipCardDTO";
-import { IMembershipCardService } from "../../domain/services/IMembershipCardService";
+  GuestCard,
+  GuestWallet,
+  GuestWalletLedgerEntry,
+} from "../../domain/entities/GuestWallet";
+import { IGuestWalletService } from "../../domain/services/IGuestWalletService";
 import container from "../../infrastructure/di/container";
+import {
+  GUEST_WALLET_AMOUNT_OPTIONS,
+  GuestWalletAmountOption,
+  isUnspendableWalletStatus,
+} from "@/lib/pos/guestWalletAmounts";
 
 export type CardTopupStep = "menu" | "detect" | "amount" | "print";
 
@@ -16,18 +21,36 @@ export interface CardTopupPrefill {
   customerName?: string;
   customerPhone?: string;
   tenantId?: string;
+  walletId?: string;
+}
+
+export interface CardTopupReceipt {
+  receiptId: string;
+  cardNumber: string;
+  customerName?: string;
+  amount: string;
+  balanceAfter: string;
+  printedAt: string;
+}
+
+export interface CardTopupConfirmInput {
+  locationId: string;
+  posSessionId: string;
+  paymentMethodId: string;
+  reference?: string;
 }
 
 interface UseCardTopupFlowReturn {
   step: CardTopupStep;
   cardNumber: string;
-  detectedCard: MembershipCard | null;
+  detectedCard: GuestCard | null;
+  detectedWallet: GuestWallet | null;
   customerName: string | null;
   customerPhone: string | null;
-  amountOptions: MembershipCardTopupAmountOptionDTO[];
+  amountOptions: GuestWalletAmountOption[];
   selectedAmount: string;
   customAmount: string;
-  receipt: MembershipCardTopupReceiptDTO | null;
+  receipt: CardTopupReceipt | null;
   isLoading: boolean;
   error: string | null;
   setCardNumber: (value: string) => void;
@@ -38,7 +61,7 @@ interface UseCardTopupFlowReturn {
   startTopupFromPrefill: (prefill: CardTopupPrefill) => void;
   detectCard: () => Promise<void>;
   confirmAmount: () => void;
-  confirmAndPrint: (tenantId: string) => Promise<void>;
+  confirmAndPrint: (input: CardTopupConfirmInput) => Promise<void>;
   resetFlow: () => void;
   clearError: () => void;
 }
@@ -49,48 +72,29 @@ const parseAmount = (value: string): number => {
 };
 
 export function useCardTopupFlow(): UseCardTopupFlowReturn {
-  const membershipCardService = container.resolve<IMembershipCardService>(
-    "membershipCardService"
+  const guestWalletService = container.resolve<IGuestWalletService>(
+    "guestWalletService"
   );
 
   const [step, setStep] = useState<CardTopupStep>("menu");
   const [cardNumber, setCardNumber] = useState("");
-  const [detectedCard, setDetectedCard] = useState<MembershipCard | null>(null);
+  const [detectedCard, setDetectedCard] = useState<GuestCard | null>(null);
+  const [detectedWallet, setDetectedWallet] = useState<GuestWallet | null>(null);
   const [customerName, setCustomerName] = useState<string | null>(null);
   const [customerPhone, setCustomerPhone] = useState<string | null>(null);
-  const [amountOptions, setAmountOptions] = useState<
-    MembershipCardTopupAmountOptionDTO[]
-  >([]);
   const [selectedAmount, setSelectedAmount] = useState("");
   const [customAmount, setCustomAmount] = useState("");
-  const [receipt, setReceipt] = useState<MembershipCardTopupReceiptDTO | null>(
-    null
-  );
+  const [receipt, setReceipt] = useState<CardTopupReceipt | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const clearError = useCallback(() => setError(null), []);
 
-  useEffect(() => {
-    let cancelled = false;
-    const loadOptions = async () => {
-      try {
-        const options = await membershipCardService.getTopupAmountOptions();
-        if (!cancelled) setAmountOptions(options);
-      } catch {
-        if (!cancelled) setAmountOptions([]);
-      }
-    };
-    loadOptions();
-    return () => {
-      cancelled = true;
-    };
-  }, [membershipCardService]);
-
   const resetFlow = useCallback(() => {
     setStep("menu");
     setCardNumber("");
     setDetectedCard(null);
+    setDetectedWallet(null);
     setCustomerName(null);
     setCustomerPhone(null);
     setSelectedAmount("");
@@ -108,6 +112,7 @@ export function useCardTopupFlow(): UseCardTopupFlowReturn {
     setError(null);
     setCardNumber("");
     setDetectedCard(null);
+    setDetectedWallet(null);
     setCustomerName(null);
     setCustomerPhone(null);
     setSelectedAmount("");
@@ -116,52 +121,73 @@ export function useCardTopupFlow(): UseCardTopupFlowReturn {
     setStep("detect");
   }, []);
 
-  const startTopupFromPrefill = useCallback((prefill: CardTopupPrefill) => {
-    if (!prefill.cardNumber?.trim()) {
-      startTopup();
-      return;
-    }
+  const startTopupFromPrefill = useCallback(
+    (prefill: CardTopupPrefill) => {
+      if (!prefill.cardNumber?.trim()) {
+        startTopup();
+        return;
+      }
 
-    setError(null);
-    setReceipt(null);
-    setSelectedAmount("");
-    setCustomAmount("");
-    setCardNumber(prefill.cardNumber);
-    setCustomerName(prefill.customerName || null);
-    setCustomerPhone(prefill.customerPhone || null);
-    setDetectedCard(
-      new MembershipCard({
-        id: "",
-        tenantId: prefill.tenantId || "",
-        customerId: prefill.customerId || "",
-        cardNumber: prefill.cardNumber,
-        balance: prefill.balance || "0.0000",
-        status: "BOUND",
-      })
-    );
-    setStep("amount");
-  }, [startTopup]);
+      setError(null);
+      setReceipt(null);
+      setSelectedAmount("");
+      setCustomAmount("");
+      setCardNumber(prefill.cardNumber);
+      setCustomerName(prefill.customerName || null);
+      setCustomerPhone(prefill.customerPhone || null);
+      setDetectedCard(
+        new GuestCard({
+          id: prefill.customerId || "",
+          cardUid: prefill.cardNumber,
+          walletId: prefill.walletId || "",
+          status: "ACTIVE",
+        })
+      );
+      setDetectedWallet(
+        new GuestWallet({
+          id: prefill.walletId || "",
+          guestName: prefill.customerName || "",
+          guestPhone: prefill.customerPhone || "",
+          balance: prefill.balance || "0.0000",
+          status: "ACTIVE",
+        })
+      );
+      setStep("amount");
+    },
+    [startTopup]
+  );
 
   const detectCard = useCallback(async () => {
     try {
       setIsLoading(true);
       clearError();
-      const result = await membershipCardService.detectMembershipCard({
-        cardNumber: cardNumber.trim(),
-      });
-      setDetectedCard(result.card);
-      setCustomerName(result.customerName || null);
-      setCustomerPhone(result.customerPhone || null);
-      setCardNumber(result.card.cardNumber);
+      const card = await guestWalletService.lookupCard(cardNumber.trim());
+      if (card.status && card.status.toUpperCase() !== "ACTIVE") {
+        throw new Error("This card is not active");
+      }
+      const wallet =
+        card.wallet ||
+        (card.walletId ? await guestWalletService.getWallet(card.walletId) : null);
+      if (!wallet) {
+        throw new Error("No guest wallet is linked to this card");
+      }
+      if (isUnspendableWalletStatus(wallet.status)) {
+        throw new Error("This wallet cannot be topped up right now");
+      }
+      setDetectedCard(card);
+      setDetectedWallet(wallet);
+      setCustomerName(wallet.guestName || null);
+      setCustomerPhone(wallet.guestPhone || null);
+      setCardNumber(card.cardUid);
       setStep("amount");
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Unable to detect membership card";
+        err instanceof Error ? err.message : "Unable to detect guest card";
       setError(message);
     } finally {
       setIsLoading(false);
     }
-  }, [cardNumber, clearError, membershipCardService]);
+  }, [cardNumber, clearError, guestWalletService]);
 
   const resolveAmount = useCallback((): string => {
     if (selectedAmount) return selectedAmount;
@@ -179,41 +205,45 @@ export function useCardTopupFlow(): UseCardTopupFlowReturn {
   }, [clearError, resolveAmount]);
 
   const confirmAndPrint = useCallback(
-    async (tenantId: string) => {
+    async (input: CardTopupConfirmInput) => {
       const amount = resolveAmount();
-      if (!detectedCard?.cardNumber) {
+      if (!detectedCard?.cardUid || !detectedWallet?.id) {
         setError("Card must be detected before printing");
-        return;
-      }
-      if (!tenantId?.trim()) {
-        setError("Tenant is required");
         return;
       }
       if (parseAmount(amount) <= 0) {
         setError("Topup amount must be greater than zero");
         return;
       }
+      if (!input.paymentMethodId?.trim()) {
+        setError("Payment method is required");
+        return;
+      }
 
       try {
         setIsLoading(true);
         clearError();
-        const result = await membershipCardService.createTopupReceipt({
-          tenantId,
-          cardNumber: detectedCard.cardNumber,
-          amount,
-        });
-        setReceipt({
-          ...result,
-          customerName: result.customerName || customerName || undefined,
-        });
-        setDetectedCard((current) =>
-          current
-            ? new MembershipCard({
-                ...current,
-                balance: result.balanceAfter,
-              })
-            : current
+        const entry: GuestWalletLedgerEntry = await guestWalletService.topUpWallet(
+          detectedWallet.id,
+          {
+            amount,
+            paymentMethodId: input.paymentMethodId,
+            posSessionId: input.posSessionId,
+            locationId: input.locationId,
+            reference: input.reference?.trim() || undefined,
+            guestCardId: detectedCard.id?.trim() || undefined,
+          }
         );
+        const wallet = await guestWalletService.getWallet(detectedWallet.id);
+        setDetectedWallet(wallet);
+        setReceipt({
+          receiptId: entry.id || `topup-${Date.now()}`,
+          cardNumber: detectedCard.cardUid,
+          customerName: wallet.guestName || customerName || undefined,
+          amount,
+          balanceAfter: entry.balanceAfter || wallet.balance,
+          printedAt: entry.createdAt || new Date().toISOString(),
+        });
         window.print();
       } catch (err) {
         const message =
@@ -227,7 +257,8 @@ export function useCardTopupFlow(): UseCardTopupFlowReturn {
       clearError,
       customerName,
       detectedCard,
-      membershipCardService,
+      detectedWallet,
+      guestWalletService,
       resolveAmount,
     ]
   );
@@ -236,9 +267,10 @@ export function useCardTopupFlow(): UseCardTopupFlowReturn {
     step,
     cardNumber,
     detectedCard,
+    detectedWallet,
     customerName,
     customerPhone,
-    amountOptions,
+    amountOptions: GUEST_WALLET_AMOUNT_OPTIONS,
     selectedAmount,
     customAmount,
     receipt,

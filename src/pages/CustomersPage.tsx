@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { CardCaptureStatus } from "@/components/ui/CardCaptureStatus";
@@ -17,6 +17,10 @@ import { useCardCapture } from "@/core/presentation/hooks/useCardCapture";
 import { useGuestWalletManagement } from "@/core/presentation/hooks/useGuestWalletManagement";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
 import { useDateFormatter } from "@/lib/i18n/formatters";
+import {
+  assertPaymentReference,
+  paymentRequiresReference,
+} from "@/lib/pos/paymentReference";
 
 const PAGE_SIZE = 6;
 const LEDGER_PAGE_SIZE = 10;
@@ -24,6 +28,15 @@ const GUEST_CARDS_PAGE_SIZE = 6;
 
 const fieldClass =
   "min-h-11 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-500";
+
+const modalOverlayClass =
+  "fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-3";
+
+const modalPanelClass =
+  "flex max-h-[78dvh] w-full flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-xl sm:max-h-[68vh] sm:rounded-xl";
+
+const modalFieldClass =
+  "min-h-9 w-full rounded border border-slate-300 bg-white px-2.5 text-sm text-slate-900 outline-none focus:border-blue-500";
 
 const emptyCustomerForm = {
   name: "",
@@ -51,6 +64,7 @@ const emptyIssueForm = {
   cardUid: "",
   cardLabel: "",
   roomNumber: "",
+  extraCards: [] as Array<{ cardUid: string; cardLabel: string }>,
   paymentMethodId: "",
   paymentAmount: "",
   paymentReference: "",
@@ -207,6 +221,35 @@ function Detail({ label, value }: { label: string; value: string }) {
   );
 }
 
+function ModalFrame({
+  title,
+  children,
+  footer,
+  onSubmit,
+  wide = false,
+}: {
+  title: string;
+  children: ReactNode;
+  footer: ReactNode;
+  onSubmit: (event: FormEvent) => void;
+  wide?: boolean;
+}) {
+  return (
+    <div className={modalOverlayClass}>
+      <form
+        onSubmit={onSubmit}
+        className={`${modalPanelClass} ${wide ? "max-w-xl" : "max-w-lg"}`}
+      >
+        <h2 className="shrink-0 border-b border-slate-100 px-4 py-2 text-base font-bold text-slate-900">
+          {title}
+        </h2>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">{children}</div>
+        <div className="shrink-0 border-t border-slate-100 px-4 py-2">{footer}</div>
+      </form>
+    </div>
+  );
+}
+
 function PaymentMethodSelect({
   label,
   methods,
@@ -222,7 +265,7 @@ function PaymentMethodSelect({
     <select
       required
       aria-label={label}
-      className={fieldClass}
+      className={modalFieldClass}
       value={value}
       onChange={(event) => onChange(event.target.value)}
     >
@@ -318,6 +361,9 @@ export function CustomersPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [interactionForm, setInteractionForm] = useState(emptyInteractionForm);
   const [issueForm, setIssueForm] = useState(emptyIssueForm);
+  const [tierOptions, setTierOptions] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
   const [isIssueFormOpen, setIsIssueFormOpen] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -517,7 +563,19 @@ export function CustomersPage() {
     const mode = captureModeRef.current;
     if (mode === "ignore") return;
     if (mode === "issue") {
-      setIssueForm((current) => ({ ...current, cardUid: uid }));
+      setIssueForm((current) => {
+        if (!current.cardUid.trim()) {
+          return { ...current, cardUid: uid };
+        }
+        const extras = [...current.extraCards];
+        const emptyIndex = extras.findIndex((card) => !card.cardUid.trim());
+        if (emptyIndex >= 0) {
+          extras[emptyIndex] = { ...extras[emptyIndex], cardUid: uid };
+        } else {
+          extras.push({ cardUid: uid, cardLabel: "" });
+        }
+        return { ...current, extraCards: extras };
+      });
       setNotice(t("crm.cardCaptured", { uid }));
       return;
     }
@@ -668,6 +726,7 @@ export function CustomersPage() {
     if (!selectedCustomer) return;
     setIssueForm({
       ...emptyIssueForm,
+      extraCards: [],
       guestName: selectedCustomer.name,
       guestPhone: selectedCustomer.phone || "",
       cardLabel: selectedCustomer.name,
@@ -675,6 +734,18 @@ export function CustomersPage() {
     });
     setIsIssueFormOpen(true);
     setLocalError(null);
+    void listWallets({ page: 1, limit: 50 })
+      .then((result) => {
+        const unique = new Map<string, string>();
+        result.wallets.forEach((wallet) => {
+          if (!wallet.tierId) return;
+          unique.set(wallet.tierId, wallet.tierNameSnapshot || wallet.tierId);
+        });
+        setTierOptions(
+          Array.from(unique.entries()).map(([id, name]) => ({ id, name }))
+        );
+      })
+      .catch(() => setTierOptions([]));
   };
 
   const openAction = async (action: WalletAction, card?: GuestCard) => {
@@ -779,6 +850,17 @@ export function CustomersPage() {
     setLocalError(null);
     try {
       const context = await requireWorkspace();
+      const issuePaymentMethod = paymentMethods.find(
+        (method) => method.id === issueForm.paymentMethodId
+      );
+      assertPaymentReference(issuePaymentMethod, issueForm.paymentReference);
+      const extraCards = issueForm.extraCards
+        .filter((card) => card.cardUid.trim())
+        .map((card) => ({
+          cardUid: card.cardUid.trim(),
+          label: card.cardLabel.trim() || undefined,
+          roomNumber: issueForm.roomNumber.trim() || undefined,
+        }));
       const wallet = await issueWallet({
         tierId: issueForm.tierId.trim(),
         guestName: issueForm.guestName.trim(),
@@ -792,6 +874,7 @@ export function CustomersPage() {
             label: issueForm.cardLabel.trim() || undefined,
             roomNumber: issueForm.roomNumber.trim() || undefined,
           },
+          ...extraCards,
         ],
         payment: {
           paymentMethodId: issueForm.paymentMethodId,
@@ -817,6 +900,8 @@ export function CustomersPage() {
     try {
       if (walletAction === "topup") {
         const context = await requireWorkspace();
+        const method = paymentMethods.find((item) => item.id === paymentMethodId);
+        assertPaymentReference(method, reference);
         await topUpWallet(selectedWallet.id, {
           amount: amount.trim(),
           paymentMethodId,
@@ -977,7 +1062,7 @@ export function CustomersPage() {
                 <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-100 text-lg font-bold text-blue-700">
                   {initials(selectedCustomer.name)}
                 </div>
-                <div>
+        <div>
                   <h2 className="text-2xl font-bold text-slate-900">
                     {selectedCustomer.name}
                   </h2>
@@ -1142,8 +1227,8 @@ export function CustomersPage() {
                               <p className="text-xs text-slate-500">
                                 {card.label || "—"} · {card.roomNumber || "—"} ·{" "}
                                 {card.status}
-                              </p>
-                            </div>
+          </p>
+        </div>
                             {card.status.toUpperCase() === "ACTIVE" ? (
                               <div className="flex flex-wrap gap-1">
                                 <Button
@@ -1152,7 +1237,7 @@ export function CustomersPage() {
                                   onClick={() => void openAction("lost", card)}
                                 >
                                   {t("crm.reportLost")}
-                                </Button>
+        </Button>
                                 <Button
                                   size="sm"
                                   variant="secondary"
@@ -1275,7 +1360,7 @@ export function CustomersPage() {
                     <p className="mt-1 text-xs text-slate-500">
                       {t("crm.guestCardRegistryHint")}
                     </p>
-                    <input
+          <input
                       aria-label={t("crm.search")}
                       placeholder={t("crm.search")}
                       className={`${fieldClass} mt-3`}
@@ -1410,7 +1495,7 @@ export function CustomersPage() {
                   </select>
                 </div>
                 <input
-                  required
+            required
                   aria-label={t("crm.summary")}
                   placeholder={t("crm.summary")}
                   className={fieldClass}
@@ -1598,21 +1683,56 @@ export function CustomersPage() {
       </main>
 
       {walletAction ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-          <form
-            onSubmit={handleWalletAction}
-            className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-xl"
-          >
-            <h2 className="text-lg font-bold text-slate-900">{actionTitle}</h2>
-            <div className="mt-4 space-y-3">
+        <ModalFrame
+          title={actionTitle}
+          onSubmit={handleWalletAction}
+          footer={
+            <div className="flex gap-2">
+              <Button
+                fullWidth
+                size="sm"
+                type="submit"
+                isLoading={isWalletLoading}
+                disabled={walletAction === "close" && !canConfirmClose}
+              >
+                {walletAction === "topup"
+                  ? t("crm.confirmTopup")
+                  : walletAction === "refund"
+                    ? t("crm.confirmRefund")
+                    : walletAction === "bind"
+                      ? t("crm.confirmBind")
+                      : walletAction === "unbind"
+                        ? t("crm.confirmUnbind")
+                        : walletAction === "lost"
+                          ? t("crm.confirmLost")
+                          : walletAction === "replace"
+                            ? t("crm.confirmReplace")
+                            : walletAction === "void"
+                              ? t("crm.confirmVoid")
+                              : t("crm.confirmCloseCard")}
+              </Button>
+              <Button
+                fullWidth
+                size="sm"
+                variant="outline"
+                type="button"
+                className="border-slate-300 text-slate-700 hover:bg-slate-50"
+                onClick={resetActionForm}
+              >
+                {t("common.cancel")}
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-2">
               {walletAction === "topup" || walletAction === "refund" ? (
                 <>
-                  <input
-                    required
+          <input
+            required
                     inputMode="decimal"
                     aria-label={t("crm.amount")}
                     placeholder={t("crm.amount")}
-                    className={fieldClass}
+                    className={modalFieldClass}
                     value={amount}
                     onChange={(event) => setAmount(event.target.value)}
                   />
@@ -1625,7 +1745,7 @@ export function CustomersPage() {
                   {walletAction === "topup" && activeCards.length > 0 ? (
                     <select
                       aria-label={t("crm.cardUid")}
-                      className={fieldClass}
+                      className={modalFieldClass}
                       value={selectedCardId}
                       onChange={(event) => setSelectedCardId(event.target.value)}
                     >
@@ -1637,17 +1757,17 @@ export function CustomersPage() {
                       ))}
                     </select>
                   ) : null}
-                  <input
+          <input
                     aria-label={t("crm.reference")}
                     placeholder={t("crm.reference")}
-                    className={fieldClass}
+                    className={modalFieldClass}
                     value={reference}
                     onChange={(event) => setReference(event.target.value)}
                   />
                   <input
                     aria-label={t("crm.notes")}
                     placeholder={t("crm.notes")}
-                    className={fieldClass}
+                    className={modalFieldClass}
                     value={notes}
                     onChange={(event) => setNotes(event.target.value)}
                   />
@@ -1659,10 +1779,10 @@ export function CustomersPage() {
               walletAction === "void" ? (
                 <>
                   <input
-                    required
+            required
                     aria-label={t("crm.approverToken")}
                     placeholder={t("crm.approverToken")}
-                    className={fieldClass}
+                    className={modalFieldClass}
                     value={approverToken}
                     onChange={(event) => setApproverToken(event.target.value)}
                   />
@@ -1672,11 +1792,11 @@ export function CustomersPage() {
 
               {walletAction === "bind" ? (
                 <>
-                  <input
-                    required
+          <input
+            required
                     aria-label={t("crm.cardUid")}
                     placeholder={t("crm.cardUid")}
-                    className={fieldClass}
+                    className={modalFieldClass}
                     value={cardUid}
                     onChange={(event) => setCardUid(event.target.value)}
                   />
@@ -1691,14 +1811,14 @@ export function CustomersPage() {
                   <input
                     aria-label={t("crm.cardLabel")}
                     placeholder={t("crm.cardLabel")}
-                    className={fieldClass}
+                    className={modalFieldClass}
                     value={cardLabel}
                     onChange={(event) => setCardLabel(event.target.value)}
                   />
                   <input
                     aria-label={t("crm.roomNumber")}
                     placeholder={t("crm.roomNumber")}
-                    className={fieldClass}
+                    className={modalFieldClass}
                     value={roomNumber}
                     onChange={(event) => setRoomNumber(event.target.value)}
                   />
@@ -1715,7 +1835,7 @@ export function CustomersPage() {
                   <select
                     required
                     aria-label={t("crm.cardUid")}
-                    className={fieldClass}
+                    className={modalFieldClass}
                     value={selectedCardId}
                     onChange={(event) => setSelectedCardId(event.target.value)}
                   >
@@ -1733,7 +1853,7 @@ export function CustomersPage() {
                   <select
                     required
                     aria-label={t("crm.cardUid")}
-                    className={fieldClass}
+                    className={modalFieldClass}
                     value={selectedCardId}
                     onChange={(event) => setSelectedCardId(event.target.value)}
                   >
@@ -1747,7 +1867,7 @@ export function CustomersPage() {
                     required
                     aria-label={t("crm.newCardUid")}
                     placeholder={t("crm.newCardUid")}
-                    className={fieldClass}
+                    className={modalFieldClass}
                     value={newCardUid}
                     onChange={(event) => setNewCardUid(event.target.value)}
                   />
@@ -1762,14 +1882,14 @@ export function CustomersPage() {
                   <input
                     aria-label={t("crm.cardLabel")}
                     placeholder={t("crm.cardLabel")}
-                    className={fieldClass}
+                    className={modalFieldClass}
                     value={cardLabel}
                     onChange={(event) => setCardLabel(event.target.value)}
                   />
                   <input
                     aria-label={t("crm.roomNumber")}
                     placeholder={t("crm.roomNumber")}
-                    className={fieldClass}
+                    className={modalFieldClass}
                     value={roomNumber}
                     onChange={(event) => setRoomNumber(event.target.value)}
                   />
@@ -1791,7 +1911,7 @@ export function CustomersPage() {
                     onClick={() => void handleBeginSettlement()}
                   >
                     {t("crm.beginSettlement")}
-                  </Button>
+            </Button>
                   {!walletSettling ? (
                     <p className="text-xs text-amber-600">{t("crm.settlementRequired")}</p>
                   ) : null}
@@ -1837,73 +1957,59 @@ export function CustomersPage() {
                   ) : null}
                   <input
                     aria-label={t("crm.reference")}
-                    placeholder={t("crm.reference")}
-                    className={fieldClass}
+                    placeholder={
+                      paymentRequiresReference(
+                        paymentMethods.find((method) => method.id === paymentMethodId)
+                      )
+                        ? t("crm.referenceRequired")
+                        : t("crm.reference")
+                    }
+                    className={modalFieldClass}
                     value={reference}
                     onChange={(event) => setReference(event.target.value)}
                   />
                   <input
                     aria-label={t("crm.notes")}
                     placeholder={t("crm.notes")}
-                    className={fieldClass}
+                    className={modalFieldClass}
                     value={notes}
                     onChange={(event) => setNotes(event.target.value)}
                   />
                 </>
               ) : null}
-
-              <div className="flex gap-2 pt-1">
-                <Button
-                  fullWidth
-                  type="submit"
-                  isLoading={isWalletLoading}
-                  disabled={walletAction === "close" && !canConfirmClose}
-                >
-                  {walletAction === "topup"
-                    ? t("crm.confirmTopup")
-                    : walletAction === "refund"
-                      ? t("crm.confirmRefund")
-                      : walletAction === "bind"
-                        ? t("crm.confirmBind")
-                        : walletAction === "unbind"
-                          ? t("crm.confirmUnbind")
-                          : walletAction === "lost"
-                            ? t("crm.confirmLost")
-                            : walletAction === "replace"
-                              ? t("crm.confirmReplace")
-                              : walletAction === "void"
-                                ? t("crm.confirmVoid")
-                                : t("crm.confirmCloseCard")}
-                </Button>
-                <Button
-                  fullWidth
-                  variant="outline"
-                  type="button"
-                  onClick={resetActionForm}
-                >
-                  {t("common.cancel")}
-                </Button>
-              </div>
-            </div>
-          </form>
-        </div>
+          </div>
+        </ModalFrame>
       ) : null}
 
       {isIssueFormOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-          <form
-            onSubmit={handleIssueWallet}
-            className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-xl"
-          >
-            <h2 className="text-lg font-bold text-slate-900">
-              {t("crm.registerTitle")}
-            </h2>
-            <div className="mt-4 space-y-3">
+        <ModalFrame
+          wide
+          title={t("crm.registerTitle")}
+          onSubmit={handleIssueWallet}
+          footer={
+            <div className="flex gap-2">
+              <Button fullWidth size="sm" type="submit" isLoading={isWalletLoading}>
+                {t("crm.issueWallet")}
+              </Button>
+              <Button
+                fullWidth
+                size="sm"
+                variant="outline"
+                type="button"
+                className="border-slate-300 text-slate-700 hover:bg-slate-50"
+                onClick={() => setIsIssueFormOpen(false)}
+              >
+                {t("common.cancel")}
+              </Button>
+            </div>
+          }
+        >
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <input
                 required
                 aria-label={t("crm.name")}
                 placeholder={t("crm.name")}
-                className={fieldClass}
+                className={modalFieldClass}
                 value={issueForm.guestName}
                 onChange={(event) =>
                   setIssueForm((current) => ({
@@ -1916,7 +2022,7 @@ export function CustomersPage() {
                 required
                 aria-label={t("crm.phone")}
                 placeholder={t("crm.phone")}
-                className={fieldClass}
+                className={modalFieldClass}
                 value={issueForm.guestPhone}
                 onChange={(event) =>
                   setIssueForm((current) => ({
@@ -1928,7 +2034,7 @@ export function CustomersPage() {
               <input
                 aria-label={t("crm.guestIdNumber")}
                 placeholder={t("crm.guestIdNumber")}
-                className={fieldClass}
+                className={modalFieldClass}
                 value={issueForm.guestIdNumber}
                 onChange={(event) =>
                   setIssueForm((current) => ({
@@ -1937,24 +2043,46 @@ export function CustomersPage() {
                   }))
                 }
               />
-              <input
-                required
-                aria-label={t("crm.tierId")}
-                placeholder={t("crm.tierId")}
-                className={fieldClass}
-                value={issueForm.tierId}
-                onChange={(event) =>
-                  setIssueForm((current) => ({
-                    ...current,
-                    tierId: event.target.value,
-                  }))
-                }
-              />
+              {tierOptions.length ? (
+                <select
+                  required
+                  aria-label={t("crm.tierSelect")}
+                  className={modalFieldClass}
+                  value={issueForm.tierId}
+                  onChange={(event) =>
+                    setIssueForm((current) => ({
+                      ...current,
+                      tierId: event.target.value,
+                    }))
+                  }
+                >
+                  <option value="">{t("crm.tierSelect")}</option>
+                  {tierOptions.map((tier) => (
+                    <option key={tier.id} value={tier.id}>
+                      {tier.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  required
+                  aria-label={t("crm.tierId")}
+                  placeholder={t("crm.tierId")}
+                  className={modalFieldClass}
+                  value={issueForm.tierId}
+                  onChange={(event) =>
+                    setIssueForm((current) => ({
+                      ...current,
+                      tierId: event.target.value,
+                    }))
+                  }
+                />
+              )}
               <input
                 required
                 aria-label={t("crm.cardUid")}
                 placeholder={t("crm.cardUid")}
-                className={fieldClass}
+                className={`${modalFieldClass} sm:col-span-2`}
                 value={issueForm.cardUid}
                 onChange={(event) =>
                   setIssueForm((current) => ({
@@ -1963,6 +2091,7 @@ export function CustomersPage() {
                   }))
                 }
               />
+              <div className="sm:col-span-2">
               <CardCaptureStatus
                 variant="light"
                 nfcSupported={nfcSupported}
@@ -1971,32 +2100,102 @@ export function CustomersPage() {
                 lastUid={lastUid}
                 onEnableNfc={() => void startNfc()}
               />
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  aria-label={t("crm.cardLabel")}
-                  placeholder={t("crm.cardLabel")}
-                  className={fieldClass}
-                  value={issueForm.cardLabel}
-                  onChange={(event) =>
-                    setIssueForm((current) => ({
-                      ...current,
-                      cardLabel: event.target.value,
-                    }))
-                  }
-                />
-                <input
-                  aria-label={t("crm.roomNumber")}
-                  placeholder={t("crm.roomNumber")}
-                  className={fieldClass}
-                  value={issueForm.roomNumber}
-                  onChange={(event) =>
-                    setIssueForm((current) => ({
-                      ...current,
-                      roomNumber: event.target.value,
-                    }))
-                  }
-                />
               </div>
+              {issueForm.extraCards.map((card, index) => (
+                <div
+                  key={`extra-card-${index}`}
+                  className="grid grid-cols-1 gap-2 sm:col-span-2 sm:grid-cols-[1fr_1fr_auto]"
+                >
+                  <input
+                    aria-label={t("crm.extraCardUid")}
+                    placeholder={t("crm.extraCardUid")}
+                    className={modalFieldClass}
+                    value={card.cardUid}
+                    onChange={(event) =>
+                      setIssueForm((current) => {
+                        const extraCards = current.extraCards.map((item, itemIndex) =>
+                          itemIndex === index
+                            ? { ...item, cardUid: event.target.value }
+                            : item
+                        );
+                        return { ...current, extraCards };
+                      })
+                    }
+                  />
+                  <input
+                    aria-label={t("crm.cardLabel")}
+                    placeholder={t("crm.cardLabel")}
+                    className={modalFieldClass}
+                    value={card.cardLabel}
+                    onChange={(event) =>
+                      setIssueForm((current) => {
+                        const extraCards = current.extraCards.map((item, itemIndex) =>
+                          itemIndex === index
+                            ? { ...item, cardLabel: event.target.value }
+                            : item
+                        );
+                        return { ...current, extraCards };
+                      })
+                    }
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      setIssueForm((current) => ({
+                        ...current,
+                        extraCards: current.extraCards.filter(
+                          (_, itemIndex) => itemIndex !== index
+                        ),
+                      }))
+                    }
+                  >
+                    {t("crm.removeCard")}
+                  </Button>
+                </div>
+              ))}
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="sm:col-span-2"
+                onClick={() =>
+                  setIssueForm((current) => ({
+                    ...current,
+                    extraCards: [
+                      ...current.extraCards,
+                      { cardUid: "", cardLabel: "" },
+                    ],
+                  }))
+                }
+              >
+                {t("crm.addAnotherCard")}
+              </Button>
+              <input
+                aria-label={t("crm.cardLabel")}
+                placeholder={t("crm.cardLabel")}
+                className={modalFieldClass}
+                value={issueForm.cardLabel}
+                onChange={(event) =>
+                  setIssueForm((current) => ({
+                    ...current,
+                    cardLabel: event.target.value,
+                  }))
+                }
+              />
+              <input
+                aria-label={t("crm.roomNumber")}
+                placeholder={t("crm.roomNumber")}
+                className={modalFieldClass}
+                value={issueForm.roomNumber}
+                onChange={(event) =>
+                  setIssueForm((current) => ({
+                    ...current,
+                    roomNumber: event.target.value,
+                  }))
+                }
+              />
               <PaymentMethodSelect
                 label={t("crm.paymentMethod")}
                 methods={paymentMethods}
@@ -2013,7 +2212,7 @@ export function CustomersPage() {
                 inputMode="decimal"
                 aria-label={t("crm.paymentAmount")}
                 placeholder={t("crm.paymentAmount")}
-                className={fieldClass}
+                className={modalFieldClass}
                 value={issueForm.paymentAmount}
                 onChange={(event) =>
                   setIssueForm((current) => ({
@@ -2024,8 +2223,16 @@ export function CustomersPage() {
               />
               <input
                 aria-label={t("crm.reference")}
-                placeholder={t("crm.reference")}
-                className={fieldClass}
+                placeholder={
+                  paymentRequiresReference(
+                    paymentMethods.find(
+                      (method) => method.id === issueForm.paymentMethodId
+                    )
+                  )
+                    ? t("crm.referenceRequired")
+                    : t("crm.reference")
+                }
+                className={`${modalFieldClass} sm:col-span-2`}
                 value={issueForm.paymentReference}
                 onChange={(event) =>
                   setIssueForm((current) => ({
@@ -2034,39 +2241,38 @@ export function CustomersPage() {
                   }))
                 }
               />
-              <div className="flex gap-2 pt-1">
-                <Button fullWidth type="submit" isLoading={isWalletLoading}>
-                  {t("crm.issueWallet")}
-                </Button>
-                <Button
-                  fullWidth
-                  variant="outline"
-                  type="button"
-                  onClick={() => setIsIssueFormOpen(false)}
-                >
-                  {t("common.cancel")}
-                </Button>
-              </div>
-            </div>
-          </form>
-        </div>
+          </div>
+        </ModalFrame>
       ) : null}
 
       {isFormOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-          <form
-            onSubmit={handleSubmitCustomer}
-            className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-xl"
-          >
-            <h2 className="text-lg font-bold text-slate-900">
-              {editing ? t("crm.editCustomer") : t("crm.addCustomer")}
-            </h2>
-            <div className="mt-4 space-y-3">
+        <ModalFrame
+          title={editing ? t("crm.editCustomer") : t("crm.addCustomer")}
+          onSubmit={handleSubmitCustomer}
+          footer={
+            <div className="flex gap-2">
+              <Button fullWidth size="sm" type="submit" isLoading={isLoading}>
+                {editing ? t("common.save") : t("crm.addCustomer")}
+              </Button>
+              <Button
+                fullWidth
+                size="sm"
+                variant="outline"
+                type="button"
+                className="border-slate-300 text-slate-700 hover:bg-slate-50"
+                onClick={() => setIsFormOpen(false)}
+              >
+                {t("common.cancel")}
+              </Button>
+            </div>
+          }
+        >
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <input
                 required
                 aria-label={t("crm.name")}
                 placeholder={t("crm.name")}
-                className={fieldClass}
+                className={modalFieldClass}
                 value={form.name}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, name: event.target.value }))
@@ -2075,7 +2281,7 @@ export function CustomersPage() {
               <input
                 aria-label={t("crm.phone")}
                 placeholder={t("crm.phone")}
-                className={fieldClass}
+                className={modalFieldClass}
                 value={form.phone}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, phone: event.target.value }))
@@ -2085,18 +2291,17 @@ export function CustomersPage() {
                 type="email"
                 aria-label={t("crm.email")}
                 placeholder={t("crm.email")}
-                className={fieldClass}
+                className={`${modalFieldClass} sm:col-span-2`}
                 value={form.email}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, email: event.target.value }))
                 }
               />
-              <div className="grid grid-cols-2 gap-2">
-                <label className="text-xs text-slate-500">
+              <label className="text-xs text-slate-500">
                   {t("crm.accountType")}
                   <select
                     aria-label={t("crm.accountType")}
-                    className={`${fieldClass} mt-1`}
+                    className={`${modalFieldClass} mt-1`}
                     value={form.accountType}
                     onChange={(event) =>
                       setForm((current) => ({
@@ -2112,7 +2317,7 @@ export function CustomersPage() {
                   {t("crm.loyaltyTier")}
                   <select
                     aria-label={t("crm.loyaltyTier")}
-                    className={`${fieldClass} mt-1`}
+                    className={`${modalFieldClass} mt-1`}
                     value={form.loyaltyTier}
                     onChange={(event) =>
                       setForm((current) => ({
@@ -2127,8 +2332,7 @@ export function CustomersPage() {
                     <option value="PLATINUM">PLATINUM</option>
                   </select>
                 </label>
-              </div>
-              <label className="flex items-center gap-2 text-sm text-slate-700">
+              <label className="flex items-center gap-2 text-sm text-slate-700 sm:col-span-2">
                 <input
                   type="checkbox"
                   checked={form.hasCreditAccount}
@@ -2141,12 +2345,11 @@ export function CustomersPage() {
                 />
                 {t("crm.creditOn")}
               </label>
-              <div className="grid grid-cols-2 gap-2">
                 <label className="text-xs text-slate-500">
                   {t("crm.maxCredit")}
                   <input
                     aria-label={t("crm.maxCredit")}
-                    className={`${fieldClass} mt-1`}
+                    className={`${modalFieldClass} mt-1`}
                     value={form.maxCreditLimit}
                     onChange={(event) =>
                       setForm((current) => ({
@@ -2162,7 +2365,7 @@ export function CustomersPage() {
                     aria-label={t("crm.terms")}
                     type="number"
                     min={0}
-                    className={`${fieldClass} mt-1`}
+                    className={`${modalFieldClass} mt-1`}
                     value={form.paymentTermsDays}
                     onChange={(event) =>
                       setForm((current) => ({
@@ -2172,23 +2375,8 @@ export function CustomersPage() {
                     }
                   />
                 </label>
-              </div>
-              <div className="flex gap-2 pt-1">
-                <Button fullWidth type="submit" isLoading={isLoading}>
-                  {editing ? t("common.save") : t("crm.addCustomer")}
-                </Button>
-                <Button
-                  fullWidth
-                  variant="outline"
-                  type="button"
-                  onClick={() => setIsFormOpen(false)}
-                >
-                  {t("common.cancel")}
-                </Button>
-              </div>
-            </div>
-          </form>
-        </div>
+          </div>
+        </ModalFrame>
       ) : null}
     </section>
   );

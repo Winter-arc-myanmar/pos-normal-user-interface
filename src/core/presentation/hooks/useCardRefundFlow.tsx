@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useState } from "react";
-import { MembershipCard } from "../../domain/entities/MembershipCard";
-import {
-  MembershipCardRefundAmountOptionDTO,
-  MembershipCardRefundReceiptDTO,
-} from "../../application/dtos/MembershipCardDTO";
-import { IMembershipCardService } from "../../domain/services/IMembershipCardService";
+import { useCallback, useState } from "react";
+import { GuestCard, GuestWallet } from "../../domain/entities/GuestWallet";
+import { IGuestWalletService } from "../../domain/services/IGuestWalletService";
 import container from "../../infrastructure/di/container";
+import {
+  GUEST_WALLET_AMOUNT_OPTIONS,
+  GuestWalletAmountOption,
+  isUnspendableWalletStatus,
+} from "@/lib/pos/guestWalletAmounts";
 
-export type CardRefundStep = "detect" | "pin" | "amount" | "print";
+export type CardRefundStep = "detect" | "amount" | "print";
 
 export interface CardRefundPrefill {
   cardNumber: string;
@@ -16,32 +17,48 @@ export interface CardRefundPrefill {
   customerName?: string;
   customerPhone?: string;
   tenantId?: string;
+  walletId?: string;
+}
+
+export interface CardRefundReceipt {
+  receiptId: string;
+  cardNumber: string;
+  customerName?: string;
+  amount: string;
+  balanceAfter: string;
+  printedAt: string;
+}
+
+export interface CardRefundConfirmInput {
+  locationId: string;
+  posSessionId: string;
+  paymentMethodId: string;
+  approverAuthorization: string;
+  reference?: string;
+  notes?: string;
 }
 
 interface UseCardRefundFlowReturn {
   step: CardRefundStep;
   cardNumber: string;
-  pin: string;
-  pinVerified: boolean;
-  detectedCard: MembershipCard | null;
+  detectedCard: GuestCard | null;
+  detectedWallet: GuestWallet | null;
   customerName: string | null;
   customerPhone: string | null;
-  amountOptions: MembershipCardRefundAmountOptionDTO[];
+  amountOptions: GuestWalletAmountOption[];
   selectedAmount: string;
   customAmount: string;
-  receipt: MembershipCardRefundReceiptDTO | null;
+  receipt: CardRefundReceipt | null;
   isLoading: boolean;
   error: string | null;
   setCardNumber: (value: string) => void;
-  setPin: (value: string) => void;
   setSelectedAmount: (value: string) => void;
   setCustomAmount: (value: string) => void;
   goToStep: (step: CardRefundStep) => void;
   startRefundFromPrefill: (prefill: CardRefundPrefill) => void;
   detectCard: () => Promise<void>;
-  verifyPin: () => Promise<void>;
   confirmAmount: () => void;
-  confirmAndPrint: (tenantId: string) => Promise<void>;
+  confirmAndPrint: (input: CardRefundConfirmInput) => Promise<void>;
   resetFlow: () => void;
   clearError: () => void;
 }
@@ -52,52 +69,29 @@ const parseAmount = (value: string): number => {
 };
 
 export function useCardRefundFlow(): UseCardRefundFlowReturn {
-  const membershipCardService = container.resolve<IMembershipCardService>(
-    "membershipCardService"
+  const guestWalletService = container.resolve<IGuestWalletService>(
+    "guestWalletService"
   );
 
   const [step, setStep] = useState<CardRefundStep>("detect");
   const [cardNumber, setCardNumber] = useState("");
-  const [pin, setPin] = useState("");
-  const [pinVerified, setPinVerified] = useState(false);
-  const [detectedCard, setDetectedCard] = useState<MembershipCard | null>(null);
+  const [detectedCard, setDetectedCard] = useState<GuestCard | null>(null);
+  const [detectedWallet, setDetectedWallet] = useState<GuestWallet | null>(null);
   const [customerName, setCustomerName] = useState<string | null>(null);
   const [customerPhone, setCustomerPhone] = useState<string | null>(null);
-  const [amountOptions, setAmountOptions] = useState<
-    MembershipCardRefundAmountOptionDTO[]
-  >([]);
   const [selectedAmount, setSelectedAmount] = useState("");
   const [customAmount, setCustomAmount] = useState("");
-  const [receipt, setReceipt] = useState<MembershipCardRefundReceiptDTO | null>(
-    null
-  );
+  const [receipt, setReceipt] = useState<CardRefundReceipt | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const clearError = useCallback(() => setError(null), []);
 
-  useEffect(() => {
-    let cancelled = false;
-    const loadOptions = async () => {
-      try {
-        const options = await membershipCardService.getRefundAmountOptions();
-        if (!cancelled) setAmountOptions(options);
-      } catch {
-        if (!cancelled) setAmountOptions([]);
-      }
-    };
-    loadOptions();
-    return () => {
-      cancelled = true;
-    };
-  }, [membershipCardService]);
-
   const resetFlow = useCallback(() => {
     setStep("detect");
     setCardNumber("");
-    setPin("");
-    setPinVerified(false);
     setDetectedCard(null);
+    setDetectedWallet(null);
     setCustomerName(null);
     setCustomerPhone(null);
     setSelectedAmount("");
@@ -111,84 +105,74 @@ export function useCardRefundFlow(): UseCardRefundFlowReturn {
     setStep(nextStep);
   }, []);
 
-  const startRefundFromPrefill = useCallback((prefill: CardRefundPrefill) => {
-    if (!prefill.cardNumber?.trim()) {
-      resetFlow();
-      return;
-    }
+  const startRefundFromPrefill = useCallback(
+    (prefill: CardRefundPrefill) => {
+      if (!prefill.cardNumber?.trim()) {
+        resetFlow();
+        return;
+      }
 
-    setError(null);
-    setReceipt(null);
-    setPin("");
-    setPinVerified(false);
-    setSelectedAmount("");
-    setCustomAmount("");
-    setCardNumber(prefill.cardNumber);
-    setCustomerName(prefill.customerName || null);
-    setCustomerPhone(prefill.customerPhone || null);
-    setDetectedCard(
-      new MembershipCard({
-        id: "",
-        tenantId: prefill.tenantId || "",
-        customerId: prefill.customerId || "",
-        cardNumber: prefill.cardNumber,
-        balance: prefill.balance || "0.0000",
-        status: "BOUND",
-      })
-    );
-    setStep("pin");
-  }, [resetFlow]);
+      setError(null);
+      setReceipt(null);
+      setSelectedAmount("");
+      setCustomAmount("");
+      setCardNumber(prefill.cardNumber);
+      setCustomerName(prefill.customerName || null);
+      setCustomerPhone(prefill.customerPhone || null);
+      setDetectedCard(
+        new GuestCard({
+          id: prefill.customerId || "",
+          cardUid: prefill.cardNumber,
+          walletId: prefill.walletId || "",
+          status: "ACTIVE",
+        })
+      );
+      setDetectedWallet(
+        new GuestWallet({
+          id: prefill.walletId || "",
+          guestName: prefill.customerName || "",
+          guestPhone: prefill.customerPhone || "",
+          purchasedBalance: prefill.balance || "0.0000",
+          balance: prefill.balance || "0.0000",
+          status: "ACTIVE",
+        })
+      );
+      setStep("amount");
+    },
+    [resetFlow]
+  );
 
   const detectCard = useCallback(async () => {
     try {
       setIsLoading(true);
       clearError();
-      const result = await membershipCardService.detectMembershipCard({
-        cardNumber: cardNumber.trim(),
-      });
-      setDetectedCard(result.card);
-      setCustomerName(result.customerName || null);
-      setCustomerPhone(result.customerPhone || null);
-      setCardNumber(result.card.cardNumber);
-      setPin("");
-      setPinVerified(false);
-      setStep("pin");
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Unable to detect membership card";
-      setError(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [cardNumber, clearError, membershipCardService]);
-
-  const verifyPin = useCallback(async () => {
-    if (!detectedCard?.cardNumber) {
-      setError("Card must be detected before verifying PIN");
-      return;
-    }
-    if (!pin.trim()) {
-      setError("PIN is required");
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      clearError();
-      await membershipCardService.verifyMembershipCardPin({
-        cardNumber: detectedCard.cardNumber,
-        pin: pin.trim(),
-      });
-      setPinVerified(true);
+      const card = await guestWalletService.lookupCard(cardNumber.trim());
+      if (card.status && card.status.toUpperCase() !== "ACTIVE") {
+        throw new Error("This card is not active");
+      }
+      const wallet =
+        card.wallet ||
+        (card.walletId ? await guestWalletService.getWallet(card.walletId) : null);
+      if (!wallet) {
+        throw new Error("No guest wallet is linked to this card");
+      }
+      if (isUnspendableWalletStatus(wallet.status)) {
+        throw new Error("This wallet cannot be refunded right now");
+      }
+      setDetectedCard(card);
+      setDetectedWallet(wallet);
+      setCustomerName(wallet.guestName || null);
+      setCustomerPhone(wallet.guestPhone || null);
+      setCardNumber(card.cardUid);
       setStep("amount");
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Unable to verify card PIN";
+        err instanceof Error ? err.message : "Unable to detect guest card";
       setError(message);
     } finally {
       setIsLoading(false);
     }
-  }, [clearError, detectedCard, membershipCardService, pin]);
+  }, [cardNumber, clearError, guestWalletService]);
 
   const resolveAmount = useCallback((): string => {
     if (selectedAmount) return selectedAmount;
@@ -201,27 +185,30 @@ export function useCardRefundFlow(): UseCardRefundFlowReturn {
       setError("Refund amount must be greater than zero");
       return;
     }
-    if (detectedCard && parseAmount(amount) > parseAmount(detectedCard.balance)) {
-      setError("Refund amount cannot exceed card balance");
+    const refundable = parseAmount(
+      detectedWallet?.purchasedBalance || detectedWallet?.balance || "0"
+    );
+    if (parseAmount(amount) > refundable) {
+      setError("Refund amount cannot exceed purchased balance");
       return;
     }
     clearError();
     setStep("print");
-  }, [clearError, detectedCard, resolveAmount]);
+  }, [clearError, detectedWallet, resolveAmount]);
 
   const confirmAndPrint = useCallback(
-    async (tenantId: string) => {
+    async (input: CardRefundConfirmInput) => {
       const amount = resolveAmount();
-      if (!detectedCard?.cardNumber) {
+      if (!detectedCard?.cardUid || !detectedWallet?.id) {
         setError("Card must be detected before printing");
         return;
       }
-      if (!pinVerified || !pin.trim()) {
-        setError("PIN must be verified before printing");
+      if (!input.approverAuthorization?.trim()) {
+        setError("Approver authorization is required");
         return;
       }
-      if (!tenantId?.trim()) {
-        setError("Tenant is required");
+      if (!input.paymentMethodId?.trim()) {
+        setError("Payment method is required");
         return;
       }
       if (parseAmount(amount) <= 0) {
@@ -232,24 +219,24 @@ export function useCardRefundFlow(): UseCardRefundFlowReturn {
       try {
         setIsLoading(true);
         clearError();
-        const result = await membershipCardService.createRefundReceipt({
-          tenantId,
-          cardNumber: detectedCard.cardNumber,
+        const wallet = await guestWalletService.refundWallet(detectedWallet.id, {
           amount,
-          pin: pin.trim(),
+          paymentMethodId: input.paymentMethodId,
+          posSessionId: input.posSessionId,
+          locationId: input.locationId,
+          reference: input.reference?.trim() || undefined,
+          notes: input.notes?.trim() || undefined,
+          approverAuthorization: input.approverAuthorization.trim(),
         });
+        setDetectedWallet(wallet);
         setReceipt({
-          ...result,
-          customerName: result.customerName || customerName || undefined,
+          receiptId: `refund-${Date.now()}`,
+          cardNumber: detectedCard.cardUid,
+          customerName: wallet.guestName || customerName || undefined,
+          amount,
+          balanceAfter: wallet.balance,
+          printedAt: new Date().toISOString(),
         });
-        setDetectedCard((current) =>
-          current
-            ? new MembershipCard({
-                ...current,
-                balance: result.balanceAfter,
-              })
-            : current
-        );
         window.print();
       } catch (err) {
         const message =
@@ -263,9 +250,8 @@ export function useCardRefundFlow(): UseCardRefundFlowReturn {
       clearError,
       customerName,
       detectedCard,
-      membershipCardService,
-      pin,
-      pinVerified,
+      detectedWallet,
+      guestWalletService,
       resolveAmount,
     ]
   );
@@ -273,25 +259,22 @@ export function useCardRefundFlow(): UseCardRefundFlowReturn {
   return {
     step,
     cardNumber,
-    pin,
-    pinVerified,
     detectedCard,
+    detectedWallet,
     customerName,
     customerPhone,
-    amountOptions,
+    amountOptions: GUEST_WALLET_AMOUNT_OPTIONS,
     selectedAmount,
     customAmount,
     receipt,
     isLoading,
     error,
     setCardNumber,
-    setPin,
     setSelectedAmount,
     setCustomAmount,
     goToStep,
     startRefundFromPrefill,
     detectCard,
-    verifyPin,
     confirmAmount,
     confirmAndPrint,
     resetFlow,

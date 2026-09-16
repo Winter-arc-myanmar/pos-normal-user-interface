@@ -182,6 +182,13 @@ vi.mock("@/core/presentation/hooks/useSalesOrderManagement", () => ({
   }),
 }));
 
+vi.mock("@/core/presentation/hooks/useGuestWalletManagement", () => ({
+  useGuestWalletManagement: () => ({
+    lookupCard: vi.fn(),
+    getWallet: vi.fn(),
+  }),
+}));
+
 describe("CashierPage integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();

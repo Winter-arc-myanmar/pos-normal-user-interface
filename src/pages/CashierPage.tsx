@@ -27,14 +27,22 @@ import {
   ProductVariant,
   SalesOrderLine,
 } from "@/core/domain/entities/Cashier";
+import { GuestCard, GuestWallet } from "@/core/domain/entities/GuestWallet";
+import { useCardCapture } from "@/core/presentation/hooks/useCardCapture";
+import { useGuestWalletManagement } from "@/core/presentation/hooks/useGuestWalletManagement";
 import { calcLineTotals } from "@/lib/pos/checkoutCalculations";
+import { isUnspendableWalletStatus } from "@/lib/pos/guestWalletAmounts";
 import {
   clearTableOrderIds,
   mergeTableOrderIds,
   readTableOrderIds,
   writeTableOrderIds,
 } from "@/lib/pos/multiOrdering";
-import { ensureMemberCardPaymentMethod } from "@/lib/pos/paymentMethods";
+import {
+  ensureMemberCardPaymentMethod,
+  findMemberCardPaymentMethod,
+  isMemberCardPaymentMethod,
+} from "@/lib/pos/paymentMethods";
 import {
   assertCheckoutPaymentsReady,
   buildCheckoutPayments,
@@ -100,12 +108,18 @@ export function CashierPage() {
     isPosSessionLoading,
     requireCashierContext,
   } = usePosWorkspace();
+  const { lookupCard, getWallet } = useGuestWalletManagement();
 
   const [statusFilter, setStatusFilter] = useState<"ALL" | OrderStatus>("ALL");
   const [zoneFilter, setZoneFilter] = useState("ALL");
   const [boardPage, setBoardPage] = useState(1);
   const [paymentAmount, setPaymentAmount] = useState("0.0000");
   const [paymentMethodId, setPaymentMethodId] = useState("");
+  const [memberCardUid, setMemberCardUid] = useState("");
+  const [memberCard, setMemberCard] = useState<GuestCard | null>(null);
+  const [memberWallet, setMemberWallet] = useState<GuestWallet | null>(null);
+  const [memberCardError, setMemberCardError] = useState<string | null>(null);
+  const [isMemberCardLoading, setIsMemberCardLoading] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [directCartLines, setDirectCartLines] = useState<typeof selectedOrderLines>([]);
@@ -124,6 +138,7 @@ export function CashierPage() {
   const [nowMs, setNowMs] = useState(() => Date.now());
   const paymentInputRef = useRef<HTMLInputElement>(null);
   const payReturnViewRef = useRef("menu");
+  const pendingMemberDetectRef = useRef(false);
 
   const locationId = activeLocationId;
   const activeView = searchParams.get("view") || "orders";
@@ -348,6 +363,83 @@ export function CashierPage() {
     () => ensureMemberCardPaymentMethod(paymentMethods),
     [paymentMethods]
   );
+  const selectedPaymentMethod = checkoutPaymentMethods.find(
+    (method) => method.id === paymentMethodId
+  );
+  const memberCardSelected = Boolean(
+    selectedPaymentMethod && isMemberCardPaymentMethod(selectedPaymentMethod)
+  );
+
+  const resetMemberCardLookup = useCallback(() => {
+    setMemberCardUid("");
+    setMemberCard(null);
+    setMemberWallet(null);
+    setMemberCardError(null);
+    setIsMemberCardLoading(false);
+  }, []);
+
+  const handleLookupMemberCard = useCallback(async () => {
+    if (!memberCardUid.trim()) {
+      setMemberCardError(t("cashier.errors.memberCardRequired"));
+      return;
+    }
+    setIsMemberCardLoading(true);
+    setMemberCardError(null);
+    try {
+      const card = await lookupCard(memberCardUid.trim());
+      if (card.status && card.status.toUpperCase() !== "ACTIVE") {
+        throw new Error(t("cashier.errors.memberCardInactive"));
+      }
+      const wallet =
+        card.wallet ||
+        (card.walletId ? await getWallet(card.walletId) : null);
+      if (!wallet) {
+        throw new Error(t("crm.unknownCard"));
+      }
+      if (isUnspendableWalletStatus(wallet.status)) {
+        throw new Error(t("cashier.errors.memberCardInactive"));
+      }
+      setMemberCard(card);
+      setMemberWallet(wallet);
+      setMemberCardUid(card.cardUid);
+    } catch (caught) {
+      setMemberCard(null);
+      setMemberWallet(null);
+      setMemberCardError(
+        caught instanceof Error
+          ? caught.message
+          : t("cashier.errors.memberCardRequired")
+      );
+    } finally {
+      setIsMemberCardLoading(false);
+    }
+  }, [getWallet, lookupCard, memberCardUid, t]);
+
+  const { nfcSupported, nfcActive, nfcError, lastUid, startNfc } = useCardCapture({
+    enabled: activeView === "pay" && memberCardSelected,
+    onRead: (uid) => {
+      pendingMemberDetectRef.current = true;
+      setMemberCardUid(uid);
+    },
+  });
+
+  useEffect(() => {
+    if (!memberCardSelected) {
+      resetMemberCardLookup();
+    }
+  }, [memberCardSelected, resetMemberCardLookup]);
+
+  useEffect(() => {
+    if (
+      !memberCardSelected ||
+      !pendingMemberDetectRef.current ||
+      !memberCardUid.trim()
+    ) {
+      return;
+    }
+    pendingMemberDetectRef.current = false;
+    void handleLookupMemberCard();
+  }, [handleLookupMemberCard, memberCardSelected, memberCardUid]);
 
   useEffect(() => {
     if (isSplitMode) return;
@@ -993,6 +1085,20 @@ export function CashierPage() {
         payments: checkoutPayments,
       });
 
+      const memberCardMethod = findMemberCardPaymentMethod(checkoutPaymentMethods);
+      const usesMemberCard = checkoutPayments.some(
+        (payment) =>
+          memberCardMethod && payment.paymentMethodId === memberCardMethod.id
+      );
+      if (usesMemberCard) {
+        if (!memberCard || !memberWallet) {
+          throw new Error(t("cashier.errors.memberCardRequired"));
+        }
+        if (isUnspendableWalletStatus(memberWallet.status)) {
+          throw new Error(t("cashier.errors.memberCardInactive"));
+        }
+      }
+
       const isMultiOrderSecondary =
         Boolean(
           activeTableId &&
@@ -1123,6 +1229,7 @@ export function CashierPage() {
     setIsSplitMode(false);
     setSplitTenders([]);
     setPaymentAmount(orderTotal);
+    resetMemberCardLookup();
     setSearchParams({ view: nextView });
   };
 
@@ -1163,6 +1270,14 @@ export function CashierPage() {
   const handleAddSplitTender = () => {
     if (!paymentMethodId) {
       setLocalError(t("cashier.errors.paymentMethodRequired"));
+      return;
+    }
+    if (
+      selectedPaymentMethod &&
+      isMemberCardPaymentMethod(selectedPaymentMethod) &&
+      (!memberCard || !memberWallet)
+    ) {
+      setLocalError(t("cashier.errors.memberCardRequired"));
       return;
     }
     const amount = Number(paymentAmount);
@@ -1487,6 +1602,22 @@ export function CashierPage() {
             isSplitMode={isSplitMode}
             splitTenders={splitTenders}
             isLoading={isLoading || isPosSessionLoading}
+            memberCardLookup={{
+              cardUid: memberCardUid,
+              guestName: memberWallet?.guestName,
+              walletNumber: memberWallet?.walletNumber,
+              balance: memberWallet?.balance,
+              status: memberWallet?.status,
+              error: memberCardError,
+              isLoading: isMemberCardLoading,
+              nfcSupported,
+              nfcActive,
+              nfcError,
+              lastUid,
+              onEnableNfc: () => void startNfc(),
+              onCardUidChange: setMemberCardUid,
+              onDetect: () => void handleLookupMemberCard(),
+            }}
             onSelectMethod={setPaymentMethodId}
             onPaymentAmountChange={setPaymentAmount}
             onOpenSplit={handleOpenSplit}

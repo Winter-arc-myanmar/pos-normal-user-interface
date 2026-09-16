@@ -2,13 +2,14 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CardRefundPage } from "../CardRefundPage";
-import { MembershipCard } from "@/core/domain/entities/MembershipCard";
+import { GuestCard, GuestWallet } from "@/core/domain/entities/GuestWallet";
 
 const mocks = vi.hoisted(() => ({
-  detectMembershipCard: vi.fn(),
-  verifyMembershipCardPin: vi.fn(),
-  getRefundAmountOptions: vi.fn(),
-  createRefundReceipt: vi.fn(),
+  lookupCard: vi.fn(),
+  getWallet: vi.fn(),
+  refundWallet: vi.fn(),
+  requireCashierContext: vi.fn(),
+  fetchPaymentMethods: vi.fn(),
 }));
 
 vi.mock("react-i18next", () => ({
@@ -23,54 +24,69 @@ vi.mock("@/lib/i18n/formatters", () => ({
   }),
 }));
 
-vi.mock("@/core/presentation/hooks/useAuth", () => ({
-  useAuth: () => ({
-    user: { id: "user-1", tenantId: "tenant-1" },
+vi.mock("@/core/presentation/hooks/usePosWorkspace", () => ({
+  usePosWorkspace: () => ({
+    requireCashierContext: mocks.requireCashierContext,
+  }),
+}));
+
+vi.mock("@/core/presentation/hooks/useCashier", () => ({
+  useCashier: () => ({
+    paymentMethods: [{ id: "cash", tenantId: "tenant-1", name: "Cash" }],
+    fetchPaymentMethods: mocks.fetchPaymentMethods,
   }),
 }));
 
 vi.mock("@/core/infrastructure/di/container", () => ({
   default: {
     resolve: () => ({
-      detectMembershipCard: mocks.detectMembershipCard,
-      verifyMembershipCardPin: mocks.verifyMembershipCardPin,
-      getRefundAmountOptions: mocks.getRefundAmountOptions,
-      createRefundReceipt: mocks.createRefundReceipt,
+      lookupCard: mocks.lookupCard,
+      getWallet: mocks.getWallet,
+      refundWallet: mocks.refundWallet,
     }),
   },
 }));
 
+const wallet = new GuestWallet({
+  id: "wallet-1",
+  guestName: "Test Member",
+  guestPhone: "09123456789",
+  walletNumber: "W-1",
+  balance: "50000.0000",
+  purchasedBalance: "50000.0000",
+  status: "ACTIVE",
+});
+
 describe("CardRefundPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getRefundAmountOptions.mockResolvedValue([
-      { id: "refund-10", label: "10,000", amount: "10000.0000" },
-    ]);
-    mocks.detectMembershipCard.mockResolvedValue({
-      card: new MembershipCard({
+    mocks.fetchPaymentMethods.mockResolvedValue(undefined);
+    mocks.requireCashierContext.mockResolvedValue({
+      tenantId: "tenant-1",
+      locationId: "location-1",
+      posRegisterId: "register-1",
+      posSessionId: "session-1",
+    });
+    mocks.lookupCard.mockResolvedValue(
+      new GuestCard({
         id: "card-1",
-        tenantId: "tenant-1",
-        customerId: "cust-1",
-        cardNumber: "MC-001",
-        balance: "50000.0000",
-        status: "BOUND",
-      }),
-      customerName: "Test Member",
-      customerPhone: "09123456789",
-    });
-    mocks.verifyMembershipCardPin.mockResolvedValue({ verified: true });
-    mocks.createRefundReceipt.mockResolvedValue({
-      receiptId: "rcpt-1",
-      cardNumber: "MC-001",
-      customerName: "Test Member",
-      amount: "10000.0000",
-      balanceAfter: "0.0000",
-      printedAt: "2026-01-01T00:00:00.000Z",
-    });
+        walletId: "wallet-1",
+        cardUid: "MC-001",
+        status: "ACTIVE",
+      })
+    );
+    mocks.getWallet.mockResolvedValue(wallet);
+    mocks.refundWallet.mockResolvedValue(
+      new GuestWallet({
+        ...wallet,
+        balance: "40000.0000",
+        purchasedBalance: "40000.0000",
+      })
+    );
     vi.spyOn(window, "print").mockImplementation(() => undefined);
   });
 
-  it("walks through menu, detect, pin, amount, and print steps", async () => {
+  it("walks through detect, amount, and print steps", async () => {
     render(
       <MemoryRouter>
         <CardRefundPage />
@@ -85,35 +101,26 @@ describe("CardRefundPage", () => {
     fireEvent.click(screen.getByText("cardRefund.detect"));
 
     await waitFor(() => {
-      expect(mocks.detectMembershipCard).toHaveBeenCalledWith({
-        cardNumber: "MC-001",
-      });
-      expect(screen.getByPlaceholderText("cardRefund.pinPlaceholder")).toBeInTheDocument();
-    });
-
-    fireEvent.change(screen.getByPlaceholderText("cardRefund.pinPlaceholder"), {
-      target: { value: "1234" },
-    });
-    fireEvent.click(screen.getByText("cardRefund.verifyPin"));
-
-    await waitFor(() => {
-      expect(mocks.verifyMembershipCardPin).toHaveBeenCalledWith({
-        cardNumber: "MC-001",
-        pin: "1234",
-      });
+      expect(mocks.lookupCard).toHaveBeenCalledWith("MC-001");
       expect(screen.getByText("10,000")).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByText("10,000"));
     fireEvent.click(screen.getByText("cardRefund.continueToPrint"));
+    fireEvent.change(screen.getByPlaceholderText("crm.approverToken"), {
+      target: { value: "approver-token" },
+    });
     fireEvent.click(screen.getByText("cardRefund.confirmPrint"));
 
     await waitFor(() => {
-      expect(mocks.createRefundReceipt).toHaveBeenCalledWith({
-        tenantId: "tenant-1",
-        cardNumber: "MC-001",
+      expect(mocks.refundWallet).toHaveBeenCalledWith("wallet-1", {
         amount: "10000.0000",
-        pin: "1234",
+        paymentMethodId: "cash",
+        posSessionId: "session-1",
+        locationId: "location-1",
+        reference: undefined,
+        notes: undefined,
+        approverAuthorization: "approver-token",
       });
       expect(window.print).toHaveBeenCalled();
     });
