@@ -1,8 +1,20 @@
+const PRODUCTION_API_URL = "https://apivision.winterarc.asia";
+
+const resolveApiBaseUrl = (): string => {
+  if (import.meta.env.DEV) {
+    // Same-origin in dev so the Vite proxy can handle CORS.
+    return "";
+  }
+
+  const configured = String(import.meta.env.VITE_API_URL || PRODUCTION_API_URL)
+    .trim()
+    .replace(/\/+$/, "");
+
+  return configured;
+};
+
 export const API_CONFIG = {
-  // In dev, always use same-origin requests so Vite proxy handles CORS.
-  BASE_URL: import.meta.env.DEV
-    ? ""
-    : import.meta.env.VITE_API_URL || "",
+  BASE_URL: resolveApiBaseUrl(),
 } as const;
 
 /**

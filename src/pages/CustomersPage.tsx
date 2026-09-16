@@ -1937,7 +1937,7 @@ export function CustomersPage() {
                             .join(", ")}
                         </p>
                       ) : null}
-                    </div>
+          </div>
                   ) : null}
                   {Number(settlementQuote?.refundable || 0) > 0 ? (
                     <PaymentMethodSelect
@@ -1977,7 +1977,7 @@ export function CustomersPage() {
                   />
                 </>
               ) : null}
-          </div>
+      </div>
         </ModalFrame>
       ) : null}
 
@@ -2001,7 +2001,7 @@ export function CustomersPage() {
               >
                 {t("common.cancel")}
               </Button>
-            </div>
+        </div>
           }
         >
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -2100,7 +2100,7 @@ export function CustomersPage() {
                 lastUid={lastUid}
                 onEnableNfc={() => void startNfc()}
               />
-              </div>
+          </div>
               {issueForm.extraCards.map((card, index) => (
                 <div
                   key={`extra-card-${index}`}
@@ -2138,9 +2138,9 @@ export function CustomersPage() {
                       })
                     }
                   />
-                  <Button
+                      <Button
                     type="button"
-                    size="sm"
+                        size="sm"
                     variant="outline"
                     onClick={() =>
                       setIssueForm((current) => ({
@@ -2152,7 +2152,7 @@ export function CustomersPage() {
                     }
                   >
                     {t("crm.removeCard")}
-                  </Button>
+                      </Button>
                 </div>
               ))}
               <Button
@@ -2264,7 +2264,7 @@ export function CustomersPage() {
               >
                 {t("common.cancel")}
               </Button>
-            </div>
+        </div>
           }
         >
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
