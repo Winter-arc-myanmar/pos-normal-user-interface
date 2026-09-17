@@ -322,6 +322,13 @@ describe("CashierPage integration", () => {
       </MemoryRouter>
     );
 
+    expect(
+      screen.queryByRole("button", { name: /cashier.status.paid/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /cashier.status.all/i })
+    ).toBeInTheDocument();
+
     fireEvent.change(screen.getByLabelText("Table status"), {
       target: { value: "DIRTY" },
     });

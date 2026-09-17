@@ -98,6 +98,7 @@ export interface CreateSalesOrderDTO {
   customerId?: string;
   orderNumber?: string;
   salesChannel?: string;
+  serviceType?: ServiceType | ApiServiceType;
   idempotencyKey?: string;
   subtotal?: string;
   totalDiscount?: string;

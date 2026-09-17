@@ -15,6 +15,7 @@ import {
   TableSession,
 } from "@/core/domain/entities/Cashier";
 import { OrderTabs } from "./OrderTabs";
+import { isSettledSalesOrder } from "@/lib/pos/orderStatus";
 
 interface OrderPanelProps {
   selectedOrder: SalesOrder | null;
@@ -103,6 +104,7 @@ export function OrderPanel({
   const [confirmCloseSplit, setConfirmCloseSplit] = useState(false);
   const variants = Object.values(variantsByProductId).flat();
   const hasActiveOrder = !!selectedOrder || selectedOrderLines.length > 0;
+  const isSettledOrder = isSettledSalesOrder(selectedOrder);
   const checkoutReady = isSplitMode
     ? splitTenderCount > 0 && splitRemaining <= 0.009
     : Boolean(paymentMethodId) && Number(paymentAmount) > 0;
@@ -178,7 +180,7 @@ export function OrderPanel({
                         type="button"
                         className="rounded border border-slate-300 px-2 py-1 text-xs"
                         onClick={() => onDecreaseLineQuantity(line)}
-                        disabled={isLoading}
+                        disabled={isLoading || isSettledOrder}
                       >
                         {t("cashier.orderPanel.decrease")}
                       </button>
@@ -186,7 +188,7 @@ export function OrderPanel({
                         type="button"
                         className="rounded border border-slate-300 px-2 py-1 text-xs"
                         onClick={() => onIncreaseLineQuantity(line)}
-                        disabled={isLoading}
+                        disabled={isLoading || isSettledOrder}
                       >
                         {t("cashier.orderPanel.increase")}
                       </button>
@@ -194,7 +196,7 @@ export function OrderPanel({
                         type="button"
                         className="ml-auto rounded border border-red-300 px-2 py-1 text-xs text-red-700"
                         onClick={() => onRemoveLine(line)}
-                        disabled={isLoading}
+                        disabled={isLoading || isSettledOrder}
                       >
                         {t("cashier.orderPanel.remove")}
                       </button>
@@ -321,7 +323,7 @@ export function OrderPanel({
             ) : (
               <Button
                 variant="secondary"
-                disabled={isLoading}
+                disabled={isLoading || isSettledOrder}
                 onClick={onOpenSplit}
               >
                 {t("cashier.payment.split")}
@@ -373,7 +375,7 @@ export function OrderPanel({
           <div className="grid grid-cols-2 gap-2">
             <Button
               variant="secondary"
-              disabled={!selectedOrderLines.length || isLoading}
+              disabled={!selectedOrderLines.length || isLoading || isSettledOrder}
               onClick={onFireKds}
             >
               {t("cashier.orderPanel.sendKds")}
@@ -393,6 +395,7 @@ export function OrderPanel({
           <Button
             fullWidth
             disabled={
+              isSettledOrder ||
               !selectedOrderLines.length ||
               isLoading ||
               (isPayView && !checkoutReady)

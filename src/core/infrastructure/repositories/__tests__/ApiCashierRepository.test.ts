@@ -352,4 +352,43 @@ describe("ApiCashierRepository", () => {
       glAccountId: "gl-1",
     });
   });
+
+  it("creates a sales order with the API serviceType", async () => {
+    const post = vi.fn().mockResolvedValue({
+      data: {
+        id: "order-1",
+        tenantId: "tenant-1",
+        locationId: "location-1",
+        serviceType: "TAKEAWAY",
+        status: "DRAFT",
+      },
+    });
+    const repository = new ApiCashierRepository({
+      post,
+    } as unknown as HttpClient);
+
+    const order = await repository.createSalesOrder({
+      tenantId: "tenant-1",
+      locationId: "location-1",
+      salesChannel: "POS",
+      serviceType: "TAKE_AWAY",
+      status: "DRAFT",
+    });
+
+    expect(post).toHaveBeenCalledWith("/api/v1/sales-orders", {
+      tenantId: "tenant-1",
+      locationId: "location-1",
+      customerId: undefined,
+      orderNumber: undefined,
+      salesChannel: "POS",
+      serviceType: "TAKEAWAY",
+      idempotencyKey: undefined,
+      subtotal: undefined,
+      totalDiscount: undefined,
+      totalTax: undefined,
+      grandTotal: undefined,
+      status: "DRAFT",
+    });
+    expect(order.serviceType).toBe("TAKE_AWAY");
+  });
 });

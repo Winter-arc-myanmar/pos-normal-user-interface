@@ -671,7 +671,8 @@
       "pickupFailed": "Unable to mark pickup.",
       "emptyOrder": "Add at least one item before sending to KDS.",
       "kdsTargetMissing": "Create or select an order before sending to KDS.",
-      "kdsFailed": "Failed to send order to KDS."
+      "kdsFailed": "Failed to send order to KDS.",
+      "orderAlreadyPaid": "This order is already paid and cannot be charged again."
     }
   },
   "salesOrders": {

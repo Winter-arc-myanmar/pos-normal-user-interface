@@ -11,6 +11,7 @@ import {
 import { TableWarningStatusDTO } from "@/core/application/dtos/CashierDTO";
 import { ApiLoadingState } from "@/components/ApiLoadingState";
 import { NotificationBell } from "@/components/ui/NotificationBell";
+import { isSettledSalesOrder } from "@/lib/pos/orderStatus";
 
 const serviceTabs: Array<{ key: ServiceType; labelKey: string }> = [
   { key: "TABLE", labelKey: "cashier.serviceTypes.table" },
@@ -20,11 +21,10 @@ const serviceTabs: Array<{ key: ServiceType; labelKey: string }> = [
   { key: "PICK_UP", labelKey: "cashier.serviceTypes.pickUp" },
 ];
 
-const statusTabs: Array<{ key: "ALL" | OrderStatus; labelKey: string }> = [
+const statusTabs: Array<{ key: "ALL" | "DRAFT" | "CONFIRMED"; labelKey: string }> = [
   { key: "ALL", labelKey: "cashier.status.all" },
   { key: "DRAFT", labelKey: "cashier.status.pending" },
   { key: "CONFIRMED", labelKey: "cashier.status.placed" },
-  { key: "COMPLETED", labelKey: "cashier.status.paid" },
 ];
 
 interface CashierBoardProps {
@@ -211,7 +211,9 @@ export function CashierBoard({
                     </button>
                   );
                 })
-              : orders.map((order) => (
+              : orders.map((order) => {
+                  const settled = isSettledSalesOrder(order);
+                  return (
                   <button
                     key={order.id}
                     type="button"
@@ -219,18 +221,22 @@ export function CashierBoard({
                       boardTileClass,
                       "rounded-md",
                       selectedOrderId === order.id ? "border-blue-500" : "",
+                      settled ? "opacity-80" : "",
                     ].join(" ")}
                     onClick={() => onOrderSelect(order)}
                   >
                     <span className="absolute left-2 top-2 text-sm font-semibold">
                       {order.orderNumber || order.id.slice(0, 8)}
                     </span>
-                    <span className="text-4xl leading-none text-white/90">+</span>
+                    {settled ? null : (
+                      <span className="text-4xl leading-none text-white/90">+</span>
+                    )}
                     <span className="absolute bottom-2 right-2 text-[10px] text-slate-300">
                       {order.status}
                     </span>
                   </button>
-                ))}
+                  );
+                })}
           </div>
         )}
       </div>

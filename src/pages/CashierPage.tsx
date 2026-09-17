@@ -32,6 +32,7 @@ import { useCardCapture } from "@/core/presentation/hooks/useCardCapture";
 import { useGuestWalletManagement } from "@/core/presentation/hooks/useGuestWalletManagement";
 import { calcLineTotals } from "@/lib/pos/checkoutCalculations";
 import { isUnspendableWalletStatus } from "@/lib/pos/guestWalletAmounts";
+import { isSettledSalesOrder } from "@/lib/pos/orderStatus";
 import {
   clearTableOrderIds,
   mergeTableOrderIds,
@@ -183,6 +184,12 @@ export function CashierPage() {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (statusFilter === "COMPLETED" || statusFilter === "CANCELLED") {
+      setStatusFilter("ALL");
+    }
+  }, [statusFilter]);
 
   const resetWorkspaceAfterTransaction = useCallback(
     async (message: string) => {
@@ -494,6 +501,7 @@ export function CashierPage() {
   const filteredOrders = useMemo(
     () =>
       salesOrders.filter((order) => {
+        if (isSettledSalesOrder(order)) return false;
         const serviceMatches =
           activeServiceType === "TABLE"
             ? order.serviceType === "DINE_IN"
@@ -568,6 +576,7 @@ export function CashierPage() {
 
     const countOrdersForService = (serviceType: ServiceType) =>
       salesOrders.filter((order) => {
+        if (isSettledSalesOrder(order)) return false;
         const serviceMatches =
           serviceType === "TABLE"
             ? order.serviceType === "DINE_IN"
@@ -582,7 +591,6 @@ export function CashierPage() {
           ALL: tablesInZone.length,
           DRAFT: countTablesByStatus("DRAFT"),
           CONFIRMED: countTablesByStatus("CONFIRMED"),
-          COMPLETED: countTablesByStatus("COMPLETED"),
         }
       : {
           ALL: ordersForActiveService.length,
@@ -591,9 +599,6 @@ export function CashierPage() {
           ).length,
           CONFIRMED: ordersForActiveService.filter(
             (order) => order.status === "CONFIRMED"
-          ).length,
-          COMPLETED: ordersForActiveService.filter(
-            (order) => order.status === "COMPLETED"
           ).length,
         };
 
@@ -987,6 +992,9 @@ export function CashierPage() {
     variantId: string,
     quantity: number
   ) => {
+    if (isSettledSalesOrder(selectedOrder)) {
+      throw new Error(t("cashier.errors.orderAlreadyPaid"));
+    }
     const shouldUseTableSession = Boolean(
       selectedOrderSession && isPrimaryTableOrder
     );
@@ -1079,6 +1087,9 @@ export function CashierPage() {
     }
 
     try {
+      if (isSettledSalesOrder(selectedOrder)) {
+        throw new Error(t("cashier.errors.orderAlreadyPaid"));
+      }
       const context = await requireCashierContext();
       if (!activeOrderLines.length) {
         throw new Error("Add at least one item before checkout");
@@ -1201,6 +1212,9 @@ export function CashierPage() {
   };
 
   const mutateOrderLineQuantity = async (lineId: string, nextQty: number) => {
+    if (isSettledSalesOrder(selectedOrder) && !isDirectCheckoutMode) {
+      throw new Error(t("cashier.errors.orderAlreadyPaid"));
+    }
     const targetLine = activeOrderLines.find((line) => line.id === lineId);
     if (!targetLine) return;
 
@@ -1254,6 +1268,10 @@ export function CashierPage() {
   };
 
   const handleOpenPay = () => {
+    if (isSettledSalesOrder(selectedOrder)) {
+      setLocalError(t("cashier.errors.orderAlreadyPaid"));
+      return;
+    }
     if (activeView !== "pay") {
       payReturnViewRef.current = activeView;
     }
@@ -1263,6 +1281,10 @@ export function CashierPage() {
   };
 
   const handleOpenSplit = () => {
+    if (isSettledSalesOrder(selectedOrder)) {
+      setLocalError(t("cashier.errors.orderAlreadyPaid"));
+      return;
+    }
     if (activeView !== "pay") {
       payReturnViewRef.current = activeView;
     }
@@ -1368,6 +1390,9 @@ export function CashierPage() {
       if (isDirectCheckoutMode) {
         setDirectCartLines((current) => current.filter((entry) => entry.id !== line.id));
       } else if (selectedOrder) {
+        if (isSettledSalesOrder(selectedOrder)) {
+          throw new Error(t("cashier.errors.orderAlreadyPaid"));
+        }
         await removeOrderLine(selectedOrder.id, line.id);
       }
       setNotice(t("cashier.orderPanel.itemRemoved"));
@@ -1388,6 +1413,9 @@ export function CashierPage() {
     }
 
     try {
+      if (isSettledSalesOrder(selectedOrder)) {
+        throw new Error(t("cashier.errors.orderAlreadyPaid"));
+      }
       let salesOrderId = selectedOrder?.id;
       const sessionId = selectedOrderSession?.id;
 
@@ -1401,6 +1429,7 @@ export function CashierPage() {
           tenantId: context.tenantId,
           locationId: context.locationId,
           salesChannel: "POS",
+          serviceType: activeServiceType,
           status: "DRAFT",
           subtotal: "0.0000",
           totalDiscount: "0.0000",
@@ -1454,6 +1483,11 @@ export function CashierPage() {
       setLocalError(null);
       setNotice(t("cashier.orderPanel.kdsSent"));
       setSearchParams({ view: "orders" });
+      try {
+        await fetchSalesOrders({ page: 1, limit: 100 });
+      } catch {
+        // The created order remains in local state if the list refresh fails.
+      }
     } catch (caught) {
       setLocalError(
         caught instanceof Error
