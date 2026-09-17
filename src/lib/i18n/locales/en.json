@@ -579,12 +579,14 @@
       "variant": "Variant",
       "quantity": "Quantity",
       "add": "Add to order",
+      "chooseVariant": "Choose a variant",
+      "noVariant": "This product has no sellable variant.",
       "selectOrder": "Select or create an order first.",
       "selectTableTitle": "Choose a table",
       "selectTableHint": "Select a table below, then add items to the order.",
       "selectTableOptionalTitle": "Assign a table (optional)",
       "selectTableOptionalHint": "Pick a table for seated dine-in, or add items without a table.",
-      "selectPrompt": "Select a product to choose its variant and quantity."
+      "selectPrompt": "Tap a product to add it to the order."
     },
     "payment": {
       "remaining": "Remaining receivable {{amount}}",

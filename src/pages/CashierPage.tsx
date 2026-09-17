@@ -337,6 +337,16 @@ export function CashierPage() {
     variantById,
   ]);
 
+  const orderedProductQuantities = useMemo(() => {
+    return displayOrderLines.reduce<Record<string, number>>((quantities, line) => {
+      const productId = variantById[line.variantId]?.productId;
+      if (!productId) return quantities;
+      quantities[productId] =
+        (quantities[productId] || 0) + Number(line.quantity || 0);
+      return quantities;
+    }, {});
+  }, [displayOrderLines, variantById]);
+
   const orderTotal = useMemo(() => {
     const backendTotal = Number(selectedOrder?.grandTotal || 0);
     const totalLines = isDirectCheckoutMode ? activeOrderLines : displayOrderLines;
@@ -1609,6 +1619,7 @@ export function CashierPage() {
           <ProductMenu
             products={products}
             variantsByProductId={variantsByProductId}
+            orderedProductQuantities={orderedProductQuantities}
             onLoadVariants={fetchProductVariants}
             onAdd={handleAddProduct}
             onClose={handleCloseMenu}

@@ -271,12 +271,6 @@ describe("CashierPage integration", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: /Coffee/ }));
-    await screen.findByRole("button", {
-      name: "cashier.productMenu.add",
-    });
-    fireEvent.click(
-      screen.getByRole("button", { name: "cashier.productMenu.add" })
-    );
 
     await waitFor(() =>
       expect(mocks.addProductToTableSession).toHaveBeenCalledWith(

@@ -46,7 +46,7 @@ import {
   WaitlistEntry,
 } from "../../domain/entities/Cashier";
 import { HttpClient } from "../api/HttpClient";
-import { API_ENDPOINTS } from "../api/constants";
+import { API_ENDPOINTS, resolveMediaUrl } from "../api/constants";
 
 interface ApiEnvelope<T> {
   data: T;
@@ -499,7 +499,7 @@ export class ApiCashierRepository implements ICashierRepository {
         name: String(item.name || ""),
         basePrice: String(item.basePrice || "0"),
         baseSku: item.baseSku ? String(item.baseSku) : undefined,
-        imageUrl: item.imageUrl ? String(item.imageUrl) : undefined,
+        imageUrl: resolveMediaUrl(item.imageUrl),
         totalOnHand: item.totalOnHand ? String(item.totalOnHand) : undefined,
         isTaxable: toBoolean(item.isTaxable),
         taxRate:
@@ -530,7 +530,7 @@ export class ApiCashierRepository implements ICashierRepository {
         variantSku: item.variantSku ? String(item.variantSku) : undefined,
         barcode: item.barcode ? String(item.barcode) : undefined,
         priceModifier: item.priceModifier ? String(item.priceModifier) : undefined,
-        imageUrl: item.imageUrl ? String(item.imageUrl) : undefined,
+        imageUrl: resolveMediaUrl(item.imageUrl),
         matrixOptions:
           item.matrixOptions && typeof item.matrixOptions === "object"
             ? (item.matrixOptions as Record<string, unknown>)

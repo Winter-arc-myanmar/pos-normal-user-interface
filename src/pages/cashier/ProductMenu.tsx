@@ -6,6 +6,7 @@ import { Product, ProductVariant } from "@/core/domain/entities/Cashier";
 interface ProductMenuProps {
   products: Product[];
   variantsByProductId: Record<string, ProductVariant[]>;
+  orderedProductQuantities?: Record<string, number>;
   onLoadVariants: (productId: string) => Promise<ProductVariant[]>;
   onAdd: (
     product: Product,
@@ -15,9 +16,49 @@ interface ProductMenuProps {
   onClose: () => void;
 }
 
+const variantLabel = (variant: ProductVariant): string =>
+  variant.variantSku ||
+  String(Object.values(variant.matrixOptions || {}).join(" / ")) ||
+  variant.id.slice(0, 8);
+
+const productCardImage = (
+  product: Product,
+  variantsByProductId: Record<string, ProductVariant[]>
+): string | undefined =>
+  product.imageUrl ||
+  (variantsByProductId[product.id] || []).find((variant) => variant.imageUrl)
+    ?.imageUrl;
+
+function ProductCardImage({
+  src,
+  name,
+}: {
+  src?: string;
+  name: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) {
+    return (
+      <span className="flex h-24 items-center justify-center bg-slate-800 text-lg font-semibold uppercase text-slate-500">
+        {name.trim().slice(0, 1) || "?"}
+      </span>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt=""
+      className="h-24 w-full object-cover"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 export function ProductMenu({
   products,
   variantsByProductId,
+  orderedProductQuantities = {},
   onLoadVariants,
   onAdd,
   onClose,
@@ -26,8 +67,10 @@ export function ProductMenu({
   const [search, setSearch] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedVariantId, setSelectedVariantId] = useState("");
+  const [variantOptions, setVariantOptions] = useState<ProductVariant[]>([]);
   const [quantity, setQuantity] = useState(1);
   const [isAdding, setIsAdding] = useState(false);
+  const [needsVariantChoice, setNeedsVariantChoice] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
   const visibleProducts = useMemo(() => {
@@ -40,17 +83,73 @@ export function ProductMenu({
     );
   }, [products, search]);
 
-  const variants = selectedProduct
-    ? variantsByProductId[selectedProduct.id] || []
-    : [];
+  const variants = variantOptions.length
+    ? variantOptions
+    : selectedProduct
+      ? variantsByProductId[selectedProduct.id] || []
+      : [];
+
+  const closeVariantModal = () => {
+    setNeedsVariantChoice(false);
+    setSelectedProduct(null);
+    setSelectedVariantId("");
+    setVariantOptions([]);
+    setQuantity(1);
+    setLocalError(null);
+  };
+
+  const loadVariants = async (product: Product): Promise<ProductVariant[]> => {
+    const cached = variantsByProductId[product.id] || [];
+    if (cached.length) return cached;
+    return onLoadVariants(product.id);
+  };
+
+  const addProduct = async (
+    product: Product,
+    variantId: string,
+    nextQuantity: number
+  ) => {
+    if (!variantId) return false;
+    setIsAdding(true);
+    setLocalError(null);
+    try {
+      await onAdd(product, variantId, nextQuantity);
+      setQuantity(1);
+      return true;
+    } catch (caught) {
+      setLocalError(
+        caught instanceof Error ? caught.message : "Unable to add product"
+      );
+      return false;
+    } finally {
+      setIsAdding(false);
+    }
+  };
 
   const selectProduct = async (product: Product) => {
     setSelectedProduct(product);
     setQuantity(1);
     setLocalError(null);
+    setNeedsVariantChoice(false);
+    setVariantOptions([]);
+
     try {
-      const loaded = await onLoadVariants(product.id);
-      setSelectedVariantId(loaded[0]?.id || "");
+      const loaded = await loadVariants(product);
+      const defaultVariantId = loaded[0]?.id || "";
+      setSelectedVariantId(defaultVariantId);
+      setVariantOptions(loaded);
+
+      if (loaded.length > 1) {
+        setNeedsVariantChoice(true);
+        return;
+      }
+
+      if (!defaultVariantId) {
+        setLocalError(t("cashier.productMenu.noVariant"));
+        return;
+      }
+
+      await addProduct(product, defaultVariantId, 1);
     } catch (caught) {
       setLocalError(
         caught instanceof Error ? caught.message : "Unable to load variants"
@@ -60,18 +159,8 @@ export function ProductMenu({
 
   const addSelected = async () => {
     if (!selectedProduct || !selectedVariantId) return;
-    setIsAdding(true);
-    setLocalError(null);
-    try {
-      await onAdd(selectedProduct, selectedVariantId, quantity);
-      setQuantity(1);
-    } catch (caught) {
-      setLocalError(
-        caught instanceof Error ? caught.message : "Unable to add product"
-      );
-    } finally {
-      setIsAdding(false);
-    }
+    const added = await addProduct(selectedProduct, selectedVariantId, quantity);
+    if (added) closeVariantModal();
   };
 
   return (
@@ -89,101 +178,136 @@ export function ProductMenu({
         </Button>
       </header>
 
-      <div className="mt-2 grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_13rem] gap-2">
+      <div className="mt-2 grid min-h-0 flex-1 grid-cols-1 gap-2">
         <div className="grid content-start grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3 xl:grid-cols-4">
-          {visibleProducts.map((product) => (
-            <button
-              key={product.id}
-              type="button"
-              onClick={() => void selectProduct(product)}
-              className={[
-                "min-h-24 rounded border bg-[#181818] p-3 text-left",
-                selectedProduct?.id === product.id
-                  ? "border-blue-500"
-                  : "border-slate-700",
-              ].join(" ")}
-            >
-              <span className="block truncate text-sm font-semibold">
-                {product.name}
-              </span>
-              <span className="mt-2 block text-xs text-slate-400">
-                {product.baseSku || t("cashier.productMenu.noSku")}
-              </span>
-              <span className="mt-1 block font-semibold text-blue-400">
-                {product.basePrice}
-              </span>
-            </button>
-          ))}
+          {visibleProducts.map((product) => {
+            const orderedQty = Number(orderedProductQuantities[product.id] || 0);
+            const isSelected =
+              selectedProduct?.id === product.id || orderedQty > 0;
+            return (
+              <button
+                key={product.id}
+                type="button"
+                aria-pressed={isSelected}
+                onClick={() => void selectProduct(product)}
+                className={[
+                  "relative overflow-hidden rounded border bg-[#181818] text-left",
+                  isSelected
+                    ? "border-blue-500 ring-2 ring-blue-400 ring-offset-1 ring-offset-[#070707]"
+                    : "border-slate-700",
+                ].join(" ")}
+              >
+                <ProductCardImage
+                  src={productCardImage(product, variantsByProductId)}
+                  name={product.name}
+                />
+                {orderedQty > 0 ? (
+                  <span className="absolute right-2 top-2 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                    {orderedQty}
+                  </span>
+                ) : null}
+                <span className="block px-3 py-2">
+                  <span className="block truncate text-sm font-semibold">
+                    {product.name}
+                  </span>
+                  <span className="mt-1 block font-semibold text-blue-400">
+                    {product.basePrice}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
           {visibleProducts.length === 0 ? (
             <p className="col-span-full p-6 text-center text-sm text-slate-400">
               {t("cashier.productMenu.notFound")}
             </p>
           ) : null}
         </div>
+      </div>
+      {localError && !needsVariantChoice ? (
+        <p className="mt-2 text-xs text-red-300">{localError}</p>
+      ) : null}
 
-        <aside className="rounded border border-slate-700 bg-slate-900 p-3">
-          {selectedProduct ? (
-            <div className="space-y-3">
+      {needsVariantChoice && selectedProduct ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-8"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="product-variant-title"
+          onClick={closeVariantModal}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-slate-700 bg-[#181818] p-5 text-white shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="font-semibold">{selectedProduct.name}</p>
-                <p className="text-xs text-slate-400">
-                  {selectedProduct.baseSku ||
-                    t("cashier.productMenu.noSku")}
+                <p className="text-xs uppercase tracking-wide text-slate-400">
+                  {t("cashier.productMenu.chooseVariant")}
                 </p>
-              </div>
-
-              <label className="block text-xs text-slate-300">
-                {t("cashier.productMenu.variant")}
-                <select
-                  value={selectedVariantId}
-                  onChange={(event) => setSelectedVariantId(event.target.value)}
-                  className="mt-1 min-h-10 w-full rounded border border-slate-600 bg-slate-800 px-2 text-sm"
+                <h2
+                  id="product-variant-title"
+                  className="mt-1 text-lg font-semibold"
                 >
-                  {variants.map((variant) => (
-                    <option key={variant.id} value={variant.id}>
-                      {variant.variantSku ||
-                        String(
-                          Object.values(variant.matrixOptions || {}).join(" / ")
-                        ) ||
-                        variant.id.slice(0, 8)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="block text-xs text-slate-300">
-                {t("cashier.productMenu.quantity")}
-                <input
-                  type="number"
-                  min={1}
-                  step={1}
-                  value={quantity}
-                  onChange={(event) =>
-                    setQuantity(Math.max(1, Number(event.target.value) || 1))
-                  }
-                  className="mt-1 min-h-10 w-full rounded border border-slate-600 bg-slate-800 px-2 text-sm"
-                />
-              </label>
-
-              <Button
-                fullWidth
-                disabled={!selectedVariantId}
-                isLoading={isAdding}
-                onClick={() => void addSelected()}
-              >
-                {t("cashier.productMenu.add")}
+                  {selectedProduct.name}
+                </h2>
+              </div>
+              <Button variant="outline" size="sm" onClick={closeVariantModal}>
+                {t("common.cancel")}
               </Button>
             </div>
-          ) : (
-            <p className="text-sm text-slate-400">
-              {t("cashier.productMenu.selectPrompt")}
-            </p>
-          )}
-          {localError ? (
-            <p className="mt-3 text-xs text-red-300">{localError}</p>
-          ) : null}
-        </aside>
-      </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              {variants.map((variant) => {
+                const selected = selectedVariantId === variant.id;
+                return (
+                  <button
+                    key={variant.id}
+                    type="button"
+                    onClick={() => setSelectedVariantId(variant.id)}
+                    className={[
+                      "rounded border px-3 py-3 text-left text-sm",
+                      selected
+                        ? "border-blue-500 bg-blue-500/10"
+                        : "border-slate-700 bg-slate-900",
+                    ].join(" ")}
+                  >
+                    {variantLabel(variant)}
+                  </button>
+                );
+              })}
+            </div>
+
+            <label className="mt-4 block text-xs text-slate-300">
+              {t("cashier.productMenu.quantity")}
+              <input
+                type="number"
+                min={1}
+                step={1}
+                value={quantity}
+                onChange={(event) =>
+                  setQuantity(Math.max(1, Number(event.target.value) || 1))
+                }
+                className="mt-1 min-h-10 w-full rounded border border-slate-600 bg-slate-800 px-2 text-sm"
+              />
+            </label>
+
+            {localError ? (
+              <p className="mt-3 text-xs text-red-300">{localError}</p>
+            ) : null}
+
+            <Button
+              className="mt-4"
+              fullWidth
+              disabled={!selectedVariantId}
+              isLoading={isAdding}
+              onClick={() => void addSelected()}
+            >
+              {t("cashier.productMenu.add")}
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

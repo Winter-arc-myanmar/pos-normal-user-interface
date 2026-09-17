@@ -14,6 +14,11 @@ export default defineConfig({
         changeOrigin: true,
         secure: true,
       },
+      '/uploads': {
+        target: 'https://apivision.winterarc.asia',
+        changeOrigin: true,
+        secure: true,
+      },
       '/csrf': {
         target: 'https://apivision.winterarc.asia',
         changeOrigin: true,

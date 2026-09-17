@@ -1,21 +1,31 @@
 const PRODUCTION_API_URL = "https://apivision.winterarc.asia";
 
+const resolveApiOrigin = (): string =>
+  String(import.meta.env.VITE_API_URL || PRODUCTION_API_URL)
+    .trim()
+    .replace(/\/+$/, "") || PRODUCTION_API_URL;
+
 const resolveApiBaseUrl = (): string => {
   if (import.meta.env.DEV) {
     // Same-origin in dev so the Vite proxy can handle CORS.
     return "";
   }
 
-  const configured = String(import.meta.env.VITE_API_URL || PRODUCTION_API_URL)
-    .trim()
-    .replace(/\/+$/, "");
-
-  return configured;
+  return resolveApiOrigin();
 };
 
 export const API_CONFIG = {
   BASE_URL: resolveApiBaseUrl(),
+  MEDIA_BASE_URL: resolveApiOrigin(),
 } as const;
+
+export const resolveMediaUrl = (value: unknown): string | undefined => {
+  if (value == null || String(value).trim() === "") return undefined;
+  const url = String(value).trim();
+  if (/^(https?:|data:|blob:)/i.test(url)) return url;
+  const path = url.startsWith("/") ? url : `/${url}`;
+  return `${API_CONFIG.MEDIA_BASE_URL}${path}`;
+};
 
 /**
  * Template endpoint map.
