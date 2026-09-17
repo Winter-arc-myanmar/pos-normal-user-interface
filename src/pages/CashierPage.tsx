@@ -1408,7 +1408,8 @@ export function CashierPage() {
             order.id,
             product,
             line.variantId,
-            Number(line.quantity || 1)
+            Number(line.quantity || 1),
+            { refreshLines: false }
           );
         }
 
@@ -1437,7 +1438,12 @@ export function CashierPage() {
         return;
       }
 
-      await resetWorkspaceAfterTransaction(t("cashier.orderPanel.kdsSent"));
+      clearOrderSelection();
+      setIsDirectCheckoutMode(false);
+      setDirectCartLines([]);
+      setLocalError(null);
+      setNotice(t("cashier.orderPanel.kdsSent"));
+      setSearchParams({ view: "orders" });
     } catch (caught) {
       setLocalError(
         caught instanceof Error

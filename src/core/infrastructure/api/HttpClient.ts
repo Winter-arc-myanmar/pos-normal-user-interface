@@ -1,5 +1,33 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
 import { API_CONFIG, API_ENDPOINTS } from "./constants";
+
+const readApiErrorMessage = (data: unknown): string | undefined => {
+  if (!data || typeof data !== "object") return undefined;
+  const payload = data as Record<string, unknown>;
+  if (typeof payload.message === "string" && payload.message.trim()) {
+    return payload.message.trim();
+  }
+  const nested = payload.error;
+  if (nested && typeof nested === "object") {
+    const nestedMessage = (nested as Record<string, unknown>).message;
+    if (typeof nestedMessage === "string" && nestedMessage.trim()) {
+      return nestedMessage.trim();
+    }
+  }
+  return undefined;
+};
+
+export const applyAxiosErrorMessage = (error: unknown): unknown => {
+  if (!axios.isAxiosError(error)) return error;
+  const apiMessage = readApiErrorMessage(error.response?.data);
+  if (error.response?.status === 429) {
+    error.message =
+      apiMessage || "Too many requests. Wait a moment and try again.";
+  } else if (apiMessage) {
+    error.message = apiMessage;
+  }
+  return error;
+};
 import {
   tokenCookies,
   isTokenExpired,
@@ -138,6 +166,7 @@ export class HttpClient {
           console.error("CSRF token invalid, please retry");
         }
 
+        applyAxiosErrorMessage(error);
         return Promise.reject(error);
       }
     );
