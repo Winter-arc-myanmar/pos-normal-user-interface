@@ -186,7 +186,9 @@ export function OrderPanel({
                   {t("cashier.currentOrder")}
                 </p>
                 <p className="truncate font-semibold">
-                  {selectedOrder?.orderNumber || selectedOrder?.id || "Quick Checkout"}
+                  {selectedOrder?.orderNumber ||
+                    selectedOrder?.id ||
+                    t("cashier.orderPanel.quickCheckout")}
                 </p>
                 {selectedTable ? (
                   <p className="text-xs text-slate-500">
@@ -408,7 +410,7 @@ export function OrderPanel({
           ) : null}
           {selectedTable ? (
             <select
-              aria-label="Table status"
+              aria-label={t("cashier.orderPanel.tableStatus")}
               value={selectedTable.status}
               onChange={(event) =>
                 onTableStatusChange(event.target.value as DiningTableStatus)
@@ -418,7 +420,7 @@ export function OrderPanel({
               {(["AVAILABLE", "OCCUPIED", "DIRTY", "RESERVED"] as const).map(
                 (status) => (
                   <option key={status} value={status}>
-                    Table: {status}
+                    {t("cashier.orderPanel.tableStatusOption", { status })}
                   </option>
                 )
               )}
@@ -426,7 +428,7 @@ export function OrderPanel({
           ) : null}
           {selectedSession ? (
             <select
-              aria-label="Table session state"
+              aria-label={t("cashier.orderPanel.sessionState")}
               value={selectedSession.sessionState}
               onChange={(event) =>
                 onSessionStateChange(event.target.value as TableSessionState)
@@ -443,7 +445,7 @@ export function OrderPanel({
                 ] as const
               ).map((state) => (
                 <option key={state} value={state}>
-                  Session: {state}
+                  {t("cashier.orderPanel.sessionStateOption", { state })}
                 </option>
               ))}
             </select>

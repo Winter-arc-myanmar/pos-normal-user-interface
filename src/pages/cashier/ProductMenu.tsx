@@ -118,7 +118,7 @@ export function ProductMenu({
       return true;
     } catch (caught) {
       setLocalError(
-        caught instanceof Error ? caught.message : "Unable to add product"
+        caught instanceof Error ? caught.message : t("cashier.errors.addProduct")
       );
       return false;
     } finally {
@@ -152,7 +152,7 @@ export function ProductMenu({
       await addProduct(product, defaultVariantId, 1);
     } catch (caught) {
       setLocalError(
-        caught instanceof Error ? caught.message : "Unable to load variants"
+        caught instanceof Error ? caught.message : t("cashier.errors.loadVariants")
       );
     }
   };

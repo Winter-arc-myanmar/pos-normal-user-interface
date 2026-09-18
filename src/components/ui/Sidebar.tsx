@@ -1,5 +1,6 @@
 import { type ReactNode, useState } from "react";
 import { NavLink, type NavLinkProps } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 type SidebarItem = {
   to: string;
@@ -79,6 +80,7 @@ export function Sidebar({
   onToggle,
   className = "",
 }: SidebarProps) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(defaultExpanded);
 
   const handleToggle = () => {
@@ -131,7 +133,9 @@ export function Sidebar({
             "transition-colors duration-150",
             "border-b border-slate-200",
           ].join(" ")}
-          aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
+          aria-label={
+            expanded ? t("shell.collapseSidebar") : t("shell.expandSidebar")
+          }
         >
           <span
             className={[

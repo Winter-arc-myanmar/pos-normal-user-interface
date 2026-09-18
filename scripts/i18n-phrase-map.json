@@ -1,0 +1,1901 @@
+{
+  "Refresh": {
+    "my": "ပြန်လည်စစ်မည်"
+  },
+  "Refreshing...": {
+    "my": "ပြန်လည်စစ်နေသည်..."
+  },
+  "Delete": {
+    "my": "ဖျက်မည်"
+  },
+  "Save": {
+    "my": "သိမ်းမည်"
+  },
+  "Cancel": {
+    "my": "ပယ်ဖျက်မည်"
+  },
+  "Loading...": {
+    "my": "ဖွင့်နေသည်..."
+  },
+  "Clear search": {
+    "my": "ရှာဖွေမှု ရှင်းမည်"
+  },
+  "Preparing your workspace.": {
+    "my": "လုပ်ငန်းခွင်ကို ပြင်ဆင်နေသည်။"
+  },
+  "English": {
+    "my": "English"
+  },
+  "한국어": {
+    "my": "한국어"
+  },
+  "မြန်မာ": {
+    "my": "မြန်မာ"
+  },
+  "简体中文": {
+    "my": "简体中文"
+  },
+  "Switch language": {
+    "my": "ဘာသာစကား ပြောင်းရန်"
+  },
+  "You are offline": {
+    "my": "အင်တာနက် ပြတ်နေသည်"
+  },
+  "Reconnect to continue.": {
+    "my": "ဆက်လုပ်ရန် ပြန်ချိတ်ပါ။"
+  },
+  "Offline": {
+    "my": "အော့ဖ်လိုင်း"
+  },
+  "App": {
+    "my": "အက်ပ်"
+  },
+  "Frontend template": {
+    "my": "ရှေ့ဆုံး တမ်းပလိတ်"
+  },
+  "Main menu": {
+    "my": "ပင်မမီနူး"
+  },
+  "Workspace": {
+    "my": "လုပ်ငန်းခွင်"
+  },
+  "Getting started": {
+    "my": "စတင်အသုံးပြုခြင်း"
+  },
+  "Use Users and Customers as architecture examples, then replace them with your features.": {
+    "my": "Users နှင့် Customers ကို နမူနာအဖြစ် သုံးပြီး မိမိလုပ်ဆောင်ချက်များဖြင့် အစားထိုးပါ။"
+  },
+  "v{{version}}": {
+    "my": "v{{version}}"
+  },
+  "Dashboard": {
+    "my": "ပင်မစာမျက်နှာ"
+  },
+  "Overview": {
+    "my": "အနှစ်ချုပ်"
+  },
+  "Cashier": {
+    "my": "ငွေကောက်"
+  },
+  "POS mode": {
+    "my": "POS မုဒ်"
+  },
+  "Counter orders": {
+    "my": "ကောင်တာ အော်ဒါများ"
+  },
+  "Sales orders": {
+    "my": "အရောင်းအော်ဒါများ"
+  },
+  "Printer": {
+    "my": "ပရင်တာ"
+  },
+  "Notifications": {
+    "my": "အကြောင်းကြားချက်များ"
+  },
+  "Waitlist": {
+    "my": "စောင့်ဆိုင်းစာရင်း"
+  },
+  "Tip pools": {
+    "my": "တိပ်ပေါင်းငွေ"
+  },
+  "Sync": {
+    "my": "ချိန်ကိုက်မှု"
+  },
+  "Users": {
+    "my": "အသုံးပြုသူများ"
+  },
+  "Example list": {
+    "my": "နမူနာစာရင်း"
+  },
+  "Membership": {
+    "my": "အဖွဲ့ဝင်"
+  },
+  "Example CRUD": {
+    "my": "နမူနာ CRUD"
+  },
+  "Cards": {
+    "my": "ကတ်များ"
+  },
+  "Membership card operations": {
+    "my": "အဖွဲ့ဝင်ကတ် လုပ်ဆောင်ချက်များ"
+  },
+  "Authenticated app shell": {
+    "my": "အကောင့်ဝင်ထားသော အက်ပ်"
+  },
+  "Signed in as": {
+    "my": "ဝင်ထားသူ"
+  },
+  "Full access": {
+    "my": "အပြည့်အဝ ခွင့်ပြုချက်"
+  },
+  "User": {
+    "my": "အသုံးပြုသူ"
+  },
+  "Log out": {
+    "my": "ထွက်ရန်"
+  },
+  "Drawer": {
+    "my": "ငွေသားအံ"
+  },
+  "Menu": {
+    "my": "မီနူး"
+  },
+  "Orders": {
+    "my": "အော်ဒါများ"
+  },
+  "Pay": {
+    "my": "ပေးချေရန်"
+  },
+  "Active branch": {
+    "my": "လက်ရှိဆိုင်ခွဲ"
+  },
+  "Settings": {
+    "my": "ဆက်တင်များ"
+  },
+  "Collapse sidebar": {
+    "my": "ဘေးဘား ခေါက်မည်"
+  },
+  "Expand sidebar": {
+    "my": "ဘေးဘား ဖြန့်မည်"
+  },
+  "Cash drawer API is not configured": {
+    "my": "ငွေသားအံ API မပြင်ဆင်ရသေးပါ"
+  },
+  "Sign in": {
+    "my": "အကောင့်ဝင်ရန်"
+  },
+  "Use your account credentials to continue.": {
+    "my": "ဆက်လုပ်ရန် အကောင့်အချက်အလက် ထည့်ပါ။"
+  },
+  "Account type": {
+    "my": "အကောင့်အမျိုးအစား"
+  },
+  "System admin": {
+    "my": "စနစ်အက်ဒမင်"
+  },
+  "Tenant user": {
+    "my": "ဆိုင်အသုံးပြုသူ"
+  },
+  "Platform admin login. Email and password only.": {
+    "my": "ပလက်ဖောင်းအက်ဒမင် ဝင်ရောက်မှု။ အီးမေးလ်နှင့် စကားဝှက်သာ။"
+  },
+  "POS staff login for a specific tenant and branch.": {
+    "my": "သတ်မှတ်ဆိုင်နှင့် ဆိုင်ခွဲအတွက် POS ဝန်ထမ်း ဝင်ရောက်မှု။"
+  },
+  "Tenant ID": {
+    "my": "Tenant ID"
+  },
+  "Enter tenant ID": {
+    "my": "Tenant ID ထည့်ပါ"
+  },
+  "Branch ID": {
+    "my": "ဆိုင်ခွဲ ID"
+  },
+  "Enter branch ID": {
+    "my": "ဆိုင်ခွဲ ID ထည့်ပါ"
+  },
+  "Email": {
+    "my": "အီးမေးလ်"
+  },
+  "you@example.com": {
+    "my": "you@example.com"
+  },
+  "Password": {
+    "my": "စကားဝှက်"
+  },
+  "Enter password": {
+    "my": "စကားဝှက် ထည့်ပါ"
+  },
+  "Show password": {
+    "my": "စကားဝှက် ပြရန်"
+  },
+  "Hide password": {
+    "my": "စကားဝှက် ဖျောက်ရန်"
+  },
+  "Your session expired. Please sign in again.": {
+    "my": "ဆက်ရှင် သက်တမ်းကုန်ပါပြီ။ ပြန်ဝင်ပါ။"
+  },
+  "Signing in...": {
+    "my": "ဝင်နေသည်..."
+  },
+  "Unable to sign in": {
+    "my": "ဝင်၍မရပါ"
+  },
+  "Neutral starter home. Replace this page with your product overview.": {
+    "my": "ထုတ်ကုန်အနှစ်ချုပ်ဖြင့် အစားထိုးနိုင်သော စတင်သည့်စာမျက်နှာ။"
+  },
+  "Customers": {
+    "my": "ဖောက်သည်များ"
+  },
+  "—": {
+    "my": "—"
+  },
+  "Example resource via useUserManagement": {
+    "my": "useUserManagement မှ နမူနာအရင်းအမြစ်"
+  },
+  "Example resource via useCustomerManagement": {
+    "my": "useCustomerManagement မှ နမူနာအရင်းအမြစ်"
+  },
+  "Next steps": {
+    "my": "နောက်ထပ်လုပ်ရန်များ"
+  },
+  "Explore the example pages, then add your own feature using architecture.md.": {
+    "my": "နမူနာစာမျက်နှာများကို ကြည့်ရှုပြီး architecture.md အတိုင်း မိမိလုပ်ဆောင်ချက် ထည့်ပါ။"
+  },
+  "Open users": {
+    "my": "အသုံးပြုသူများ ဖွင့်ရန်"
+  },
+  "Open customers": {
+    "my": "ဖောက်သည်များ ဖွင့်ရန်"
+  },
+  "Thin example list page wired through core layers.": {
+    "my": "core အလွှာများနှင့် ချိတ်ထားသော နမူနာစာရင်း။"
+  },
+  "Loading users...": {
+    "my": "အသုံးပြုသူများ ဖွင့်နေသည်..."
+  },
+  "No users found. Point USERS endpoints at your backend to populate this list.": {
+    "my": "အသုံးပြုသူ မတွေ့ပါ။ ဤစာရင်းအတွက် USERS API ကို ချိတ်ပါ။"
+  },
+  "{{count}} users": {
+    "my": "အသုံးပြုသူ {{count}} ဦး"
+  },
+  "Name": {
+    "my": "အမည်"
+  },
+  "Role": {
+    "my": "အခန်းကဏ္ဍ"
+  },
+  "Please select a member": {
+    "my": "အဖွဲ့ဝင်တစ်ဦး ရွေးပါ"
+  },
+  "Please enter Name, Phone No, Email": {
+    "my": "အမည်၊ ဖုန်း၊ အီးမေးလ် ထည့်ပါ"
+  },
+  "Add customer": {
+    "my": "ဖောက်သည် ထည့်မည်"
+  },
+  "Edit customer": {
+    "my": "ဖောက်သည် ပြင်မည်"
+  },
+  "Edit": {
+    "my": "ပြင်မည်"
+  },
+  "Phone": {
+    "my": "ဖုန်း"
+  },
+  "Loyalty tier": {
+    "my": "သစ္စာအဆင့်"
+  },
+  "Lifetime points": {
+    "my": "စုစုပေါင်းပွိုင့်"
+  },
+  "Credit": {
+    "my": "ခရက်ဒစ်"
+  },
+  "Credit account": {
+    "my": "ခရက်ဒစ်အကောင့်"
+  },
+  "No credit": {
+    "my": "ခရက်ဒစ်မရှိ"
+  },
+  "Max credit": {
+    "my": "အများဆုံးခရက်ဒစ်"
+  },
+  "Payment terms": {
+    "my": "ပေးချေကာလ"
+  },
+  "{{days}} days": {
+    "my": "{{days}} ရက်"
+  },
+  "Interactions": {
+    "my": "ဆက်သွယ်မှုများ"
+  },
+  "Channel": {
+    "my": "ချန်နယ်"
+  },
+  "Type": {
+    "my": "အမျိုးအစား"
+  },
+  "Summary": {
+    "my": "အနှစ်ချုပ်"
+  },
+  "Notes": {
+    "my": "မှတ်ချက်များ"
+  },
+  "Add interaction": {
+    "my": "ဆက်သွယ်မှု ထည့်မည်"
+  },
+  "No interactions yet.": {
+    "my": "ဆက်သွယ်မှု မရှိသေးပါ။"
+  },
+  "Loading customers...": {
+    "my": "ဖောက်သည်များ ဖွင့်နေသည်..."
+  },
+  "No customers found.": {
+    "my": "ဖောက်သည် မတွေ့ပါ။"
+  },
+  "Previous page": {
+    "my": "ယခင်စာမျက်နှာ"
+  },
+  "Next page": {
+    "my": "နောက်စာမျက်နှာ"
+  },
+  "Customer created.": {
+    "my": "ဖောက်သည် ဖန်တီးပြီး။"
+  },
+  "Customer updated.": {
+    "my": "ဖောက်သည် ပြင်ဆင်ပြီး။"
+  },
+  "Customer deleted.": {
+    "my": "ဖောက်သည် ဖျက်ပြီး။"
+  },
+  "Interaction added.": {
+    "my": "ဆက်သွယ်မှု ထည့်ပြီး။"
+  },
+  "Unable to load customer.": {
+    "my": "ဖောက်သည် ဖွင့်၍မရပါ။"
+  },
+  "Unable to save customer.": {
+    "my": "ဖောက်သည် သိမ်း၍မရပါ။"
+  },
+  "Unable to delete customer.": {
+    "my": "ဖောက်သည် ဖျက်၍မရပါ။"
+  },
+  "Unable to save interaction.": {
+    "my": "ဆက်သွယ်မှု သိမ်း၍မရပါ။"
+  },
+  "Membership card": {
+    "my": "အဖွဲ့ဝင်ကတ်"
+  },
+  "Card number": {
+    "my": "ကတ်နံပါတ်"
+  },
+  "Balance": {
+    "my": "လက်ကျန်"
+  },
+  "Status": {
+    "my": "အခြေအနေ"
+  },
+  "No membership card linked yet.": {
+    "my": "အဖွဲ့ဝင်ကတ် မချိတ်ရသေးပါ။"
+  },
+  "No guest wallet linked to this customer yet.": {
+    "my": "ဤဖောက်သည်နှင့် ချိတ်ထားသော ဧည့်သည်ပိုက်ဆံအိတ် မရှိသေးပါ။"
+  },
+  "Issue wallet": {
+    "my": "ပိုက်ဆံအိတ် ထုတ်မည်"
+  },
+  "Reader ready — tap NFC or swipe a USB card": {
+    "my": "ဖတ်စက် အဆင်သင့် — NFC တို့ပါ သို့မဟုတ် USB ကတ် ပွတ်ပါ"
+  },
+  "NFC ready — tap a card": {
+    "my": "NFC အဆင်သင့် — ကတ်တို့ပါ"
+  },
+  "Enable NFC": {
+    "my": "NFC ဖွင့်မည်"
+  },
+  "NFC is not available here. Swipe the USB reader or type the UID.": {
+    "my": "ဤနေရာတွင် NFC မရပါ။ USB ဖတ်စက် ပွတ်ပါ သို့မဟုတ် UID ရိုက်ထည့်ပါ။"
+  },
+  "Card {{uid}} captured": {
+    "my": "ကတ် {{uid}} ဖမ်းမိပါပြီ"
+  },
+  "No guest wallet is linked to this card.": {
+    "my": "ဤကတ်နှင့် ချိတ်ထားသော ဧည့်သည်ပိုက်ဆံအိတ် မရှိပါ။"
+  },
+  "Top up": {
+    "my": "ငွေဖြည့်"
+  },
+  "Refund": {
+    "my": "ပြန်အမ်း"
+  },
+  "Bind card": {
+    "my": "ကတ်ချိတ်မည်"
+  },
+  "Unbind card": {
+    "my": "ကတ်ချိတ်ဖြုတ်မည်"
+  },
+  "Close card": {
+    "my": "ကတ်ပိတ်မည်"
+  },
+  "Top up membership card": {
+    "my": "အဖွဲ့ဝင်ကတ် ငွေဖြည့်မည်"
+  },
+  "Refund membership card": {
+    "my": "အဖွဲ့ဝင်ကတ် ပြန်အမ်းမည်"
+  },
+  "Bind membership card": {
+    "my": "အဖွဲ့ဝင်ကတ် ချိတ်မည်"
+  },
+  "Close membership card": {
+    "my": "အဖွဲ့ဝင်ကတ် ပိတ်မည်"
+  },
+  "Amount": {
+    "my": "ပမာဏ"
+  },
+  "Reference": {
+    "my": "ကိုးကားချက်"
+  },
+  "Reason": {
+    "my": "အကြောင်းရင်း"
+  },
+  "Confirm top up": {
+    "my": "ငွေဖြည့် အတည်ပြုမည်"
+  },
+  "Confirm refund": {
+    "my": "ပြန်အမ်း အတည်ပြုမည်"
+  },
+  "Confirm unbind": {
+    "my": "ချိတ်ဖြုတ် အတည်ပြုမည်"
+  },
+  "Confirm close": {
+    "my": "ပိတ်ရန် အတည်ပြုမည်"
+  },
+  "Membership card topped up.": {
+    "my": "အဖွဲ့ဝင်ကတ် ငွေဖြည့်ပြီး။"
+  },
+  "Membership card refunded.": {
+    "my": "အဖွဲ့ဝင်ကတ် ပြန်အမ်းပြီး။"
+  },
+  "Membership card bound.": {
+    "my": "အဖွဲ့ဝင်ကတ် ချိတ်ပြီး။"
+  },
+  "Membership card unbound.": {
+    "my": "အဖွဲ့ဝင်ကတ် ချိတ်ဖြုတ်ပြီး။"
+  },
+  "Membership card closed.": {
+    "my": "အဖွဲ့ဝင်ကတ် ပိတ်ပြီး။"
+  },
+  "Unable to complete membership card action.": {
+    "my": "အဖွဲ့ဝင်ကတ် လုပ်ဆောင်ချက် မပြီးနိုင်ပါ။"
+  },
+  "Close this membership card? This cannot be undone.": {
+    "my": "ဤအဖွဲ့ဝင်ကတ်ကို ပိတ်မလား။ ပြန်ပြင်၍မရပါ။"
+  },
+  "Unbind this membership card from the member?": {
+    "my": "ဤအဖွဲ့ဝင်ကတ်ကို အဖွဲ့ဝင်မှ ချိတ်ဖြုတ်မလား?"
+  },
+  "Wallet number": {
+    "my": "ပိုက်ဆံအိတ်နံပါတ်"
+  },
+  "ID number": {
+    "my": "မှတ်ပုံတင်နံပါတ်"
+  },
+  "Tier ID": {
+    "my": "အဆင့် ID"
+  },
+  "Tier": {
+    "my": "အဆင့်"
+  },
+  "Discount": {
+    "my": "လျှော့စျေး"
+  },
+  "{{bps}} bps": {
+    "my": "{{bps}} bps"
+  },
+  "Postpaid": {
+    "my": "နောက်မှပေး"
+  },
+  "Prepaid": {
+    "my": "ကြိုပေး"
+  },
+  "Preload": {
+    "my": "ကြိုတင်ဖြည့်"
+  },
+  "Funding": {
+    "my": "ရန်ပုံငွေ"
+  },
+  "Purchased balance": {
+    "my": "ဝယ်ယူထားသောလက်ကျန်"
+  },
+  "Granted balance": {
+    "my": "ပေးထားသောလက်ကျန်"
+  },
+  "Expires": {
+    "my": "သက်တမ်းကုန်"
+  },
+  "Opened": {
+    "my": "ဖွင့်ပြီး"
+  },
+  "Closed": {
+    "my": "ပိတ်ပြီး"
+  },
+  "Sequence": {
+    "my": "အစဉ်"
+  },
+  "Card UID": {
+    "my": "ကတ် UID"
+  },
+  "Card label": {
+    "my": "ကတ်အမည်"
+  },
+  "Room number": {
+    "my": "အခန်းနံပါတ်"
+  },
+  "Payment method": {
+    "my": "ပေးချေနည်း"
+  },
+  "Payment amount": {
+    "my": "ပေးချေပမာဏ"
+  },
+  "Payment reference (required)": {
+    "my": "ပေးချေကိုးကားချက် (လိုအပ်သည်)"
+  },
+  "Add another card": {
+    "my": "ကတ်ထပ်ထည့်မည်"
+  },
+  "Remove card": {
+    "my": "ကတ်ဖယ်မည်"
+  },
+  "Additional card UID": {
+    "my": "နောက်ထပ်ကတ် UID"
+  },
+  "Select loyalty tier": {
+    "my": "သစ္စာအဆင့် ရွေးပါ"
+  },
+  "Approver token": {
+    "my": "အတည်ပြုသူ တိုကင်"
+  },
+  "Manager bearer token from a different signed-in user.": {
+    "my": "အခြားဝင်ထားသော အသုံးပြုသူ၏ မန်နေဂျာ bearer token။"
+  },
+  "Wallet statement": {
+    "my": "ပိုက်ဆံအိတ်စာရင်း"
+  },
+  "No ledger entries yet.": {
+    "my": "စာရင်းမှတ်တမ်း မရှိသေးပါ။"
+  },
+  "No cards linked to this wallet yet.": {
+    "my": "ဤပိုက်ဆံအိတ်နှင့် ချိတ်ထားသော ကတ် မရှိသေးပါ။"
+  },
+  "Report lost": {
+    "my": "ပျောက်ကြောင်း တိုင်မည်"
+  },
+  "Replace card": {
+    "my": "ကတ်အစားထိုးမည်"
+  },
+  "New card UID": {
+    "my": "ကတ် UID အသစ်"
+  },
+  "Void wallet": {
+    "my": "ပိုက်ဆံအိတ် ပယ်ဖျက်မည်"
+  },
+  "Void this wallet? Only unused wallets can be voided.": {
+    "my": "ဤပိုက်ဆံအိတ်ကို ပယ်ဖျက်မလား? မသုံးရသေးသော ပိုက်ဆံအိတ်များသာ ပယ်ဖျက်နိုင်သည်။"
+  },
+  "Audit ledger": {
+    "my": "စာရင်းစစ်"
+  },
+  "Stored {{stored}} · Replayed {{replayed}}{{drift}}": {
+    "my": "သိမ်းထား {{stored}} · ပြန်ဖွင့် {{replayed}}{{drift}}"
+  },
+  " · drift detected": {
+    "my": " · ကွာဟမှု တွေ့ရှိ"
+  },
+  "Settlement action": {
+    "my": "ရှင်းတမ်းလုပ်ဆောင်ချက်"
+  },
+  "Refundable": {
+    "my": "ပြန်အမ်းနိုင်"
+  },
+  "Forfeitable": {
+    "my": "သိမ်းဆည်းနိုင်"
+  },
+  "Collectable": {
+    "my": "ကောက်ခံနိုင်"
+  },
+  "Blockers": {
+    "my": "ပိတ်ဆို့ချက်များ"
+  },
+  "Cancel settlement": {
+    "my": "ရှင်းတမ်း ပယ်ဖျက်မည်"
+  },
+  "Begin settlement": {
+    "my": "ရှင်းတမ်း စတင်မည်"
+  },
+  "Lock the wallet before closing so no new spending occurs during checkout.": {
+    "my": "ငွေရှင်းချိန်တွင် အသုံးစရိတ်အသစ် မဖြစ်စေရန် ပိတ်မီ ပိုက်ဆံအိတ်ကို သော့ခတ်ပါ။"
+  },
+  "Settlement started. The wallet is locked for checkout.": {
+    "my": "ရှင်းတမ်း စတင်ပြီး။ ငွေရှင်းရန် ပိုက်ဆံအိတ် သော့ခတ်ထားသည်။"
+  },
+  "Begin settlement before confirming close.": {
+    "my": "ပိတ်ရန် အတည်မပြုမီ ရှင်းတမ်း စတင်ပါ။"
+  },
+  "Guest card registry": {
+    "my": "ဧည့်သည်ကတ် စာရင်း"
+  },
+  "Search all guest cards by UID, label, or room.": {
+    "my": "UID၊ အမည် သို့မဟုတ် အခန်းဖြင့် ဧည့်သည်ကတ်အားလုံး ရှာပါ။"
+  },
+  "No guest cards found.": {
+    "my": "ဧည့်သည်ကတ် မတွေ့ပါ။"
+  },
+  "View card": {
+    "my": "ကတ်ကြည့်မည်"
+  },
+  "Confirm void": {
+    "my": "ပယ်ဖျက် အတည်ပြုမည်"
+  },
+  "Card reported lost.": {
+    "my": "ကတ်ပျောက်ကြောင်း တိုင်ပြီး။"
+  },
+  "Card replaced.": {
+    "my": "ကတ် အစားထိုးပြီး။"
+  },
+  "Wallet voided.": {
+    "my": "ပိုက်ဆံအိတ် ပယ်ဖျက်ပြီး။"
+  },
+  "Register guest wallet": {
+    "my": "ဧည့်သည်ပိုက်ဆံအိတ် မှတ်ပုံတင်မည်"
+  },
+  "Open a POS session before registering or settling a wallet.": {
+    "my": "ပိုက်ဆံအိတ် မှတ်ပုံတင် သို့မဟုတ် ရှင်းတမ်းမလုပ်မီ POS ဆက်ရှင် ဖွင့်ပါ။"
+  },
+  "Guest wallet issued.": {
+    "my": "ဧည့်သည်ပိုက်ဆံအိတ် ထုတ်ပေးပြီး။"
+  },
+  "Top up or refund membership cards.": {
+    "my": "အဖွဲ့ဝင်ကတ် ငွေဖြည့် သို့မဟုတ် ပြန်အမ်းပါ။"
+  },
+  "Card top up": {
+    "my": "ကတ်ငွေဖြည့်"
+  },
+  "Swipe or enter a membership card, add value, and print a receipt.": {
+    "my": "အဖွဲ့ဝင်ကတ် ပွတ်ပါ သို့မဟုတ် ထည့်ပါ၊ တန်ဖိုးဖြည့်ပြီး ပြေစာပရင့်ထုတ်ပါ။"
+  },
+  "Card refund": {
+    "my": "ကတ်ပြန်အမ်း"
+  },
+  "Detect a guest card, choose amount, approve, and print a receipt.": {
+    "my": "ဧည့်သည်ကတ် ဖတ်ပါ၊ ပမာဏရွေးပါ၊ အတည်ပြုပြီး ပြေစာပရင့်ထုတ်ပါ။"
+  },
+  "Back to cards": {
+    "my": "ကတ်များသို့ ပြန်မည်"
+  },
+  "Detect card, choose amount, and print receipt.": {
+    "my": "ကတ်ဖတ်ပါ၊ ပမာဏရွေးပြီး ပြေစာပရင့်ထုတ်ပါ။"
+  },
+  "Detect": {
+    "my": "ဖတ်မည်"
+  },
+  "Print": {
+    "my": "ပရင့်ထုတ်မည်"
+  },
+  "Coming soon": {
+    "my": "မကြာမီလာမည်"
+  },
+  "Swipe card or enter number": {
+    "my": "ကတ်ပွတ်ပါ သို့မဟုတ် နံပါတ်ထည့်ပါ"
+  },
+  "Tap NFC, swipe the USB reader, or type the card number, then detect.": {
+    "my": "NFC တို့ပါ၊ USB ဖတ်စက် ပွတ်ပါ၊ သို့မဟုတ် ကတ်နံပါတ် ရိုက်ပြီး ဖတ်ပါ။"
+  },
+  "Detect card": {
+    "my": "ကတ်ဖတ်မည်"
+  },
+  "Detecting...": {
+    "my": "ဖတ်နေသည်..."
+  },
+  "Detected card": {
+    "my": "ဖတ်မိသောကတ်"
+  },
+  "Current balance": {
+    "my": "လက်ရှိလက်ကျန်"
+  },
+  "Predefined amounts": {
+    "my": "သတ်မှတ်ပမာဏများ"
+  },
+  "Custom amount": {
+    "my": "ကိုယ်တိုင်ပမာဏ"
+  },
+  "Continue to print": {
+    "my": "ပရင့်သို့ ဆက်မည်"
+  },
+  "Confirm & print": {
+    "my": "အတည်ပြုပြီး ပရင့်ထုတ်မည်"
+  },
+  "Processing...": {
+    "my": "ဆောင်ရွက်နေသည်..."
+  },
+  "Print again": {
+    "my": "ထပ်ပရင့်ထုတ်မည်"
+  },
+  "New top up": {
+    "my": "ငွေဖြည့်အသစ်"
+  },
+  "Unable to complete card top up.": {
+    "my": "ကတ်ငွေဖြည့် မပြီးနိုင်ပါ။"
+  },
+  "Back": {
+    "my": "နောက်သို့"
+  },
+  "Keypad": {
+    "my": "ကီးပက်"
+  },
+  "Use the keypad for card number or custom amount entry.": {
+    "my": "ကတ်နံပါတ် သို့မဟုတ် ကိုယ်တိုင်ပမာဏ ထည့်ရန် ကီးပက်သုံးပါ။"
+  },
+  "Card Top Up Receipt": {
+    "my": "ကတ်ငွေဖြည့် ပြေစာ"
+  },
+  "Receipt": {
+    "my": "ပြေစာ"
+  },
+  "Member": {
+    "my": "အဖွဲ့ဝင်"
+  },
+  "Card": {
+    "my": "ကတ်"
+  },
+  "Balance after": {
+    "my": "ပြီးနောက်လက်ကျန်"
+  },
+  "Detect guest card, choose amount, approve, and print receipt.": {
+    "my": "ဧည့်သည်ကတ် ဖတ်ပါ၊ ပမာဏရွေးပါ၊ အတည်ပြုပြီး ပြေစာပရင့်ထုတ်ပါ။"
+  },
+  "PIN": {
+    "my": "PIN"
+  },
+  "Swipe or enter a guest card, approve, and refund value.": {
+    "my": "ဧည့်သည်ကတ် ပွတ်ပါ သို့မဟုတ် ထည့်ပါ၊ အတည်ပြုပြီး တန်ဖိုးပြန်အမ်းပါ။"
+  },
+  "PIN / Password": {
+    "my": "PIN / စကားဝှက်"
+  },
+  "Enter card PIN or password": {
+    "my": "ကတ် PIN သို့မဟုတ် စကားဝှက် ထည့်ပါ"
+  },
+  "Enter the member PIN or password to authorize this refund.": {
+    "my": "ဤပြန်အမ်းကို ခွင့်ပြုရန် အဖွဲ့ဝင် PIN သို့မဟုတ် စကားဝှက် ထည့်ပါ။"
+  },
+  "Verify PIN": {
+    "my": "PIN စစ်မည်"
+  },
+  "Verifying...": {
+    "my": "စစ်နေသည်..."
+  },
+  "New refund": {
+    "my": "ပြန်အမ်းအသစ်"
+  },
+  "Unable to complete card refund.": {
+    "my": "ကတ်ပြန်အမ်း မပြီးနိုင်ပါ။"
+  },
+  "Use the keypad for card number, PIN, or custom amount entry.": {
+    "my": "ကတ်နံပါတ်၊ PIN သို့မဟုတ် ကိုယ်တိုင်ပမာဏ ထည့်ရန် ကီးပက်သုံးပါ။"
+  },
+  "Card Refund Receipt": {
+    "my": "ကတ်ပြန်အမ်း ပြေစာ"
+  },
+  "Sync & maintenance": {
+    "my": "ချိန်ကိုက်မှုနှင့် ထိန်းသိမ်းမှု"
+  },
+  "Keep this device aligned with cloud settings, orders, and services.": {
+    "my": "ဤစက်ကို ကလောက်ဒ် ဆက်တင်များ၊ အော်ဒါများနှင့် ဝန်ဆောင်မှုများနှင့် ကိုက်ညီအောင် ထားပါ။"
+  },
+  "Last time {{time}}": {
+    "my": "နောက်ဆုံးအကြိမ် {{time}}"
+  },
+  "Not run yet on this device": {
+    "my": "ဤစက်တွင် မလုပ်ရသေးပါ"
+  },
+  "Get latest settings": {
+    "my": "နောက်ဆုံးဆက်တင်များ ရယူမည်"
+  },
+  "After the merchant updates POS parameters in the back office, pull the latest settings so this register can apply them.": {
+    "my": "ကုန်သည်က နောက်ရုံးတွင် POS ကန့်သတ်ချက်များ ပြင်ပြီးနောက် ဤငွေကောက်စက် အသုံးပြုနိုင်ရန် နောက်ဆုံးဆက်တင်များ ဆွဲယူပါ။"
+  },
+  "Get updates": {
+    "my": "အပ်ဒိတ်ရယူမည်"
+  },
+  "Item updates": {
+    "my": "ပစ္စည်းအပ်ဒိတ်များ"
+  },
+  "Upload order": {
+    "my": "အော်ဒါ တင်မည်"
+  },
+  "Synchronize orders from this device to the cloud. The system can also auto-sync every 30 minutes once connected.": {
+    "my": "ဤစက်မှ အော်ဒါများကို ကလောက်ဒ် သို့ ချိန်ကိုက်ပါ။ ချိတ်ပြီးနောက် စနစ်က ၃၀ မိနစ်တိုင်း အလိုအလျောက် ချိန်ကိုက်နိုင်သည်။"
+  },
+  "Upload now": {
+    "my": "ယခုတင်မည်"
+  },
+  "Service restart": {
+    "my": "ဝန်ဆောင်မှု ပြန်စမည်"
+  },
+  "If a linked SubPOS service stops responding, try restarting the local service stack from here.": {
+    "my": "ချိတ်ထားသော SubPOS ဝန်ဆောင်မှု တုံ့ပြန်မှု ရပ်သွားပါက ဤနေရာမှ ဒေသခံ ဝန်ဆောင်မှုများကို ပြန်စကြည့်ပါ။"
+  },
+  "Restart": {
+    "my": "ပြန်စမည်"
+  },
+  "Open settings": {
+    "my": "ဆက်တင်များ ဖွင့်မည်"
+  },
+  "Cashier Settings": {
+    "my": "ငွေကောက် ဆက်တင်များ"
+  },
+  "Devices & IP": {
+    "my": "စက်များနှင့် IP"
+  },
+  "Print Template": {
+    "my": "ပရင့် တမ်းပလိတ်"
+  },
+  "POS terminal": {
+    "my": "POS စက်"
+  },
+  "Logout": {
+    "my": "ထွက်မည်"
+  },
+  "Shortcut key": {
+    "my": "ဖြတ်လမ်းခလုတ်"
+  },
+  "Edit shortcut key": {
+    "my": "ဖြတ်လမ်းခလုတ် ပြင်မည်"
+  },
+  "Cashier behavior": {
+    "my": "ငွေကောက် အပြုအမူ"
+  },
+  "Auto Check Out": {
+    "my": "အလိုအလျောက် ငွေရှင်း"
+  },
+  "Switch on: After paying off the order, the system will automatically check out the order.": {
+    "my": "ဖွင့်ပါ- အော်ဒါပေးချေပြီးနောက် စနစ်က အော်ဒါကို အလိုအလျောက် ငွေရှင်းမည်။"
+  },
+  "Dine In": {
+    "my": "ဆိုင်တွင်စား"
+  },
+  "Take Away": {
+    "my": "ပါဆယ်"
+  },
+  "Delivery": {
+    "my": "ပို့ဆောင်"
+  },
+  "Pick Up": {
+    "my": "လာယူ"
+  },
+  "Sold Out": {
+    "my": "ရောင်းကုန်"
+  },
+  "Kitchen Print": {
+    "my": "မီးဖိုချောင် ပရင့်"
+  },
+  "Reserve": {
+    "my": "ကြိုတင်မှာ"
+  },
+  "Seasonal Items": {
+    "my": "ရာသီပစ္စည်းများ"
+  },
+  "Bookkeeping": {
+    "my": "စာရင်းကိုင်"
+  },
+  "Storage": {
+    "my": "သိုလှောင်"
+  },
+  "Pick up": {
+    "my": "လာယူမည်"
+  },
+  "Open New Order After Check Out": {
+    "my": "ငွေရှင်းပြီး အော်ဒါအသစ် ဖွင့်မည်"
+  },
+  "After checkout completes, start a new order immediately.": {
+    "my": "ငွေရှင်းပြီးနောက် အော်ဒါအသစ် ချက်ချင်း စတင်ပါ။"
+  },
+  "Quick Order": {
+    "my": "အမြန်အော်ဒါ"
+  },
+  "Creating a new order goes directly to the menu.": {
+    "my": "အော်ဒါအသစ် ဖန်တီးပါက မီနူးသို့ တိုက်ရိုက်သွားသည်။"
+  },
+  "Priority display order memo": {
+    "my": "အော်ဒါမှတ်ချက် ဦးစားပေးပြ"
+  },
+  "Show the order memo before other order details.": {
+    "my": "အခြားအော်ဒါအချက်အလက်များမတိုင်မီ အော်ဒါမှတ်ချက် ပြပါ။"
+  },
+  "Device name": {
+    "my": "စက်အမည်"
+  },
+  "POS terminal 01": {
+    "my": "POS စက် 01"
+  },
+  "IP address": {
+    "my": "IP လိပ်စာ"
+  },
+  "Subnet mask": {
+    "my": "ဆပ်နက်မာ့စ်"
+  },
+  "Gateway": {
+    "my": "ဂိတ်ဝေး"
+  },
+  "Network settings will sync when the device API is connected.": {
+    "my": "စက် API ချိတ်သောအခါ ကွန်ရက်ဆက်တင်များ ချိန်ကိုက်မည်။"
+  },
+  "Printer name": {
+    "my": "ပရင်တာအမည်"
+  },
+  "Kitchen printer": {
+    "my": "မီးဖိုချောင် ပရင်တာ"
+  },
+  "Connection type": {
+    "my": "ချိတ်ဆက်အမျိုးအစား"
+  },
+  "Printer IP address": {
+    "my": "ပရင်တာ IP လိပ်စာ"
+  },
+  "Printer routing will be configured when the print service is connected.": {
+    "my": "ပရင့်ဝန်ဆောင်မှု ချိတ်သောအခါ ပရင်တာလမ်းကြောင်း ပြင်ဆင်မည်။"
+  },
+  "Network": {
+    "my": "ကွန်ရက်"
+  },
+  "USB": {
+    "my": "USB"
+  },
+  "Bluetooth": {
+    "my": "ဘလူးတုသ်"
+  },
+  "Template name": {
+    "my": "တမ်းပလိတ်အမည်"
+  },
+  "Paper width": {
+    "my": "စက္ကူအကျယ်"
+  },
+  "Receipt template preview will appear here.": {
+    "my": "ပြေစာတမ်းပလိတ် အကြိုမြင်ကွင်း ဤနေရာတွင် ပေါ်မည်။"
+  },
+  "Terminal name": {
+    "my": "စက်အမည်"
+  },
+  "Front counter": {
+    "my": "ရှေ့ကောင်တာ"
+  },
+  "Register ID": {
+    "my": "ငွေကောက်စက် ID"
+  },
+  "Receipt header": {
+    "my": "ပြေစာခေါင်းစဉ်"
+  },
+  "Store name and address": {
+    "my": "ဆိုင်အမည်နှင့် လိပ်စာ"
+  },
+  "Terminal details will bind to the active POS session when connected.": {
+    "my": "ချိတ်သောအခါ စက်အချက်အလက်များသည် လက်ရှိ POS ဆက်ရှင်နှင့် ချိတ်မည်။"
+  },
+  "Sign out": {
+    "my": "ထွက်ရန်"
+  },
+  "End your cashier session on this device.": {
+    "my": "ဤစက်ရှိ ငွေကောက်ဆက်ရှင်ကို အဆုံးသတ်ပါ။"
+  },
+  "Example CRUD resource. Copy this pattern for new features.": {
+    "my": "CRUD နမူနာ။ လုပ်ဆောင်ချက်အသစ်များအတွက် ဤပုံစံကို ကူးယူပါ။"
+  },
+  "Create customer": {
+    "my": "ဖောက်သည် အသစ်"
+  },
+  "Create": {
+    "my": "ဖန်တီးမည်"
+  },
+  "Unable to create customer": {
+    "my": "ဖောက်သည် ဖန်တီး၍မရပါ"
+  },
+  "No customers yet. Create one above or connect your API.": {
+    "my": "ဖောက်သည် မရှိသေးပါ။ အထက်တွင် ဖန်တီးပါ သို့မဟုတ် API ချိတ်ပါ။"
+  },
+  "{{count}} customers": {
+    "my": "ဖောက်သည် {{count}} ဦး"
+  },
+  "Address": {
+    "my": "လိပ်စာ"
+  },
+  "Actions": {
+    "my": "လုပ်ဆောင်ချက်များ"
+  },
+  "+ New": {
+    "my": "+ အသစ်"
+  },
+  "Location": {
+    "my": "တည်နေရာ"
+  },
+  "Select location": {
+    "my": "တည်နေရာ ရွေးပါ"
+  },
+  "Current order": {
+    "my": "လက်ရှိအော်ဒါ"
+  },
+  "Total": {
+    "my": "စုစုပေါင်း"
+  },
+  "Table": {
+    "my": "စားပွဲ"
+  },
+  "Session": {
+    "my": "ဆက်ရှင်"
+  },
+  "Confirm pay": {
+    "my": "ပေးချေ အတည်ပြုမည်"
+  },
+  "Mark Pickup": {
+    "my": "လာယူပြီး မှတ်မည်"
+  },
+  "Select an order tile or create a new one.": {
+    "my": "အော်ဒါကွက် ရွေးပါ သို့မဟုတ် အသစ်ဖန်တီးပါ။"
+  },
+  "Search products...": {
+    "my": "ကုန်ပစ္စည်း ရှာမည်..."
+  },
+  "Loading cashier workspace...": {
+    "my": "ငွေကောက် လုပ်ငန်းခွင် ဖွင့်နေသည်..."
+  },
+  "Showing pending orders.": {
+    "my": "ဆိုင်းငံ့အော်ဒါများ ပြနေသည်။"
+  },
+  "Select orders to merge, split items, or open order details.": {
+    "my": "ပေါင်းရန်၊ ပစ္စည်းခွဲရန် သို့မဟုတ် အသေးစိတ်ကြည့်ရန် အော်ဒါများ ရွေးပါ။"
+  },
+  "Merge all": {
+    "my": "အားလုံးပေါင်းမည်"
+  },
+  "Merge selected": {
+    "my": "ရွေးထားသည်များ ပေါင်းမည်"
+  },
+  "Split items": {
+    "my": "ပစ္စည်းများ ခွဲမည်"
+  },
+  "Move items from": {
+    "my": "ပစ္စည်းများ ရွှေ့မည့်နေရာ"
+  },
+  "Move items to": {
+    "my": "ပစ္စည်းများ ရွှေ့မည့်နေရာသို့"
+  },
+  "Move selected items": {
+    "my": "ရွေးထားသောပစ္စည်းများ ရွှေ့မည်"
+  },
+  "This order has no items.": {
+    "my": "ဤအော်ဒါတွင် ပစ္စည်းမရှိပါ။"
+  },
+  "No items": {
+    "my": "ပစ္စည်းမရှိ"
+  },
+  "Details": {
+    "my": "အသေးစိတ်"
+  },
+  "New": {
+    "my": "အသစ်"
+  },
+  "Add another order": {
+    "my": "အော်ဒါထပ်ထည့်မည်"
+  },
+  "Manage multiple orders": {
+    "my": "အော်ဒါများစွာ စီမံမည်"
+  },
+  "Primary": {
+    "my": "အဓိက"
+  },
+  "Table orders": {
+    "my": "စားပွဲအော်ဒါများ"
+  },
+  "Order {{number}}": {
+    "my": "အော်ဒါ {{number}}"
+  },
+  "Select order {{number}}": {
+    "my": "အော်ဒါ {{number}} ရွေးပါ"
+  },
+  "{{count}} Orders": {
+    "my": "အော်ဒါ {{count}} ခု"
+  },
+  "Order {{number}} created for this table.": {
+    "my": "ဤစားပွဲအတွက် အော်ဒါ {{number}} ဖန်တီးပြီး။"
+  },
+  "Orders merged successfully.": {
+    "my": "အော်ဒါများ ပေါင်းပြီး အောင်မြင်ပါသည်။"
+  },
+  "Items moved successfully.": {
+    "my": "ပစ္စည်းများ ရွှေ့ပြီး အောင်မြင်ပါသည်။"
+  },
+  "Select a table before adding another order.": {
+    "my": "အော်ဒါထပ်မထည့်မီ စားပွဲ ရွေးပါ။"
+  },
+  "Unable to open this order.": {
+    "my": "ဤအော်ဒါ ဖွင့်၍မရပါ။"
+  },
+  "Unable to add another order.": {
+    "my": "အော်ဒါထပ်ထည့်၍မရပါ။"
+  },
+  "Unable to merge orders.": {
+    "my": "အော်ဒါများ ပေါင်း၍မရပါ။"
+  },
+  "Unable to split items.": {
+    "my": "ပစ္စည်းများ ခွဲ၍မရပါ။"
+  },
+  "{{count}} active": {
+    "my": "{{count}} ခု လုပ်ဆောင်နေ"
+  },
+  "No active waitlist entries.": {
+    "my": "လုပ်ဆောင်နေသော စောင့်ဆိုင်းစာရင်း မရှိပါ။"
+  },
+  "Add party": {
+    "my": "အဖွဲ့ထည့်မည်"
+  },
+  "Edit party": {
+    "my": "အဖွဲ့ပြင်မည်"
+  },
+  "Save party": {
+    "my": "အဖွဲ့သိမ်းမည်"
+  },
+  "Search guest or phone": {
+    "my": "ဧည့်သည် သို့မဟုတ် ဖုန်း ရှာမည်"
+  },
+  "Please select a guest from the list.": {
+    "my": "စာရင်းမှ ဧည့်သည် ရွေးပါ။"
+  },
+  "No guests in this status.": {
+    "my": "ဤအခြေအနေတွင် ဧည့်သည်မရှိပါ။"
+  },
+  "Guest name": {
+    "my": "ဧည့်သည်အမည်"
+  },
+  "Joined": {
+    "my": "ဝင်ပြီး"
+  },
+  "Wait time": {
+    "my": "စောင့်ချိန်"
+  },
+  "Estimated wait": {
+    "my": "ခန့်မှန်းစောင့်ချိန်"
+  },
+  "~{{minutes}} min": {
+    "my": "~{{minutes}} မိနစ်"
+  },
+  "Waited {{duration}}": {
+    "my": "{{duration}} စောင့်ပြီး"
+  },
+  "Preferred zone": {
+    "my": "နှစ်သက်ရာဇုန်"
+  },
+  "Any zone": {
+    "my": "ဇုန်မည်သည့်ခုမဆို"
+  },
+  "Choose available table": {
+    "my": "ရနိုင်သောစားပွဲ ရွေးပါ"
+  },
+  "Table for {{guest}}": {
+    "my": "{{guest}} အတွက် စားပွဲ"
+  },
+  "Unable to save waitlist entry.": {
+    "my": "စောင့်ဆိုင်းစာရင်း သိမ်း၍မရပါ။"
+  },
+  "Waitlist action failed.": {
+    "my": "စောင့်ဆိုင်းစာရင်း လုပ်ဆောင်ချက် မအောင်မြင်ပါ။"
+  },
+  "Processed": {
+    "my": "ဆောင်ရွက်ပြီး"
+  },
+  "Seated": {
+    "my": "ထိုင်ပြီး"
+  },
+  "Canceled": {
+    "my": "ပယ်ဖျက်ပြီး"
+  },
+  "No-show": {
+    "my": "မလာ"
+  },
+  "Party": {
+    "my": "အဖွဲ့"
+  },
+  "Notify": {
+    "my": "အကြောင်းကြားမည်"
+  },
+  "Seat": {
+    "my": "ထိုင်ခိုင်းမည်"
+  },
+  "Tip Pools": {
+    "my": "တိပ်ပေါင်းငွေ"
+  },
+  "No tip pools yet.": {
+    "my": "တိပ်ပေါင်းငွေ မရှိသေးပါ။"
+  },
+  "Create tip pool": {
+    "my": "တိပ်ပေါင်းငွေ ဖန်တီးမည်"
+  },
+  "Edit tip pool": {
+    "my": "တိပ်ပေါင်းငွေ ပြင်မည်"
+  },
+  "Edit selected": {
+    "my": "ရွေးထားသည် ပြင်မည်"
+  },
+  "Pool name": {
+    "my": "ပေါင်းငွေအမည်"
+  },
+  "Start": {
+    "my": "စတင်"
+  },
+  "End": {
+    "my": "ပြီးဆုံး"
+  },
+  "Distribution method": {
+    "my": "ခွဲဝေနည်း"
+  },
+  "Include service charge": {
+    "my": "ဝန်ဆောင်ခ ထည့်မည်"
+  },
+  "Service charge share BPS": {
+    "my": "ဝန်ဆောင်ခ ဝေစု BPS"
+  },
+  "Save pool": {
+    "my": "ပေါင်းငွေ သိမ်းမည်"
+  },
+  "Create pool": {
+    "my": "ပေါင်းငွေ ဖန်တီးမည်"
+  },
+  "Cancel edit": {
+    "my": "ပြင်ဆင်မှု ပယ်ဖျက်မည်"
+  },
+  "Selected pool": {
+    "my": "ရွေးထားသောပေါင်းငွေ"
+  },
+  "Select a tip pool.": {
+    "my": "တိပ်ပေါင်းငွေ ရွေးပါ။"
+  },
+  "Tips {{tips}} · Service charge {{serviceCharge}}": {
+    "my": "တိပ် {{tips}} · ဝန်ဆောင်ခ {{serviceCharge}}"
+  },
+  "Distributable {{amount}}": {
+    "my": "ခွဲဝေနိုင် {{amount}}"
+  },
+  "Distribute": {
+    "my": "ခွဲဝေမည်"
+  },
+  "Settle": {
+    "my": "ရှင်းမည်"
+  },
+  "Allocations": {
+    "my": "ခွဲဝေမှုများ"
+  },
+  "Hours {{hours}} · Weight {{weight}}": {
+    "my": "နာရီ {{hours}} · အလေးချိန် {{weight}}"
+  },
+  "ALL": {
+    "my": "အားလုံး"
+  },
+  "OPEN": {
+    "my": "ဖွင့်"
+  },
+  "SETTLED": {
+    "my": "ရှင်းပြီး"
+  },
+  "Unable to load tip pool": {
+    "my": "တိပ်ပေါင်းငွေ ဖွင့်၍မရပါ"
+  },
+  "Unable to save tip pool": {
+    "my": "တိပ်ပေါင်းငွေ သိမ်း၍မရပါ"
+  },
+  "Select a tenant branch before creating a tip pool": {
+    "my": "တိပ်ပေါင်းငွေ မဖန်တီးမီ ဆိုင်ခွဲ ရွေးပါ"
+  },
+  "Tip pool created": {
+    "my": "တိပ်ပေါင်းငွေ ဖန်တီးပြီး"
+  },
+  "Tip pool updated": {
+    "my": "တိပ်ပေါင်းငွေ ပြင်ဆင်ပြီး"
+  },
+  "Tip pool distributed": {
+    "my": "တိပ်ပေါင်းငွေ ခွဲဝေပြီး"
+  },
+  "Tip pool settled": {
+    "my": "တိပ်ပေါင်းငွေ ရှင်းပြီး"
+  },
+  "Tip pool action failed": {
+    "my": "တိပ်ပေါင်းငွေ လုပ်ဆောင်ချက် မအောင်မြင်ပါ"
+  },
+  "Add allocation": {
+    "my": "ခွဲဝေမှု ထည့်မည်"
+  },
+  "Save allocation": {
+    "my": "ခွဲဝေမှု သိမ်းမည်"
+  },
+  "Staff": {
+    "my": "ဝန်ထမ်း"
+  },
+  "Select staff": {
+    "my": "ဝန်ထမ်း ရွေးပါ"
+  },
+  "Hours worked": {
+    "my": "အလုပ်လုပ်နာရီ"
+  },
+  "Weight": {
+    "my": "အလေးချိန်"
+  },
+  "Select a staff member.": {
+    "my": "ဝန်ထမ်းတစ်ဦး ရွေးပါ။"
+  },
+  "Select a role.": {
+    "my": "အခန်းကဏ္ဍ ရွေးပါ။"
+  },
+  "Enter a valid number.": {
+    "my": "မှန်ကန်သော ဂဏန်း ထည့်ပါ။"
+  },
+  "Enter hours, weight, or amount greater than zero.": {
+    "my": "သုညထက်ကြီးသော နာရီ၊ အလေးချိန် သို့မဟုတ် ပမာဏ ထည့်ပါ။"
+  },
+  "Unable to save allocation.": {
+    "my": "ခွဲဝေမှု သိမ်း၍မရပါ။"
+  },
+  "All": {
+    "my": "အားလုံး"
+  },
+  "Pending": {
+    "my": "ဆိုင်းငံ့"
+  },
+  "Placed": {
+    "my": "မှာပြီး"
+  },
+  "Paid": {
+    "my": "ပေးပြီး"
+  },
+  "POS Session": {
+    "my": "POS ဆက်ရှင်"
+  },
+  "Set up your POS workspace": {
+    "my": "POS လုပ်ငန်းခွင် ပြင်ဆင်ပါ"
+  },
+  "Choose your location and open a POS session before taking orders.": {
+    "my": "အော်ဒါမယူမီ တည်နေရာရွေးပြီး POS ဆက်ရှင် ဖွင့်ပါ။"
+  },
+  "POS register": {
+    "my": "POS ငွေကောက်စက်"
+  },
+  "Select register": {
+    "my": "ငွေကောက်စက် ရွေးပါ"
+  },
+  "Open session": {
+    "my": "ဆက်ရှင် ဖွင့်မည်"
+  },
+  "Close": {
+    "my": "ပိတ်မည်"
+  },
+  "Continue": {
+    "my": "ဆက်လုပ်မည်"
+  },
+  "Session is active.": {
+    "my": "ဆက်ရှင် လုပ်ဆောင်နေသည်။"
+  },
+  "No active session.": {
+    "my": "လုပ်ဆောင်နေသော ဆက်ရှင် မရှိပါ။"
+  },
+  "POS session opened.": {
+    "my": "POS ဆက်ရှင် ဖွင့်ပြီး။"
+  },
+  "POS session closed.": {
+    "my": "POS ဆက်ရှင် ပိတ်ပြီး။"
+  },
+  "A POS session is already open.": {
+    "my": "POS ဆက်ရှင် ဖွင့်ပြီးသားရှိပါသည်။"
+  },
+  "Open a POS session to continue.": {
+    "my": "ဆက်လုပ်ရန် POS ဆက်ရှင် ဖွင့်ပါ။"
+  },
+  "POS context refreshed.": {
+    "my": "POS အကြောင်းအရာ ပြန်စစ်ပြီး။"
+  },
+  "Search products": {
+    "my": "ကုန်ပစ္စည်း ရှာမည်"
+  },
+  "No SKU": {
+    "my": "SKU မရှိ"
+  },
+  "No products found": {
+    "my": "ကုန်ပစ္စည်း မတွေ့ပါ"
+  },
+  "Variant": {
+    "my": "မျိုးကွဲ"
+  },
+  "Quantity": {
+    "my": "အရေအတွက်"
+  },
+  "Add to order": {
+    "my": "အော်ဒါသို့ ထည့်မည်"
+  },
+  "Choose a variant": {
+    "my": "မျိုးကွဲ ရွေးပါ"
+  },
+  "This product has no sellable variant.": {
+    "my": "ဤကုန်ပစ္စည်းတွင် ရောင်းနိုင်သော မျိုးကွဲ မရှိပါ။"
+  },
+  "Select or create an order first.": {
+    "my": "အရင် အော်ဒါ ရွေးပါ သို့မဟုတ် ဖန်တီးပါ။"
+  },
+  "Choose a table": {
+    "my": "စားပွဲ ရွေးပါ"
+  },
+  "Select a table below, then add items to the order.": {
+    "my": "အောက်တွင် စားပွဲရွေးပြီး အော်ဒါသို့ ပစ္စည်းထည့်ပါ။"
+  },
+  "Assign a table (optional)": {
+    "my": "စားပွဲ သတ်မှတ်မည် (ရွေးချယ်နိုင်)"
+  },
+  "Pick a table for seated dine-in, or add items without a table.": {
+    "my": "ဆိုင်တွင်စားရန် စားပွဲရွေးပါ၊ သို့မဟုတ် စားပွဲမရှိဘဲ ပစ္စည်းထည့်ပါ။"
+  },
+  "Tap a product to add it to the order.": {
+    "my": "အော်ဒါသို့ ထည့်ရန် ကုန်ပစ္စည်းကို တို့ပါ။"
+  },
+  "Remaining receivable {{amount}}": {
+    "my": "ကျန်ရှိသော လက်ခံရငွေ {{amount}}"
+  },
+  "Bill": {
+    "my": "ဘில்"
+  },
+  "Subtotal": {
+    "my": "ခွဲစုစုပေါင်း"
+  },
+  "Split": {
+    "my": "ခွဲမည်"
+  },
+  "Split on": {
+    "my": "ခွဲထားသည်"
+  },
+  "Continue split": {
+    "my": "ခွဲမှု ဆက်မည်"
+  },
+  "Close split": {
+    "my": "ခွဲမှု ပိတ်မည်"
+  },
+  "Keep split": {
+    "my": "ခွဲမှု ထားမည်"
+  },
+  "Close payment": {
+    "my": "ပေးချေမှု ပိတ်မည်"
+  },
+  "Clear {{count}} tenders and close this payment screen?": {
+    "my": "ပေးချေမှု {{count}} ခု ရှင်းပြီး ဤပေးချေမျက်နှာပြင် ပိတ်မလား?"
+  },
+  "Split amount": {
+    "my": "ခွဲပမာဏ"
+  },
+  "Add tender": {
+    "my": "ပေးချေမှု ထည့်မည်"
+  },
+  "Select CASH or MEMBER CARD, enter an amount, then add each tender.": {
+    "my": "CASH သို့မဟုတ် MEMBER CARD ရွေးပါ၊ ပမာဏထည့်ပြီး ပေးချေမှုတစ်ခုချင်း ထည့်ပါ။"
+  },
+  "Tap Split to divide this bill. Close to leave payment methods.": {
+    "my": "ဤဘിൽခွဲရန် Split တို့ပါ။ ပေးချေနည်းများ ထားခဲ့ရန် ပိတ်ပါ။"
+  },
+  "Split is on. Add each tender, then checkout.": {
+    "my": "ခွဲမှု ဖွင့်ထားသည်။ ပေးချေမှုတစ်ခုချင်း ထည့်ပြီး ငွေရှင်းပါ။"
+  },
+  "Split closed.": {
+    "my": "ခွဲမှု ပိတ်ပြီး။"
+  },
+  "{{count}} tenders": {
+    "my": "ပေးချေမှု {{count}} ခု"
+  },
+  "Bill covered. Confirm pay when ready.": {
+    "my": "ဘിൽ ပြည့်ပြီး။ အဆင်သင့်ဖြစ်လျှင် ပေးချေ အတည်ပြုပါ။"
+  },
+  "Choose a payment method, then confirm pay.": {
+    "my": "ပေးချေနည်း ရွေးပြီး ပေးချေ အတည်ပြုပါ။"
+  },
+  "MEMBER CARD": {
+    "my": "MEMBER CARD"
+  },
+  "Tap, swipe, or enter the guest card UID.": {
+    "my": "ဧည့်သည်ကတ် UID ကို တို့ပါ၊ ပွတ်ပါ၊ သို့မဟုတ် ထည့်ပါ။"
+  },
+  "Look up card": {
+    "my": "ကတ်ရှာမည်"
+  },
+  "Looking up...": {
+    "my": "ရှာနေသည်..."
+  },
+  "Guest wallet": {
+    "my": "ဧည့်သည်ပိုက်ဆံအိတ်"
+  },
+  "Balance is shown for reference. The till rechecks it at tender.": {
+    "my": "လက်ကျန်ကို ကိုးကားရန် ပြထားသည်။ ပေးချေချိန်တွင် ငွေကောက်စက်က ထပ်စစ်သည်။"
+  },
+  "Card linked. Confirm pay when ready.": {
+    "my": "ကတ်ချိတ်ပြီး။ အဆင်သင့်ဖြစ်လျှင် ပေးချေ အတည်ပြုပါ။"
+  },
+  "On time": {
+    "my": "အချိန်မီ"
+  },
+  "Warning": {
+    "my": "သတိပေး"
+  },
+  "Overdue": {
+    "my": "ကျော်လွန်"
+  },
+  "Open Menu and add products.": {
+    "my": "မီနူးဖွင့်ပြီး ကုန်ပစ္စည်း ထည့်ပါ။"
+  },
+  "No order selected": {
+    "my": "အော်ဒါ မရွေးရသေးပါ"
+  },
+  "Quick Checkout": {
+    "my": "အမြန်ငွေရှင်း"
+  },
+  "Table status": {
+    "my": "စားပွဲအခြေအနေ"
+  },
+  "Table: {{status}}": {
+    "my": "စားပွဲ: {{status}}"
+  },
+  "Table session state": {
+    "my": "စားပွဲဆက်ရှင် အခြေအနေ"
+  },
+  "Session: {{state}}": {
+    "my": "ဆက်ရှင်: {{state}}"
+  },
+  "Select table": {
+    "my": "စားပွဲ ရွေးပါ"
+  },
+  "New dine-in order": {
+    "my": "ဆိုင်တွင်စား အော်ဒါအသစ်"
+  },
+  "Select payment method": {
+    "my": "ပေးချေနည်း ရွေးပါ"
+  },
+  "Send KDS": {
+    "my": "KDS ပို့မည်"
+  },
+  "Picked up": {
+    "my": "လာယူပြီး"
+  },
+  "-1": {
+    "my": "-1"
+  },
+  "+1": {
+    "my": "+1"
+  },
+  "Remove": {
+    "my": "ဖယ်ရှားမည်"
+  },
+  "Item quantity updated.": {
+    "my": "ပစ္စည်းအရေအတွက် ပြင်ဆင်ပြီး။"
+  },
+  "Item removed from order.": {
+    "my": "အော်ဒါမှ ပစ္စည်း ဖယ်ပြီး။"
+  },
+  "Adjustments": {
+    "my": "ချိန်ညှိမှုများ"
+  },
+  "Discount reason": {
+    "my": "လျှော့စျေးအကြောင်းရင်း"
+  },
+  "Select discount reason": {
+    "my": "လျှော့စျေးအကြောင်းရင်း ရွေးပါ"
+  },
+  "Remove discount": {
+    "my": "လျှော့စျေး ဖယ်မည်"
+  },
+  "Extra fee": {
+    "my": "အပိုကြေး"
+  },
+  "Tip": {
+    "my": "တိပ်"
+  },
+  "FOC": {
+    "my": "FOC"
+  },
+  "Undo FOC": {
+    "my": "FOC ပြန်ဖြုတ်မည်"
+  },
+  "Member points": {
+    "my": "အဖွဲ့ဝင်ပွိုင့်"
+  },
+  "Lookup": {
+    "my": "ရှာဖွေမည်"
+  },
+  "Balance {{balance}}": {
+    "my": "လက်ကျန် {{balance}}"
+  },
+  "Payment completed successfully.": {
+    "my": "ပေးချေမှု အောင်မြင်စွာ ပြီးပါပြီ။"
+  },
+  "Order sent to kitchen (KDS).": {
+    "my": "အော်ဒါကို မီးဖိုချောင် (KDS) သို့ ပို့ပြီး။"
+  },
+  "New cart started. Add products from the menu.": {
+    "my": "လှည်းအသစ် စတင်ပြီး။ မီနူးမှ ကုန်ပစ္စည်း ထည့်ပါ။"
+  },
+  "Add products from the menu, then choose a table.": {
+    "my": "မီနူးမှ ကုန်ပစ္စည်းထည့်ပြီး စားပွဲ ရွေးပါ။"
+  },
+  "Choose a table on the floor plan to continue.": {
+    "my": "ဆက်လုပ်ရန် ကြမ်းခင်းပုံတွင် စားပွဲ ရွေးပါ။"
+  },
+  "Dine-in order started. Add items from the menu or assign a table.": {
+    "my": "ဆိုင်တွင်စား အော်ဒါ စတင်ပြီး။ မီနူးမှ ပစ္စည်းထည့်ပါ သို့မဟုတ် စားပွဲ သတ်မှတ်ပါ။"
+  },
+  "Table marked {{status}}.": {
+    "my": "စားပွဲကို {{status}} ဟု မှတ်ပြီး။"
+  },
+  "Session updated to {{state}}.": {
+    "my": "ဆက်ရှင်ကို {{state}} သို့ ပြင်ဆင်ပြီး။"
+  },
+  "Cancel order": {
+    "my": "အော်ဒါ ပယ်ဖျက်မည်"
+  },
+  "Cancel this order?": {
+    "my": "ဤအော်ဒါကို ပယ်ဖျက်မလား?"
+  },
+  "Cancel this order and release the assigned table?": {
+    "my": "ဤအော်ဒါ ပယ်ဖျက်ပြီး သတ်မှတ်စားပွဲ ပြန်လွှတ်မလား?"
+  },
+  "Keep order": {
+    "my": "အော်ဒါ ထားမည်"
+  },
+  "Order cancelled.": {
+    "my": "အော်ဒါ ပယ်ဖျက်ပြီး။"
+  },
+  "Missing tenant or inventory location context. Ensure your tenant has at least one inventory location configured.": {
+    "my": "ဆိုင် သို့မဟုတ် ကုန်လက်ကျန် တည်နေရာ အချက်အလက် ပျောက်နေသည်။ ဆိုင်တွင် ကုန်လက်ကျန် တည်နေရာ အနည်းဆုံး တစ်ခု ပြင်ဆင်ထားကြောင်း စစ်ပါ။"
+  },
+  "Your login session is missing tenant information. Please sign in again.": {
+    "my": "သင့်ဝင်ရောက်ဆက်ရှင်တွင် ဆိုင်အချက်အလက် ပျောက်နေသည်။ ပြန်ဝင်ပါ။"
+  },
+  "No inventory location is available for this tenant. Create one in the admin backend, then refresh.": {
+    "my": "ဤဆိုင်အတွက် ကုန်လက်ကျန် တည်နေရာ မရှိပါ။ အက်ဒမင် နောက်ရုံးတွင် ဖန်တီးပြီး ပြန်လည်စစ်ပါ။"
+  },
+  "Unable to create order.": {
+    "my": "အော်ဒါ ဖန်တီး၍မရပါ။"
+  },
+  "Create or select an order first.": {
+    "my": "အရင် အော်ဒါ ဖန်တီးပါ သို့မဟုတ် ရွေးပါ။"
+  },
+  "Unable to open table session.": {
+    "my": "စားပွဲဆက်ရှင် ဖွင့်၍မရပါ။"
+  },
+  "Unable to add product.": {
+    "my": "ကုန်ပစ္စည်း ထည့်၍မရပါ။"
+  },
+  "Unable to process checkout.": {
+    "my": "ငွေရှင်း၍မရပါ။"
+  },
+  "Unable to cancel the order.": {
+    "my": "အော်ဒါ ပယ်ဖျက်၍မရပါ။"
+  },
+  "Unable to update item quantity.": {
+    "my": "ပစ္စည်းအရေအတွက် ပြင်၍မရပါ။"
+  },
+  "Unable to remove item from order.": {
+    "my": "အော်ဒါမှ ပစ္စည်း ဖယ်၍မရပါ။"
+  },
+  "No active POS session. Open a session and try again.": {
+    "my": "လုပ်ဆောင်နေသော POS ဆက်ရှင် မရှိပါ။ ဆက်ရှင်ဖွင့်ပြီး ထပ်ကြိုးစားပါ။"
+  },
+  "Unable to update POS session.": {
+    "my": "POS ဆက်ရှင် ပြင်၍မရပါ။"
+  },
+  "Choose a payment method first.": {
+    "my": "အရင် ပေးချေနည်း ရွေးပါ။"
+  },
+  "Look up a guest card before taking Member Card payment.": {
+    "my": "Member Card ပေးချေမှု မယူမီ ဧည့်သည်ကတ် ရှာပါ။"
+  },
+  "This guest wallet cannot be used for payment right now.": {
+    "my": "ဤဧည့်သည်ပိုက်ဆံအိတ်ကို ယခု ပေးချေရန် အသုံးမပြုနိုင်ပါ။"
+  },
+  "Enter a split amount greater than zero.": {
+    "my": "သုညထက်ကြီးသော ခွဲပမာဏ ထည့်ပါ။"
+  },
+  "Split payments already cover this bill.": {
+    "my": "ခွဲပေးချေမှုများက ဤဘിൽကို ပြီးသား ဖုံးအုပ်ထားသည်။"
+  },
+  "No available table for this waitlist party.": {
+    "my": "ဤစောင့်ဆိုင်းအဖွဲ့အတွက် ရနိုင်သောစားပွဲ မရှိပါ။"
+  },
+  "Unable to seat waitlist entry.": {
+    "my": "စောင့်ဆိုင်းစာရင်း ထိုင်ခိုင်း၍မရပါ။"
+  },
+  "Unable to mark pickup.": {
+    "my": "လာယူပြီး မှတ်၍မရပါ။"
+  },
+  "Add at least one item before checkout": {
+    "my": "ငွေမရှင်းမီ ပစ္စည်း အနည်းဆုံး တစ်ခု ထည့်ပါ"
+  },
+  "Unable to update table status": {
+    "my": "စားပွဲအခြေအနေ ပြင်၍မရပါ"
+  },
+  "Unable to update table session": {
+    "my": "စားပွဲဆက်ရှင် ပြင်၍မရပါ"
+  },
+  "Unable to load variants": {
+    "my": "မျိုးကွဲများ ဖွင့်၍မရပါ"
+  },
+  "Add at least one item before sending to KDS.": {
+    "my": "KDS သို့ မပို့မီ ပစ္စည်း အနည်းဆုံး တစ်ခု ထည့်ပါ။"
+  },
+  "Create or select an order before sending to KDS.": {
+    "my": "KDS သို့ မပို့မီ အော်ဒါ ဖန်တီးပါ သို့မဟုတ် ရွေးပါ။"
+  },
+  "Failed to send order to KDS.": {
+    "my": "အော်ဒါကို KDS သို့ ပို့၍မရပါ။"
+  },
+  "This order is already paid and cannot be charged again.": {
+    "my": "ဤအော်ဒါ ပေးပြီးသားဖြစ်၍ ထပ်ကောက်၍မရပါ။"
+  },
+  "Choose a discount reason before applying a discount.": {
+    "my": "လျှော့စျေး မသုံးမီ အကြောင်းရင်း ရွေးပါ။"
+  },
+  "Discount cannot be greater than the order subtotal.": {
+    "my": "လျှော့စျေးသည် အော်ဒါခွဲစုစုပေါင်းထက် မကြီးနိုင်ပါ။"
+  },
+  "Open": {
+    "my": "ဖွင့်"
+  },
+  "Completed": {
+    "my": "ပြီးဆုံး"
+  },
+  "Voided": {
+    "my": "ပယ်ဖျက်ပြီး"
+  },
+  "On hold": {
+    "my": "ဆိုင်းငံ့"
+  },
+  "Refunded": {
+    "my": "ပြန်အမ်းပြီး"
+  },
+  "Partially refunded": {
+    "my": "တစ်စိတ်တစ်ပိုင်း ပြန်အမ်းပြီး"
+  },
+  "Search order number, customer, or item": {
+    "my": "အော်ဒါနံပါတ်၊ ဖောက်သည် သို့မဟုတ် ပစ္စည်း ရှာမည်"
+  },
+  "Create sales order": {
+    "my": "အရောင်းအော်ဒါ ဖန်တီးမည်"
+  },
+  "Loading sales orders...": {
+    "my": "အရောင်းအော်ဒါများ ဖွင့်နေသည်..."
+  },
+  "No orders yet": {
+    "my": "အော်ဒါ မရှိသေးပါ"
+  },
+  "Select an order to view details": {
+    "my": "အသေးစိတ်ကြည့်ရန် အော်ဒါ ရွေးပါ"
+  },
+  "Sales order": {
+    "my": "အရောင်းအော်ဒါ"
+  },
+  "Items": {
+    "my": "ပစ္စည်းများ"
+  },
+  "No items on this order": {
+    "my": "ဤအော်ဒါတွင် ပစ္စည်းမရှိပါ"
+  },
+  "Item": {
+    "my": "ပစ္စည်း"
+  },
+  "Walk-in": {
+    "my": "တိုက်ရိုက်လာ"
+  },
+  "{{count}} items": {
+    "my": "ပစ္စည်း {{count}} ခု"
+  },
+  "1 item": {
+    "my": "ပစ္စည်း ၁ ခု"
+  },
+  "Pickup #{{number}}": {
+    "my": "လာယူ #{{number}}"
+  },
+  "Page {{page}} of {{totalPages}}": {
+    "my": "စာမျက်နှာ {{page}} / {{totalPages}}"
+  },
+  "Previous": {
+    "my": "ယခင်"
+  },
+  "Next": {
+    "my": "ရှေ့"
+  },
+  "Order {{number}} created": {
+    "my": "အော်ဒါ {{number}} ဖန်တီးပြီး"
+  },
+  "Order deleted": {
+    "my": "အော်ဒါ ဖျက်ပြီး"
+  },
+  "Line updated": {
+    "my": "လိုင်း ပြင်ဆင်ပြီး"
+  },
+  "Fire": {
+    "my": "ချက်မည်"
+  },
+  "Ready": {
+    "my": "အဆင်သင့်"
+  },
+  "Serve": {
+    "my": "တင်မည်"
+  },
+  "Missing tenant or location context.": {
+    "my": "ဆိုင် သို့မဟုတ် တည်နေရာ အချက်အလက် ပျောက်နေသည်။"
+  },
+  "Access denied": {
+    "my": "ဝင်ခွင့်မရှိပါ"
+  },
+  "You do not have permission to view this page.": {
+    "my": "ဤစာမျက်နှာကို ကြည့်ရန် ခွင့်ပြုချက် မရှိပါ။"
+  },
+  "Find takeaway orders and confirm customer pickup.": {
+    "my": "ပါဆယ်အော်ဒါများ ရှာပြီး ဖောက်သည်လာယူ အတည်ပြုပါ။"
+  },
+  "Counter order ID": {
+    "my": "ကောင်တာ အော်ဒါ ID"
+  },
+  "Find order": {
+    "my": "အော်ဒါရှာမည်"
+  },
+  "Order": {
+    "my": "အော်ဒါ"
+  },
+  "KDS tickets": {
+    "my": "KDS လက်မှတ်များ"
+  },
+  "No returned order lines.": {
+    "my": "ပြန်ရသော အော်ဒါလိုင်း မရှိပါ။"
+  },
+  "No KDS tickets returned.": {
+    "my": "ပြန်ရသော KDS လက်မှတ် မရှိပါ။"
+  },
+  "Confirm pickup": {
+    "my": "လာယူ အတည်ပြုမည်"
+  },
+  "Enter an order ID to load order lines and KDS tickets.": {
+    "my": "အော်ဒါလိုင်းများနှင့် KDS လက်မှတ်များ ဖွင့်ရန် အော်ဒါ ID ထည့်ပါ။"
+  },
+  "Unable to find counter order": {
+    "my": "ကောင်တာ အော်ဒါ ရှာ၍မရပါ"
+  },
+  "Unable to confirm pickup": {
+    "my": "လာယူ အတည်ပြု၍မရပါ"
+  },
+  "Counter order marked as picked up": {
+    "my": "ကောင်တာ အော်ဒါကို လာယူပြီးဟု မှတ်ပြီး"
+  },
+  "Page not found": {
+    "my": "စာမျက်နှာ မတွေ့ပါ"
+  },
+  "That route does not exist.": {
+    "my": "ဤလမ်းကြောင်း မရှိပါ။"
+  },
+  "Go to dashboard": {
+    "my": "ပင်မစာမျက်နှာသို့"
+  },
+  "Verified": {
+    "my": "အတည်ပြုပြီး"
+  },
+  "Inactive": {
+    "my": "မလုပ်ဆောင်"
+  },
+  "Approved": {
+    "my": "ခွင့်ပြုပြီး"
+  },
+  "Awaiting Instruction": {
+    "my": "ညွှန်ကြားချက် စောင့်နေသည်"
+  },
+  "Rejected": {
+    "my": "ငြင်းပယ်ပြီး"
+  }
+}

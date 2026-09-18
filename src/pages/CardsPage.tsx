@@ -63,6 +63,7 @@ function ReceiptPreview({
   receiptId: string;
   printedAt: string;
 }) {
+  const { t } = useTranslation();
   const { formatCurrency } = useNumberFormatter();
 
   return (
@@ -71,30 +72,30 @@ function ReceiptPreview({
       className="mx-auto w-full max-w-sm rounded-lg border border-dashed border-slate-600 bg-white p-6 text-slate-900 print:border-black print:shadow-none"
     >
       <p className="text-center text-sm font-semibold uppercase tracking-wide">
-        Card Top Up Receipt
+        {t("cardTopup.receiptTitle")}
       </p>
       <p className="mt-1 text-center text-xs text-slate-500">{printedAt}</p>
       <div className="mt-4 space-y-2 text-sm">
         <div className="flex justify-between gap-4">
-          <span className="text-slate-500">Receipt</span>
+          <span className="text-slate-500">{t("cardTopup.receiptLabel")}</span>
           <span className="font-medium">{receiptId}</span>
         </div>
         {customerName ? (
           <div className="flex justify-between gap-4">
-            <span className="text-slate-500">Member</span>
+            <span className="text-slate-500">{t("cardTopup.member")}</span>
             <span className="font-medium">{customerName}</span>
           </div>
         ) : null}
         <div className="flex justify-between gap-4">
-          <span className="text-slate-500">Card</span>
+          <span className="text-slate-500">{t("cardTopup.card")}</span>
           <span className="font-medium">{cardNumber}</span>
         </div>
         <div className="flex justify-between gap-4 border-t border-slate-200 pt-2">
-          <span className="text-slate-500">Top up</span>
+          <span className="text-slate-500">{t("cardTopup.topupAmount")}</span>
           <span className="font-semibold">{formatCurrency(Number(amount))}</span>
         </div>
         <div className="flex justify-between gap-4">
-          <span className="text-slate-500">Balance after</span>
+          <span className="text-slate-500">{t("cardTopup.balanceAfter")}</span>
           <span className="font-semibold">
             {formatCurrency(Number(balanceAfter))}
           </span>

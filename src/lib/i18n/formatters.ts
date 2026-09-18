@@ -2,8 +2,6 @@ import { useTranslation } from "react-i18next";
 
 const resolveIntlLocale = (language: string) => {
   if (language === "my") return "my-MM";
-  if (language === "ko") return "ko-KR";
-  if (language === "zh-CN") return "zh-CN";
   return "en-US";
 };
 

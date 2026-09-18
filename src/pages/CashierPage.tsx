@@ -1131,7 +1131,7 @@ export function CashierPage() {
       }
       const context = await requireCashierContext();
       if (!activeOrderLines.length) {
-        throw new Error("Add at least one item before checkout");
+        throw new Error(t("cashier.errors.checkoutEmpty"));
       }
 
       const orderDiscount = Math.max(0, Number(discountAmount) || 0);
@@ -1649,7 +1649,7 @@ export function CashierPage() {
       setNotice(t("cashier.orderPanel.tableStatusUpdated", { status }));
     } catch (caught) {
       setLocalError(
-        caught instanceof Error ? caught.message : "Unable to update table status"
+        caught instanceof Error ? caught.message : t("cashier.errors.updateTableStatus")
       );
     }
   };
@@ -1667,7 +1667,7 @@ export function CashierPage() {
       setLocalError(
         caught instanceof Error
           ? caught.message
-          : "Unable to update table session"
+          : t("cashier.errors.updateTableSession")
       );
     }
   };

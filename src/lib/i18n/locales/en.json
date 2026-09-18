@@ -6,13 +6,12 @@
     "save": "Save",
     "cancel": "Cancel",
     "loading": "Loading...",
-    "clearSearch": "Clear search"
+    "clearSearch": "Clear search",
+    "preparingWorkspace": "Preparing your workspace."
   },
   "language": {
     "english": "English",
-    "korean": "한국어",
     "myanmar": "မြန်မာ",
-    "chineseSimplified": "简体中文",
     "switchLanguage": "Switch language"
   },
   "networkStatus": {
@@ -57,7 +56,10 @@
     "orders": "Orders",
     "pay": "Pay",
     "branch": "Active branch",
-    "settingsTitle": "Settings"
+    "settingsTitle": "Settings",
+    "collapseSidebar": "Collapse sidebar",
+    "expandSidebar": "Expand sidebar",
+    "drawerNotConfigured": "Cash drawer API is not configured"
   },
   "login": {
     "title": "Sign in",
@@ -286,7 +288,13 @@
     "confirmFailed": "Unable to complete card top up.",
     "back": "Back",
     "keypad": "Keypad",
-    "keypadHint": "Use the keypad for card number or custom amount entry."
+    "keypadHint": "Use the keypad for card number or custom amount entry.",
+    "receiptTitle": "Card Top Up Receipt",
+    "receiptLabel": "Receipt",
+    "member": "Member",
+    "card": "Card",
+    "topupAmount": "Top up",
+    "balanceAfter": "Balance after"
   },
   "cardRefund": {
     "title": "Card refund",
@@ -322,7 +330,13 @@
     "confirmFailed": "Unable to complete card refund.",
     "back": "Back",
     "keypad": "Keypad",
-    "keypadHint": "Use the keypad for card number, PIN, or custom amount entry."
+    "keypadHint": "Use the keypad for card number, PIN, or custom amount entry.",
+    "receiptTitle": "Card Refund Receipt",
+    "receiptLabel": "Receipt",
+    "member": "Member",
+    "card": "Card",
+    "refundAmount": "Refund",
+    "balanceAfter": "Balance after"
   },
   "sync": {
     "title": "Sync & maintenance",
@@ -407,7 +421,10 @@
       "namePlaceholder": "Kitchen printer",
       "connection": "Connection type",
       "ipAddress": "Printer IP address",
-      "hint": "Printer routing will be configured when the print service is connected."
+      "hint": "Printer routing will be configured when the print service is connected.",
+      "connectionNetwork": "Network",
+      "connectionUsb": "USB",
+      "connectionBluetooth": "Bluetooth"
     },
     "printTemplate": {
       "title": "Print Template",
@@ -538,6 +555,41 @@
     "tipPoolsTitle": "Tip Pools",
     "tipPoolsEmpty": "No tip pools yet.",
     "tipPool": {
+      "title": "Tip pools",
+      "create": "Create tip pool",
+      "editPool": "Edit tip pool",
+      "editSelected": "Edit selected",
+      "poolName": "Pool name",
+      "start": "Start",
+      "end": "End",
+      "distributionMethod": "Distribution method",
+      "includeServiceCharge": "Include service charge",
+      "serviceChargeShareBps": "Service charge share BPS",
+      "poolNotes": "Notes",
+      "savePool": "Save pool",
+      "createPool": "Create pool",
+      "cancelEdit": "Cancel edit",
+      "selectedPool": "Selected pool",
+      "selectPool": "Select a tip pool.",
+      "tipsAndService": "Tips {{tips}} · Service charge {{serviceCharge}}",
+      "distributable": "Distributable {{amount}}",
+      "distribute": "Distribute",
+      "settle": "Settle",
+      "allocations": "Allocations",
+      "hoursWeight": "Hours {{hours}} · Weight {{weight}}",
+      "edit": "Edit",
+      "delete": "Delete",
+      "statusAll": "ALL",
+      "statusOpen": "OPEN",
+      "statusSettled": "SETTLED",
+      "loadFailed": "Unable to load tip pool",
+      "savePoolFailed": "Unable to save tip pool",
+      "missingBranch": "Select a tenant branch before creating a tip pool",
+      "created": "Tip pool created",
+      "updated": "Tip pool updated",
+      "distributed": "Tip pool distributed",
+      "settled": "Tip pool settled",
+      "actionFailed": "Tip pool action failed",
       "addAllocation": "Add allocation",
       "saveAllocation": "Save allocation",
       "staff": "Staff",
@@ -578,7 +630,6 @@
       "openSession": "Open session",
       "closeSession": "Close",
       "continue": "Continue",
-      "closeSession": "Close",
       "sessionActive": "Session is active.",
       "sessionInactive": "No active session.",
       "sessionOpened": "POS session opened.",
@@ -643,6 +694,11 @@
     "orderPanel": {
       "emptyLines": "Open Menu and add products.",
       "noOrder": "No order selected",
+      "quickCheckout": "Quick Checkout",
+      "tableStatus": "Table status",
+      "tableStatusOption": "Table: {{status}}",
+      "sessionState": "Table session state",
+      "sessionStateOption": "Session: {{state}}",
       "selectTable": "Select table",
       "newDineInOrder": "New dine-in order",
       "paymentAmount": "Payment amount",
@@ -705,6 +761,10 @@
       "noTableAvailable": "No available table for this waitlist party.",
       "seatWaitlist": "Unable to seat waitlist entry.",
       "pickupFailed": "Unable to mark pickup.",
+      "checkoutEmpty": "Add at least one item before checkout",
+      "updateTableStatus": "Unable to update table status",
+      "updateTableSession": "Unable to update table session",
+      "loadVariants": "Unable to load variants",
       "emptyOrder": "Add at least one item before sending to KDS.",
       "kdsTargetMissing": "Create or select an order before sending to KDS.",
       "kdsFailed": "Failed to send order to KDS.",
@@ -758,9 +818,33 @@
     "accessDeniedTitle": "Access denied",
     "accessDeniedDescription": "You do not have permission to view this page."
   },
+  "counterOrders": {
+    "title": "Counter orders",
+    "subtitle": "Find takeaway orders and confirm customer pickup.",
+    "orderId": "Counter order ID",
+    "findOrder": "Find order",
+    "order": "Order",
+    "total": "Total",
+    "kdsTickets": "KDS tickets",
+    "noLines": "No returned order lines.",
+    "noTickets": "No KDS tickets returned.",
+    "confirmPickup": "Confirm pickup",
+    "empty": "Enter an order ID to load order lines and KDS tickets.",
+    "findFailed": "Unable to find counter order",
+    "pickupFailed": "Unable to confirm pickup",
+    "pickedUp": "Counter order marked as picked up"
+  },
   "notFound": {
     "title": "Page not found",
     "description": "That route does not exist.",
     "goToDashboard": "Go to dashboard"
+  },
+  "statusBadge": {
+    "verified": "Verified",
+    "pending": "Pending",
+    "inactive": "Inactive",
+    "approved": "Approved",
+    "awaitingInstruction": "Awaiting Instruction",
+    "rejected": "Rejected"
   }
 }

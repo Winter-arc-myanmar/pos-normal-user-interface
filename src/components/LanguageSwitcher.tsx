@@ -1,20 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import {
+  normalizeAppLanguage,
+  setAppLanguage,
+  type AppLanguage,
+} from "@/lib/i18n";
 
-const LANGUAGE_OPTIONS = [
-  { value: "en", labelKey: "language.english" },
-  { value: "ko", labelKey: "language.korean" },
-  { value: "my", labelKey: "language.myanmar" },
-  { value: "zh-CN", labelKey: "language.chineseSimplified" },
-] as const;
-
-function resolveSelectedLanguage(language?: string) {
-  if (!language) return "en";
-  if (language === "zh-CN" || language.startsWith("zh")) return "zh-CN";
-  if (language.startsWith("ko")) return "ko";
-  if (language.startsWith("my")) return "my";
-  return "en";
-}
+const LANGUAGE_OPTIONS: Array<{ value: AppLanguage; nativeLabel: string }> = [
+  { value: "en", nativeLabel: "English" },
+  { value: "my", nativeLabel: "မြန်မာ" },
+];
 
 function ChevronDownIcon() {
   return (
@@ -31,19 +26,30 @@ function ChevronDownIcon() {
 export function LanguageSwitcher() {
   const { i18n, t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
+  const [currentValue, setCurrentValue] = useState<AppLanguage>(() =>
+    normalizeAppLanguage(i18n.resolvedLanguage ?? i18n.language)
+  );
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const currentValue = resolveSelectedLanguage(
-    i18n.resolvedLanguage ?? i18n.language
-  );
+  useEffect(() => {
+    const sync = (language: string) => {
+      setCurrentValue(normalizeAppLanguage(language));
+    };
+    sync(i18n.resolvedLanguage ?? i18n.language);
+    i18n.on("languageChanged", sync);
+    return () => {
+      i18n.off("languageChanged", sync);
+    };
+  }, [i18n]);
 
   const currentLabel =
-    LANGUAGE_OPTIONS.find((opt) => opt.value === currentValue)?.labelKey ??
-    "language.english";
+    LANGUAGE_OPTIONS.find((option) => option.value === currentValue)
+      ?.nativeLabel ?? "English";
 
-  const handleSelect = (value: string) => {
-    void i18n.changeLanguage(value);
+  const handleSelect = (value: AppLanguage) => {
+    setCurrentValue(value);
     setIsOpen(false);
+    void setAppLanguage(value);
   };
 
   useEffect(() => {
@@ -67,7 +73,6 @@ export function LanguageSwitcher() {
 
   return (
     <div className="relative" ref={containerRef}>
-      <span className="sr-only">{t("language.switchLanguage")}</span>
       <button
         type="button"
         className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
@@ -76,7 +81,7 @@ export function LanguageSwitcher() {
         aria-expanded={isOpen}
         onClick={() => setIsOpen((prev) => !prev)}
       >
-        <span>{t(currentLabel)}</span>
+        <span>{currentLabel}</span>
         <ChevronDownIcon />
       </button>
 
@@ -89,26 +94,21 @@ export function LanguageSwitcher() {
           {LANGUAGE_OPTIONS.map((option) => {
             const isSelected = option.value === currentValue;
             return (
-              <li
-                key={option.value}
-                role="option"
-                aria-selected={isSelected}
-                className={[
-                  "cursor-pointer px-3 py-2 text-sm",
-                  isSelected
-                    ? "bg-slate-100 font-medium text-slate-900 dark:bg-slate-800 dark:text-white"
-                    : "text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800",
-                ].join(" ")}
-                onClick={() => handleSelect(option.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    handleSelect(option.value);
-                  }
-                }}
-                tabIndex={0}
-              >
-                {t(option.labelKey)}
+              <li key={option.value}>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={isSelected}
+                  className={[
+                    "flex w-full cursor-pointer px-3 py-2 text-left text-sm",
+                    isSelected
+                      ? "bg-slate-100 font-medium text-slate-900 dark:bg-slate-800 dark:text-white"
+                      : "text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800",
+                  ].join(" ")}
+                  onClick={() => handleSelect(option.value)}
+                >
+                  {option.nativeLabel}
+                </button>
               </li>
             );
           })}

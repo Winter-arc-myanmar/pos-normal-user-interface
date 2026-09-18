@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 interface PosActionRailProps {
@@ -29,6 +30,7 @@ export function PosActionRail({
   onPay,
   activeView = null,
 }: PosActionRailProps) {
+  const { t } = useTranslation();
   return (
     <aside className="pos-safe-y flex min-h-0 flex-col border-l border-white/10 bg-[#202020] p-1.5 text-white">
       <div className="flex flex-col items-center gap-1.5">
@@ -56,7 +58,7 @@ export function PosActionRail({
         <button
           type="button"
           disabled
-          title="Cash drawer API is not configured"
+          title={t("shell.drawerNotConfigured")}
           className="min-h-14 rounded bg-[#7165ee] px-1 py-2 opacity-50"
         >
           {drawerLabel}

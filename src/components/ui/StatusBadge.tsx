@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 export type StatusVariant =
   | "verified"
@@ -38,13 +39,13 @@ const sizeStyles: Record<Size, string> = {
   lg: "px-3 py-1.5 text-[12px]",
 };
 
-const defaultLabels: Record<StatusVariant, string> = {
-  verified: "Verified",
-  pending: "Pending",
-  inactive: "Inactive",
-  approved: "Approved",
-  awaiting_instruction: "Awaiting Instruction",
-  rejected: "Rejected",
+const defaultLabelKeys: Record<StatusVariant, string> = {
+  verified: "statusBadge.verified",
+  pending: "statusBadge.pending",
+  inactive: "statusBadge.inactive",
+  approved: "statusBadge.approved",
+  awaiting_instruction: "statusBadge.awaitingInstruction",
+  rejected: "statusBadge.rejected",
 };
 
 export function StatusBadge({
@@ -53,6 +54,7 @@ export function StatusBadge({
   children,
   className = "",
 }: StatusBadgeProps) {
+  const { t } = useTranslation();
   return (
     <span
       className={[
@@ -62,7 +64,7 @@ export function StatusBadge({
         className,
       ].join(" ")}
     >
-      {children ?? defaultLabels[variant]}
+      {children ?? t(defaultLabelKeys[variant])}
     </span>
   );
 }

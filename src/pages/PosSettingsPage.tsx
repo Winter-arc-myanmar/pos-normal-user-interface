@@ -279,9 +279,15 @@ export function PosSettingsPage() {
                     value={printerConnection}
                     onChange={(event) => setPrinterConnection(event.target.value)}
                   >
-                    <option value="NETWORK">Network</option>
-                    <option value="USB">USB</option>
-                    <option value="BLUETOOTH">Bluetooth</option>
+                    <option value="NETWORK">
+                      {t("settings.printer.connectionNetwork")}
+                    </option>
+                    <option value="USB">
+                      {t("settings.printer.connectionUsb")}
+                    </option>
+                    <option value="BLUETOOTH">
+                      {t("settings.printer.connectionBluetooth")}
+                    </option>
                   </select>
                 </label>
                 <SettingsField

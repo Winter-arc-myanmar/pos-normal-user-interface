@@ -7,6 +7,27 @@ const mocks = vi.hoisted(() => ({
   pickup: vi.fn(),
 }));
 
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    t: (key: string) => {
+      const labels: Record<string, string> = {
+        "counterOrders.title": "Counter orders",
+        "counterOrders.subtitle":
+          "Find takeaway orders and confirm customer pickup.",
+        "counterOrders.orderId": "Counter order ID",
+        "counterOrders.findOrder": "Find order",
+        "counterOrders.order": "Order",
+        "counterOrders.total": "Total",
+        "counterOrders.kdsTickets": "KDS tickets",
+        "counterOrders.confirmPickup": "Confirm pickup",
+        "counterOrders.empty":
+          "Enter an order ID to load order lines and KDS tickets.",
+      };
+      return labels[key] || key;
+    },
+  }),
+}));
+
 vi.mock("@/core/presentation/hooks/useCashier", () => ({
   useCashier: () => ({
     isLoading: false,

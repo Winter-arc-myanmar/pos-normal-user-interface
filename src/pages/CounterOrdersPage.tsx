@@ -1,4 +1,5 @@
 import { FormEvent, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { useCashier } from "@/core/presentation/hooks/useCashier";
 
@@ -35,6 +36,7 @@ const display = (record: UnknownRecord, keys: string[], fallback = "—") => {
 };
 
 export function CounterOrdersPage() {
+  const { t } = useTranslation();
   const {
     isLoading,
     error,
@@ -70,7 +72,7 @@ export function CounterOrdersPage() {
     } catch (caught) {
       setResult(null);
       setLocalError(
-        caught instanceof Error ? caught.message : "Unable to find counter order"
+        caught instanceof Error ? caught.message : t("counterOrders.findFailed")
       );
     }
   };
@@ -82,10 +84,10 @@ export function CounterOrdersPage() {
     try {
       await pickupCounterOrder(orderId);
       setResult(await getCounterOrderById(orderId));
-      setNotice("Counter order marked as picked up");
+      setNotice(t("counterOrders.pickedUp"));
     } catch (caught) {
       setLocalError(
-        caught instanceof Error ? caught.message : "Unable to confirm pickup"
+        caught instanceof Error ? caught.message : t("counterOrders.pickupFailed")
       );
     }
   };
@@ -94,21 +96,19 @@ export function CounterOrdersPage() {
     <section className="flex h-full min-h-0 flex-col overflow-hidden bg-slate-100 p-4">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold">Counter orders</h1>
-          <p className="text-sm text-slate-500">
-            Find takeaway orders and confirm customer pickup.
-          </p>
+          <h1 className="text-xl font-bold">{t("counterOrders.title")}</h1>
+          <p className="text-sm text-slate-500">{t("counterOrders.subtitle")}</p>
         </div>
         <form onSubmit={loadOrder} className="flex gap-2">
           <input
-            aria-label="Counter order ID"
-            placeholder="Counter order ID"
+            aria-label={t("counterOrders.orderId")}
+            placeholder={t("counterOrders.orderId")}
             className="min-h-11 w-72 rounded border border-slate-300 bg-white px-3 text-sm outline-none focus:border-blue-500"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
           <Button type="submit" isLoading={isLoading}>
-            Find order
+            {t("counterOrders.findOrder")}
           </Button>
         </form>
       </header>
@@ -131,7 +131,9 @@ export function CounterOrdersPage() {
           <div className="min-h-0 overflow-y-auto rounded-lg bg-white p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs uppercase text-slate-500">Order</p>
+                <p className="text-xs uppercase text-slate-500">
+                  {t("counterOrders.order")}
+                </p>
                 <h2 className="text-lg font-bold">
                   {display(order, ["orderNumber", "number", "id"])}
                 </h2>
@@ -174,13 +176,13 @@ export function CounterOrdersPage() {
                 ))
               ) : (
                 <p className="p-4 text-sm text-slate-500">
-                  No returned order lines.
+                  {t("counterOrders.noLines")}
                 </p>
               )}
             </div>
 
             <div className="mt-4 flex items-center justify-between rounded bg-slate-50 p-3">
-              <span className="font-semibold">Total</span>
+              <span className="font-semibold">{t("counterOrders.total")}</span>
               <span className="text-lg font-bold">
                 {display(order, ["grandTotal", "total", "netTotal"])}
               </span>
@@ -188,7 +190,7 @@ export function CounterOrdersPage() {
           </div>
 
           <aside className="flex min-h-0 flex-col rounded-lg bg-white p-4">
-            <h2 className="font-bold">KDS tickets</h2>
+            <h2 className="font-bold">{t("counterOrders.kdsTickets")}</h2>
             <div className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto">
               {tickets.length ? (
                 tickets.map((ticket, index) => (
@@ -215,7 +217,7 @@ export function CounterOrdersPage() {
                 ))
               ) : (
                 <p className="text-sm text-slate-500">
-                  No KDS tickets returned.
+                  {t("counterOrders.noTickets")}
                 </p>
               )}
             </div>
@@ -225,13 +227,13 @@ export function CounterOrdersPage() {
               isLoading={isLoading}
               onClick={() => void markPickedUp()}
             >
-              Confirm pickup
+              {t("counterOrders.confirmPickup")}
             </Button>
           </aside>
         </div>
       ) : (
         <div className="mt-4 grid flex-1 place-items-center rounded-lg border border-dashed border-slate-300 bg-white text-sm text-slate-500">
-          Enter an order ID to load order lines and KDS tickets.
+          {t("counterOrders.empty")}
         </div>
       )}
     </section>

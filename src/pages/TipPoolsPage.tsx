@@ -146,7 +146,7 @@ export function TipPoolsPage() {
       await fetchTipPoolAllocations(poolId);
     } catch (caught) {
       setLocalError(
-        caught instanceof Error ? caught.message : "Unable to load tip pool"
+        caught instanceof Error ? caught.message : t("cashier.tipPool.loadFailed")
       );
     }
   };
@@ -187,10 +187,10 @@ export function TipPoolsPage() {
       if (editingPool && selectedPoolId) {
         const updated = await updateTipPool(selectedPoolId, common);
         setPoolDetail(updated);
-        setNotice("Tip pool updated");
+        setNotice(t("cashier.tipPool.updated"));
       } else {
         if (!tenantId || !locationId) {
-          throw new Error("Select a tenant branch before creating a tip pool");
+          throw new Error(t("cashier.tipPool.missingBranch"));
         }
         const payload: CreateTipPoolDTO = {
           tenantId,
@@ -199,12 +199,12 @@ export function TipPoolsPage() {
         };
         const created = await createTipPool(payload);
         await selectPool(created.id);
-        setNotice("Tip pool created");
+        setNotice(t("cashier.tipPool.created"));
       }
       resetPoolForm();
     } catch (caught) {
       setLocalError(
-        caught instanceof Error ? caught.message : "Unable to save tip pool"
+        caught instanceof Error ? caught.message : t("cashier.tipPool.savePoolFailed")
       );
     }
   };
@@ -283,7 +283,7 @@ export function TipPoolsPage() {
       setNotice(successMessage);
     } catch (caught) {
       setLocalError(
-        caught instanceof Error ? caught.message : "Tip pool action failed"
+        caught instanceof Error ? caught.message : t("cashier.tipPool.actionFailed")
       );
     }
   };
@@ -291,7 +291,7 @@ export function TipPoolsPage() {
   return (
     <section className="grid h-full min-h-0 grid-cols-[16rem_minmax(0,1fr)] overflow-hidden bg-slate-100">
       <aside className="flex min-h-0 flex-col border-r border-slate-200 bg-white p-3">
-        <h1 className="text-xl font-bold">Tip pools</h1>
+        <h1 className="text-xl font-bold">{t("cashier.tipPool.title")}</h1>
         <div className="my-3 grid grid-cols-3 gap-1">
           {(["ALL", "OPEN", "SETTLED"] as const).map((item) => (
             <button
@@ -303,7 +303,11 @@ export function TipPoolsPage() {
                 status === item ? "bg-blue-600 text-white" : "bg-slate-100",
               ].join(" ")}
             >
-              {item}
+              {item === "ALL"
+                ? t("cashier.tipPool.statusAll")
+                : item === "OPEN"
+                  ? t("cashier.tipPool.statusOpen")
+                  : t("cashier.tipPool.statusSettled")}
             </button>
           ))}
         </div>
@@ -333,7 +337,9 @@ export function TipPoolsPage() {
         <form onSubmit={savePool} className="rounded-lg bg-white p-4">
           <div className="flex items-center justify-between">
             <h2 className="font-bold">
-              {editingPool ? "Edit tip pool" : "Create tip pool"}
+              {editingPool
+                ? t("cashier.tipPool.editPool")
+                : t("cashier.tipPool.create")}
             </h2>
             {poolDetail && !editingPool ? (
               <Button
@@ -341,15 +347,15 @@ export function TipPoolsPage() {
                 variant="outline"
                 onClick={() => beginPoolEdit(poolDetail)}
               >
-                Edit selected
+                {t("cashier.tipPool.editSelected")}
               </Button>
             ) : null}
           </div>
           <div className="mt-3 space-y-2">
             <input
               required
-              aria-label="Pool name"
-              placeholder="Pool name"
+              aria-label={t("cashier.tipPool.poolName")}
+              placeholder={t("cashier.tipPool.poolName")}
               className={fieldClass}
               value={poolForm.name}
               onChange={(event) =>
@@ -361,7 +367,7 @@ export function TipPoolsPage() {
             />
             <div className="grid grid-cols-2 gap-2">
               <label className="text-xs text-slate-500">
-                Start
+                {t("cashier.tipPool.start")}
                 <input
                   required
                   type="datetime-local"
@@ -376,7 +382,7 @@ export function TipPoolsPage() {
                 />
               </label>
               <label className="text-xs text-slate-500">
-                End
+                {t("cashier.tipPool.end")}
                 <input
                   required
                   type="datetime-local"
@@ -393,8 +399,8 @@ export function TipPoolsPage() {
             </div>
             <input
               required
-              aria-label="Distribution method"
-              placeholder="Backend distribution method"
+              aria-label={t("cashier.tipPool.distributionMethod")}
+              placeholder={t("cashier.tipPool.distributionMethod")}
               className={fieldClass}
               value={poolForm.distributionMethod}
               onChange={(event) =>
@@ -415,14 +421,14 @@ export function TipPoolsPage() {
                   }))
                 }
               />
-              Include service charge
+              {t("cashier.tipPool.includeServiceCharge")}
             </label>
             <input
               type="number"
               min={0}
               max={10000}
-              aria-label="Service charge share BPS"
-              placeholder="Service charge share BPS"
+              aria-label={t("cashier.tipPool.serviceChargeShareBps")}
+              placeholder={t("cashier.tipPool.serviceChargeShareBps")}
               className={fieldClass}
               value={poolForm.serviceChargeShareBps}
               onChange={(event) =>
@@ -433,8 +439,8 @@ export function TipPoolsPage() {
               }
             />
             <textarea
-              aria-label="Pool notes"
-              placeholder="Notes"
+              aria-label={t("cashier.tipPool.poolNotes")}
+              placeholder={t("cashier.tipPool.poolNotes")}
               className={`${fieldClass} min-h-20 py-2`}
               value={poolForm.notes}
               onChange={(event) =>
@@ -445,28 +451,34 @@ export function TipPoolsPage() {
               }
             />
             <Button fullWidth type="submit" isLoading={isLoading}>
-              {editingPool ? "Save pool" : "Create pool"}
+              {editingPool
+                ? t("cashier.tipPool.savePool")
+                : t("cashier.tipPool.createPool")}
             </Button>
             {editingPool ? (
               <Button fullWidth variant="outline" onClick={resetPoolForm}>
-                Cancel edit
+                {t("cashier.tipPool.cancelEdit")}
               </Button>
             ) : null}
           </div>
         </form>
 
         <section className="rounded-lg bg-white p-4">
-          <h2 className="font-bold">Selected pool</h2>
+          <h2 className="font-bold">{t("cashier.tipPool.selectedPool")}</h2>
           {poolDetail ? (
             <>
               <div className="mt-3 rounded bg-slate-50 p-3 text-sm">
                 <p className="font-semibold">{poolDetail.name}</p>
                 <p className="mt-1 text-slate-500">
-                  Tips {poolDetail.totalTips} · Service charge{" "}
-                  {poolDetail.totalServiceCharge}
+                  {t("cashier.tipPool.tipsAndService", {
+                    tips: poolDetail.totalTips,
+                    serviceCharge: poolDetail.totalServiceCharge,
+                  })}
                 </p>
                 <p className="mt-1 font-semibold">
-                  Distributable {poolDetail.totalDistributable}
+                  {t("cashier.tipPool.distributable", {
+                    amount: poolDetail.totalDistributable,
+                  })}
                 </p>
               </div>
               {poolDetail.status === "OPEN" ? (
@@ -476,24 +488,26 @@ export function TipPoolsPage() {
                     onClick={() =>
                       void runPoolAction(
                         distributeTipPool,
-                        "Tip pool distributed"
+                        t("cashier.tipPool.distributed")
                       )
                     }
                   >
-                    Distribute
+                    {t("cashier.tipPool.distribute")}
                   </Button>
                   <Button
                     onClick={() =>
-                      void runPoolAction(settleTipPool, "Tip pool settled")
+                      void runPoolAction(settleTipPool, t("cashier.tipPool.settled"))
                     }
                   >
-                    Settle
+                    {t("cashier.tipPool.settle")}
                   </Button>
                 </div>
               ) : null}
             </>
           ) : (
-            <p className="mt-3 text-sm text-slate-500">Select a tip pool.</p>
+            <p className="mt-3 text-sm text-slate-500">
+              {t("cashier.tipPool.selectPool")}
+            </p>
           )}
         </section>
 
@@ -630,13 +644,13 @@ export function TipPoolsPage() {
               className="mt-2"
               onClick={resetAllocationForm}
             >
-              Cancel edit
+              {t("cashier.tipPool.cancelEdit")}
             </Button>
           ) : null}
         </form>
 
         <section className="rounded-lg bg-white p-4">
-          <h2 className="font-bold">Allocations</h2>
+          <h2 className="font-bold">{t("cashier.tipPool.allocations")}</h2>
           <div className="mt-3 max-h-72 space-y-2 overflow-y-auto">
             {tipPoolAllocations.map((allocation) => (
               <div
@@ -651,7 +665,10 @@ export function TipPoolsPage() {
                   <span>{allocation.amount}</span>
                 </div>
                 <p className="text-xs text-slate-500">
-                  Hours {allocation.hoursWorked} · Weight {allocation.weight}
+                  {t("cashier.tipPool.hoursWeight", {
+                    hours: allocation.hoursWorked,
+                    weight: allocation.weight,
+                  })}
                 </p>
                 <div className="mt-2 flex gap-2">
                   <Button
@@ -659,7 +676,7 @@ export function TipPoolsPage() {
                     variant="outline"
                     onClick={() => beginAllocationEdit(allocation)}
                   >
-                    Edit
+                    {t("cashier.tipPool.edit")}
                   </Button>
                   <Button
                     size="sm"
@@ -671,7 +688,7 @@ export function TipPoolsPage() {
                       )
                     }
                   >
-                    Delete
+                    {t("cashier.tipPool.delete")}
                   </Button>
                 </div>
               </div>

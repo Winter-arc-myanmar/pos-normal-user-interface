@@ -341,10 +341,10 @@ describe("CashierPage integration", () => {
       screen.getByRole("button", { name: /cashier.status.all/i })
     ).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Table status"), {
+    fireEvent.change(screen.getByLabelText("cashier.orderPanel.tableStatus"), {
       target: { value: "DIRTY" },
     });
-    fireEvent.change(screen.getByLabelText("Table session state"), {
+    fireEvent.change(screen.getByLabelText("cashier.orderPanel.sessionState"), {
       target: { value: "SERVED" },
     });
 

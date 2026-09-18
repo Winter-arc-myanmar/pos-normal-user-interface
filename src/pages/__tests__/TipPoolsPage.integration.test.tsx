@@ -32,8 +32,9 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
-    t: (key: string) => {
+    t: (key: string, options?: Record<string, unknown>) => {
       const labels: Record<string, string> = {
+        "cashier.tipPool.title": "Tip pools",
         "cashier.tipPool.addAllocation": "Add allocation",
         "cashier.tipPool.saveAllocation": "Save allocation",
         "cashier.tipPool.staff": "Staff",
@@ -49,8 +50,24 @@ vi.mock("react-i18next", () => ({
         "cashier.tipPool.valueRequired":
           "Enter hours, weight, or amount greater than zero.",
         "cashier.tipPool.createFailed": "Unable to save allocation.",
+        "cashier.tipPool.distributable": "Distributable {{amount}}",
+        "cashier.tipPool.distribute": "Distribute",
+        "cashier.tipPool.settle": "Settle",
+        "cashier.tipPool.statusAll": "ALL",
+        "cashier.tipPool.statusOpen": "OPEN",
+        "cashier.tipPool.statusSettled": "SETTLED",
+        "cashier.tipPool.create": "Create tip pool",
+        "cashier.tipPool.poolName": "Pool name",
+        "cashier.tipPool.selectedPool": "Selected pool",
       };
-      return labels[key] || key;
+      let text = labels[key] || key;
+      if (options) {
+        for (const [name, value] of Object.entries(options)) {
+          if (name === "interpolation") continue;
+          text = text.replace(`{{${name}}}`, String(value ?? ""));
+        }
+      }
+      return text;
     },
   }),
 }));
