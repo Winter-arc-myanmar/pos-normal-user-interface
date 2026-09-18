@@ -171,6 +171,8 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
     pickupCounterOrder: mocks.pickupCounterOrder,
     processCheckout: vi.fn(),
     voidCheckout: mocks.voidCheckout,
+    discountReasons: [],
+    fetchDiscountReasons: vi.fn().mockResolvedValue(undefined),
     resolveTableWarning: vi.fn().mockReturnValue(null),
     clearOrderSelection: vi.fn(),
     clearError: vi.fn(),

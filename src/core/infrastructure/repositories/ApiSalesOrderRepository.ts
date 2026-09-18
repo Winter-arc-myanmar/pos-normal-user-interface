@@ -73,8 +73,88 @@ const toMeta = (response: unknown, fallbackLimit: number, count: number) => {
   return { page, limit, total, totalPages };
 };
 
-const toSalesOrder = (item: Record<string, unknown>): SalesOrder =>
-  new SalesOrder({
+const asText = (value: unknown): string | undefined => {
+  if (value == null) return undefined;
+  const text = String(value).trim();
+  return text ? text : undefined;
+};
+
+const UUID_LIKE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const asHumanName = (value: unknown): string | undefined => {
+  const text = asText(value);
+  if (!text || UUID_LIKE.test(text)) return undefined;
+  return text;
+};
+
+const nestedName = (value: unknown, keys: string[]): string | undefined => {
+  const record = asRecord(value);
+  if (!record) return undefined;
+  for (const key of keys) {
+    const text = asHumanName(record[key]);
+    if (text) return text;
+  }
+  return undefined;
+};
+
+const nestedList = (item: Record<string, unknown>): Record<string, unknown>[] => {
+  const candidates = [item.lines, item.items, item.orderLines];
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate.filter(
+        (entry): entry is Record<string, unknown> =>
+          Boolean(entry) && typeof entry === "object" && !Array.isArray(entry)
+      );
+    }
+  }
+  return [];
+};
+
+const resolveCustomerName = (item: Record<string, unknown>): string | undefined =>
+  asHumanName(item.customerName) ||
+  asHumanName(item.guestName) ||
+  nestedName(item.customer, ["fullName", "name", "displayName", "guestName"]) ||
+  nestedName(item.guest, ["fullName", "name", "guestName"]);
+
+const resolveLineCatalog = (item: Record<string, unknown>) => {
+  const product = asRecord(item.product);
+  const variant = asRecord(item.variant);
+  return {
+    productName:
+      asHumanName(item.productName) ||
+      asHumanName(item.name) ||
+      nestedName(product, ["name", "productName"]),
+    variantName:
+      asHumanName(item.variantName) ||
+      nestedName(variant, ["name", "variantName", "variantSku"]),
+    sku:
+      asHumanName(item.sku) ||
+      asHumanName(item.variantSku) ||
+      nestedName(variant, ["variantSku", "sku"]),
+  };
+};
+
+const resolveItemSummary = (item: Record<string, unknown>) => {
+  const lines = nestedList(item);
+  const names = lines
+    .map((line) => {
+      const catalog = resolveLineCatalog(line);
+      return catalog.productName || catalog.variantName || catalog.sku;
+    })
+    .filter((name): name is string => Boolean(name));
+  const counted = toNumber(item.itemCount ?? item.lineCount ?? item.itemsCount);
+  const itemCount = counted ?? (lines.length || names.length || undefined);
+  let itemSummary = asHumanName(item.itemSummary);
+  if (!itemSummary && names.length) {
+    itemSummary =
+      names.length === 1 ? names[0] : `${names[0]} + ${names.length - 1}`;
+  }
+  return { itemCount, itemSummary };
+};
+
+const toSalesOrder = (item: Record<string, unknown>): SalesOrder => {
+  const catalog = resolveItemSummary(item);
+  return new SalesOrder({
     id: String(item.id || ""),
     tenantId: String(item.tenantId || ""),
     customerId: item.customerId ? String(item.customerId) : undefined,
@@ -101,15 +181,20 @@ const toSalesOrder = (item: Record<string, unknown>): SalesOrder =>
     discountReasonId: item.discountReasonId
       ? String(item.discountReasonId)
       : undefined,
+    customerName: resolveCustomerName(item),
+    itemCount: catalog.itemCount,
+    itemSummary: catalog.itemSummary,
     createdAt: String(item.createdAt || ""),
     updatedAt: String(item.updatedAt || ""),
   });
+};
 
 const toSalesOrderLine = (
   item: Record<string, unknown>,
   salesOrderId?: string
-): SalesOrderLine =>
-  new SalesOrderLine({
+): SalesOrderLine => {
+  const catalog = resolveLineCatalog(item);
+  return new SalesOrderLine({
     id: String(item.id || ""),
     salesOrderId: String(item.salesOrderId || salesOrderId || ""),
     variantId: String(item.variantId || ""),
@@ -132,9 +217,13 @@ const toSalesOrderLine = (
         ? (item.selectedModifiers as Record<string, unknown>)
         : undefined,
     seatNumber: typeof item.seatNumber === "number" ? item.seatNumber : undefined,
+    productName: catalog.productName,
+    variantName: catalog.variantName,
+    sku: catalog.sku,
     createdAt: item.createdAt ? String(item.createdAt) : undefined,
     updatedAt: item.updatedAt ? String(item.updatedAt) : undefined,
   });
+};
 
 const normalizeUpsertLinePayload = (
   payload: UpsertSalesOrderLineDTO

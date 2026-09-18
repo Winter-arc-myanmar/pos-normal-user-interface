@@ -6,6 +6,7 @@ import {
   TableSessionState,
 } from "@/core/application/dtos/CashierDTO";
 import {
+  AdjustmentReason,
   DiningTable,
   PaymentMethod,
   Product,
@@ -15,7 +16,9 @@ import {
   TableSession,
 } from "@/core/domain/entities/Cashier";
 import { OrderTabs } from "./OrderTabs";
+import { OrderAdjustments } from "./OrderAdjustments";
 import { isSettledSalesOrder } from "@/lib/pos/orderStatus";
+import { isFocLine } from "@/lib/pos/checkoutAdjustments";
 
 interface OrderPanelProps {
   selectedOrder: SalesOrder | null;
@@ -42,6 +45,23 @@ interface OrderPanelProps {
   onIncreaseLineQuantity: (line: SalesOrderLine) => void;
   onDecreaseLineQuantity: (line: SalesOrderLine) => void;
   onRemoveLine: (line: SalesOrderLine) => void;
+  onToggleFoc?: (line: SalesOrderLine) => void;
+  discountAmount?: string;
+  discountReasonId?: string;
+  discountReasons?: AdjustmentReason[];
+  serviceCharge?: string;
+  tipAmount?: string;
+  memberCardUid?: string;
+  memberPointsLabel?: string;
+  memberCardError?: string | null;
+  isMemberCardLoading?: boolean;
+  onDiscountAmountChange?: (value: string) => void;
+  onDiscountReasonChange?: (value: string) => void;
+  onRemoveDiscount?: () => void;
+  onServiceChargeChange?: (value: string) => void;
+  onTipAmountChange?: (value: string) => void;
+  onMemberCardUidChange?: (value: string) => void;
+  onLookupMemberCard?: () => void;
   onPaymentAmountChange: (value: string) => void;
   onPaymentMethodChange: (value: string) => void;
   onOpenSplit?: () => void;
@@ -85,6 +105,23 @@ export function OrderPanel({
   onIncreaseLineQuantity,
   onDecreaseLineQuantity,
   onRemoveLine,
+  onToggleFoc,
+  discountAmount = "0.0000",
+  discountReasonId = "",
+  discountReasons = [],
+  serviceCharge = "0.0000",
+  tipAmount = "0.0000",
+  memberCardUid = "",
+  memberPointsLabel,
+  memberCardError,
+  isMemberCardLoading = false,
+  onDiscountAmountChange,
+  onDiscountReasonChange,
+  onRemoveDiscount,
+  onServiceChargeChange,
+  onTipAmountChange,
+  onMemberCardUidChange,
+  onLookupMemberCard,
   onPaymentAmountChange,
   onPaymentMethodChange,
   onOpenSplit,
@@ -181,6 +218,7 @@ export function OrderPanel({
                     </div>
                     <p className="mt-1 text-xs text-slate-500">
                       {Number(line.quantity)} × {line.unitPrice}
+                      {isFocLine(line) ? ` · ${t("cashier.orderPanel.foc")}` : ""}
                     </p>
                     <div className="mt-2 flex items-center gap-2">
                       <button
@@ -198,6 +236,16 @@ export function OrderPanel({
                         disabled={isLoading || isSettledOrder}
                       >
                         {t("cashier.orderPanel.increase")}
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded border border-slate-300 px-2 py-1 text-xs"
+                        onClick={() => onToggleFoc?.(line)}
+                        disabled={isLoading || isSettledOrder || !onToggleFoc}
+                      >
+                        {isFocLine(line)
+                          ? t("cashier.orderPanel.undoFoc")
+                          : t("cashier.orderPanel.foc")}
                       </button>
                       <button
                         type="button"
@@ -239,6 +287,27 @@ export function OrderPanel({
             <span>{t("cashier.total")}</span>
             <span>{total}</span>
           </div>
+          {onDiscountAmountChange && onTipAmountChange && onServiceChargeChange ? (
+            <OrderAdjustments
+              discountAmount={discountAmount}
+              discountReasonId={discountReasonId}
+              discountReasons={discountReasons}
+              serviceCharge={serviceCharge}
+              tipAmount={tipAmount}
+              memberCardUid={memberCardUid}
+              memberPointsLabel={memberPointsLabel}
+              memberCardError={memberCardError}
+              isMemberCardLoading={isMemberCardLoading}
+              disabled={isLoading || isSettledOrder}
+              onDiscountAmountChange={onDiscountAmountChange}
+              onDiscountReasonChange={onDiscountReasonChange || (() => undefined)}
+              onRemoveDiscount={onRemoveDiscount || (() => undefined)}
+              onServiceChargeChange={onServiceChargeChange}
+              onTipAmountChange={onTipAmountChange}
+              onMemberCardUidChange={onMemberCardUidChange || (() => undefined)}
+              onLookupMemberCard={onLookupMemberCard || (() => undefined)}
+            />
+          ) : null}
           {isSplitMode || isPayView ? (
             <p className="text-xs text-slate-500">
               {isSplitMode

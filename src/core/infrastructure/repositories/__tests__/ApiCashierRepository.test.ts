@@ -246,6 +246,64 @@ describe("ApiCashierRepository", () => {
     });
   });
 
+  it("sends checkout tip, service charge, and discount reason", async () => {
+    const post = vi.fn().mockResolvedValue({
+      success: true,
+      data: { orderId: "checkout-1" },
+    });
+    const repository = new ApiCashierRepository({
+      post,
+    } as unknown as HttpClient);
+
+    await repository.checkout({
+      tenantId: "tenant-1",
+      locationId: "location-1",
+      salesChannel: "POS",
+      serviceType: "DINE_IN",
+      tipAmount: "5.0000",
+      serviceCharge: "3.0000",
+      discountReasonId: "reason-1",
+      items: [
+        {
+          variantId: "variant-1",
+          quantity: "1.0000",
+          lineDiscount: "5.0000",
+        },
+      ],
+      payments: [
+        {
+          paymentMethodId: "cash",
+          amount: "93.0000",
+          tipAmount: "5.0000",
+        },
+      ],
+    });
+
+    expect(post).toHaveBeenCalledWith("/api/v1/checkout", {
+      tenantId: "tenant-1",
+      locationId: "location-1",
+      salesChannel: "POS",
+      serviceType: "DINE_IN",
+      discountReasonId: "reason-1",
+      tipAmount: "5.0000",
+      serviceCharge: "3.0000",
+      items: [
+        {
+          variantId: "variant-1",
+          quantity: "1.0000",
+          lineDiscount: "5.0000",
+        },
+      ],
+      payments: [
+        {
+          paymentMethodId: "cash",
+          amount: "93.0000",
+          tipAmount: "5.0000",
+        },
+      ],
+    });
+  });
+
   it("sends guestCardId on member-card checkout payments", async () => {
     const post = vi.fn().mockResolvedValue({
       success: true,

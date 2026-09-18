@@ -31,6 +31,14 @@ import { GuestCard, GuestWallet } from "@/core/domain/entities/GuestWallet";
 import { useCardCapture } from "@/core/presentation/hooks/useCardCapture";
 import { useGuestWalletManagement } from "@/core/presentation/hooks/useGuestWalletManagement";
 import { calcLineTotals } from "@/lib/pos/checkoutCalculations";
+import {
+  allocateOrderDiscountToLines,
+  isFocLine,
+  lineFocDiscount,
+  payableTotal,
+  toMoney,
+  withOrderTipOnFirstPayment,
+} from "@/lib/pos/checkoutAdjustments";
 import { isUnspendableWalletStatus } from "@/lib/pos/guestWalletAmounts";
 import { isSettledSalesOrder } from "@/lib/pos/orderStatus";
 import {
@@ -95,6 +103,8 @@ export function CashierPage() {
     pickupCounterOrder,
     processCheckout,
     voidCheckout,
+    discountReasons,
+    fetchDiscountReasons,
     clearOrderSelection,
     resolveTableWarning,
     clearError,
@@ -139,6 +149,10 @@ export function CashierPage() {
   const [isMultiOrderMutating, setIsMultiOrderMutating] = useState(false);
   const [isSplitMode, setIsSplitMode] = useState(false);
   const [splitTenders, setSplitTenders] = useState<SplitPaymentTenderDTO[]>([]);
+  const [discountAmount, setDiscountAmount] = useState("0.0000");
+  const [discountReasonId, setDiscountReasonId] = useState("");
+  const [tipAmount, setTipAmount] = useState("0.0000");
+  const [serviceCharge, setServiceCharge] = useState("0.0000");
   const [nowMs, setNowMs] = useState(() => Date.now());
   const paymentInputRef = useRef<HTMLInputElement>(null);
   const payReturnViewRef = useRef("menu");
@@ -171,11 +185,13 @@ export function CashierPage() {
         sortBy: "openedAt",
         sortOrder: "desc",
       }),
+      fetchDiscountReasons(),
     ]);
   }, [
     clearError,
     fetchDiningTables,
     fetchDiningZones,
+    fetchDiscountReasons,
     fetchPaymentMethods,
     fetchProducts,
     fetchSalesOrders,
@@ -206,6 +222,10 @@ export function CashierPage() {
       setPaymentAmount("0.0000");
       setIsSplitMode(false);
       setSplitTenders([]);
+      setDiscountAmount("0.0000");
+      setDiscountReasonId("");
+      setTipAmount("0.0000");
+      setServiceCharge("0.0000");
       setLocalError(null);
       setNotice(message);
       setSearchParams({ view: "orders" });
@@ -360,7 +380,7 @@ export function CashierPage() {
     }, {});
   }, [displayOrderLines, variantById]);
 
-  const orderTotal = useMemo(() => {
+  const lineSubtotal = useMemo(() => {
     const backendTotal = Number(selectedOrder?.grandTotal || 0);
     const totalLines = isDirectCheckoutMode ? activeOrderLines : displayOrderLines;
     const lineTotal = totalLines.reduce((sum, line) => {
@@ -370,18 +390,27 @@ export function CashierPage() {
       const tax = Number(line.taxAmount || 0);
       return sum + quantity * unitPrice - discount + tax;
     }, 0);
-
     if (!isDirectCheckoutMode && backendTotal > 0) {
-      return Math.max(backendTotal, lineTotal).toFixed(4);
+      return Math.max(backendTotal, lineTotal);
     }
-
-    return (lineTotal > 0 ? lineTotal : backendTotal).toFixed(4);
+    return lineTotal > 0 ? lineTotal : backendTotal;
   }, [
     activeOrderLines,
     displayOrderLines,
     isDirectCheckoutMode,
     selectedOrder?.grandTotal,
   ]);
+
+  const orderTotal = useMemo(
+    () =>
+      payableTotal({
+        lineTotal: lineSubtotal,
+        orderDiscount: Number(discountAmount),
+        serviceCharge: Number(serviceCharge),
+        tipAmount: Number(tipAmount),
+      }).toFixed(4),
+    [discountAmount, lineSubtotal, serviceCharge, tipAmount]
+  );
 
   const checkoutPaymentMethods = useMemo(
     () => ensureMemberCardPaymentMethod(paymentMethods),
@@ -480,6 +509,10 @@ export function CashierPage() {
     ) {
       setIsSplitMode(false);
       setSplitTenders([]);
+      setDiscountAmount("0.0000");
+      setDiscountReasonId("");
+      setTipAmount("0.0000");
+      setServiceCharge("0.0000");
     }
     previousOrderIdRef.current = nextId;
   }, [selectedOrder?.id]);
@@ -1101,20 +1134,33 @@ export function CashierPage() {
         throw new Error("Add at least one item before checkout");
       }
 
-      const checkoutPayments = attachGuestCardIdToMemberPayments(
-        buildCheckoutPayments({
-          total: orderTotal,
-          paymentMethodId,
-          paymentAmount,
-          guestCardId: memberCard?.id,
-          splitTenders,
-          isSplitMode,
-        }),
-        memberCard?.id,
-        (methodId) => {
-          const method = checkoutPaymentMethods.find((item) => item.id === methodId);
-          return Boolean(method && isMemberCardPaymentMethod(method));
-        }
+      const orderDiscount = Math.max(0, Number(discountAmount) || 0);
+      const tip = Math.max(0, Number(tipAmount) || 0);
+      const extraFee = Math.max(0, Number(serviceCharge) || 0);
+      if (orderDiscount > lineSubtotal + 0.009) {
+        throw new Error(t("cashier.errors.discountTooLarge"));
+      }
+      if (orderDiscount > 0 && discountReasons.length && !discountReasonId) {
+        throw new Error(t("cashier.errors.discountReasonRequired"));
+      }
+
+      const checkoutPayments = withOrderTipOnFirstPayment(
+        attachGuestCardIdToMemberPayments(
+          buildCheckoutPayments({
+            total: orderTotal,
+            paymentMethodId,
+            paymentAmount,
+            guestCardId: memberCard?.id,
+            splitTenders,
+            isSplitMode,
+          }),
+          memberCard?.id,
+          (methodId) => {
+            const method = checkoutPaymentMethods.find((item) => item.id === methodId);
+            return Boolean(method && isMemberCardPaymentMethod(method));
+          }
+        ),
+        tip
       );
       assertCheckoutPaymentsReady({
         total: orderTotal,
@@ -1147,6 +1193,10 @@ export function CashierPage() {
       if (selectedOrderSession && isPrimaryTableOrder && selectedOrder) {
         await checkoutTableSession(selectedOrderSession.id, {
           payments: checkoutPayments,
+          ...(tip > 0 ? { tipAmount: tip } : {}),
+          ...(extraFee > 0 ? { serviceCharge: extraFee } : {}),
+          ...(discountReasonId ? { discountReasonId } : {}),
+          ...(orderDiscount > 0 ? { totalDiscount: orderDiscount } : {}),
         });
       } else if (isMultiOrderSecondary && selectedOrder) {
         for (const payment of checkoutPayments) {
@@ -1156,6 +1206,7 @@ export function CashierPage() {
             posSessionId: context.posSessionId,
             amount: payment.amount,
             guestCardId: payment.guestCardId,
+            ...(payment.tipAmount ? { tipAmount: payment.tipAmount } : {}),
           });
         }
       } else {
@@ -1169,11 +1220,10 @@ export function CashierPage() {
           salesChannel: "POS",
           serviceType: toApiServiceType(selectedServiceType),
           idempotencyKey: `checkout-${selectedOrder?.id || "direct"}-${Date.now()}`,
-          items: activeOrderLines.map((line) => ({
-            variantId: line.variantId,
-            quantity: line.quantity,
-            lineDiscount: line.lineDiscount || "0.0000",
-          })),
+          ...(discountReasonId ? { discountReasonId } : {}),
+          ...(tip > 0 ? { tipAmount: toMoney(tip) } : {}),
+          ...(extraFee > 0 ? { serviceCharge: toMoney(extraFee) } : {}),
+          items: allocateOrderDiscountToLines(activeOrderLines, orderDiscount),
           payments: checkoutPayments,
         });
       }
@@ -1305,6 +1355,45 @@ export function CashierPage() {
       taxAmount: targetLine.taxAmount || "0.0000",
       seatNumber: targetLine.seatNumber,
     });
+  };
+
+  const handleToggleFoc = async (line: SalesOrderLine) => {
+    setLocalError(null);
+    setNotice(null);
+    try {
+      if (isSettledSalesOrder(selectedOrder) && !isDirectCheckoutMode) {
+        throw new Error(t("cashier.errors.orderAlreadyPaid"));
+      }
+      const nextDiscount = isFocLine(line) ? "0.0000" : lineFocDiscount(line);
+      if (isDirectCheckoutMode) {
+        setDirectCartLines((current) => {
+          const target = current.find((entry) => entry.id === line.id);
+          if (!target) return current;
+          const variant = variantById[target.variantId];
+          const product = variant ? productById[variant.productId] : undefined;
+          const updated = buildDirectLine(
+            { ...target, lineDiscount: nextDiscount },
+            product,
+            variant
+          );
+          return current.map((entry) => (entry.id === line.id ? updated : entry));
+        });
+        return;
+      }
+      if (!selectedOrder) return;
+      await updateOrderLine(selectedOrder.id, line.id, {
+        variantId: line.variantId,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice || "0.0000",
+        lineDiscount: nextDiscount,
+        taxAmount: line.taxAmount || "0.0000",
+        seatNumber: line.seatNumber,
+      });
+    } catch (caught) {
+      setLocalError(
+        caught instanceof Error ? caught.message : t("cashier.errors.updateOrderLine")
+      );
+    }
   };
 
   const closePayView = () => {
@@ -1608,6 +1697,10 @@ export function CashierPage() {
     setMultiOrderLines({});
     setSelectedMergeOrderIds([]);
     clearOrderSelection();
+    setDiscountAmount("0.0000");
+    setDiscountReasonId("");
+    setTipAmount("0.0000");
+    setServiceCharge("0.0000");
     setLocalError(null);
     setNotice(null);
     setSearchParams({ view: "orders" });
@@ -1680,6 +1773,32 @@ export function CashierPage() {
         onIncreaseLineQuantity={(line) => void handleIncreaseLineQuantity(line)}
         onDecreaseLineQuantity={(line) => void handleDecreaseLineQuantity(line)}
         onRemoveLine={(line) => void handleRemoveLine(line)}
+        onToggleFoc={(line) => void handleToggleFoc(line)}
+        discountAmount={discountAmount}
+        discountReasonId={discountReasonId}
+        discountReasons={discountReasons}
+        serviceCharge={serviceCharge}
+        tipAmount={tipAmount}
+        memberCardUid={memberCardUid}
+        memberPointsLabel={
+          memberWallet
+            ? t("cashier.orderPanel.memberPointsBalance", {
+                balance: memberWallet.balance,
+              })
+            : undefined
+        }
+        memberCardError={memberCardError}
+        isMemberCardLoading={isMemberCardLoading}
+        onDiscountAmountChange={setDiscountAmount}
+        onDiscountReasonChange={setDiscountReasonId}
+        onRemoveDiscount={() => {
+          setDiscountAmount("0.0000");
+          setDiscountReasonId("");
+        }}
+        onServiceChargeChange={setServiceCharge}
+        onTipAmountChange={setTipAmount}
+        onMemberCardUidChange={setMemberCardUid}
+        onLookupMemberCard={() => void handleLookupMemberCard()}
         onPaymentAmountChange={setPaymentAmount}
         onPaymentMethodChange={setPaymentMethodId}
         onOpenSplit={handleOpenSplit}

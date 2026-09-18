@@ -8,14 +8,20 @@ import { SalesOrder } from "@/core/domain/entities/Cashier";
 import { useAuth } from "@/core/presentation/hooks/useAuth";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
 import { useSalesOrderManagement } from "@/core/presentation/hooks/useSalesOrderManagement";
-import { useDateFormatter } from "@/lib/i18n/formatters";
+import { useDateFormatter, useNumberFormatter } from "@/lib/i18n/formatters";
+import {
+  formatPosQuantity,
+  lineDisplayName,
+  salesOrderServiceTypeKey,
+  salesOrderStatusKey,
+} from "@/lib/pos/orderListDisplay";
 
-type StatusTab = "storing" | "takenOut" | "invalid";
+type StatusTab = "open" | "completed" | "voided";
 
 const statusTabFilters: Record<StatusTab, OrderStatus | undefined> = {
-  storing: "DRAFT",
-  takenOut: "COMPLETED",
-  invalid: "VOIDED",
+  open: "DRAFT",
+  completed: "COMPLETED",
+  voided: "VOIDED",
 };
 
 function EmptyIllustration() {
@@ -41,6 +47,7 @@ function EmptyIllustration() {
 export function SalesOrdersPage() {
   const { t } = useTranslation();
   const { formatDateTime } = useDateFormatter();
+  const { formatCurrency } = useNumberFormatter();
   const { user } = useAuth();
   const { activeLocationId } = usePosWorkspace();
   const {
@@ -62,7 +69,7 @@ export function SalesOrdersPage() {
     clearSelectedOrder,
   } = useSalesOrderManagement();
 
-  const [statusTab, setStatusTab] = useState<StatusTab>("storing");
+  const [statusTab, setStatusTab] = useState<StatusTab>("open");
   const [search, setSearch] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -158,13 +165,33 @@ export function SalesOrdersPage() {
     }
   };
 
+  const money = (value: unknown) => formatCurrency(Number(value) || 0);
+
+  const orderSummary = (order: SalesOrder) => {
+    const parts = [
+      order.customerName || t("salesOrders.walkIn"),
+      t(salesOrderServiceTypeKey(order.serviceType)),
+    ];
+    if (order.pickupNumber) {
+      parts.push(t("salesOrders.pickup", { number: order.pickupNumber }));
+    }
+    if (order.itemSummary) {
+      parts.push(order.itemSummary);
+    } else if (order.itemCount === 1) {
+      parts.push(t("salesOrders.itemCountOne"));
+    } else if (order.itemCount && order.itemCount > 1) {
+      parts.push(t("salesOrders.itemCount", { count: order.itemCount }));
+    }
+    return parts.join(" · ");
+  };
+
   const feedback = localError || error || notice;
 
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden bg-[#080808] text-white">
       <header className="flex items-center justify-between gap-3 px-4 pb-3 pt-4">
         <div className="flex flex-wrap items-center gap-2">
-          {(["storing", "takenOut", "invalid"] as const).map((tab) => (
+          {(["open", "completed", "voided"] as const).map((tab) => (
             <button
               key={tab}
               type="button"
@@ -247,13 +274,11 @@ export function SalesOrdersPage() {
                           {order.orderNumber || order.id.slice(0, 8)}
                         </p>
                         <p className="truncate text-xs text-slate-400">
-                          {order.pickupNumber
-                            ? `${t("salesOrders.pickup")} ${order.pickupNumber}`
-                            : order.serviceType}
+                          {orderSummary(order)}
                         </p>
                       </div>
                       <div className="shrink-0 text-right">
-                        <p className="font-semibold">{order.grandTotal}</p>
+                        <p className="font-semibold">{money(order.grandTotal)}</p>
                         <p className="text-[10px] text-slate-400">
                           {formatDateTime(order.createdAt)}
                         </p>
@@ -323,7 +348,11 @@ export function SalesOrdersPage() {
                       {selectedOrder.orderNumber || selectedOrder.id}
                     </h2>
                     <p className="text-xs text-slate-400">
-                      {selectedOrder.status} · {selectedOrder.salesChannel}
+                      {t(salesOrderStatusKey(selectedOrder.status))} ·{" "}
+                      {t(salesOrderServiceTypeKey(selectedOrder.serviceType))}
+                      {selectedOrder.customerName
+                        ? ` · ${selectedOrder.customerName}`
+                        : ` · ${t("salesOrders.walkIn")}`}
                     </p>
                   </div>
                   <button
@@ -362,10 +391,10 @@ export function SalesOrdersPage() {
                         <div className="flex items-start justify-between gap-2">
                           <div>
                             <p className="font-medium">
-                              {line.variantId.slice(0, 8)}
+                              {lineDisplayName(line) || t("salesOrders.item")}
                             </p>
                             <p className="text-xs text-slate-400">
-                              × {line.quantity} @ {line.unitPrice}
+                              × {formatPosQuantity(line.quantity)} @ {money(line.unitPrice)}
                             </p>
                           </div>
                           <span className="rounded bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase">
@@ -404,7 +433,7 @@ export function SalesOrdersPage() {
               <div className="border-t border-white/10 px-4 py-3">
                 <div className="flex items-center justify-between font-semibold">
                   <span>{t("salesOrders.total")}</span>
-                  <span>{selectedOrder.grandTotal}</span>
+                  <span>{money(selectedOrder.grandTotal)}</span>
                 </div>
               </div>
             </>

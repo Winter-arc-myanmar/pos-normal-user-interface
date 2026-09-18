@@ -109,4 +109,41 @@ describe("OrderPanel", () => {
     );
     expect(onCancelOrder).toHaveBeenCalledTimes(1);
   });
+
+  it("lets cashiers edit checkout adjustments and mark a line FOC", () => {
+    const onDiscountAmountChange = vi.fn();
+    const onRemoveDiscount = vi.fn();
+    const onToggleFoc = vi.fn();
+
+    render(
+      <OrderPanel
+        {...defaultProps}
+        selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
+        discountAmount="5.0000"
+        discountReasons={[]}
+        serviceCharge="0.0000"
+        tipAmount="0.0000"
+        onDiscountAmountChange={onDiscountAmountChange}
+        onDiscountReasonChange={vi.fn()}
+        onRemoveDiscount={onRemoveDiscount}
+        onServiceChargeChange={vi.fn()}
+        onTipAmountChange={vi.fn()}
+        onMemberCardUidChange={vi.fn()}
+        onLookupMemberCard={vi.fn()}
+        onToggleFoc={onToggleFoc}
+      />
+    );
+
+    expect(screen.getByText("cashier.orderPanel.adjustments")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("cashier.orderPanel.discount"), {
+      target: { value: "8.0000" },
+    });
+    expect(onDiscountAmountChange).toHaveBeenCalledWith("8.0000");
+    fireEvent.click(
+      screen.getByRole("button", { name: "cashier.orderPanel.removeDiscount" })
+    );
+    expect(onRemoveDiscount).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.foc" }));
+    expect(onToggleFoc).toHaveBeenCalledTimes(1);
+  });
 });

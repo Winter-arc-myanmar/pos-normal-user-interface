@@ -22,6 +22,9 @@ const order = {
   totalDiscount: "0.0000",
   totalTax: "0.0000",
   grandTotal: "10.0000",
+  customerName: "Jane Doe",
+  itemSummary: "Coffee",
+  itemCount: 1,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
 };
@@ -30,16 +33,18 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, options?: Record<string, unknown>) => {
       const labels: Record<string, string> = {
-        "salesOrders.tabs.storing": "Storing",
-        "salesOrders.tabs.takenOut": "Taken out",
-        "salesOrders.tabs.invalid": "Invalid",
-        "salesOrders.search": "Phone number, name, code",
+        "salesOrders.tabs.open": "Open",
+        "salesOrders.tabs.completed": "Completed",
+        "salesOrders.tabs.voided": "Voided",
+        "salesOrders.search": "Search order number, customer, or item",
         "salesOrders.create": "Create sales order",
-        "salesOrders.empty": "No data",
+        "salesOrders.empty": "No orders yet",
         "salesOrders.detailTitle": "Sales order",
-        "salesOrders.lines": "Order lines",
-        "salesOrders.noLines": "No lines on this order",
+        "salesOrders.lines": "Items",
+        "salesOrders.noLines": "No items on this order",
+        "salesOrders.walkIn": "Walk-in",
         "salesOrders.total": "Total",
+        "cashier.serviceTypes.dineIn": "Dine In",
         "salesOrders.created": `Order ${options?.number ?? ""} created`,
         "common.delete": "Delete",
         "common.cancel": "Cancel",
@@ -52,6 +57,9 @@ vi.mock("react-i18next", () => ({
 vi.mock("@/lib/i18n/formatters", () => ({
   useDateFormatter: () => ({
     formatDateTime: (value: string) => value,
+  }),
+  useNumberFormatter: () => ({
+    formatCurrency: (value: number) => `$${value.toFixed(2)}`,
   }),
 }));
 
@@ -115,6 +123,8 @@ describe("SalesOrdersPage integration", () => {
 
     await waitFor(() => expect(mocks.fetchOrders).toHaveBeenCalled());
     expect(screen.getByText("SO-001")).toBeInTheDocument();
+    expect(screen.getByText("$10.00")).toBeInTheDocument();
+    expect(screen.getByText(/Jane Doe · Dine In · Coffee/)).toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole("button", { name: "Create sales order" })
@@ -134,7 +144,7 @@ describe("SalesOrdersPage integration", () => {
   it("filters by status tab and opens order details", async () => {
     render(<SalesOrdersPage />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Taken out" }));
+    fireEvent.click(screen.getByRole("button", { name: "Completed" }));
     await waitFor(() =>
       expect(mocks.fetchOrders).toHaveBeenCalledWith(
         expect.objectContaining({ status: "COMPLETED" })

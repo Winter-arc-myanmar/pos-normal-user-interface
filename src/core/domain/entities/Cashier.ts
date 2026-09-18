@@ -67,6 +67,9 @@ export class SalesOrder {
   pickupNumber?: string;
   pickedUpAt?: string | null;
   discountReasonId?: string;
+  customerName?: string;
+  itemCount?: number;
+  itemSummary?: string;
   createdAt!: string;
   updatedAt!: string;
 
@@ -93,6 +96,9 @@ export class SalesOrderLine {
   courseType?: string;
   selectedModifiers?: Record<string, unknown>;
   seatNumber?: number;
+  productName?: string;
+  variantName?: string;
+  sku?: string;
   createdAt?: string;
   updatedAt?: string;
 
