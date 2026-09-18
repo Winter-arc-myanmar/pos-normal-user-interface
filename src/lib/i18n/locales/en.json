@@ -646,7 +646,13 @@
       "assignTableToContinue": "Choose a table on the floor plan to continue.",
       "dineInStarted": "Dine-in order started. Add items from the menu or assign a table.",
       "tableStatusUpdated": "Table marked {{status}}.",
-      "sessionStateUpdated": "Session updated to {{state}}."
+      "sessionStateUpdated": "Session updated to {{state}}.",
+      "cancelOrder": "Cancel order",
+      "cancelOrderConfirm": "Cancel this order?",
+      "cancelOrderConfirmTable": "Cancel this order and release the assigned table?",
+      "keepOrder": "Keep order",
+      "confirmCancelOrder": "Cancel order",
+      "orderCancelled": "Order cancelled."
     },
     "errors": {
       "missingContext": "Missing tenant or inventory location context. Ensure your tenant has at least one inventory location configured.",
@@ -657,6 +663,7 @@
       "openTable": "Unable to open table session.",
       "addProduct": "Unable to add product.",
       "checkout": "Unable to process checkout.",
+      "cancelOrder": "Unable to cancel the order.",
       "updateOrderLine": "Unable to update item quantity.",
       "removeOrderLine": "Unable to remove item from order.",
       "missingPosSession": "No active POS session. Open a session and try again.",

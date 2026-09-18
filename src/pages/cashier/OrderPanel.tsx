@@ -54,6 +54,7 @@ interface OrderPanelProps {
   onOpenPay?: () => void;
   onCheckout: () => void;
   onFireKds: () => void;
+  onCancelOrder?: () => void;
   onPickup: () => void;
   onTableStatusChange: (status: DiningTableStatus) => void;
   onSessionStateChange: (state: TableSessionState) => void;
@@ -96,12 +97,14 @@ export function OrderPanel({
   onOpenPay,
   onCheckout,
   onFireKds,
+  onCancelOrder,
   onPickup,
   onTableStatusChange,
   onSessionStateChange,
 }: OrderPanelProps) {
   const { t } = useTranslation();
   const [confirmCloseSplit, setConfirmCloseSplit] = useState(false);
+  const [confirmCancelOrder, setConfirmCancelOrder] = useState(false);
   const variants = Object.values(variantsByProductId).flat();
   const hasActiveOrder = !!selectedOrder || selectedOrderLines.length > 0;
   const isSettledOrder = isSettledSalesOrder(selectedOrder);
@@ -112,6 +115,10 @@ export function OrderPanel({
   useEffect(() => {
     if (!isSplitMode) setConfirmCloseSplit(false);
   }, [isSplitMode]);
+
+  useEffect(() => {
+    if (!hasActiveOrder) setConfirmCancelOrder(false);
+  }, [hasActiveOrder]);
 
   const resolveLineName = (line: SalesOrderLine) => {
     const variant = variants.find((item) => item.id === line.variantId);
@@ -411,6 +418,48 @@ export function OrderPanel({
           >
             {isPayView ? t("cashier.confirmPay") : t("cashier.payNow")}
           </Button>
+          {onCancelOrder ? (
+            confirmCancelOrder ? (
+              <div className="space-y-2 rounded-lg border border-rose-200 bg-rose-50 p-2">
+                <p className="text-xs text-rose-900">
+                  {selectedTable
+                    ? t("cashier.orderPanel.cancelOrderConfirmTable")
+                    : t("cashier.orderPanel.cancelOrderConfirm")}
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={isLoading}
+                    onClick={() => setConfirmCancelOrder(false)}
+                  >
+                    {t("cashier.orderPanel.keepOrder")}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    disabled={isLoading}
+                    isLoading={isLoading}
+                    onClick={() => {
+                      setConfirmCancelOrder(false);
+                      onCancelOrder();
+                    }}
+                  >
+                    {t("cashier.orderPanel.confirmCancelOrder")}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                fullWidth
+                variant="destructive"
+                disabled={isLoading || selectedOrder?.status === "CANCELLED"}
+                onClick={() => setConfirmCancelOrder(true)}
+              >
+                {t("cashier.orderPanel.cancelOrder")}
+              </Button>
+            )
+          ) : null}
         </div>
       ) : (
         <Button

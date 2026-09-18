@@ -26,6 +26,7 @@ import {
   UpdateSalesOrderLineDTO,
   UpdateWaitlistEntryDTO,
   UpsertSalesOrderLineDTO,
+  VoidCheckoutResultDTO,
   WaitlistFilterDTO,
   TableWarningPolicyDTO,
   TableWarningStatusDTO,
@@ -487,5 +488,12 @@ export class CashierService implements ICashierService {
       ...payload,
       serviceType: toApiServiceType(payload.serviceType),
     });
+  }
+
+  async voidCheckout(id: string): Promise<VoidCheckoutResultDTO> {
+    if (!id?.trim()) {
+      throw new Error("Checkout ID is required");
+    }
+    return this.cashierRepository.voidCheckout(id.trim());
   }
 }

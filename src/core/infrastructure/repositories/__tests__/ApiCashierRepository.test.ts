@@ -391,4 +391,34 @@ describe("ApiCashierRepository", () => {
     });
     expect(order.serviceType).toBe("TAKE_AWAY");
   });
+
+  it("posts checkout void with only the sale id path", async () => {
+    const post = vi.fn().mockResolvedValue({
+      success: true,
+      message: "Request successful",
+      data: {
+        orderId: "sale-1",
+        orderNumber: "SO-20260402-0001",
+        grandTotal: "95.0000",
+        totalPaid: "100.0000",
+        change: "5.0000",
+        status: "COMPLETED",
+      },
+    });
+    const repository = new ApiCashierRepository({
+      post,
+    } as unknown as HttpClient);
+
+    const result = await repository.voidCheckout("sale-1");
+
+    expect(post).toHaveBeenCalledWith("/api/v1/checkout/sale-1/void");
+    expect(result).toEqual({
+      orderId: "sale-1",
+      orderNumber: "SO-20260402-0001",
+      grandTotal: "95.0000",
+      totalPaid: "100.0000",
+      change: "5.0000",
+      status: "COMPLETED",
+    });
+  });
 });

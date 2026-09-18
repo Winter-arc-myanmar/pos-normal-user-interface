@@ -94,6 +94,7 @@ export function CashierPage() {
     getCounterOrderById,
     pickupCounterOrder,
     processCheckout,
+    voidCheckout,
     clearOrderSelection,
     resolveTableWarning,
     clearError,
@@ -102,6 +103,7 @@ export function CashierPage() {
     fetchOrderLines: fetchManagedOrderLines,
     addOrderLine: addManagedOrderLine,
     deleteOrderLine: deleteManagedOrderLine,
+    updateOrder: updateManagedOrder,
     deleteOrder: deleteManagedOrder,
   } = useSalesOrderManagement();
   const {
@@ -1211,6 +1213,52 @@ export function CashierPage() {
     }
   };
 
+  const handleCancelOrder = async () => {
+    const orderId = selectedOrder?.id || activeTableSession?.salesOrderId;
+    const sessionId = selectedOrderSession?.id || activeTableSession?.id;
+    const tableId = displayedOrderTable?.id || activeTableId;
+
+    setLocalError(null);
+    setNotice(null);
+    try {
+      if (orderId) {
+        const isCompletedSale =
+          String(selectedOrder?.status || "").toUpperCase() === "COMPLETED";
+        if (isCompletedSale) {
+          await voidCheckout(orderId);
+        } else {
+          await updateManagedOrder(orderId, { status: "CANCELLED" });
+        }
+      }
+
+      if (sessionId) {
+        try {
+          await updateTableSessionState(sessionId, { sessionState: "CLOSED" });
+        } catch {
+          // Void may already close the session.
+        }
+      }
+
+      if (tableId) {
+        try {
+          await updateDiningTableStatus(tableId, "AVAILABLE");
+        } catch {
+          // Void may already release the table.
+        }
+        clearTableOrderIds(tableId);
+        setTableOrderIds([]);
+        setMultiOrderLines({});
+        setActiveTableId(null);
+      }
+
+      await resetWorkspaceAfterTransaction(t("cashier.orderPanel.orderCancelled"));
+    } catch (caught) {
+      const message =
+        caught instanceof Error ? caught.message : t("cashier.errors.cancelOrder");
+      setLocalError(message);
+    }
+  };
+
   const mutateOrderLineQuantity = async (lineId: string, nextQty: number) => {
     if (isSettledSalesOrder(selectedOrder) && !isDirectCheckoutMode) {
       throw new Error(t("cashier.errors.orderAlreadyPaid"));
@@ -1643,6 +1691,7 @@ export function CashierPage() {
         onOpenPay={handleOpenPay}
         onCheckout={() => void handleCheckout()}
         onFireKds={() => void handleFireKds()}
+        onCancelOrder={() => void handleCancelOrder()}
         onPickup={() => void handlePickup()}
         onTableStatusChange={(status) => void handleTableStatusChange(status)}
         onSessionStateChange={(state) => void handleSessionStateChange(state)}

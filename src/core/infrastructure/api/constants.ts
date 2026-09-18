@@ -171,6 +171,7 @@ export const API_ENDPOINTS = {
 
   CHECKOUT: {
     PROCESS: "/api/v1/checkout",
+    VOID: (id: string) => `/api/v1/checkout/${id}/void`,
   },
 
   PAYMENT_METHODS: {

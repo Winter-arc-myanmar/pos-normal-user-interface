@@ -25,6 +25,7 @@ import {
   UpdateTipPoolDTO,
   UpdateWaitlistEntryDTO,
   UpsertSalesOrderLineDTO,
+  VoidCheckoutResultDTO,
   WaitlistFilterDTO,
 } from "../../application/dtos/CashierDTO";
 import { ICashierRepository } from "../../domain/repositories/ICashierRepository";
@@ -1215,5 +1216,22 @@ export class ApiCashierRepository implements ICashierRepository {
       normalizeCheckoutPayload(payload)
     );
     return unwrap(response);
+  }
+
+  async voidCheckout(id: string): Promise<VoidCheckoutResultDTO> {
+    const response = await this.httpClient.post<
+      ApiEnvelope<Record<string, unknown>> | Record<string, unknown>
+    >(API_ENDPOINTS.CHECKOUT.VOID(id));
+    const item = unwrap(response) as Record<string, unknown>;
+    return {
+      orderId: String(item.orderId || id),
+      ...(item.orderNumber != null
+        ? { orderNumber: String(item.orderNumber) }
+        : {}),
+      ...(item.grandTotal != null ? { grandTotal: String(item.grandTotal) } : {}),
+      ...(item.totalPaid != null ? { totalPaid: String(item.totalPaid) } : {}),
+      ...(item.change != null ? { change: String(item.change) } : {}),
+      ...(item.status != null ? { status: String(item.status) } : {}),
+    };
   }
 }

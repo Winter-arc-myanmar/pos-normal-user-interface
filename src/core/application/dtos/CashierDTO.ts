@@ -173,6 +173,15 @@ export interface CheckoutRequestDTO {
   payments: CheckoutPaymentEntryDTO[];
 }
 
+export interface VoidCheckoutResultDTO {
+  orderId: string;
+  orderNumber?: string;
+  grandTotal?: string;
+  totalPaid?: string;
+  change?: string;
+  status?: string;
+}
+
 export interface OpenTableSessionDTO {
   tenantId: string;
   tableId: string;

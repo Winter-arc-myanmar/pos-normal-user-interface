@@ -20,7 +20,9 @@ const mocks = vi.hoisted(() => ({
   fetchManagedOrderLines: vi.fn(),
   addManagedOrderLine: vi.fn(),
   deleteManagedOrderLine: vi.fn(),
+  updateManagedOrder: vi.fn(),
   deleteManagedOrder: vi.fn(),
+  voidCheckout: vi.fn(),
 }));
 
 const product = {
@@ -168,7 +170,9 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
     getCounterOrderById: mocks.getCounterOrderById,
     pickupCounterOrder: mocks.pickupCounterOrder,
     processCheckout: vi.fn(),
+    voidCheckout: mocks.voidCheckout,
     resolveTableWarning: vi.fn().mockReturnValue(null),
+    clearOrderSelection: vi.fn(),
     clearError: vi.fn(),
   }),
 }));
@@ -178,6 +182,7 @@ vi.mock("@/core/presentation/hooks/useSalesOrderManagement", () => ({
     fetchOrderLines: mocks.fetchManagedOrderLines,
     addOrderLine: mocks.addManagedOrderLine,
     deleteOrderLine: mocks.deleteManagedOrderLine,
+    updateOrder: mocks.updateManagedOrder,
     deleteOrder: mocks.deleteManagedOrder,
   }),
 }));
@@ -261,6 +266,11 @@ describe("CashierPage integration", () => {
       ...session,
       sessionState: "CLOSED",
     });
+    mocks.updateManagedOrder.mockResolvedValue({
+      ...order,
+      status: "CANCELLED",
+    });
+    mocks.voidCheckout.mockResolvedValue({ orderId: "order-1" });
   });
 
   it("loads variants and adds a product to a table session", async () => {
@@ -344,6 +354,35 @@ describe("CashierPage integration", () => {
       expect(mocks.updateTableSessionState).toHaveBeenCalledWith("session-1", {
         sessionState: "SERVED",
       });
+    });
+  });
+
+  it("cancels an unpaid order without calling checkout void", async () => {
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=orders"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "cashier.orderPanel.cancelOrder" })
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "cashier.orderPanel.confirmCancelOrder" })
+    );
+
+    await waitFor(() => {
+      expect(mocks.updateManagedOrder).toHaveBeenCalledWith("order-1", {
+        status: "CANCELLED",
+      });
+      expect(mocks.voidCheckout).not.toHaveBeenCalled();
+      expect(mocks.updateTableSessionState).toHaveBeenCalledWith("session-1", {
+        sessionState: "CLOSED",
+      });
+      expect(mocks.updateDiningTableStatus).toHaveBeenCalledWith(
+        "table-1",
+        "AVAILABLE"
+      );
     });
   });
 });

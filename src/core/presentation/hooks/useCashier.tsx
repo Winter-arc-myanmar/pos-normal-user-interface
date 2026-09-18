@@ -25,6 +25,7 @@ import {
   UpdateTipPoolDTO,
   UpdateWaitlistEntryDTO,
   TableWarningStatusDTO,
+  VoidCheckoutResultDTO,
   WaitlistFilterDTO,
 } from "../../application/dtos/CashierDTO";
 import {
@@ -167,6 +168,7 @@ interface UseCashierReturn {
   pickupCounterOrder: (counterOrderId: string) => Promise<Record<string, unknown>>;
   addPayment: (orderId: string, payload: CreateOrderPaymentDTO) => Promise<void>;
   processCheckout: (payload: CheckoutRequestDTO) => Promise<Record<string, unknown>>;
+  voidCheckout: (id: string) => Promise<VoidCheckoutResultDTO>;
   resolveTableWarning: (
     openedAt?: string | null,
     nowMs?: number
@@ -1269,6 +1271,26 @@ export function useCashier(): UseCashierReturn {
     [cashierService, clearError, clearOrderSelection, fetchSalesOrders]
   );
 
+  const voidCheckout = useCallback(
+    async (id: string) => {
+      setIsLoading(true);
+      clearError();
+      try {
+        const result = await cashierService.voidCheckout(id);
+        await fetchSalesOrders({ page: 1, limit: 100 });
+        return result;
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Unable to cancel order";
+        setError(message);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [cashierService, clearError, fetchSalesOrders]
+  );
+
   const resolveTableWarning = useCallback(
     (openedAt?: string | null, nowMs?: number) =>
       cashierService.getTableWarningStatus(openedAt, nowMs),
@@ -1349,6 +1371,7 @@ export function useCashier(): UseCashierReturn {
       pickupCounterOrder,
       addPayment,
       processCheckout,
+      voidCheckout,
       resolveTableWarning,
       clearOrderSelection,
       clearError,
@@ -1425,6 +1448,7 @@ export function useCashier(): UseCashierReturn {
       pickupCounterOrder,
       addPayment,
       processCheckout,
+      voidCheckout,
       resolveTableWarning,
       clearOrderSelection,
       clearError,

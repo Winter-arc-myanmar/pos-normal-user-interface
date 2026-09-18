@@ -23,6 +23,7 @@ import {
   UpdateWaitlistEntryDTO,
   UpdateSalesOrderLineDTO,
   UpsertSalesOrderLineDTO,
+  VoidCheckoutResultDTO,
   WaitlistFilterDTO,
   TableWarningStatusDTO,
 } from "../../application/dtos/CashierDTO";
@@ -131,4 +132,5 @@ export interface ICashierService {
   getCounterOrderById(id: string): Promise<Record<string, unknown>>;
   pickupCounterOrder(id: string): Promise<Record<string, unknown>>;
   checkout(payload: CheckoutRequestDTO): Promise<Record<string, unknown>>;
+  voidCheckout(id: string): Promise<VoidCheckoutResultDTO>;
 }
