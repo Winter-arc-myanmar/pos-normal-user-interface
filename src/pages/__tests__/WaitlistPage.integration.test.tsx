@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   create: vi.fn(),
   notify: vi.fn(),
   seat: vi.fn(),
+  noShow: vi.fn(),
   fetchWaitlist: vi.fn(),
   fetchTables: vi.fn(),
   fetchZones: vi.fn(),
@@ -18,7 +19,7 @@ vi.mock("react-i18next", () => ({
         return `${options?.count ?? 0} active`;
       }
       if (key === "cashier.waitlist.waited") {
-        return `${options?.minutes ?? 0} min waited`;
+        return `Waited ${options?.duration ?? ""}`;
       }
       if (key === "cashier.waitlist.estimated") {
         return `~${options?.minutes ?? 0} min`;
@@ -40,6 +41,8 @@ vi.mock("react-i18next", () => ({
         "cashier.waitlist.anyZone": "Any zone",
         "cashier.waitlist.notes": "Notes",
         "cashier.waitlist.chooseTable": "Choose available table",
+        "cashier.errors.noTableAvailable":
+          "No available table for this waitlist party.",
         "cashier.notify": "Notify",
         "cashier.seat": "Seat",
         "cashier.cancel": "Cancel",
@@ -82,7 +85,24 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
         guestPhone: "+1-555-0100",
         partySize: 2,
         estimatedWaitMins: 20,
-        joinedAt: "2026-08-24T21:27:03.805Z",
+        joinedAt: new Date().toISOString(),
+        status: "WAITING",
+      },
+      {
+        id: "wait-stale",
+        guestName: "Old Guest",
+        guestPhone: "+1-555-0199",
+        partySize: 2,
+        joinedAt: "2020-01-01T00:00:00.000Z",
+        status: "WAITING",
+      },
+      {
+        id: "wait-vip",
+        guestName: "TAR TAY GYI",
+        guestPhone: "09420000000",
+        partySize: 5,
+        preferredZoneId: "zone-vip",
+        joinedAt: new Date().toISOString(),
         status: "WAITING",
       },
     ],
@@ -90,11 +110,30 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
       {
         id: "table-1",
         tableNumber: "T1",
+        zoneId: "zone-1",
         maxSeats: 4,
         status: "AVAILABLE",
       },
+      {
+        id: "tvip-1",
+        tableNumber: "TVIP-1",
+        zoneId: "zone-vip",
+        maxSeats: 4,
+        status: "OCCUPIED",
+      },
+      {
+        id: "tvip-2",
+        tableNumber: "TVIP-2",
+        zoneId: "zone-vip-2",
+        maxSeats: 6,
+        status: "DIRTY",
+      },
     ],
-    diningZones: [{ id: "zone-1", name: "Patio" }],
+    diningZones: [
+      { id: "zone-1", name: "Patio" },
+      { id: "zone-vip", name: "VIP / VIP2 ZONE" },
+      { id: "zone-vip-2", name: "VIP2" },
+    ],
     isLoading: false,
     error: null,
     fetchWaitlist: mocks.fetchWaitlist,
@@ -107,7 +146,7 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
     notifyWaitlistEntry: mocks.notify,
     seatWaitlistEntry: mocks.seat,
     cancelWaitlistEntry: vi.fn(),
-    noShowWaitlistEntry: vi.fn(),
+    noShowWaitlistEntry: mocks.noShow,
     activeLocationId: "location-1",
     fetchInventoryLocations: vi.fn().mockResolvedValue("location-1"),
   }),
@@ -122,6 +161,7 @@ describe("WaitlistPage integration", () => {
     mocks.create.mockResolvedValue({ id: "wait-2", status: "WAITING" });
     mocks.notify.mockResolvedValue({ id: "wait-1", status: "NOTIFIED" });
     mocks.seat.mockResolvedValue({ id: "wait-1", status: "SEATED" });
+    mocks.noShow.mockResolvedValue({ id: "wait-stale", status: "NO_SHOW" });
   });
 
   it("creates, notifies, and seats a waitlist party", async () => {
@@ -141,6 +181,13 @@ describe("WaitlistPage integration", () => {
       expect(screen.queryByLabelText("Guest name")).not.toBeInTheDocument();
     });
 
+    expect(screen.getByRole("button", { name: "John Smith" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Old Guest" })).not.toBeInTheDocument();
+    expect(screen.getAllByText(/Waited 0m/).length).toBeGreaterThan(0);
+
+    await waitFor(() => {
+      expect(mocks.noShow).toHaveBeenCalledWith("wait-stale");
+    });
     fireEvent.click(screen.getByRole("button", { name: "John Smith" }));
     fireEvent.click(screen.getByRole("button", { name: "Notify" }));
     fireEvent.click(screen.getByRole("option", { name: /T1/ }));
@@ -164,5 +211,17 @@ describe("WaitlistPage integration", () => {
         openedByPosSessionId: "session-1",
       });
     });
+  });
+
+  it("offers vacant VIP tables for a preferred-zone party instead of an empty warning", () => {
+    render(<WaitlistPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "TAR TAY GYI" }));
+
+    expect(
+      screen.queryByText("No available table for this waitlist party.")
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /TVIP-1/ })).toBeEnabled();
+    expect(screen.getByRole("option", { name: /TVIP-2/ })).toBeEnabled();
   });
 });

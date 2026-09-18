@@ -407,9 +407,18 @@ export class CashierService implements ICashierService {
     payload: TipPoolAllocationDTO
   ): Promise<TipPoolAllocation> {
     if (!poolId?.trim()) throw new Error("Tip pool ID is required");
-    if (!payload.userId?.trim()) throw new Error("User ID is required");
+    if (!payload.userId?.trim()) throw new Error("A valid staff member is required");
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        payload.userId.trim()
+      )
+    ) {
+      throw new Error("A valid staff member is required");
+    }
+    if (!payload.role?.trim()) throw new Error("Allocation role is required");
     const values = [payload.hoursWorked, payload.weight, payload.amount].filter(
-      (value): value is number => value !== undefined
+      (value): value is number =>
+        typeof value === "number" && Number.isFinite(value)
     );
     if (!values.length || values.some((value) => value < 0)) {
       throw new Error("Allocation requires a non-negative value");
@@ -428,7 +437,8 @@ export class CashierService implements ICashierService {
     if (!poolId?.trim()) throw new Error("Tip pool ID is required");
     if (!allocationId?.trim()) throw new Error("Allocation ID is required");
     const values = [payload.hoursWorked, payload.weight, payload.amount].filter(
-      (value): value is number => value !== undefined
+      (value): value is number =>
+        typeof value === "number" && Number.isFinite(value)
     );
     if (values.some((value) => value < 0)) {
       throw new Error("Allocation values cannot be negative");

@@ -1,18 +1,39 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
 import { API_CONFIG, API_ENDPOINTS } from "./constants";
 
+const normalizeErrorText = (value: unknown): string | undefined => {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (Array.isArray(value)) {
+    const parts = value
+      .map((item) => normalizeErrorText(item))
+      .filter((item): item is string => Boolean(item));
+    if (parts.length) return parts.join(". ");
+  }
+  if (value && typeof value === "object") {
+    const payload = value as Record<string, unknown>;
+    return (
+      normalizeErrorText(payload.message) ||
+      normalizeErrorText(payload.messages) ||
+      normalizeErrorText(payload.errors)
+    );
+  }
+  return undefined;
+};
+
 const readApiErrorMessage = (data: unknown): string | undefined => {
+  if (typeof data === "string" && data.trim()) return data.trim();
   if (!data || typeof data !== "object") return undefined;
   const payload = data as Record<string, unknown>;
-  if (typeof payload.message === "string" && payload.message.trim()) {
-    return payload.message.trim();
-  }
+  const fromMessage = normalizeErrorText(payload.message);
+  if (fromMessage) return fromMessage;
+  const fromErrors = normalizeErrorText(payload.errors);
+  if (fromErrors) return fromErrors;
   const nested = payload.error;
+  if (typeof nested === "string" && nested.trim() && nested !== "Bad Request") {
+    return nested.trim();
+  }
   if (nested && typeof nested === "object") {
-    const nestedMessage = (nested as Record<string, unknown>).message;
-    if (typeof nestedMessage === "string" && nestedMessage.trim()) {
-      return nestedMessage.trim();
-    }
+    return normalizeErrorText((nested as Record<string, unknown>).message);
   }
   return undefined;
 };
@@ -25,6 +46,11 @@ export const applyAxiosErrorMessage = (error: unknown): unknown => {
       apiMessage || "Too many requests. Wait a moment and try again.";
   } else if (apiMessage) {
     error.message = apiMessage;
+  } else if (
+    error.response?.status === 400 &&
+    /^Request failed with status code 400$/i.test(error.message)
+  ) {
+    error.message = "Check the highlighted fields and try again.";
   }
   return error;
 };

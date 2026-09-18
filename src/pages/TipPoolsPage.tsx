@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import {
   CreateTipPoolDTO,
@@ -11,6 +12,13 @@ import {
 } from "@/core/domain/entities/Cashier";
 import { useAuth } from "@/core/presentation/hooks/useAuth";
 import { useCashier } from "@/core/presentation/hooks/useCashier";
+import { useUserManagement } from "@/core/presentation/hooks/useUserManagement";
+import {
+  TIP_POOL_ROLE,
+  TipPoolAllocationFieldErrors,
+  TipPoolAllocationForm,
+  validateTipPoolAllocationForm,
+} from "@/lib/pos/tipPoolAllocation";
 
 const fieldClass =
   "min-h-10 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-500";
@@ -19,18 +27,18 @@ const emptyPoolForm = {
   name: "",
   periodStart: "",
   periodEnd: "",
-  distributionMethod: "",
+  distributionMethod: "BY_HOURS",
   includeServiceCharge: false,
   serviceChargeShareBps: "0",
   notes: "",
 };
 
-const emptyAllocationForm = {
+const emptyAllocationForm: TipPoolAllocationForm = {
   userId: "",
-  role: "",
-  hoursWorked: "",
-  weight: "",
-  amount: "",
+  role: TIP_POOL_ROLE,
+  hoursWorked: "8",
+  weight: "1",
+  amount: "0",
   notes: "",
 };
 
@@ -38,6 +46,7 @@ const toLocalDateTime = (value?: string) =>
   value ? new Date(value).toISOString().slice(0, 16) : "";
 
 export function TipPoolsPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const {
     tipPools,
@@ -57,12 +66,15 @@ export function TipPoolsPage() {
     activeLocationId,
     fetchInventoryLocations,
   } = useCashier();
+  const { users, loadUsers } = useUserManagement();
   const [status, setStatus] = useState<"ALL" | TipPoolStatus>("ALL");
   const [selectedPoolId, setSelectedPoolId] = useState("");
   const [poolDetail, setPoolDetail] = useState<TipPool | null>(null);
   const [poolForm, setPoolForm] = useState(emptyPoolForm);
   const [editingPool, setEditingPool] = useState(false);
   const [allocationForm, setAllocationForm] = useState(emptyAllocationForm);
+  const [allocationErrors, setAllocationErrors] =
+    useState<TipPoolAllocationFieldErrors>({});
   const [editingAllocation, setEditingAllocation] =
     useState<TipPoolAllocation | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -75,6 +87,10 @@ export function TipPoolsPage() {
     if (!tenantId) return;
     void fetchInventoryLocations(tenantId);
   }, [fetchInventoryLocations, tenantId]);
+
+  useEffect(() => {
+    void loadUsers({ take: 100, skip: 0 }).catch(() => undefined);
+  }, [loadUsers]);
 
   useEffect(() => {
     if (!locationId) return;
@@ -93,6 +109,33 @@ export function TipPoolsPage() {
         : tipPools.filter((pool) => pool.status === status),
     [status, tipPools]
   );
+
+  const staffNameById = useMemo(
+    () =>
+      new Map(
+        users.map((staff) => [
+          staff.id,
+          String(staff.nickname || staff.name || staff.email || staff.id),
+        ])
+      ),
+    [users]
+  );
+
+  const roleOptions = useMemo(() => {
+    const roles = new Set<string>([TIP_POOL_ROLE]);
+    if (allocationForm.role) roles.add(allocationForm.role);
+    for (const allocation of tipPoolAllocations) {
+      if (allocation.role) roles.add(allocation.role);
+    }
+    for (const staff of users) {
+      for (const access of staff.branchAccess || []) {
+        for (const role of access.roles || []) {
+          if (role) roles.add(String(role).toUpperCase());
+        }
+      }
+    }
+    return [...roles];
+  }, [allocationForm.role, tipPoolAllocations, users]);
 
   const selectPool = async (poolId: string) => {
     setSelectedPoolId(poolId);
@@ -168,9 +211,10 @@ export function TipPoolsPage() {
 
   const beginAllocationEdit = (allocation: TipPoolAllocation) => {
     setEditingAllocation(allocation);
+    setAllocationErrors({});
     setAllocationForm({
       userId: allocation.userId,
-      role: allocation.role,
+      role: allocation.role || TIP_POOL_ROLE,
       hoursWorked: allocation.hoursWorked,
       weight: allocation.weight,
       amount: allocation.amount,
@@ -180,6 +224,7 @@ export function TipPoolsPage() {
 
   const resetAllocationForm = () => {
     setEditingAllocation(null);
+    setAllocationErrors({});
     setAllocationForm(emptyAllocationForm);
   };
 
@@ -187,35 +232,41 @@ export function TipPoolsPage() {
     event.preventDefault();
     if (!selectedPoolId) return;
     setLocalError(null);
+    const { errors, payload } = validateTipPoolAllocationForm(allocationForm);
+    if (!payload) {
+      setAllocationErrors(errors);
+      setLocalError(
+        t(`cashier.tipPool.${errors.form || errors.userId || errors.role || "createFailed"}`)
+      );
+      return;
+    }
+    setAllocationErrors({});
     try {
-      const payload: TipPoolAllocationDTO = {
-        userId: allocationForm.userId.trim(),
-        role: allocationForm.role.trim(),
-        hoursWorked: allocationForm.hoursWorked
-          ? Number(allocationForm.hoursWorked)
-          : undefined,
-        weight: allocationForm.weight
-          ? Number(allocationForm.weight)
-          : undefined,
-        amount: allocationForm.amount
-          ? Number(allocationForm.amount)
-          : undefined,
-        notes: allocationForm.notes.trim() || undefined,
-      };
-
       if (editingAllocation) {
-        await updateTipPoolAllocation(
-          selectedPoolId,
-          editingAllocation.id,
-          payload
-        );
+        await updateTipPoolAllocation(selectedPoolId, editingAllocation.id, {
+          role: payload.role,
+          hoursWorked: payload.hoursWorked,
+          weight: payload.weight,
+          amount: payload.amount,
+          notes: payload.notes,
+        });
       } else {
-        await createTipPoolAllocation(selectedPoolId, payload);
+        const createPayload: TipPoolAllocationDTO = {
+          userId: payload.userId,
+          role: payload.role,
+          hoursWorked: payload.hoursWorked,
+          weight: payload.weight,
+          amount: payload.amount,
+          notes: payload.notes,
+        };
+        await createTipPoolAllocation(selectedPoolId, createPayload);
       }
       resetAllocationForm();
     } catch (caught) {
       setLocalError(
-        caught instanceof Error ? caught.message : "Unable to save allocation"
+        caught instanceof Error
+          ? caught.message
+          : t("cashier.tipPool.createFailed")
       );
     }
   };
@@ -448,73 +499,129 @@ export function TipPoolsPage() {
 
         <form onSubmit={saveAllocation} className="rounded-lg bg-white p-4">
           <h2 className="font-bold">
-            {editingAllocation ? "Edit allocation" : "Add allocation"}
+            {editingAllocation
+              ? t("cashier.tipPool.saveAllocation")
+              : t("cashier.tipPool.addAllocation")}
           </h2>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <input
-              required
-              aria-label="Allocation user ID"
-              placeholder="User ID"
-              className={fieldClass}
-              value={allocationForm.userId}
-              onChange={(event) =>
-                setAllocationForm((current) => ({
-                  ...current,
-                  userId: event.target.value,
-                }))
-              }
-            />
-            <input
-              required
-              aria-label="Allocation role"
-              placeholder="Role"
-              className={fieldClass}
-              value={allocationForm.role}
-              onChange={(event) =>
-                setAllocationForm((current) => ({
-                  ...current,
-                  role: event.target.value,
-                }))
-              }
-            />
-            {(["hoursWorked", "weight", "amount"] as const).map((field) => (
-              <input
-                key={field}
-                type="number"
-                min={0}
-                step="any"
-                aria-label={field}
-                placeholder={field}
-                className={fieldClass}
-                value={allocationForm[field]}
+            <label className="text-xs text-slate-500">
+              {t("cashier.tipPool.staff")}
+              <select
+                aria-label={t("cashier.tipPool.staff")}
+                className={`${fieldClass} mt-1`}
+                value={allocationForm.userId}
                 onChange={(event) =>
                   setAllocationForm((current) => ({
                     ...current,
-                    [field]: event.target.value,
+                    userId: event.target.value,
+                  }))
+                }
+              >
+                <option value="">{t("cashier.tipPool.selectStaff")}</option>
+                {allocationForm.userId && !staffNameById.has(allocationForm.userId) ? (
+                  <option value={allocationForm.userId}>
+                    {allocationForm.userId}
+                  </option>
+                ) : null}
+                {users.map((staff) => (
+                  <option key={staff.id} value={staff.id}>
+                    {staffNameById.get(staff.id) || staff.id}
+                  </option>
+                ))}
+              </select>
+              {allocationErrors.userId ? (
+                <span className="mt-1 block text-xs text-red-600">
+                  {t(`cashier.tipPool.${allocationErrors.userId}`)}
+                </span>
+              ) : null}
+            </label>
+            <label className="text-xs text-slate-500">
+              {t("cashier.tipPool.role")}
+              <select
+                aria-label={t("cashier.tipPool.role")}
+                className={`${fieldClass} mt-1`}
+                value={allocationForm.role}
+                onChange={(event) =>
+                  setAllocationForm((current) => ({
+                    ...current,
+                    role: event.target.value,
+                  }))
+                }
+              >
+                {roleOptions.map((role) => (
+                  <option key={role} value={role}>
+                    {role}
+                  </option>
+                ))}
+              </select>
+              {allocationErrors.role ? (
+                <span className="mt-1 block text-xs text-red-600">
+                  {t(`cashier.tipPool.${allocationErrors.role}`)}
+                </span>
+              ) : null}
+            </label>
+            {(
+              [
+                ["hoursWorked", t("cashier.tipPool.hoursWorked")],
+                ["weight", t("cashier.tipPool.weight")],
+                ["amount", t("cashier.tipPool.amount")],
+              ] as const
+            ).map(([field, label]) => (
+              <label key={field} className="text-xs text-slate-500">
+                {label}
+                <input
+                  type="number"
+                  min={0}
+                  step="any"
+                  inputMode="decimal"
+                  aria-label={label}
+                  placeholder={label}
+                  className={`${fieldClass} mt-1`}
+                  value={allocationForm[field]}
+                  onChange={(event) =>
+                    setAllocationForm((current) => ({
+                      ...current,
+                      [field]: event.target.value,
+                    }))
+                  }
+                />
+                {allocationErrors[field] ? (
+                  <span className="mt-1 block text-xs text-red-600">
+                    {t(`cashier.tipPool.${allocationErrors[field]}`)}
+                  </span>
+                ) : null}
+              </label>
+            ))}
+            <label className="col-span-2 text-xs text-slate-500">
+              {t("cashier.tipPool.notes")}
+              <input
+                aria-label={t("cashier.tipPool.notes")}
+                placeholder={t("cashier.tipPool.notes")}
+                className={`${fieldClass} mt-1`}
+                value={allocationForm.notes}
+                onChange={(event) =>
+                  setAllocationForm((current) => ({
+                    ...current,
+                    notes: event.target.value,
                   }))
                 }
               />
-            ))}
-            <input
-              aria-label="Allocation notes"
-              placeholder="Notes"
-              className={fieldClass}
-              value={allocationForm.notes}
-              onChange={(event) =>
-                setAllocationForm((current) => ({
-                  ...current,
-                  notes: event.target.value,
-                }))
-              }
-            />
+            </label>
           </div>
+          {allocationErrors.form ? (
+            <p className="mt-2 text-xs text-red-600">
+              {t(`cashier.tipPool.${allocationErrors.form}`)}
+            </p>
+          ) : null}
           <Button
             fullWidth
             type="submit"
             disabled={!selectedPoolId}
             className="mt-3"
           >
-            {editingAllocation ? "Save allocation" : "Add allocation"}
+            {editingAllocation
+              ? t("cashier.tipPool.saveAllocation")
+              : t("cashier.tipPool.addAllocation")}
           </Button>
           {editingAllocation ? (
             <Button
@@ -538,7 +645,8 @@ export function TipPoolsPage() {
               >
                 <div className="flex justify-between">
                   <span className="font-medium">
-                    {allocation.userId} · {allocation.role}
+                    {staffNameById.get(allocation.userId) || allocation.userId}{" "}
+                    · {allocation.role}
                   </span>
                   <span>{allocation.amount}</span>
                 </div>

@@ -2,6 +2,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TipPoolsPage } from "../TipPoolsPage";
 
+const STAFF_ID = "11111111-1111-4111-8111-111111111111";
+
 const pool = {
   id: "pool-1",
   tenantId: "tenant-1",
@@ -9,7 +11,7 @@ const pool = {
   name: "Dinner pool",
   periodStart: "2026-08-29T10:00:00Z",
   periodEnd: "2026-08-29T18:00:00Z",
-  distributionMethod: "HOURS_WORKED",
+  distributionMethod: "BY_HOURS",
   includeServiceCharge: true,
   serviceChargeShareBps: 10000,
   totalTips: "100.0000",
@@ -25,11 +27,51 @@ const mocks = vi.hoisted(() => ({
   createAllocation: vi.fn(),
   distribute: vi.fn(),
   settle: vi.fn(),
+  loadUsers: vi.fn(),
+}));
+
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    t: (key: string) => {
+      const labels: Record<string, string> = {
+        "cashier.tipPool.addAllocation": "Add allocation",
+        "cashier.tipPool.saveAllocation": "Save allocation",
+        "cashier.tipPool.staff": "Staff",
+        "cashier.tipPool.selectStaff": "Select staff",
+        "cashier.tipPool.role": "Role",
+        "cashier.tipPool.hoursWorked": "Hours worked",
+        "cashier.tipPool.weight": "Weight",
+        "cashier.tipPool.amount": "Amount",
+        "cashier.tipPool.notes": "Notes",
+        "cashier.tipPool.staffRequired": "Select a staff member.",
+        "cashier.tipPool.roleRequired": "Select a role.",
+        "cashier.tipPool.invalidNumber": "Enter a valid number.",
+        "cashier.tipPool.valueRequired":
+          "Enter hours, weight, or amount greater than zero.",
+        "cashier.tipPool.createFailed": "Unable to save allocation.",
+      };
+      return labels[key] || key;
+    },
+  }),
 }));
 
 vi.mock("@/core/presentation/hooks/useAuth", () => ({
   useAuth: () => ({
     user: { tenantId: "tenant-1", activeBranchId: "branch-1" },
+  }),
+}));
+
+vi.mock("@/core/presentation/hooks/useUserManagement", () => ({
+  useUserManagement: () => ({
+    users: [
+      {
+        id: STAFF_ID,
+        name: "Alice Server",
+        email: "alice@example.com",
+        role: "STAFF",
+      },
+    ],
+    loadUsers: mocks.loadUsers,
   }),
 }));
 
@@ -63,6 +105,7 @@ describe("TipPoolsPage integration", () => {
     mocks.distribute.mockResolvedValue(pool);
     mocks.settle.mockResolvedValue({ ...pool, status: "SETTLED" });
     mocks.createAllocation.mockResolvedValue({ id: "allocation-1" });
+    mocks.loadUsers.mockResolvedValue(undefined);
   });
 
   it("loads a pool, runs lifecycle actions, and creates an allocation", async () => {
@@ -75,13 +118,10 @@ describe("TipPoolsPage integration", () => {
     await waitFor(() => expect(mocks.distribute).toHaveBeenCalledWith("pool-1"));
     fireEvent.click(screen.getByRole("button", { name: "Settle" }));
 
-    fireEvent.change(screen.getByLabelText("Allocation user ID"), {
-      target: { value: "user-1" },
+    fireEvent.change(screen.getByLabelText("Staff"), {
+      target: { value: STAFF_ID },
     });
-    fireEvent.change(screen.getByLabelText("Allocation role"), {
-      target: { value: "SERVER" },
-    });
-    fireEvent.change(screen.getByLabelText("amount"), {
+    fireEvent.change(screen.getByLabelText("Amount"), {
       target: { value: "25" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Add allocation" }));
@@ -89,13 +129,33 @@ describe("TipPoolsPage integration", () => {
     await waitFor(() => {
       expect(mocks.settle).toHaveBeenCalledWith("pool-1");
       expect(mocks.createAllocation).toHaveBeenCalledWith("pool-1", {
-        userId: "user-1",
+        userId: STAFF_ID,
         role: "SERVER",
-        hoursWorked: undefined,
-        weight: undefined,
+        hoursWorked: 8,
+        weight: 1,
         amount: 25,
-        notes: undefined,
+        notes: null,
       });
     });
+  });
+
+  it("shows field errors instead of submitting invalid allocation text", async () => {
+    render(<TipPoolsPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Dinner pool/ }));
+    await screen.findByText("Distributable 120.0000");
+
+    fireEvent.change(screen.getByLabelText("Staff"), {
+      target: { value: "" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add allocation" }));
+
+    expect(
+      await screen.findAllByText("Select a staff member.")
+    ).not.toHaveLength(0);
+    expect(mocks.createAllocation).not.toHaveBeenCalled();
+    expect(
+      screen.queryByText(/Request failed with status code 400/i)
+    ).not.toBeInTheDocument();
   });
 });

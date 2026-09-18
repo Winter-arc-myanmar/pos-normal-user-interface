@@ -28,4 +28,24 @@ describe("applyAxiosErrorMessage", () => {
 
     expect(error.message).toBe("Order is not fireable");
   });
+
+  it("joins array API validation messages instead of raw status 400 text", () => {
+    const error = {
+      isAxiosError: true,
+      message: "Request failed with status code 400",
+      response: {
+        status: 400,
+        data: {
+          error: "Bad Request",
+          message: ["userId must be a UUID", "hoursWorked must be a number"],
+        },
+      },
+    } as AxiosError;
+
+    applyAxiosErrorMessage(error);
+
+    expect(error.message).toBe(
+      "userId must be a UUID. hoursWorked must be a number"
+    );
+  });
 });

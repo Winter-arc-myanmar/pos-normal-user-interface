@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { SearchInput } from "@/components/ui/SearchInput";
@@ -11,6 +11,16 @@ import { useAuth } from "@/core/presentation/hooks/useAuth";
 import { useCashier } from "@/core/presentation/hooks/useCashier";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
 import { useDateFormatter } from "@/lib/i18n/formatters";
+import {
+  formatWaitDuration,
+  isStaleWaitlistEntry,
+  waitlistElapsedMinutes,
+} from "@/lib/pos/waitlistDuration";
+import {
+  selectWaitlistTables,
+  tableFitsParty,
+  tableMatchesPreferredZone,
+} from "@/lib/pos/waitlistTableMatch";
 
 type StatusTab = WaitlistStatus;
 
@@ -34,10 +44,8 @@ const emptyForm = {
   notes: "",
 };
 
-function formatElapsedMinutes(joinedAt: string): number {
-  const joined = new Date(joinedAt).getTime();
-  if (Number.isNaN(joined)) return 0;
-  return Math.max(0, Math.floor((Date.now() - joined) / 60_000));
+function waitLabel(entry: WaitlistEntry, nowMs: number): string {
+  return formatWaitDuration(waitlistElapsedMinutes(entry, nowMs));
 }
 
 function ListEmptyIllustration() {
@@ -123,6 +131,8 @@ export function WaitlistPage() {
   const [selectedTableId, setSelectedTableId] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const staleExpireRef = useRef(new Set<string>());
 
   const tenantId = String(user?.tenantId || "");
   const locationId = activeLocationId;
@@ -142,6 +152,7 @@ export function WaitlistPage() {
         limit: 200,
         sortBy: "openedAt",
         sortOrder: "desc",
+        openOnly: true,
       }),
     ]);
   }, [fetchDiningTables, fetchDiningZones, fetchTableSessions, locationId]);
@@ -157,16 +168,52 @@ export function WaitlistPage() {
     });
   }, [fetchWaitlist, locationId, search, statusTab]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 30000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const stale = waitlistEntries.filter(
+      (entry) =>
+        isStaleWaitlistEntry(entry, nowMs) &&
+        !staleExpireRef.current.has(entry.id)
+    );
+    if (!stale.length) return;
+    stale.forEach((entry) => staleExpireRef.current.add(entry.id));
+    void Promise.allSettled(
+      stale.map((entry) => noShowWaitlistEntry(entry.id))
+    ).then(() => {
+      if (!locationId) return;
+      void fetchWaitlist({
+        page: 1,
+        limit: 100,
+        locationId,
+        status: statusTab,
+        search: search.trim() || undefined,
+      });
+    });
+  }, [
+    fetchWaitlist,
+    locationId,
+    noShowWaitlistEntry,
+    nowMs,
+    search,
+    statusTab,
+    waitlistEntries,
+  ]);
+
   const visibleEntries = useMemo(() => {
     const keyword = search.trim().toLowerCase();
     return waitlistEntries.filter((entry) => {
       if (entry.status !== statusTab) return false;
+      if (isStaleWaitlistEntry(entry, nowMs)) return false;
       if (!keyword) return true;
       return [entry.guestName, entry.guestPhone]
         .filter(Boolean)
         .some((value) => value.toLowerCase().includes(keyword));
     });
-  }, [search, statusTab, waitlistEntries]);
+  }, [nowMs, search, statusTab, waitlistEntries]);
 
   const selectedEntry = useMemo(
     () => visibleEntries.find((entry) => entry.id === selectedId) ?? null,
@@ -179,13 +226,19 @@ export function WaitlistPage() {
   );
 
   const seatableTables = useMemo(() => {
-    return diningTables.filter((table) => {
-      if (table.status.toUpperCase() !== "AVAILABLE") return false;
-      const session = getLatestSessionByTableId(table.id);
-      if (session && !session.closedAt) return false;
-      return true;
+    return selectWaitlistTables(diningTables, {
+      getSession: getLatestSessionByTableId,
+      preferredZoneId: selectedEntry?.preferredZoneId,
+      zones: diningZones,
+      partySize: selectedEntry?.partySize,
     });
-  }, [diningTables, getLatestSessionByTableId]);
+  }, [
+    diningTables,
+    diningZones,
+    getLatestSessionByTableId,
+    selectedEntry?.partySize,
+    selectedEntry?.preferredZoneId,
+  ]);
 
   const tableLabelById = useMemo(
     () => new Map(diningTables.map((table) => [table.id, table.tableNumber])),
@@ -203,6 +256,10 @@ export function WaitlistPage() {
       setSelectedTableId("");
     }
   }, [selectedId, visibleEntries]);
+
+  useEffect(() => {
+    setSelectedTableId("");
+  }, [selectedId]);
 
   const resetForm = () => {
     setForm(emptyForm);
@@ -350,7 +407,7 @@ export function WaitlistPage() {
             <ul className="space-y-1">
               {visibleEntries.map((entry) => {
                 const isSelected = entry.id === selectedId;
-                const elapsed = formatElapsedMinutes(entry.joinedAt);
+                const elapsedLabel = waitLabel(entry, nowMs);
                 return (
                   <li key={entry.id}>
                     <button
@@ -381,7 +438,7 @@ export function WaitlistPage() {
                         </span>
                       </div>
                       <p className="mt-2 text-xs text-slate-500">
-                        {t("cashier.waitlist.waited", { minutes: elapsed })}
+                        {t("cashier.waitlist.waited", { duration: elapsedLabel })}
                         {entry.estimatedWaitMins
                           ? ` · ${t("cashier.waitlist.estimated", {
                               minutes: entry.estimatedWaitMins,
@@ -487,7 +544,7 @@ export function WaitlistPage() {
                   </dt>
                   <dd className="mt-1 text-sm">
                     {t("cashier.waitlist.waited", {
-                      minutes: formatElapsedMinutes(selectedEntry.joinedAt),
+                      duration: waitLabel(selectedEntry, nowMs),
                     })}
                   </dd>
                 </div>
@@ -556,28 +613,36 @@ export function WaitlistPage() {
                       >
                         {seatableTables.map((table) => {
                           const isSelected = selectedTableId === table.id;
-                          const fitsParty = table.maxSeats >= selectedEntry.partySize;
+                          const preferred = tableMatchesPreferredZone(
+                            table,
+                            selectedEntry.preferredZoneId,
+                            diningZones
+                          );
+                          const fitsParty = tableFitsParty(
+                            table,
+                            selectedEntry.partySize
+                          );
                           return (
                             <button
                               key={table.id}
                               type="button"
                               role="option"
                               aria-selected={isSelected}
-                              disabled={!fitsParty}
                               onClick={() => setSelectedTableId(table.id)}
                               className={[
                                 "min-h-16 rounded border px-2 py-2 text-sm font-semibold transition",
                                 isSelected
                                   ? "border-blue-500 bg-blue-950/40 text-white"
-                                  : "border-slate-700 bg-[#181818] text-slate-200 hover:border-blue-500",
-                                !fitsParty
-                                  ? "cursor-not-allowed opacity-40 hover:border-slate-700"
-                                  : "",
+                                  : preferred
+                                    ? "border-emerald-700 bg-[#181818] text-slate-200 hover:border-blue-500"
+                                    : "border-slate-700 bg-[#181818] text-slate-200 hover:border-blue-500",
+                                !fitsParty ? "opacity-80" : "",
                               ].join(" ")}
                             >
                               {table.tableNumber}
                               <span className="mt-1 block text-[10px] font-normal text-slate-400">
-                                {table.maxSeats} {t("cashier.partySize").toLowerCase()}
+                                {table.maxSeats || "—"}{" "}
+                                {t("cashier.partySize").toLowerCase()}
                               </span>
                             </button>
                           );
