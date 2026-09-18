@@ -268,7 +268,7 @@ describe("CashierPage integration", () => {
     });
     mocks.updateManagedOrder.mockResolvedValue({
       ...order,
-      status: "CANCELLED",
+      status: "VOIDED",
     });
     mocks.voidCheckout.mockResolvedValue({ orderId: "order-1" });
   });
@@ -373,7 +373,7 @@ describe("CashierPage integration", () => {
 
     await waitFor(() => {
       expect(mocks.updateManagedOrder).toHaveBeenCalledWith("order-1", {
-        status: "CANCELLED",
+        status: "VOIDED",
       });
       expect(mocks.voidCheckout).not.toHaveBeenCalled();
       expect(mocks.updateTableSessionState).toHaveBeenCalledWith("session-1", {

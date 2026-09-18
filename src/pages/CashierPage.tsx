@@ -188,7 +188,11 @@ export function CashierPage() {
   }, [loadData]);
 
   useEffect(() => {
-    if (statusFilter === "COMPLETED" || statusFilter === "CANCELLED") {
+    if (
+      statusFilter === "COMPLETED" ||
+      statusFilter === "CANCELLED" ||
+      statusFilter === "VOIDED"
+    ) {
       setStatusFilter("ALL");
     }
   }, [statusFilter]);
@@ -1227,7 +1231,7 @@ export function CashierPage() {
         if (isCompletedSale) {
           await voidCheckout(orderId);
         } else {
-          await updateManagedOrder(orderId, { status: "CANCELLED" });
+          await updateManagedOrder(orderId, { status: "VOIDED" });
         }
       }
 

@@ -15,7 +15,7 @@ type StatusTab = "storing" | "takenOut" | "invalid";
 const statusTabFilters: Record<StatusTab, OrderStatus | undefined> = {
   storing: "DRAFT",
   takenOut: "COMPLETED",
-  invalid: "CANCELLED",
+  invalid: "VOIDED",
 };
 
 function EmptyIllustration() {

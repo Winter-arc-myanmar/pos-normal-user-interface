@@ -453,7 +453,11 @@ export function OrderPanel({
               <Button
                 fullWidth
                 variant="destructive"
-                disabled={isLoading || selectedOrder?.status === "CANCELLED"}
+                disabled={
+                  isLoading ||
+                  selectedOrder?.status === "CANCELLED" ||
+                  selectedOrder?.status === "VOIDED"
+                }
                 onClick={() => setConfirmCancelOrder(true)}
               >
                 {t("cashier.orderPanel.cancelOrder")}

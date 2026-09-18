@@ -34,7 +34,15 @@ export function fromApiServiceType(serviceType?: string): ServiceType {
       return "DINE_IN";
   }
 }
-export type OrderStatus = "DRAFT" | "CONFIRMED" | "COMPLETED" | "CANCELLED";
+export type OrderStatus =
+  | "DRAFT"
+  | "CONFIRMED"
+  | "COMPLETED"
+  | "CANCELLED"
+  | "VOIDED"
+  | "ON_HOLD_CREDIT"
+  | "PARTIALLY_REFUNDED"
+  | "REFUNDED";
 export type DiningTableStatus = "AVAILABLE" | "OCCUPIED" | "DIRTY" | "RESERVED";
 export type TableSessionState =
   | "SEATED"
