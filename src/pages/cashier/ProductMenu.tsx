@@ -117,8 +117,11 @@ export function ProductMenu({
       setQuantity(1);
       return true;
     } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "";
       setLocalError(
-        caught instanceof Error ? caught.message : t("cashier.errors.addProduct")
+        /throttler|too many requests/i.test(message)
+          ? t("cashier.errors.tooManyRequests")
+          : message || t("cashier.errors.addProduct")
       );
       return false;
     } finally {

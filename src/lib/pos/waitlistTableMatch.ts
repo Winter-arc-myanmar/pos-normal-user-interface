@@ -1,3 +1,7 @@
+import { isOpenTableSession } from "./tableSession";
+
+export { isOpenTableSession };
+
 type WaitlistTable = {
   id: string;
   tableNumber?: string | null;
@@ -21,16 +25,6 @@ const tokensOf = (value?: string | null): string[] =>
     .toLowerCase()
     .split(/[^a-z0-9]+/)
     .filter(Boolean);
-
-export function isOpenTableSession(
-  session?: WaitlistSession | null
-): boolean {
-  if (!session) return false;
-  const state = String(session.sessionState || "").toUpperCase();
-  if (state === "CLOSED") return false;
-  if (session.closedAt) return false;
-  return true;
-}
 
 export function isVacantWaitlistTable(
   table: WaitlistTable,

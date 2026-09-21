@@ -53,6 +53,7 @@ import {
   resolveActiveLocationId,
   writeStoredActiveLocationId,
 } from "@/lib/pos/activeLocation";
+import { findOpenTableSession } from "@/lib/pos/tableSession";
 
 interface UseCashierReturn {
   products: Product[];
@@ -93,7 +94,8 @@ interface UseCashierReturn {
   closePosSession: (sessionId: string) => Promise<PosSession>;
   fetchDiningZones: () => Promise<void>;
   fetchDiningTables: (params?: DiningTableFilterDTO) => Promise<void>;
-  fetchTableSessions: (params?: TableSessionFilterDTO) => Promise<void>;
+  fetchTableSessions: (params?: TableSessionFilterDTO) => Promise<TableSession[]>;
+  refreshDiningTableStatus: () => Promise<boolean>;
   updateDiningTableStatus: (
     tableId: string,
     status: DiningTable["status"]
@@ -142,7 +144,7 @@ interface UseCashierReturn {
   fireToKds: (payload: FireKdsDTO) => Promise<Record<string, unknown>>;
   getLatestSessionByTableId: (tableId: string) => TableSession | undefined;
   selectOrder: (order: SalesOrder) => Promise<void>;
-  selectOrderById: (orderId: string) => Promise<void>;
+  selectOrderById: (orderId: string) => Promise<SalesOrder>;
   createOrder: (payload: CreateSalesOrderDTO) => Promise<SalesOrder>;
   addProductToOrder: (
     orderId: string,
@@ -1006,6 +1008,7 @@ export function useCashier(): UseCashierReturn {
       try {
         const sessions = await cashierService.getTableSessions(params);
         setTableSessions(sessions);
+        return sessions;
       } catch (err) {
         const message =
           err instanceof Error ? err.message : "Failed to fetch table sessions";
@@ -1017,6 +1020,26 @@ export function useCashier(): UseCashierReturn {
     },
     [cashierService, clearError]
   );
+
+  const refreshDiningTableStatus = useCallback(async () => {
+    try {
+      const [tables, sessions] = await Promise.all([
+        cashierService.getDiningTables({ page: 1, limit: 200 }),
+        cashierService.getTableSessions({
+          page: 1,
+          limit: 200,
+          sortBy: "openedAt",
+          sortOrder: "desc",
+        }),
+      ]);
+      setDiningTables(tables);
+      setTableSessions(sessions);
+      return true;
+    } catch {
+      // Keep the last known floor state if a background refresh fails.
+      return false;
+    }
+  }, [cashierService]);
 
   const updateDiningTableStatus = useCallback(
     async (tableId: string, status: DiningTable["status"]) => {
@@ -1072,6 +1095,7 @@ export function useCashier(): UseCashierReturn {
       try {
         const order = await cashierService.getSalesOrderById(orderId);
         await selectOrder(order);
+        return order;
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to load order";
         setError(message);
@@ -1090,11 +1114,13 @@ export function useCashier(): UseCashierReturn {
       try {
         const session = await cashierService.openTableSession(payload);
         setTableSessions((prev) => [session, ...prev]);
-        const updatedTables = await cashierService.getDiningTables({
-          page: 1,
-          limit: 200,
-        });
-        setDiningTables(updatedTables);
+        setDiningTables((current) =>
+          current.map((table) =>
+            table.id === payload.tableId
+              ? new DiningTable({ ...table, status: "OCCUPIED" })
+              : table
+          )
+        );
         if (session.salesOrderId) {
           await selectOrderById(session.salesOrderId);
         }
@@ -1156,12 +1182,16 @@ export function useCashier(): UseCashierReturn {
 
   const getLatestSessionByTableId = useCallback(
     (tableId: string) => {
-      return tableSessions
-        .filter((session) => session.tableId === tableId)
-        .sort(
-          (a, b) =>
-            new Date(b.openedAt || 0).getTime() - new Date(a.openedAt || 0).getTime()
-        )[0];
+      return (
+        findOpenTableSession(tableSessions, tableId) ||
+        tableSessions
+          .filter((session) => session.tableId === tableId)
+          .sort(
+            (a, b) =>
+              new Date(b.openedAt || 0).getTime() -
+              new Date(a.openedAt || 0).getTime()
+          )[0]
+      );
     },
     [tableSessions]
   );
@@ -1196,11 +1226,18 @@ export function useCashier(): UseCashierReturn {
         });
 
         if (keepSelectedOrderId && keepSelectedOrderId !== line.salesOrderId) {
-          const lines = await cashierService.getSalesOrderLines(keepSelectedOrderId);
-          setSelectedOrderLines(lines);
-        } else if (line.salesOrderId) {
-          await selectOrderById(line.salesOrderId);
+          return line;
         }
+
+        setSelectedOrderLines((current) => {
+          const index = current.findIndex((item) => item.id === line.id);
+          if (index >= 0) {
+            const next = current.slice();
+            next[index] = line;
+            return next;
+          }
+          return [...current, line];
+        });
 
         return line;
       } catch (err) {
@@ -1212,7 +1249,7 @@ export function useCashier(): UseCashierReturn {
         setIsLoading(false);
       }
     },
-    [cashierService, clearError, ensureVariants, selectOrderById]
+    [cashierService, clearError, ensureVariants]
   );
 
   const pickupCounterOrder = useCallback(
@@ -1337,6 +1374,7 @@ export function useCashier(): UseCashierReturn {
       fetchDiningZones,
       fetchDiningTables,
       fetchTableSessions,
+      refreshDiningTableStatus,
       updateDiningTableStatus,
       updateTableSessionState,
       fetchWaitlist,
@@ -1414,6 +1452,7 @@ export function useCashier(): UseCashierReturn {
       fetchDiningZones,
       fetchDiningTables,
       fetchTableSessions,
+      refreshDiningTableStatus,
       updateDiningTableStatus,
       updateTableSessionState,
       fetchWaitlist,

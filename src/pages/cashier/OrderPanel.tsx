@@ -71,6 +71,7 @@ interface OrderPanelProps {
   splitRemaining?: number;
   showSplitButton?: boolean;
   isPayView?: boolean;
+  requiresTableAssignment?: boolean;
   onOpenPay?: () => void;
   onCheckout: () => void;
   onFireKds: () => void;
@@ -131,6 +132,7 @@ export function OrderPanel({
   splitRemaining = 0,
   showSplitButton = true,
   isPayView = false,
+  requiresTableAssignment = false,
   onOpenPay,
   onCheckout,
   onFireKds,
@@ -401,7 +403,12 @@ export function OrderPanel({
             ) : (
               <Button
                 variant="secondary"
-                disabled={isLoading || isSettledOrder}
+                disabled={isLoading || isSettledOrder || requiresTableAssignment}
+                title={
+                  requiresTableAssignment
+                    ? t("cashier.orderPanel.assignTableToContinue")
+                    : undefined
+                }
                 onClick={onOpenSplit}
               >
                 {t("cashier.payment.split")}
@@ -453,7 +460,17 @@ export function OrderPanel({
           <div className="grid grid-cols-2 gap-2">
             <Button
               variant="secondary"
-              disabled={!selectedOrderLines.length || isLoading || isSettledOrder}
+              disabled={
+                !selectedOrderLines.length ||
+                isLoading ||
+                isSettledOrder ||
+                requiresTableAssignment
+              }
+              title={
+                requiresTableAssignment
+                  ? t("cashier.orderPanel.assignTableToContinue")
+                  : undefined
+              }
               onClick={onFireKds}
             >
               {t("cashier.orderPanel.sendKds")}
@@ -476,7 +493,13 @@ export function OrderPanel({
               isSettledOrder ||
               !selectedOrderLines.length ||
               isLoading ||
+              requiresTableAssignment ||
               (isPayView && !checkoutReady)
+            }
+            title={
+              requiresTableAssignment
+                ? t("cashier.orderPanel.assignTableToContinue")
+                : undefined
             }
             isLoading={isLoading}
             onClick={() => {

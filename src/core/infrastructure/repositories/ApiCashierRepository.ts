@@ -274,6 +274,17 @@ const toBoolean = (value: unknown): boolean | undefined => {
   return undefined;
 };
 
+const toAdjustmentReason = (item: Record<string, unknown>) =>
+  new AdjustmentReason({
+    id: String(item.id || ""),
+    tenantId: String(item.tenantId || ""),
+    code: String(item.code || ""),
+    name: String(item.name || ""),
+    description: item.description ? String(item.description) : undefined,
+    isActive: toBoolean(item.isActive) !== false,
+    requiresManagerOverride: Boolean(item.requiresManagerOverride),
+  });
+
 const asRecord = (value: unknown): Record<string, unknown> | undefined =>
   value && typeof value === "object"
     ? (value as Record<string, unknown>)
@@ -462,6 +473,40 @@ const toPaymentMethod = (item: Record<string, unknown>): PaymentMethod => {
     updatedAt: item.updatedAt ? String(item.updatedAt) : undefined,
   });
 };
+
+const nestedId = (value: unknown): string => {
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value);
+  }
+  const record = asRecord(value);
+  return record?.id != null ? String(record.id) : "";
+};
+
+const toTableSession = (
+  item: Record<string, unknown>,
+  fallbackState?: TableSession["sessionState"]
+) =>
+  new TableSession({
+    id: String(item.id || ""),
+    tenantId: String(item.tenantId || ""),
+    tableId: nestedId(item.tableId) || nestedId(item.table),
+    waiterId: item.waiterId ? String(item.waiterId) : undefined,
+    guestCount: Number(item.guestCount || 0),
+    openedAt: String(item.openedAt || ""),
+    closedAt: item.closedAt ? String(item.closedAt) : null,
+    salesOrderId:
+      nestedId(item.salesOrderId) ||
+      nestedId(item.orderId) ||
+      nestedId(item.salesOrder) ||
+      nestedId(item.order),
+    sessionState: String(
+      item.sessionState || fallbackState || "SEATED"
+    ) as TableSession["sessionState"],
+    posRegisterId: item.posRegisterId ? String(item.posRegisterId) : undefined,
+    openedByPosSessionId: item.openedByPosSessionId
+      ? String(item.openedByPosSessionId)
+      : undefined,
+  });
 
 export class ApiCashierRepository implements ICashierRepository {
   constructor(private readonly httpClient: HttpClient) {}
@@ -883,24 +928,7 @@ export class ApiCashierRepository implements ICashierRepository {
       { params }
     );
     const data = asList<Record<string, unknown>>(response);
-    return data.map(
-      (item) =>
-        new TableSession({
-          id: String(item.id || ""),
-          tenantId: String(item.tenantId || ""),
-          tableId: String(item.tableId || ""),
-          waiterId: item.waiterId ? String(item.waiterId) : undefined,
-          guestCount: Number(item.guestCount || 0),
-          openedAt: String(item.openedAt || ""),
-          closedAt: item.closedAt ? String(item.closedAt) : null,
-          salesOrderId: String(item.salesOrderId || ""),
-          sessionState: String(item.sessionState || "SEATED") as TableSession["sessionState"],
-          posRegisterId: item.posRegisterId ? String(item.posRegisterId) : undefined,
-          openedByPosSessionId: item.openedByPosSessionId
-            ? String(item.openedByPosSessionId)
-            : undefined,
-        })
-    );
+    return data.map((item) => toTableSession(item));
   }
 
   async openTableSession(payload: OpenTableSessionDTO): Promise<TableSession> {
@@ -909,20 +937,9 @@ export class ApiCashierRepository implements ICashierRepository {
       payload
     );
     const item = unwrap(response);
-    return new TableSession({
-      id: String(item.id || ""),
-      tenantId: String(item.tenantId || ""),
-      tableId: String(item.tableId || ""),
-      waiterId: item.waiterId ? String(item.waiterId) : undefined,
-      guestCount: Number(item.guestCount || payload.guestCount),
-      openedAt: String(item.openedAt || ""),
-      closedAt: item.closedAt ? String(item.closedAt) : null,
-      salesOrderId: String(item.salesOrderId || ""),
-      sessionState: String(item.sessionState || "SEATED") as TableSession["sessionState"],
-      posRegisterId: item.posRegisterId ? String(item.posRegisterId) : undefined,
-      openedByPosSessionId: item.openedByPosSessionId
-        ? String(item.openedByPosSessionId)
-        : undefined,
+    return toTableSession({
+      ...item,
+      guestCount: item.guestCount ?? payload.guestCount,
     });
   }
 
@@ -935,21 +952,7 @@ export class ApiCashierRepository implements ICashierRepository {
       payload
     );
     const item = unwrap(response);
-    return new TableSession({
-      id: String(item.id || ""),
-      tenantId: String(item.tenantId || ""),
-      tableId: String(item.tableId || ""),
-      waiterId: item.waiterId ? String(item.waiterId) : undefined,
-      guestCount: Number(item.guestCount || 0),
-      openedAt: String(item.openedAt || ""),
-      closedAt: item.closedAt ? String(item.closedAt) : null,
-      salesOrderId: String(item.salesOrderId || ""),
-      sessionState: String(item.sessionState || payload.sessionState) as TableSession["sessionState"],
-      posRegisterId: item.posRegisterId ? String(item.posRegisterId) : undefined,
-      openedByPosSessionId: item.openedByPosSessionId
-        ? String(item.openedByPosSessionId)
-        : undefined,
-    });
+    return toTableSession(item, payload.sessionState);
   }
 
   async addTableSessionLine(
@@ -982,21 +985,7 @@ export class ApiCashierRepository implements ICashierRepository {
       normalizeTableSessionCheckoutPayload(payload)
     );
     const item = unwrap(response);
-    return new TableSession({
-      id: String(item.id || ""),
-      tenantId: String(item.tenantId || ""),
-      tableId: String(item.tableId || ""),
-      waiterId: item.waiterId ? String(item.waiterId) : undefined,
-      guestCount: Number(item.guestCount || 0),
-      openedAt: String(item.openedAt || ""),
-      closedAt: item.closedAt ? String(item.closedAt) : null,
-      salesOrderId: String(item.salesOrderId || ""),
-      sessionState: String(item.sessionState || "CLOSED") as TableSession["sessionState"],
-      posRegisterId: item.posRegisterId ? String(item.posRegisterId) : undefined,
-      openedByPosSessionId: item.openedByPosSessionId
-        ? String(item.openedByPosSessionId)
-        : undefined,
-    });
+    return toTableSession(item, "CLOSED");
   }
 
   async fireToKds(payload: FireKdsDTO): Promise<Record<string, unknown>> {
@@ -1010,41 +999,19 @@ export class ApiCashierRepository implements ICashierRepository {
   async getDiscountReasons(activeOnly: boolean = true): Promise<AdjustmentReason[]> {
     const response = await this.httpClient.get<ApiEnvelope<Record<string, unknown>[]>>(
       API_ENDPOINTS.DISCOUNT_REASONS.LIST,
-      { params: { page: 1, limit: 100, activeOnly: activeOnly ? "true" : "false" } }
+      { params: { page: 1, limit: 100 } }
     );
-    const data = asList<Record<string, unknown>>(response);
-    return data.map(
-      (item) =>
-        new AdjustmentReason({
-          id: String(item.id || ""),
-          tenantId: String(item.tenantId || ""),
-          code: String(item.code || ""),
-          name: String(item.name || ""),
-          description: item.description ? String(item.description) : undefined,
-          isActive: Boolean(item.isActive),
-          requiresManagerOverride: Boolean(item.requiresManagerOverride),
-        })
-    );
+    const reasons = asList<Record<string, unknown>>(response).map(toAdjustmentReason);
+    return activeOnly ? reasons.filter((reason) => reason.isActive) : reasons;
   }
 
   async getVoidReasons(activeOnly: boolean = true): Promise<AdjustmentReason[]> {
     const response = await this.httpClient.get<ApiEnvelope<Record<string, unknown>[]>>(
       API_ENDPOINTS.VOID_REASONS.LIST,
-      { params: { page: 1, limit: 100, activeOnly: activeOnly ? "true" : "false" } }
+      { params: { page: 1, limit: 100 } }
     );
-    const data = asList<Record<string, unknown>>(response);
-    return data.map(
-      (item) =>
-        new AdjustmentReason({
-          id: String(item.id || ""),
-          tenantId: String(item.tenantId || ""),
-          code: String(item.code || ""),
-          name: String(item.name || ""),
-          description: item.description ? String(item.description) : undefined,
-          isActive: Boolean(item.isActive),
-          requiresManagerOverride: Boolean(item.requiresManagerOverride),
-        })
-    );
+    const reasons = asList<Record<string, unknown>>(response).map(toAdjustmentReason);
+    return activeOnly ? reasons.filter((reason) => reason.isActive) : reasons;
   }
 
   async getWaitlist(params?: WaitlistFilterDTO): Promise<WaitlistEntry[]> {

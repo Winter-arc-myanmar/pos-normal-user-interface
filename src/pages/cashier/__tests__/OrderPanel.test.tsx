@@ -78,6 +78,28 @@ describe("OrderPanel", () => {
     expect(onCheckout).not.toHaveBeenCalled();
   });
 
+  it("keeps Pay disabled until a table is assigned", () => {
+    const onOpenPay = vi.fn();
+    const onCheckout = vi.fn();
+
+    render(
+      <OrderPanel
+        {...defaultProps}
+        selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
+        selectedTable={null}
+        requiresTableAssignment
+        onOpenPay={onOpenPay}
+        onCheckout={onCheckout}
+      />
+    );
+
+    const payButton = screen.getByRole("button", { name: "cashier.payNow" });
+    expect(payButton).toBeDisabled();
+    fireEvent.click(payButton);
+    expect(onOpenPay).not.toHaveBeenCalled();
+    expect(onCheckout).not.toHaveBeenCalled();
+  });
+
   it("confirms cancel order before voiding and releasing a table", () => {
     const onCancelOrder = vi.fn();
 

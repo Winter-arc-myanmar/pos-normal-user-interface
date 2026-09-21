@@ -768,6 +768,7 @@
       "emptyOrder": "Add at least one item before sending to KDS.",
       "kdsTargetMissing": "Create or select an order before sending to KDS.",
       "kdsFailed": "Failed to send order to KDS.",
+      "tooManyRequests": "Too many requests. Wait a moment and try again.",
       "orderAlreadyPaid": "This order is already paid and cannot be charged again.",
       "discountReasonRequired": "Choose a discount reason before applying a discount.",
       "discountTooLarge": "Discount cannot be greater than the order subtotal."

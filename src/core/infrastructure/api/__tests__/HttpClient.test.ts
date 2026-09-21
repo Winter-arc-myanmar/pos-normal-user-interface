@@ -17,6 +17,23 @@ describe("applyAxiosErrorMessage", () => {
     );
   });
 
+  it("hides Nest ThrottlerException text on 429", () => {
+    const error = {
+      isAxiosError: true,
+      message: "Request failed with status code 429",
+      response: {
+        status: 429,
+        data: { message: "ThrottlerException: Too Many Requests" },
+      },
+    } as AxiosError;
+
+    applyAxiosErrorMessage(error);
+
+    expect(error.message).toBe(
+      "Too many requests. Wait a moment and try again."
+    );
+  });
+
   it("uses the API message when present", () => {
     const error = {
       isAxiosError: true,

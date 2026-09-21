@@ -12,6 +12,7 @@ import { TableWarningStatusDTO } from "@/core/application/dtos/CashierDTO";
 import { ApiLoadingState } from "@/components/ApiLoadingState";
 import { NotificationBell } from "@/components/ui/NotificationBell";
 import { isSettledSalesOrder } from "@/lib/pos/orderStatus";
+import { isOpenTableSession } from "@/lib/pos/tableSession";
 
 const serviceTabs: Array<{ key: ServiceType; labelKey: string }> = [
   { key: "TABLE", labelKey: "cashier.serviceTypes.table" },
@@ -152,7 +153,10 @@ export function CashierBoard({
                     !!selectedOrderId && session?.salesOrderId === selectedOrderId;
                   const isCircle =
                     String(table.shape || "").toUpperCase() === "CIRCLE";
-                  const occupied = Boolean(session && !session.closedAt);
+                  const occupied =
+                    table.status === "OCCUPIED" ||
+                    isOpenTableSession(session) ||
+                    Boolean(session && !session.closedAt);
                   const warning = occupied
                     ? getTableWarning?.(session?.openedAt)
                     : null;

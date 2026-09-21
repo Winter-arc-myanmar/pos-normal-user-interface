@@ -479,4 +479,56 @@ describe("ApiCashierRepository", () => {
       status: "COMPLETED",
     });
   });
+
+  it("lists discount reasons without activeOnly query params", async () => {
+    const get = vi.fn().mockResolvedValue({
+      success: true,
+      data: [
+        { id: "reason-1", code: "STAFF", name: "Staff", isActive: true },
+        { id: "reason-2", code: "OLD", name: "Old", isActive: false },
+      ],
+    });
+    const repository = new ApiCashierRepository({
+      get,
+    } as unknown as HttpClient);
+
+    const reasons = await repository.getDiscountReasons(true);
+
+    expect(get).toHaveBeenCalledWith("/api/v1/discount-reasons", {
+      params: { page: 1, limit: 100 },
+    });
+    expect(reasons.map((reason) => reason.id)).toEqual(["reason-1"]);
+  });
+
+  it("maps nested table and order ids on table sessions", async () => {
+    const get = vi.fn().mockResolvedValue({
+      data: {
+        items: [
+          {
+            id: "session-1",
+            tenantId: "tenant-1",
+            table: { id: "table-1", tableNumber: "T-01" },
+            guestCount: 2,
+            openedAt: "2026-09-21T12:00:00.000Z",
+            closedAt: null,
+            salesOrder: { id: "order-1" },
+            sessionState: "ORDERING",
+          },
+        ],
+      },
+    });
+    const repository = new ApiCashierRepository({
+      get,
+    } as unknown as HttpClient);
+
+    const sessions = await repository.getTableSessions({ page: 1, limit: 100 });
+
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]).toMatchObject({
+      id: "session-1",
+      tableId: "table-1",
+      salesOrderId: "order-1",
+      sessionState: "ORDERING",
+    });
+  });
 });

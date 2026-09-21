@@ -15,6 +15,8 @@ const mocks = vi.hoisted(() => ({
   fireToKds: vi.fn(),
   getCounterOrderById: vi.fn(),
   pickupCounterOrder: vi.fn(),
+  openTableSession: vi.fn(),
+  selectOrderById: vi.fn(),
   updateDiningTableStatus: vi.fn(),
   updateTableSessionState: vi.fn(),
   fetchManagedOrderLines: vi.fn(),
@@ -23,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   updateManagedOrder: vi.fn(),
   deleteManagedOrder: vi.fn(),
   voidCheckout: vi.fn(),
+  refreshDiningTableStatus: vi.fn(),
 }));
 
 const product = {
@@ -154,14 +157,15 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
     fetchDiningZones: vi.fn().mockResolvedValue(undefined),
     fetchDiningTables: vi.fn().mockResolvedValue(undefined),
     fetchTableSessions: vi.fn().mockResolvedValue(undefined),
+    refreshDiningTableStatus: mocks.refreshDiningTableStatus,
     updateDiningTableStatus: mocks.updateDiningTableStatus,
-    openTableSession: vi.fn(),
+    openTableSession: mocks.openTableSession,
     checkoutTableSession: mocks.checkoutTableSession,
     updateTableSessionState: mocks.updateTableSessionState,
     fireToKds: mocks.fireToKds,
     getLatestSessionByTableId: vi.fn().mockReturnValue(session),
     selectOrder: vi.fn(),
-    selectOrderById: vi.fn().mockResolvedValue(undefined),
+    selectOrderById: mocks.selectOrderById,
     createOrder: vi.fn(),
     addProductToOrder: vi.fn(),
     updateOrderLine: vi.fn(),
@@ -261,6 +265,7 @@ describe("CashierPage integration", () => {
       ...table,
       status: "DIRTY",
     });
+    mocks.refreshDiningTableStatus.mockResolvedValue(true);
     mocks.getCounterOrderById.mockResolvedValue({ id: "order-1" });
     mocks.pickupCounterOrder.mockResolvedValue({ id: "order-1" });
     mocks.fireToKds.mockResolvedValue({});
@@ -273,6 +278,8 @@ describe("CashierPage integration", () => {
       status: "VOIDED",
     });
     mocks.voidCheckout.mockResolvedValue({ orderId: "order-1" });
+    mocks.selectOrderById.mockResolvedValue(order);
+    mocks.openTableSession.mockResolvedValue(session);
   });
 
   it("loads variants and adds a product to a table session", async () => {
@@ -324,7 +331,33 @@ describe("CashierPage integration", () => {
       expect(mocks.checkoutTableSession).toHaveBeenCalledWith("session-1", {
         payments: [{ paymentMethodId: "cash", amount: "10.5000" }],
       });
+      expect(mocks.updateTableSessionState).toHaveBeenCalledWith("session-1", {
+        sessionState: "CLOSED",
+      });
+      expect(mocks.updateDiningTableStatus).toHaveBeenCalledWith(
+        "table-1",
+        "AVAILABLE"
+      );
     });
+  });
+
+  it("refetches table status on an interval without waiting for a click", async () => {
+    vi.useFakeTimers();
+    try {
+      render(
+        <MemoryRouter initialEntries={["/cashier?view=orders"]}>
+          <CashierPage />
+        </MemoryRouter>
+      );
+
+      expect(mocks.refreshDiningTableStatus).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      expect(mocks.refreshDiningTableStatus).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("connects table status and table-session state controls", async () => {
@@ -357,6 +390,24 @@ describe("CashierPage integration", () => {
         sessionState: "SERVED",
       });
     });
+  });
+
+  it("opens an occupied table's existing order instead of creating a session", async () => {
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=orders"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /T1/ }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByPlaceholderText("cashier.productMenu.search")
+      ).toBeInTheDocument();
+    });
+    expect(mocks.openTableSession).not.toHaveBeenCalled();
+    expect(mocks.updateDiningTableStatus).not.toHaveBeenCalled();
   });
 
   it("cancels an unpaid order without calling checkout void", async () => {

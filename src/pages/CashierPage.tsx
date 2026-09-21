@@ -42,6 +42,10 @@ import {
 import { isUnspendableWalletStatus } from "@/lib/pos/guestWalletAmounts";
 import { isSettledSalesOrder } from "@/lib/pos/orderStatus";
 import {
+  findOpenTableSession,
+  isOpenTableSession,
+} from "@/lib/pos/tableSession";
+import {
   clearTableOrderIds,
   mergeTableOrderIds,
   readTableOrderIds,
@@ -60,6 +64,8 @@ import {
 } from "@/lib/pos/splitPayments";
 
 const BOARD_PAGE_SIZE = 15;
+const TABLE_STATUS_POLL_MS = 30_000;
+const TABLE_STATUS_BACKOFF_MS = 120_000;
 
 export function CashierPage() {
   const { t } = useTranslation();
@@ -85,6 +91,7 @@ export function CashierPage() {
     fetchDiningZones,
     fetchDiningTables,
     fetchTableSessions,
+    refreshDiningTableStatus,
     updateDiningTableStatus,
     openTableSession,
     checkoutTableSession,
@@ -244,12 +251,57 @@ export function CashierPage() {
     return () => window.clearInterval(timer);
   }, []);
 
+  const isBusyRef = useRef(false);
+  isBusyRef.current = isLoading || isPosSessionLoading || isMultiOrderMutating;
+
+  useEffect(() => {
+    if (!usesTableBoard) return;
+
+    let inFlight = false;
+    let lastStartedAt = 0;
+    let backoffUntil = 0;
+
+    const pollTableStatus = async () => {
+      const now = Date.now();
+      if (
+        document.visibilityState === "hidden" ||
+        inFlight ||
+        isBusyRef.current ||
+        now < backoffUntil ||
+        now - lastStartedAt < TABLE_STATUS_POLL_MS - 1_000
+      ) {
+        return;
+      }
+      inFlight = true;
+      lastStartedAt = now;
+      try {
+        const refreshed = await refreshDiningTableStatus();
+        if (!refreshed) {
+          backoffUntil = Date.now() + TABLE_STATUS_BACKOFF_MS;
+        }
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    const timer = window.setInterval(() => {
+      void pollTableStatus();
+    }, TABLE_STATUS_POLL_MS);
+    document.addEventListener("visibilitychange", pollTableStatus);
+
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", pollTableStatus);
+    };
+  }, [refreshDiningTableStatus, usesTableBoard]);
+
   const selectedOrderSession = useMemo(
     () =>
       selectedOrder
         ? tableSessions.find(
             (session) =>
-              session.salesOrderId === selectedOrder.id && !session.closedAt
+              session.salesOrderId === selectedOrder.id &&
+              isOpenTableSession(session)
           ) || null
         : null,
     [selectedOrder, tableSessions]
@@ -608,10 +660,9 @@ export function CashierPage() {
         return mapSessionStatus(sessionState) === status;
       }).length;
 
-    const activeTableCount = tablesInZone.filter((table) => {
-      const session = getLatestSessionByTableId(table.id);
-      return session && !session.closedAt;
-    }).length;
+    const activeTableCount = tablesInZone.filter((table) =>
+      isOpenTableSession(getLatestSessionByTableId(table.id))
+    ).length;
 
     const countOrdersForService = (serviceType: ServiceType) =>
       salesOrders.filter((order) => {
@@ -718,12 +769,21 @@ export function CashierPage() {
   );
 
   const requiresTableAssignment =
-    isTableService && isDirectCheckoutMode && directCartLines.length > 0;
+    usesTableBoard &&
+    (
+      (isDirectCheckoutMode && directCartLines.length > 0 && !activeTableId) ||
+      (displayOrderLines.length > 0 && !displayedOrderTable && !activeTableId)
+    );
 
   const promptTableSelection = useCallback(() => {
     setNotice(t("cashier.orderPanel.assignTableToContinue"));
     setSearchParams({ view: "orders" });
   }, [setSearchParams, t]);
+
+  useEffect(() => {
+    if (activeView !== "pay" || !requiresTableAssignment) return;
+    promptTableSelection();
+  }, [activeView, promptTableSelection, requiresTableAssignment]);
 
   const flushPendingLinesToSession = useCallback(
     async (
@@ -765,6 +825,26 @@ export function CashierPage() {
     setSearchParams({ view: "orders" });
   }, [promptTableSelection, requiresTableAssignment, setSearchParams]);
 
+  const releasePaidTable = useCallback(
+    async (tableId?: string | null, sessionId?: string | null) => {
+      if (sessionId) {
+        try {
+          await updateTableSessionState(sessionId, { sessionState: "CLOSED" });
+        } catch {
+          // Checkout may already have closed the session.
+        }
+      }
+      if (tableId) {
+        try {
+          await updateDiningTableStatus(tableId, "AVAILABLE");
+        } catch {
+          // Checkout may already have released the table.
+        }
+      }
+    },
+    [updateDiningTableStatus, updateTableSessionState]
+  );
+
   const handleCreateOrder = async () => {
     setLocalError(null);
     try {
@@ -802,15 +882,71 @@ export function CashierPage() {
 
     try {
       const context = await requireCashierContext();
-      const latestSession = getLatestSessionByTableId(table.id);
-      if (latestSession && !latestSession.closedAt && latestSession.salesOrderId) {
-        await selectOrderById(latestSession.salesOrderId);
-        if (pendingLines.length) {
-          await flushPendingLinesToSession(latestSession, pendingLines);
+      let sessions = tableSessions;
+      const localOpenSession = findOpenTableSession(sessions, table.id);
+      if (!localOpenSession && table.status !== "AVAILABLE") {
+        try {
+          const refreshed = await fetchTableSessions({
+            page: 1,
+            limit: 200,
+            sortBy: "openedAt",
+            sortOrder: "desc",
+          });
+          if (Array.isArray(refreshed)) {
+            sessions = refreshed;
+          }
+        } catch {
+          // Keep the in-memory list if refresh fails.
         }
-        await bindOrdersToTable(table.id, latestSession.salesOrderId);
+      }
+
+      const openSession = findOpenTableSession(sessions, table.id);
+      const latestSession =
+        openSession ||
+        sessions
+          .filter((session) => session.tableId === table.id)
+          .sort(
+            (left, right) =>
+              new Date(right.openedAt || 0).getTime() -
+              new Date(left.openedAt || 0).getTime()
+          )[0];
+      const boundOrderId =
+        openSession?.salesOrderId ||
+        latestSession?.salesOrderId ||
+        readTableOrderIds(table.id)[0] ||
+        "";
+
+      const resumeExistingOrder = async (
+        session: (typeof tableSessions)[number] | undefined,
+        orderId: string
+      ) => {
+        const alreadySelected = selectedOrder?.id === orderId ? selectedOrder : null;
+        const order =
+          alreadySelected || (await selectOrderById(orderId));
+        if (isSettledSalesOrder(order)) return false;
+        if (pendingLines.length && session) {
+          await flushPendingLinesToSession(session, pendingLines);
+        }
+        await bindOrdersToTable(table.id, orderId);
         setSearchParams({ view: "menu" });
-        return;
+        return true;
+      };
+
+      if (openSession || table.status === "OCCUPIED") {
+        if (boundOrderId) {
+          if (await resumeExistingOrder(openSession || latestSession, boundOrderId)) {
+            return;
+          }
+          clearOrderSelection();
+        } else if (openSession) {
+          setActiveTableId(table.id);
+          setSearchParams({ view: "menu" });
+          return;
+        }
+      }
+
+      if (openSession || table.status !== "AVAILABLE") {
+        await releasePaidTable(table.id, openSession?.id || latestSession?.id);
       }
 
       const newSession = await openTableSession({
@@ -822,9 +958,6 @@ export function CashierPage() {
         openedByPosSessionId: context.posSessionId,
         salesChannel: "POS",
       });
-      if (newSession.salesOrderId) {
-        await selectOrderById(newSession.salesOrderId);
-      }
       if (pendingLines.length) {
         await flushPendingLinesToSession(newSession, pendingLines);
       }
@@ -833,10 +966,11 @@ export function CashierPage() {
       }
       setSearchParams({ view: "menu" });
     } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "";
       setLocalError(
-        caught instanceof Error
-          ? caught.message
-          : t("cashier.errors.openTable")
+        /throttler|too many requests/i.test(message)
+          ? t("cashier.errors.tooManyRequests")
+          : message || t("cashier.errors.openTable")
       );
     }
   };
@@ -1031,15 +1165,21 @@ export function CashierPage() {
     variantId: string,
     quantity: number
   ) => {
-    if (isSettledSalesOrder(selectedOrder)) {
-      throw new Error(t("cashier.errors.orderAlreadyPaid"));
+    const startFreshCart = isSettledSalesOrder(selectedOrder);
+    if (startFreshCart) {
+      clearOrderSelection();
+      setActiveTableId(null);
+      setTableOrderIds([]);
+      setMultiOrderLines({});
+      setIsDirectCheckoutMode(true);
     }
+
     const shouldUseTableSession = Boolean(
-      selectedOrderSession && isPrimaryTableOrder
+      !startFreshCart && selectedOrderSession && isPrimaryTableOrder
     );
 
     if (shouldUseTableSession && selectedOrderSession) {
-      await addProductToTableSession(
+      const line = await addProductToTableSession(
         selectedOrderSession.id,
         product,
         variantId,
@@ -1051,14 +1191,31 @@ export function CashierPage() {
           sessionState: "ORDERING",
         });
       }
-    } else if (selectedOrder) {
+      if (
+        selectedOrder &&
+        tableOrderIds.includes(selectedOrder.id) &&
+        (!line.salesOrderId || line.salesOrderId === selectedOrder.id)
+      ) {
+        setMultiOrderLines((current) => {
+          const existing = current[selectedOrder.id] || [];
+          const index = existing.findIndex((item) => item.id === line.id);
+          const nextLines =
+            index >= 0
+              ? existing.map((item, itemIndex) =>
+                  itemIndex === index ? line : item
+                )
+              : [...existing, line];
+          return { ...current, [selectedOrder.id]: nextLines };
+        });
+      }
+    } else if (selectedOrder && !startFreshCart) {
       await addProductToOrder(
         selectedOrder.id,
         product,
         variantId,
         quantity
       );
-    } else if (!requiresTableSelection || isDirectCheckoutMode) {
+    } else if (!requiresTableSelection || isDirectCheckoutMode || startFreshCart) {
       setIsDirectCheckoutMode(true);
       setDirectCartLines((current) => {
         const variants = variantsByProductId[product.id] || [];
@@ -1098,21 +1255,6 @@ export function CashierPage() {
       });
     } else {
       throw new Error(t("cashier.errors.selectOrder"));
-    }
-
-    if (selectedOrder && tableOrderIds.includes(selectedOrder.id)) {
-      try {
-        const result = await fetchManagedOrderLines(selectedOrder.id, {
-          page: 1,
-          limit: 100,
-        });
-        setMultiOrderLines((current) => ({
-          ...current,
-          [selectedOrder.id]: result.lines,
-        }));
-      } catch {
-        // Cart lines are already updated via useCashier; keep multi-order sync best-effort.
-      }
     }
   };
 
@@ -1190,6 +1332,13 @@ export function CashierPage() {
             selectedOrder.id !== primaryTableOrderId
         );
 
+      const checkoutTableId =
+        selectedOrderSession?.tableId ||
+        displayedOrderTable?.id ||
+        activeTableId;
+      const checkoutSessionId =
+        selectedOrderSession?.id || activeTableSession?.id;
+
       if (selectedOrderSession && isPrimaryTableOrder && selectedOrder) {
         await checkoutTableSession(selectedOrderSession.id, {
           payments: checkoutPayments,
@@ -1230,6 +1379,7 @@ export function CashierPage() {
 
       if (activeTableId && selectedOrder) {
         if (selectedOrderSession && isPrimaryTableOrder) {
+          await releasePaidTable(checkoutTableId, checkoutSessionId);
           clearTableOrderIds(activeTableId);
           setTableOrderIds([]);
           setMultiOrderLines({});
@@ -1259,6 +1409,7 @@ export function CashierPage() {
         setActiveTableId(null);
       }
 
+      await releasePaidTable(checkoutTableId, checkoutSessionId);
       await resetWorkspaceAfterTransaction(t("cashier.orderPanel.checkoutSuccess"));
     } catch (caught) {
       const message =
@@ -1285,20 +1436,10 @@ export function CashierPage() {
         }
       }
 
-      if (sessionId) {
-        try {
-          await updateTableSessionState(sessionId, { sessionState: "CLOSED" });
-        } catch {
-          // Void may already close the session.
-        }
+      if (sessionId || tableId) {
+        await releasePaidTable(tableId, sessionId);
       }
-
       if (tableId) {
-        try {
-          await updateDiningTableStatus(tableId, "AVAILABLE");
-        } catch {
-          // Void may already release the table.
-        }
         clearTableOrderIds(tableId);
         setTableOrderIds([]);
         setMultiOrderLines({});
@@ -1409,6 +1550,10 @@ export function CashierPage() {
   };
 
   const handleOpenPay = () => {
+    if (requiresTableAssignment) {
+      promptTableSelection();
+      return;
+    }
     if (isSettledSalesOrder(selectedOrder)) {
       setLocalError(t("cashier.errors.orderAlreadyPaid"));
       return;
@@ -1422,6 +1567,10 @@ export function CashierPage() {
   };
 
   const handleOpenSplit = () => {
+    if (requiresTableAssignment) {
+      promptTableSelection();
+      return;
+    }
     if (isSettledSalesOrder(selectedOrder)) {
       setLocalError(t("cashier.errors.orderAlreadyPaid"));
       return;
@@ -1607,12 +1756,6 @@ export function CashierPage() {
       );
 
       if (activeTableId && tableOrderIds.length > 0 && selectedOrder) {
-        await selectOrderById(selectedOrder.id);
-        try {
-          await refreshMultiOrderLines(tableOrderIds);
-        } catch {
-          // Keep the active tab even if the grid refresh fails.
-        }
         setNotice(t("cashier.orderPanel.kdsSent"));
         setSearchParams({ view: "menu" });
         return;
@@ -1624,16 +1767,12 @@ export function CashierPage() {
       setLocalError(null);
       setNotice(t("cashier.orderPanel.kdsSent"));
       setSearchParams({ view: "orders" });
-      try {
-        await fetchSalesOrders({ page: 1, limit: 100 });
-      } catch {
-        // The created order remains in local state if the list refresh fails.
-      }
     } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "";
       setLocalError(
-        caught instanceof Error
-          ? caught.message
-          : t("cashier.errors.kdsFailed")
+        /throttler|too many requests/i.test(message)
+          ? t("cashier.errors.tooManyRequests")
+          : message || t("cashier.errors.kdsFailed")
       );
     }
   };
@@ -1811,6 +1950,7 @@ export function CashierPage() {
         )}
         showSplitButton={activeView !== "pay"}
         isPayView={activeView === "pay"}
+        requiresTableAssignment={requiresTableAssignment}
         onOpenPay={handleOpenPay}
         onCheckout={() => void handleCheckout()}
         onFireKds={() => void handleFireKds()}

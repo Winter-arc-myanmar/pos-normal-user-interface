@@ -41,9 +41,11 @@ const readApiErrorMessage = (data: unknown): string | undefined => {
 export const applyAxiosErrorMessage = (error: unknown): unknown => {
   if (!axios.isAxiosError(error)) return error;
   const apiMessage = readApiErrorMessage(error.response?.data);
-  if (error.response?.status === 429) {
-    error.message =
-      apiMessage || "Too many requests. Wait a moment and try again.";
+  if (
+    error.response?.status === 429 ||
+    /throttlerexception|too many requests/i.test(apiMessage || "")
+  ) {
+    error.message = "Too many requests. Wait a moment and try again.";
   } else if (apiMessage) {
     error.message = apiMessage;
   } else if (
