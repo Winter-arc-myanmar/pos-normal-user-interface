@@ -231,6 +231,7 @@ export class KdsTicket {
   startedAt?: string | null;
   bumpedAt?: string | null;
   status!: "PENDING" | "PREPARING" | "READY" | "EXPEDITED";
+  lines?: Array<{ name: string; quantity: string; categoryId?: string }>;
   createdAt!: string;
   updatedAt!: string;
 

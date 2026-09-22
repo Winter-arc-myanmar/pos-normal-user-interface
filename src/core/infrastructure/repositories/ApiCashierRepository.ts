@@ -331,6 +331,24 @@ const asList = <T>(response: unknown): T[] => {
   return [];
 };
 
+const toTicketLines = (item: Record<string, unknown>) => {
+  const candidates = [item.lines, item.items, item.orderLines];
+  for (const candidate of candidates) {
+    if (!Array.isArray(candidate)) continue;
+    return candidate
+      .filter((entry) => entry && typeof entry === "object")
+      .map((entry) => {
+        const row = entry as Record<string, unknown>;
+        return {
+          name: String(row.name || row.productName || row.variantName || "Item"),
+          quantity: String(row.quantity || "1"),
+          categoryId: row.categoryId ? String(row.categoryId) : undefined,
+        };
+      });
+  }
+  return undefined;
+};
+
 const toKdsTicket = (item: Record<string, unknown>) =>
   new KdsTicket({
     id: String(item.id || ""),
@@ -344,6 +362,7 @@ const toKdsTicket = (item: Record<string, unknown>) =>
     startedAt: item.startedAt ? String(item.startedAt) : null,
     bumpedAt: item.bumpedAt ? String(item.bumpedAt) : null,
     status: String(item.status || "PENDING") as KdsTicket["status"],
+    lines: toTicketLines(item),
     createdAt: String(item.createdAt || ""),
     updatedAt: String(item.updatedAt || ""),
   });

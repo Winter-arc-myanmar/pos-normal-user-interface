@@ -58,7 +58,9 @@ interface UseCardRefundFlowReturn {
   startRefundFromPrefill: (prefill: CardRefundPrefill) => void;
   detectCard: () => Promise<void>;
   confirmAmount: () => void;
-  confirmAndPrint: (input: CardRefundConfirmInput) => Promise<void>;
+  confirmAndPrint: (
+    input: CardRefundConfirmInput
+  ) => Promise<CardRefundReceipt | undefined>;
   resetFlow: () => void;
   clearError: () => void;
 }
@@ -229,15 +231,16 @@ export function useCardRefundFlow(): UseCardRefundFlowReturn {
           approverAuthorization: input.approverAuthorization.trim(),
         });
         setDetectedWallet(wallet);
-        setReceipt({
+        const printed = {
           receiptId: `refund-${Date.now()}`,
           cardNumber: detectedCard.cardUid,
           customerName: wallet.guestName || customerName || undefined,
           amount,
           balanceAfter: wallet.balance,
           printedAt: new Date().toISOString(),
-        });
-        window.print();
+        };
+        setReceipt(printed);
+        return printed;
       } catch (err) {
         const message =
           err instanceof Error ? err.message : "Unable to complete card refund";

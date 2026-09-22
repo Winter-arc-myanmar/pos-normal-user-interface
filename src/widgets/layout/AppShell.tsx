@@ -1,6 +1,8 @@
 import { useTranslation } from "react-i18next";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/core/presentation/hooks/useAuth";
+import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
+import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
 import {
   PAGE_PERMISSIONS,
   usePermissions,
@@ -101,6 +103,11 @@ function SyncIcon() {
 export function AppShell() {
   const { t } = useTranslation();
   const { user, setActiveBranch } = useAuth();
+  const { activePosRegisterId } = usePosWorkspace();
+  const printerConnection = usePrinterConnection(
+    String(user?.tenantId || ""),
+    activePosRegisterId
+  );
   const { canAccess } = usePermissions();
   const navigate = useNavigate();
   const location = useLocation();
@@ -214,7 +221,9 @@ export function AppShell() {
         userName={currentUserName}
         profileLabel={t("settings.profileLabel")}
         printerLabel={t("shell.printer")}
-        printerBadgeCount={1}
+        printerBadgeCount={
+          !printerConnection.defaultBinding || printerConnection.error ? 1 : 0
+        }
         notificationLabel={t("shell.notifications")}
         onNotificationsClick={() => navigate("/cashier?view=orders")}
         onPrinterClick={() => navigate("/settings/printer")}

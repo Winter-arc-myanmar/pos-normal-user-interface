@@ -9,6 +9,8 @@ import {
   SettingsSection,
   SettingsToggleRow,
 } from "./settings/settingsUi";
+import { DevicesSettingsPanel } from "./settings/DevicesSettingsPanel";
+import { PrinterSettingsPanel } from "./settings/PrinterSettingsPanel";
 
 type SettingsTab =
   | "cashier"
@@ -71,15 +73,6 @@ export function PosSettingsPage() {
   const [openNewOrderAfterCheckout, setOpenNewOrderAfterCheckout] = useState(false);
   const [quickOrder, setQuickOrder] = useState(true);
   const [priorityOrderMemo, setPriorityOrderMemo] = useState(false);
-
-  const [deviceName, setDeviceName] = useState("");
-  const [deviceIp, setDeviceIp] = useState("192.168.1.100");
-  const [subnetMask, setSubnetMask] = useState("255.255.255.0");
-  const [gateway, setGateway] = useState("192.168.1.1");
-
-  const [printerName, setPrinterName] = useState("");
-  const [printerConnection, setPrinterConnection] = useState("NETWORK");
-  const [printerIp, setPrinterIp] = useState("");
 
   const [templateName, setTemplateName] = useState("Default receipt");
   const [templatePaperWidth, setTemplatePaperWidth] = useState("80mm");
@@ -229,78 +222,11 @@ export function PosSettingsPage() {
           </div>
         ) : null}
 
-        {activeTab === "devices" ? (
-          <div className="mx-auto max-w-2xl space-y-4">
-            <SettingsSection title={t("settings.devices.title")}>
-              <div className="space-y-3">
-                <SettingsField
-                  label={t("settings.devices.deviceName")}
-                  value={deviceName}
-                  onChange={setDeviceName}
-                  placeholder={t("settings.devices.deviceNamePlaceholder")}
-                />
-                <SettingsField
-                  label={t("settings.devices.ipAddress")}
-                  value={deviceIp}
-                  onChange={setDeviceIp}
-                />
-                <SettingsField
-                  label={t("settings.devices.subnetMask")}
-                  value={subnetMask}
-                  onChange={setSubnetMask}
-                />
-                <SettingsField
-                  label={t("settings.devices.gateway")}
-                  value={gateway}
-                  onChange={setGateway}
-                />
-              </div>
-              <p className="mt-4 text-xs text-slate-400">
-                {t("settings.devices.hint")}
-              </p>
-            </SettingsSection>
-          </div>
-        ) : null}
+        {activeTab === "devices" ? <DevicesSettingsPanel /> : null}
 
         {activeTab === "printer" ? (
-          <div className="mx-auto max-w-2xl space-y-4">
-            <SettingsSection title={t("settings.printer.title")}>
-              <div className="space-y-3">
-                <SettingsField
-                  label={t("settings.printer.name")}
-                  value={printerName}
-                  onChange={setPrinterName}
-                  placeholder={t("settings.printer.namePlaceholder")}
-                />
-                <label className="block text-sm text-slate-600">
-                  {t("settings.printer.connection")}
-                  <select
-                    className="mt-1 min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500"
-                    value={printerConnection}
-                    onChange={(event) => setPrinterConnection(event.target.value)}
-                  >
-                    <option value="NETWORK">
-                      {t("settings.printer.connectionNetwork")}
-                    </option>
-                    <option value="USB">
-                      {t("settings.printer.connectionUsb")}
-                    </option>
-                    <option value="BLUETOOTH">
-                      {t("settings.printer.connectionBluetooth")}
-                    </option>
-                  </select>
-                </label>
-                <SettingsField
-                  label={t("settings.printer.ipAddress")}
-                  value={printerIp}
-                  onChange={setPrinterIp}
-                  placeholder="192.168.1.50"
-                />
-              </div>
-              <p className="mt-4 text-xs text-slate-400">
-                {t("settings.printer.hint")}
-              </p>
-            </SettingsSection>
+          <div className="mx-auto max-w-5xl">
+            <PrinterSettingsPanel />
           </div>
         ) : null}
 

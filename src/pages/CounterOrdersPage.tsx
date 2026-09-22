@@ -2,7 +2,10 @@
 import { useTranslation } from "react-i18next";
 import { KdsTicketStatus } from "@/core/application/dtos/CashierDTO";
 import { KdsTicket } from "@/core/domain/entities/Cashier";
+import { useAuth } from "@/core/presentation/hooks/useAuth";
 import { useCashier } from "@/core/presentation/hooks/useCashier";
+import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
+import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
 
 const PAGE_LIMIT = 50;
 
@@ -42,13 +45,18 @@ function shortStation(stationId?: string): string {
 
 export function CounterOrdersPage() {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const { activePosRegisterId } = usePosWorkspace();
   const { error, listKdsTickets, getKdsTicketById } = useCashier();
+  const printerConnection = usePrinterConnection(
+    String(user?.tenantId || ""),
+    activePosRegisterId
+  );
   const [queue, setQueue] = useState<QueueTab>("jobs");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [tickets, setTickets] = useState<KdsTicket[]>([]);
   const [stationId, setStationId] = useState("");
-  const [selectedTicket, setSelectedTicket] = useState<KdsTicket | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
 
   const loadTickets = useCallback(async () => {
@@ -60,17 +68,10 @@ export function CounterOrdersPage() {
     });
     setTickets(result.tickets);
     setTotalPages(Math.max(1, result.totalPages || 1));
-    setSelectedTicket((current) => {
-      if (!current) return result.tickets[0] || null;
-      return (
-        result.tickets.find((ticket) => ticket.id === current.id) ||
-        result.tickets[0] ||
-        current
-      );
-    });
   }, [listKdsTickets, page, queue, stationId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- async initial/filter load
     void loadTickets().catch((caught) => {
       setLocalError(
         caught instanceof Error ? caught.message : t("counterOrders.ticketsFailed")
@@ -98,8 +99,7 @@ export function CounterOrdersPage() {
     setLocalError(null);
     try {
       const detail = ticket.id ? await getKdsTicketById(ticket.id) : ticket;
-      setSelectedTicket(detail);
-      window.setTimeout(() => window.print(), 50);
+      await printerConnection.printTicket(detail);
     } catch (caught) {
       setLocalError(
         caught instanceof Error ? caught.message : t("counterOrders.ticketFailed")
@@ -109,30 +109,7 @@ export function CounterOrdersPage() {
 
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden bg-white text-slate-900">
-      <style>{`
-          .kds-print-sheet {
-            position: absolute;
-            width: 0;
-            height: 0;
-            overflow: hidden;
-          }
-        @media print {
-          body * { visibility: hidden; }
-          .kds-print-sheet, .kds-print-sheet * { visibility: visible; }
-          .kds-print-sheet {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 80mm;
-            height: auto;
-            overflow: visible;
-            background: white;
-            color: black;
-          }
-        }
-      `}</style>
-
-      <header className="flex items-center gap-1 border-b border-slate-200 px-3 py-2 print:hidden">
+      <header className="flex items-center gap-1 border-b border-slate-200 px-3 py-2">
         <div className="flex min-w-0 flex-1 flex-wrap gap-1">
           {queueTabs.map((tab) => {
             const selected = queue === tab;
@@ -157,6 +134,11 @@ export function CounterOrdersPage() {
             );
           })}
         </div>
+        <span className="mr-2 max-w-44 truncate text-xs text-slate-500">
+          {printerConnection.defaultBinding
+            ? printerConnection.defaultBinding.displayName
+            : t("counterOrders.noPrinter")}
+        </span>
         <button
           type="button"
           aria-label={t("counterOrders.refresh")}
@@ -176,13 +158,13 @@ export function CounterOrdersPage() {
         </button>
       </header>
 
-      {(error || localError) && (
-        <p className="border-b border-red-100 bg-red-50 px-4 py-2 text-sm text-red-700 print:hidden">
-          {localError || error}
+      {(error || localError || printerConnection.error) && (
+        <p className="border-b border-red-100 bg-red-50 px-4 py-2 text-sm text-red-700">
+          {localError || error || printerConnection.error}
         </p>
       )}
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 min-[900px]:grid-cols-[14rem_minmax(0,1fr)] print:hidden">
+      <div className="grid min-h-0 flex-1 grid-cols-1 min-[900px]:grid-cols-[14rem_minmax(0,1fr)]">
         <aside className="border-r border-slate-200 bg-slate-50">
           <button
             type="button"
@@ -295,35 +277,6 @@ export function CounterOrdersPage() {
         </div>
       </div>
 
-      {selectedTicket ? (
-        <article className="kds-print-sheet p-4 text-sm">
-          <p className="text-center text-xs uppercase tracking-wide">
-            {t("counterOrders.print.kitchenTitle")}
-          </p>
-          <h2 className="mt-2 text-center text-xl font-bold">
-            {selectedTicket.ticketNumber || selectedTicket.id}
-          </h2>
-          <p className="mt-1 text-center font-semibold">{selectedTicket.status}</p>
-          <dl className="mt-4 space-y-1">
-            <div className="flex justify-between gap-3">
-              <dt>{t("counterOrders.print.course")}</dt>
-              <dd>{selectedTicket.courseType || "—"}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt>{t("counterOrders.print.firedAt")}</dt>
-              <dd>{clockTime(selectedTicket.firedAt)}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt>{t("counterOrders.station")}</dt>
-              <dd className="truncate">{selectedTicket.stationId || "—"}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt>{t("counterOrders.print.orderRef")}</dt>
-              <dd className="truncate">{selectedTicket.salesOrderId || "—"}</dd>
-            </div>
-          </dl>
-        </article>
-      ) : null}
     </section>
   );
 }

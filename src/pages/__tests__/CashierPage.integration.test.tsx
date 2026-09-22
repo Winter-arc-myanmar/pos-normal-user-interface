@@ -26,6 +26,8 @@ const mocks = vi.hoisted(() => ({
   deleteManagedOrder: vi.fn(),
   voidCheckout: vi.fn(),
   refreshDiningTableStatus: vi.fn(),
+  printKitchen: vi.fn(),
+  printReceipt: vi.fn(),
 }));
 
 const product = {
@@ -110,6 +112,14 @@ vi.mock("@/core/presentation/hooks/usePosWorkspace", () => ({
       posSessionId: "pos-session-1",
     }),
     refreshPosContext: vi.fn(),
+  }),
+}));
+
+vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
+  usePrinterConnection: () => ({
+    printKitchen: mocks.printKitchen,
+    printReceipt: mocks.printReceipt,
+    error: null,
   }),
 }));
 
@@ -269,6 +279,8 @@ describe("CashierPage integration", () => {
     mocks.getCounterOrderById.mockResolvedValue({ id: "order-1" });
     mocks.pickupCounterOrder.mockResolvedValue({ id: "order-1" });
     mocks.fireToKds.mockResolvedValue({});
+    mocks.printKitchen.mockResolvedValue(undefined);
+    mocks.printReceipt.mockResolvedValue(undefined);
     mocks.checkoutTableSession.mockResolvedValue({
       ...session,
       sessionState: "CLOSED",
@@ -326,6 +338,8 @@ describe("CashierPage integration", () => {
       expect(mocks.fireToKds).toHaveBeenCalledWith({
         sessionId: "session-1",
       });
+      expect(mocks.printKitchen).toHaveBeenCalled();
+      expect(mocks.printReceipt).toHaveBeenCalled();
       expect(mocks.getCounterOrderById).toHaveBeenCalledWith("order-1");
       expect(mocks.pickupCounterOrder).toHaveBeenCalledWith("order-1");
       expect(mocks.checkoutTableSession).toHaveBeenCalledWith("session-1", {

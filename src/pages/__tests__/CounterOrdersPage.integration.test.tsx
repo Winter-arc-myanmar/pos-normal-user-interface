@@ -15,6 +15,7 @@ const ticket = {
 const mocks = vi.hoisted(() => ({
   listTickets: vi.fn(),
   getTicket: vi.fn(),
+  printTicket: vi.fn(),
 }));
 
 vi.mock("react-i18next", () => ({
@@ -49,6 +50,22 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
   }),
 }));
 
+vi.mock("@/core/presentation/hooks/useAuth", () => ({
+  useAuth: () => ({ user: { tenantId: "tenant-1" } }),
+}));
+
+vi.mock("@/core/presentation/hooks/usePosWorkspace", () => ({
+  usePosWorkspace: () => ({ activePosRegisterId: "register-1" }),
+}));
+
+vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
+  usePrinterConnection: () => ({
+    defaultBinding: { id: "printer-1", displayName: "Kitchen" },
+    error: null,
+    printTicket: mocks.printTicket,
+  }),
+}));
+
 describe("CounterOrdersPage integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -60,13 +77,10 @@ describe("CounterOrdersPage integration", () => {
       totalPages: 1,
     });
     mocks.getTicket.mockResolvedValue(ticket);
+    mocks.printTicket.mockResolvedValue(undefined);
   });
 
   it("lists active KDS tickets and prints the selected ticket", async () => {
-    const print = vi.fn();
-    const originalPrint = window.print;
-    window.print = print;
-
     render(<CounterOrdersPage />);
 
     expect(await screen.findByRole("button", { name: "Print KDS-9" })).toBeInTheDocument();
@@ -79,9 +93,8 @@ describe("CounterOrdersPage integration", () => {
     fireEvent.click(screen.getByRole("button", { name: "Print KDS-9" }));
     await waitFor(() => {
       expect(mocks.getTicket).toHaveBeenCalledWith("ticket-9");
-      expect(print).toHaveBeenCalled();
+      expect(mocks.printTicket).toHaveBeenCalledWith(ticket);
     });
-    window.print = originalPrint;
   });
 
   it("loads the waiting queue by status", async () => {

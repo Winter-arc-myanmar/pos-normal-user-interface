@@ -35,6 +35,17 @@ vi.mock("@/core/presentation/hooks/useAuth", () => ({
   }),
 }));
 
+vi.mock("@/core/presentation/hooks/usePosWorkspace", () => ({
+  usePosWorkspace: () => ({ activePosRegisterId: "register-1" }),
+}));
+
+vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
+  usePrinterConnection: () => ({
+    defaultBinding: { id: "printer-1" },
+    error: null,
+  }),
+}));
+
 vi.mock("@/features/permissions/usePermissions", () => ({
   PAGE_PERMISSIONS: {
     dashboard: [],

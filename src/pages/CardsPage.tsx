@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/Button";
 import { CardCaptureStatus } from "@/components/ui/CardCaptureStatus";
 import { PaymentMethod } from "@/core/domain/entities/Cashier";
 import { useCardCapture } from "@/core/presentation/hooks/useCardCapture";
+import { useAuth } from "@/core/presentation/hooks/useAuth";
 import { useCashier } from "@/core/presentation/hooks/useCashier";
+import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
 import {
   CardTopupPrefill,
   useCardTopupFlow,
@@ -138,7 +140,12 @@ export function CardsPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { formatCurrency } = useNumberFormatter();
-  const { requireCashierContext } = usePosWorkspace();
+  const { user } = useAuth();
+  const { activePosRegisterId, requireCashierContext } = usePosWorkspace();
+  const printer = usePrinterConnection(
+    String(user?.tenantId || ""),
+    activePosRegisterId
+  );
   const { paymentMethods, fetchPaymentMethods } = useCashier();
   const prefillAppliedRef = useRef(false);
   const [paymentMethodId, setPaymentMethodId] = useState("");
@@ -228,12 +235,21 @@ export function CardsPage() {
     try {
       const context = await requireCashierContext();
       assertPaymentReference(selectedPaymentMethod, paymentReference);
-      await confirmAndPrint({
+      const printed = await confirmAndPrint({
         locationId: context.locationId,
         posSessionId: context.posSessionId,
         paymentMethodId,
         reference: paymentReference,
       });
+      if (printed) {
+        await printer.printReceipt({
+          title: "CARD TOP UP",
+          receiptId: printed.receiptId,
+          lines: [{ name: `Card ${printed.cardNumber}`, quantity: "1" }],
+          total: printed.amount,
+          payments: [{ name: "Balance", amount: printed.balanceAfter }],
+        });
+      }
     } catch (caught) {
       setActionError(
         caught instanceof Error ? caught.message : t("cardTopup.confirmFailed")
@@ -472,7 +488,19 @@ export function CardsPage() {
                   </Button>
                 ) : (
                   <>
-                    <Button type="button" onClick={() => window.print()}>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        if (!receipt) return;
+                        void printer.printReceipt({
+                          title: "CARD TOP UP",
+                          receiptId: receipt.receiptId,
+                          lines: [{ name: `Card ${receipt.cardNumber}`, quantity: "1" }],
+                          total: receipt.amount,
+                          payments: [{ name: "Balance", amount: receipt.balanceAfter }],
+                        });
+                      }}
+                    >
                       {t("cardTopup.printAgain")}
                     </Button>
                     <Button type="button" variant="secondary" onClick={resetFlow}>

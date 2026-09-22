@@ -31,6 +31,10 @@ import { IGuestWalletRepository } from "../../domain/repositories/IGuestWalletRe
 import { ApiGuestWalletRepository } from "../repositories/ApiGuestWalletRepository";
 import { IGuestWalletService } from "../../domain/services/IGuestWalletService";
 import { GuestWalletService } from "../../application/services/GuestWalletService";
+import { IKitchenPrinterRepository } from "../../domain/repositories/IKitchenPrinterRepository";
+import { ApiKitchenPrinterRepository } from "../repositories/ApiKitchenPrinterRepository";
+import { IKitchenPrinterService } from "../../domain/services/IKitchenPrinterService";
+import { KitchenPrinterService } from "../../application/services/KitchenPrinterService";
 
 /**
  * Dependency Injection Container
@@ -80,6 +84,10 @@ class Container {
       "salesOrderRepository",
       new ApiSalesOrderRepository(this.resolve("httpClient"))
     );
+    this.register<IKitchenPrinterRepository>(
+      "kitchenPrinterRepository",
+      new ApiKitchenPrinterRepository(this.resolve("httpClient"))
+    );
 
     this.register<IAuthService>(
       "authService",
@@ -114,6 +122,10 @@ class Container {
     this.register<ISalesOrderService>(
       "salesOrderService",
       new SalesOrderService(this.resolve("salesOrderRepository"))
+    );
+    this.register<IKitchenPrinterService>(
+      "kitchenPrinterService",
+      new KitchenPrinterService(this.resolve("kitchenPrinterRepository"))
     );
   }
 

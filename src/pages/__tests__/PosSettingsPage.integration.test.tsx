@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { PosSettingsPage } from "../PosSettingsPage";
 
 vi.mock("react-i18next", () => ({
+  initReactI18next: { type: "3rdParty", init: () => undefined },
   useTranslation: () => ({
     t: (key: string) => {
       const labels: Record<string, string> = {
@@ -46,11 +47,53 @@ vi.mock("react-i18next", () => ({
 }));
 
 const logout = vi.fn();
+const printerMocks = vi.hoisted(() => ({
+  list: vi.fn(),
+  verify: vi.fn(),
+  saveBinding: vi.fn(),
+  create: vi.fn(),
+}));
 
 vi.mock("@/core/presentation/hooks/useAuth", () => ({
   useAuth: () => ({
-    user: { name: "Demo Admin" },
+    user: { name: "Demo Admin", tenantId: "tenant-1" },
     logout,
+  }),
+}));
+
+vi.mock("@/core/presentation/hooks/usePosWorkspace", () => ({
+  usePosWorkspace: () => ({
+    activeLocationId: "location-1",
+    activePosRegisterId: "register-1",
+  }),
+}));
+
+vi.mock("@/core/presentation/hooks/useKitchenPrinterManagement", () => ({
+  useKitchenPrinterManagement: () => ({
+    printers: [],
+    isLoading: false,
+    error: null,
+    listPrinters: printerMocks.list,
+    createPrinter: printerMocks.create,
+    updatePrinter: vi.fn(),
+    deletePrinter: vi.fn(),
+    attachCategory: vi.fn(),
+    detachCategory: vi.fn(),
+  }),
+}));
+
+vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
+  usePrinterConnection: () => ({
+    bindings: [],
+    defaultBinding: null,
+    deviceNames: ["USB Kitchen"],
+    isConnected: true,
+    isConnecting: false,
+    error: null,
+    discover: vi.fn(),
+    verify: printerMocks.verify,
+    saveBinding: printerMocks.saveBinding,
+    removeBinding: vi.fn(),
   }),
 }));
 
@@ -68,6 +111,13 @@ describe("PosSettingsPage integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     logout.mockResolvedValue(undefined);
+    printerMocks.list.mockResolvedValue({
+      printers: [],
+      total: 0,
+      page: 1,
+      limit: 100,
+      totalPages: 1,
+    });
   });
 
   it("renders cashier settings and switches tabs", () => {
@@ -82,5 +132,38 @@ describe("PosSettingsPage integration", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Logout" }));
     expect(screen.getByText("Sign out")).toBeInTheDocument();
+  });
+
+  it("requires a successful test before saving a network printer", async () => {
+    printerMocks.verify.mockResolvedValue({
+      id: "draft-1",
+      transport: "NETWORK",
+      displayName: "Kitchen",
+      host: "192.168.1.50",
+      port: 9100,
+      lastVerifiedAt: "2026-09-22T00:00:00.000Z",
+    });
+    printerMocks.create.mockResolvedValue({
+      id: "printer-1",
+      name: "Kitchen",
+      ipAddress: "192.168.1.50",
+      port: 9100,
+    });
+    renderPage("printer");
+
+    fireEvent.change(screen.getByLabelText("settings.printer.name"), {
+      target: { value: "Kitchen" },
+    });
+    fireEvent.change(screen.getByLabelText("settings.printer.ipAddress"), {
+      target: { value: "192.168.1.50" },
+    });
+
+    expect(
+      screen.getByRole("button", { name: "settings.printer.save" })
+    ).toBeDisabled();
+    fireEvent.click(
+      screen.getByRole("button", { name: "settings.printer.testPrint" })
+    );
+    expect(await screen.findByText("settings.printer.testSucceeded")).toBeInTheDocument();
   });
 });

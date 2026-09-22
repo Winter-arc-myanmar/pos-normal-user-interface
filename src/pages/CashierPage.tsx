@@ -14,8 +14,10 @@ import {
   TableSessionState,
   toApiServiceType,
 } from "@/core/application/dtos/CashierDTO";
+import { useAuth } from "@/core/presentation/hooks/useAuth";
 import { useCashier } from "@/core/presentation/hooks/useCashier";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
+import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
 import { useSalesOrderManagement } from "@/core/presentation/hooks/useSalesOrderManagement";
 import { CashierBoard } from "./cashier/CashierBoard";
 import { MultiOrderingView } from "./cashier/MultiOrderingView";
@@ -69,6 +71,7 @@ const TABLE_STATUS_BACKOFF_MS = 180_000;
 
 export function CashierPage() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const {
     products,
@@ -125,10 +128,15 @@ export function CashierPage() {
   } = useSalesOrderManagement();
   const {
     activeLocationId,
+    activePosRegisterId,
     isWorkspaceReady,
     isPosSessionLoading,
     requireCashierContext,
   } = usePosWorkspace();
+  const printer = usePrinterConnection(
+    String(user?.tenantId || ""),
+    activePosRegisterId
+  );
   const { lookupCard, getWallet } = useGuestWalletManagement();
 
   const [statusFilter, setStatusFilter] = useState<"ALL" | OrderStatus>("ALL");
@@ -1362,6 +1370,45 @@ export function CashierPage() {
       const checkoutSessionId =
         selectedOrderSession?.id || activeTableSession?.id;
 
+      const paidReceipt = {
+        title: "RECEIPT",
+        receiptId: selectedOrder?.orderNumber,
+        lines: displayOrderLines
+          .filter((line) => !line.voidedAt)
+          .map((line) => {
+            const variant = variantById[line.variantId];
+            const product = variant ? productById[variant.productId] : undefined;
+            return {
+              name:
+                line.productName ||
+                product?.name ||
+                line.variantName ||
+                "Item",
+              quantity: String(line.quantity || "1"),
+            };
+          }),
+        subtotal: lineSubtotal.toFixed(4),
+        discount: orderDiscount > 0 ? toMoney(orderDiscount) : undefined,
+        tip: tip > 0 ? toMoney(tip) : undefined,
+        total: orderTotal,
+        payments: checkoutPayments.map((payment) => ({
+          name:
+            checkoutPaymentMethods.find(
+              (method) => method.id === payment.paymentMethodId
+            )?.name || "Payment",
+          amount: payment.amount,
+        })),
+      };
+      const printPaidReceipt = async () => {
+        try {
+          await printer.printReceipt(paidReceipt);
+        } catch (printError) {
+          setLocalError(
+            printError instanceof Error ? printError.message : "Print failed"
+          );
+        }
+      };
+
       if (selectedOrderSession && isPrimaryTableOrder && selectedOrder) {
         await checkoutTableSession(selectedOrderSession.id, {
           payments: checkoutPayments,
@@ -1407,6 +1454,7 @@ export function CashierPage() {
           setTableOrderIds([]);
           setMultiOrderLines({});
           setActiveTableId(null);
+          await printPaidReceipt();
           await resetWorkspaceAfterTransaction(t("cashier.orderPanel.checkoutSuccess"));
           return;
         }
@@ -1424,6 +1472,7 @@ export function CashierPage() {
           const nextActiveOrderId = nextIds[nextIds.length - 1];
           await selectOrderById(nextActiveOrderId);
           await refreshMultiOrderLines(nextIds);
+          await printPaidReceipt();
           setNotice(t("cashier.orderPanel.checkoutSuccess"));
           setSearchParams({ view: "menu" });
           return;
@@ -1432,6 +1481,7 @@ export function CashierPage() {
         setActiveTableId(null);
       }
 
+      await printPaidReceipt();
       await releasePaidTable(checkoutTableId, checkoutSessionId);
       await resetWorkspaceAfterTransaction(t("cashier.orderPanel.checkoutSuccess"));
     } catch (caught) {
@@ -1773,9 +1823,42 @@ export function CashierPage() {
         throw new Error(t("cashier.errors.kdsTargetMissing"));
       }
 
+      const kitchenLines = displayOrderLines
+        .filter((line) => !line.voidedAt)
+        .map((line) => {
+          const variant = variantById[line.variantId];
+          const product = variant ? productById[variant.productId] : undefined;
+          return {
+            name:
+              line.productName ||
+              product?.name ||
+              line.variantName ||
+              variant?.variantSku ||
+              "Item",
+            quantity: String(line.quantity || "1"),
+            categoryId: product?.categoryId,
+          };
+        });
+
       await fireToKds(
         sessionId ? { sessionId } : { salesOrderId: salesOrderId! }
       );
+
+      try {
+        await printer.printKitchen({
+          title: selectedOrder?.orderNumber || "KITCHEN",
+          courseType: displayOrderLines.find((line) => line.courseType)?.courseType,
+          firedAt: new Date().toISOString(),
+          orderRef: salesOrderId || sessionId,
+          lines: kitchenLines,
+        });
+      } catch (printError) {
+        setLocalError(
+          printError instanceof Error
+            ? printError.message
+            : t("cashier.errors.kdsFailed")
+        );
+      }
 
       if (activeTableId && tableOrderIds.length > 0 && selectedOrder) {
         setNotice(t("cashier.orderPanel.kdsSent"));

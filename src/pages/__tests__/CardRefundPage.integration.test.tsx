@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   refundWallet: vi.fn(),
   requireCashierContext: vi.fn(),
   fetchPaymentMethods: vi.fn(),
+  printReceipt: vi.fn(),
 }));
 
 vi.mock("react-i18next", () => ({
@@ -24,9 +25,21 @@ vi.mock("@/lib/i18n/formatters", () => ({
   }),
 }));
 
+vi.mock("@/core/presentation/hooks/useAuth", () => ({
+  useAuth: () => ({ user: { tenantId: "tenant-1" } }),
+}));
+
+vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
+  usePrinterConnection: () => ({
+    printReceipt: mocks.printReceipt,
+    error: null,
+  }),
+}));
+
 vi.mock("@/core/presentation/hooks/usePosWorkspace", () => ({
   usePosWorkspace: () => ({
     requireCashierContext: mocks.requireCashierContext,
+    activePosRegisterId: "register-1",
   }),
 }));
 
@@ -122,7 +135,9 @@ describe("CardRefundPage", () => {
         notes: undefined,
         approverAuthorization: "approver-token",
       });
-      expect(window.print).toHaveBeenCalled();
+      expect(mocks.printReceipt).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "CARD REFUND", total: "10000.0000" })
+      );
     });
   });
 });

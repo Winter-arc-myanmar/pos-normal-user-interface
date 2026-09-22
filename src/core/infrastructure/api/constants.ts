@@ -221,6 +221,18 @@ export const API_ENDPOINTS = {
     TICKET: (id: string) => `/api/v1/kds/tickets/${id}`,
   },
 
+  KITCHEN_PRINTERS: {
+    LIST: "/api/v1/kitchen-printers",
+    CREATE: "/api/v1/kitchen-printers",
+    BY_ID: (id: string) => `/api/v1/kitchen-printers/${id}`,
+    UPDATE: (id: string) => `/api/v1/kitchen-printers/${id}`,
+    DELETE: (id: string) => `/api/v1/kitchen-printers/${id}`,
+    ATTACH_CATEGORY: (id: string) =>
+      `/api/v1/kitchen-printers/${id}/categories`,
+    DETACH_CATEGORY: (id: string, categoryId: string) =>
+      `/api/v1/kitchen-printers/${id}/categories/${categoryId}`,
+  },
+
   DISCOUNT_REASONS: {
     LIST: "/api/v1/discount-reasons",
   },

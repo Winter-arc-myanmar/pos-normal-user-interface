@@ -61,7 +61,9 @@ interface UseCardTopupFlowReturn {
   startTopupFromPrefill: (prefill: CardTopupPrefill) => void;
   detectCard: () => Promise<void>;
   confirmAmount: () => void;
-  confirmAndPrint: (input: CardTopupConfirmInput) => Promise<void>;
+  confirmAndPrint: (
+    input: CardTopupConfirmInput
+  ) => Promise<CardTopupReceipt | undefined>;
   resetFlow: () => void;
   clearError: () => void;
 }
@@ -236,15 +238,16 @@ export function useCardTopupFlow(): UseCardTopupFlowReturn {
         );
         const wallet = await guestWalletService.getWallet(detectedWallet.id);
         setDetectedWallet(wallet);
-        setReceipt({
+        const printed = {
           receiptId: entry.id || `topup-${Date.now()}`,
           cardNumber: detectedCard.cardUid,
           customerName: wallet.guestName || customerName || undefined,
           amount,
           balanceAfter: entry.balanceAfter || wallet.balance,
           printedAt: entry.createdAt || new Date().toISOString(),
-        });
-        window.print();
+        };
+        setReceipt(printed);
+        return printed;
       } catch (err) {
         const message =
           err instanceof Error ? err.message : "Unable to complete card top up";
