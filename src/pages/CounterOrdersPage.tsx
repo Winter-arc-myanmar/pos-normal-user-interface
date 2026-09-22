@@ -1,241 +1,329 @@
-import { FormEvent, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Button } from "@/components/ui/Button";
+import { KdsTicketStatus } from "@/core/application/dtos/CashierDTO";
+import { KdsTicket } from "@/core/domain/entities/Cashier";
 import { useCashier } from "@/core/presentation/hooks/useCashier";
 
-type UnknownRecord = Record<string, unknown>;
+const PAGE_LIMIT = 50;
 
-const asRecord = (value: unknown): UnknownRecord =>
-  value && typeof value === "object" && !Array.isArray(value)
-    ? (value as UnknownRecord)
-    : {};
+type QueueTab = "jobs" | KdsTicketStatus;
 
-const findArray = (source: UnknownRecord, keys: string[]): UnknownRecord[] => {
-  for (const key of keys) {
-    const value = source[key];
-    if (Array.isArray(value)) return value.map(asRecord);
-  }
-  for (const value of Object.values(source)) {
-    const nested = asRecord(value);
-    if (Object.keys(nested).length) {
-      const result = findArray(nested, keys);
-      if (result.length) return result;
-    }
-  }
-  return [];
+const queueTabs: QueueTab[] = [
+  "jobs",
+  "PENDING",
+  "PREPARING",
+  "READY",
+  "EXPEDITED",
+];
+
+const statusTone: Record<KdsTicketStatus, string> = {
+  PENDING: "bg-orange-500 text-white",
+  PREPARING: "bg-amber-400 text-slate-950",
+  READY: "bg-emerald-500 text-white",
+  EXPEDITED: "bg-red-500 text-white",
 };
 
-const display = (record: UnknownRecord, keys: string[], fallback = "—") => {
-  for (const key of keys) {
-    const value = record[key];
-    if (typeof value === "string" || typeof value === "number") {
-      return String(value);
-    }
-  }
-  return fallback;
-};
+function clockTime(value?: string | null): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+}
+
+function shortStation(stationId?: string): string {
+  if (!stationId) return "";
+  return stationId.length > 8 ? stationId.slice(0, 8) : stationId;
+}
 
 export function CounterOrdersPage() {
   const { t } = useTranslation();
-  const {
-    isLoading,
-    error,
-    getCounterOrderById,
-    pickupCounterOrder,
-  } = useCashier();
-  const [query, setQuery] = useState("");
-  const [result, setResult] = useState<UnknownRecord | null>(null);
+  const { error, listKdsTickets, getKdsTicketById } = useCashier();
+  const [queue, setQueue] = useState<QueueTab>("jobs");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [tickets, setTickets] = useState<KdsTicket[]>([]);
+  const [stationId, setStationId] = useState("");
+  const [selectedTicket, setSelectedTicket] = useState<KdsTicket | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
 
-  const order = useMemo(() => {
-    if (!result) return {};
-    return asRecord(result.order || result.counterOrder || result.salesOrder || result);
-  }, [result]);
-  const lines = useMemo(
-    () => (result ? findArray(result, ["lines", "items", "orderLines"]) : []),
-    [result]
-  );
-  const tickets = useMemo(
-    () => (result ? findArray(result, ["kdsTickets", "tickets"]) : []),
-    [result]
-  );
-
-  const loadOrder = async (event: FormEvent) => {
-    event.preventDefault();
-    const orderId = query.trim();
-    if (!orderId) return;
-    setLocalError(null);
-    setNotice(null);
-    try {
-      setResult(await getCounterOrderById(orderId));
-    } catch (caught) {
-      setResult(null);
-      setLocalError(
-        caught instanceof Error ? caught.message : t("counterOrders.findFailed")
+  const loadTickets = useCallback(async () => {
+    const result = await listKdsTickets({
+      page,
+      limit: PAGE_LIMIT,
+      ...(stationId ? { stationId } : {}),
+      ...(queue === "jobs" ? { activeOnly: true } : { status: queue }),
+    });
+    setTickets(result.tickets);
+    setTotalPages(Math.max(1, result.totalPages || 1));
+    setSelectedTicket((current) => {
+      if (!current) return result.tickets[0] || null;
+      return (
+        result.tickets.find((ticket) => ticket.id === current.id) ||
+        result.tickets[0] ||
+        current
       );
-    }
+    });
+  }, [listKdsTickets, page, queue, stationId]);
+
+  useEffect(() => {
+    void loadTickets().catch((caught) => {
+      setLocalError(
+        caught instanceof Error ? caught.message : t("counterOrders.ticketsFailed")
+      );
+    });
+  }, [loadTickets, t]);
+
+  const stations = useMemo(() => {
+    const ids = new Set<string>();
+    tickets.forEach((ticket) => {
+      if (ticket.stationId) ids.add(ticket.stationId);
+    });
+    return Array.from(ids);
+  }, [tickets]);
+
+  const unlinkedCount = tickets.filter((ticket) => !ticket.stationId).length;
+
+  const changeQueue = (next: QueueTab) => {
+    setQueue(next);
+    setPage(1);
+    setLocalError(null);
   };
 
-  const markPickedUp = async () => {
-    const orderId = query.trim();
-    if (!orderId) return;
+  const printTicket = async (ticket: KdsTicket) => {
     setLocalError(null);
     try {
-      await pickupCounterOrder(orderId);
-      setResult(await getCounterOrderById(orderId));
-      setNotice(t("counterOrders.pickedUp"));
+      const detail = ticket.id ? await getKdsTicketById(ticket.id) : ticket;
+      setSelectedTicket(detail);
+      window.setTimeout(() => window.print(), 50);
     } catch (caught) {
       setLocalError(
-        caught instanceof Error ? caught.message : t("counterOrders.pickupFailed")
+        caught instanceof Error ? caught.message : t("counterOrders.ticketFailed")
       );
     }
   };
 
   return (
-    <section className="flex h-full min-h-0 flex-col overflow-hidden bg-slate-100 p-4">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold">{t("counterOrders.title")}</h1>
-          <p className="text-sm text-slate-500">{t("counterOrders.subtitle")}</p>
+    <section className="flex h-full min-h-0 flex-col overflow-hidden bg-white text-slate-900">
+      <style>{`
+          .kds-print-sheet {
+            position: absolute;
+            width: 0;
+            height: 0;
+            overflow: hidden;
+          }
+        @media print {
+          body * { visibility: hidden; }
+          .kds-print-sheet, .kds-print-sheet * { visibility: visible; }
+          .kds-print-sheet {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 80mm;
+            height: auto;
+            overflow: visible;
+            background: white;
+            color: black;
+          }
+        }
+      `}</style>
+
+      <header className="flex items-center gap-1 border-b border-slate-200 px-3 py-2 print:hidden">
+        <div className="flex min-w-0 flex-1 flex-wrap gap-1">
+          {queueTabs.map((tab) => {
+            const selected = queue === tab;
+            const label =
+              tab === "jobs"
+                ? t("counterOrders.queues.printJob", { count: tickets.length })
+                : t(`counterOrders.queues.${tab.toLowerCase()}`);
+            return (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => changeQueue(tab)}
+                className={[
+                  "rounded px-3 py-1.5 text-sm",
+                  selected
+                    ? "font-semibold text-blue-600"
+                    : "text-slate-600 hover:bg-slate-100",
+                ].join(" ")}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
-        <form onSubmit={loadOrder} className="flex gap-2">
-          <input
-            aria-label={t("counterOrders.orderId")}
-            placeholder={t("counterOrders.orderId")}
-            className="min-h-11 w-72 rounded border border-slate-300 bg-white px-3 text-sm outline-none focus:border-blue-500"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          <Button type="submit" isLoading={isLoading}>
-            {t("counterOrders.findOrder")}
-          </Button>
-        </form>
+        <button
+          type="button"
+          aria-label={t("counterOrders.refresh")}
+          onClick={() => {
+            setLocalError(null);
+            void loadTickets().catch((caught) => {
+              setLocalError(
+                caught instanceof Error
+                  ? caught.message
+                  : t("counterOrders.ticketsFailed")
+              );
+            });
+          }}
+          className="grid h-9 w-9 place-items-center rounded text-lg text-slate-500 hover:bg-slate-100"
+        >
+          ↻
+        </button>
       </header>
 
-      {(error || localError || notice) && (
-        <p
-          className={[
-            "mt-3 rounded p-3 text-sm",
-            error || localError
-              ? "bg-red-50 text-red-700"
-              : "bg-green-50 text-green-700",
-          ].join(" ")}
-        >
-          {localError || error || notice}
+      {(error || localError) && (
+        <p className="border-b border-red-100 bg-red-50 px-4 py-2 text-sm text-red-700 print:hidden">
+          {localError || error}
         </p>
       )}
 
-      {result ? (
-        <div className="mt-4 grid min-h-0 flex-1 grid-cols-[minmax(0,1.4fr)_minmax(16rem,0.6fr)] gap-3 overflow-hidden">
-          <div className="min-h-0 overflow-y-auto rounded-lg bg-white p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase text-slate-500">
-                  {t("counterOrders.order")}
-                </p>
-                <h2 className="text-lg font-bold">
-                  {display(order, ["orderNumber", "number", "id"])}
-                </h2>
-                <p className="text-sm text-slate-500">
-                  {display(order, ["customerName", "guestName", "name"])}
-                </p>
-              </div>
-              <span className="rounded bg-slate-100 px-3 py-1 text-xs font-semibold">
-                {display(order, ["status", "state"])}
+      <div className="grid min-h-0 flex-1 grid-cols-1 min-[900px]:grid-cols-[14rem_minmax(0,1fr)] print:hidden">
+        <aside className="border-r border-slate-200 bg-slate-50">
+          <button
+            type="button"
+            onClick={() => {
+              setStationId("");
+              setPage(1);
+            }}
+            className={[
+              "flex w-full items-center px-4 py-3 text-left text-sm",
+              stationId ? "text-slate-700" : "bg-slate-200 font-semibold",
+            ].join(" ")}
+          >
+            {t("counterOrders.allStations")}
+          </button>
+          {stations.map((id) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => {
+                setStationId(id);
+                setPage(1);
+              }}
+              className={[
+                "flex w-full items-center px-4 py-3 text-left text-sm",
+                stationId === id ? "bg-white font-semibold" : "text-slate-700",
+              ].join(" ")}
+            >
+              <span className="truncate">
+                {t("counterOrders.station")} {shortStation(id)}
               </span>
-            </div>
+            </button>
+          ))}
+        </aside>
 
-            <div className="mt-4 overflow-hidden rounded border border-slate-200">
-              {lines.length ? (
-                lines.map((line, index) => (
-                  <div
-                    key={display(line, ["id"], String(index))}
-                    className="grid grid-cols-[minmax(0,1fr)_5rem_7rem] gap-2 border-b border-slate-100 p-3 text-sm last:border-0"
+        <div className="flex min-h-0 flex-col">
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {tickets.length ? (
+              tickets.map((ticket) => (
+                <article
+                  key={ticket.id || ticket.ticketNumber}
+                  className="grid grid-cols-[auto_4.5rem_minmax(0,1fr)_auto] items-center gap-3 border-b border-slate-100 px-4 py-3"
+                >
+                  <span
+                    className={[
+                      "rounded-full px-2 py-1 text-[10px] font-bold uppercase",
+                      statusTone[ticket.status] || "bg-slate-200 text-slate-800",
+                    ].join(" ")}
                   >
-                    <span className="truncate font-medium">
-                      {display(line, [
-                        "productName",
-                        "variantName",
-                        "name",
-                        "description",
-                      ])}
-                    </span>
-                    <span className="text-right">
-                      × {display(line, ["quantity", "qty"], "1")}
-                    </span>
-                    <span className="text-right font-semibold">
-                      {display(line, [
-                        "lineTotal",
-                        "total",
-                        "subtotal",
-                        "unitPrice",
-                      ])}
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <p className="p-4 text-sm text-slate-500">
-                  {t("counterOrders.noLines")}
-                </p>
-              )}
-            </div>
-
-            <div className="mt-4 flex items-center justify-between rounded bg-slate-50 p-3">
-              <span className="font-semibold">{t("counterOrders.total")}</span>
-              <span className="text-lg font-bold">
-                {display(order, ["grandTotal", "total", "netTotal"])}
-              </span>
-            </div>
-          </div>
-
-          <aside className="flex min-h-0 flex-col rounded-lg bg-white p-4">
-            <h2 className="font-bold">{t("counterOrders.kdsTickets")}</h2>
-            <div className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto">
-              {tickets.length ? (
-                tickets.map((ticket, index) => (
-                  <div
-                    key={display(ticket, ["id"], String(index))}
-                    className="rounded border border-slate-200 p-3 text-sm"
-                  >
-                    <div className="flex justify-between gap-2">
-                      <span className="font-medium">
-                        {display(ticket, [
-                          "ticketNumber",
-                          "stationName",
-                          "id",
-                        ])}
-                      </span>
-                      <span className="text-xs font-semibold">
-                        {display(ticket, ["status", "state"])}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {display(ticket, ["firedAt", "createdAt", "updatedAt"])}
+                    {t(`counterOrders.statuses.${ticket.status.toLowerCase()}`)}
+                  </span>
+                  <time className="text-sm text-slate-500">
+                    {clockTime(ticket.firedAt || ticket.createdAt)}
+                  </time>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold">
+                      {ticket.ticketNumber || ticket.id}
+                      {ticket.courseType ? ` | ${ticket.courseType}` : ""}
+                    </p>
+                    <p className="truncate text-xs text-slate-500">
+                      {ticket.stationId
+                        ? `${t("counterOrders.station")} ${shortStation(ticket.stationId)}`
+                        : t("counterOrders.noStation")}
                     </p>
                   </div>
-                ))
-              ) : (
-                <p className="text-sm text-slate-500">
-                  {t("counterOrders.noTickets")}
-                </p>
-              )}
+                  <button
+                    type="button"
+                    aria-label={t("counterOrders.printTicket", {
+                      ticket: ticket.ticketNumber || ticket.id,
+                    })}
+                    onClick={() => void printTicket(ticket)}
+                    className="grid h-9 w-9 place-items-center rounded-full bg-blue-600 text-sm font-bold text-white"
+                  >
+                    ⎙
+                  </button>
+                </article>
+              ))
+            ) : (
+              <p className="p-6 text-sm text-slate-500">{t("counterOrders.noTickets")}</p>
+            )}
+          </div>
+
+          <footer className="flex items-center justify-between border-t border-slate-200 px-4 py-2 text-sm">
+            <span className={unlinkedCount ? "text-red-600" : "text-slate-400"}>
+              {t("counterOrders.unlinked", { count: unlinkedCount })}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                aria-label={t("counterOrders.previous")}
+                disabled={page <= 1}
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                className="px-2 disabled:opacity-30"
+              >
+                ‹
+              </button>
+              <span>
+                {t("counterOrders.pageLabel", { page, pages: totalPages })}
+              </span>
+              <button
+                type="button"
+                aria-label={t("counterOrders.next")}
+                disabled={page >= totalPages}
+                onClick={() => setPage((current) => current + 1)}
+                className="px-2 disabled:opacity-30"
+              >
+                ›
+              </button>
             </div>
-            <Button
-              fullWidth
-              className="mt-4"
-              isLoading={isLoading}
-              onClick={() => void markPickedUp()}
-            >
-              {t("counterOrders.confirmPickup")}
-            </Button>
-          </aside>
+          </footer>
         </div>
-      ) : (
-        <div className="mt-4 grid flex-1 place-items-center rounded-lg border border-dashed border-slate-300 bg-white text-sm text-slate-500">
-          {t("counterOrders.empty")}
-        </div>
-      )}
+      </div>
+
+      {selectedTicket ? (
+        <article className="kds-print-sheet p-4 text-sm">
+          <p className="text-center text-xs uppercase tracking-wide">
+            {t("counterOrders.print.kitchenTitle")}
+          </p>
+          <h2 className="mt-2 text-center text-xl font-bold">
+            {selectedTicket.ticketNumber || selectedTicket.id}
+          </h2>
+          <p className="mt-1 text-center font-semibold">{selectedTicket.status}</p>
+          <dl className="mt-4 space-y-1">
+            <div className="flex justify-between gap-3">
+              <dt>{t("counterOrders.print.course")}</dt>
+              <dd>{selectedTicket.courseType || "—"}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt>{t("counterOrders.print.firedAt")}</dt>
+              <dd>{clockTime(selectedTicket.firedAt)}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt>{t("counterOrders.station")}</dt>
+              <dd className="truncate">{selectedTicket.stationId || "—"}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt>{t("counterOrders.print.orderRef")}</dt>
+              <dd className="truncate">{selectedTicket.salesOrderId || "—"}</dd>
+            </div>
+          </dl>
+        </article>
+      ) : null}
     </section>
   );
 }

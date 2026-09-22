@@ -246,6 +246,22 @@ export interface FireKdsDTO {
   salesOrderId?: string;
 }
 
+export type KdsTicketStatus = "PENDING" | "PREPARING" | "READY" | "EXPEDITED";
+
+export interface KdsTicketFilterDTO extends PaginatedQueryDTO {
+  stationId?: string;
+  sessionId?: string;
+  status?: KdsTicketStatus;
+  activeOnly?: boolean;
+}
+
+export interface KdsTicketListDTO {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export interface WaitlistFilterDTO extends PaginatedQueryDTO {
   locationId?: string;
   status?: WaitlistStatus;

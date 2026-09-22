@@ -566,4 +566,56 @@ describe("ApiCashierRepository", () => {
     expect(tables.map((table) => table.status)).toEqual(["AVAILABLE", "OCCUPIED"]);
     expect(sessions[0]?.sessionState).toBe("CLOSED");
   });
+
+  it("lists and reads KDS tickets from the ticket endpoints", async () => {
+    const get = vi.fn().mockImplementation((url: string) => {
+      if (String(url).endsWith("/kds/tickets/ticket-1")) {
+        return Promise.resolve({
+          success: true,
+          data: {
+            id: "ticket-1",
+            ticketNumber: "KDS-20260506-0001",
+            status: "PENDING",
+            courseType: "MAIN",
+            stationId: "station-1",
+            firedAt: "2026-09-22T16:53:22.241Z",
+          },
+        });
+      }
+      return Promise.resolve({
+        success: true,
+        meta: { total: 1, page: 1, limit: 50, totalPages: 1 },
+        data: [
+          {
+            id: "ticket-1",
+            ticketNumber: "KDS-20260506-0001",
+            status: "PREPARING",
+            courseType: "MAIN",
+            stationId: "station-1",
+          },
+        ],
+      });
+    });
+    const repository = new ApiCashierRepository({
+      get,
+    } as unknown as HttpClient);
+
+    const list = await repository.listKdsTickets({
+      page: 1,
+      limit: 50,
+      activeOnly: true,
+    });
+    const ticket = await repository.getKdsTicketById("ticket-1");
+
+    expect(get).toHaveBeenCalledWith("/api/v1/kds/tickets", {
+      params: { page: 1, limit: 50, activeOnly: true },
+    });
+    expect(list.tickets[0]).toMatchObject({
+      id: "ticket-1",
+      status: "PREPARING",
+      courseType: "MAIN",
+    });
+    expect(list.totalPages).toBe(1);
+    expect(ticket.ticketNumber).toBe("KDS-20260506-0001");
+  });
 });

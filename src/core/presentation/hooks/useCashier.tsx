@@ -7,6 +7,8 @@ import {
   CreateWaitlistEntryDTO,
   DiningTableFilterDTO,
   FireKdsDTO,
+  KdsTicketFilterDTO,
+  KdsTicketListDTO,
   OpenTableSessionDTO,
   PosRegisterFilterDTO,
   PosSessionFilterDTO,
@@ -33,6 +35,7 @@ import {
   DiningTable,
   DiningZone,
   InventoryLocation,
+  KdsTicket,
   OrderPayment,
   PaymentMethod,
   PosRegister,
@@ -168,6 +171,10 @@ interface UseCashierReturn {
   ) => Promise<SalesOrderLine>;
   getCounterOrderById: (counterOrderId: string) => Promise<Record<string, unknown>>;
   pickupCounterOrder: (counterOrderId: string) => Promise<Record<string, unknown>>;
+  listKdsTickets: (
+    params?: KdsTicketFilterDTO
+  ) => Promise<KdsTicketListDTO & { tickets: KdsTicket[] }>;
+  getKdsTicketById: (ticketId: string) => Promise<KdsTicket>;
   addPayment: (orderId: string, payload: CreateOrderPaymentDTO) => Promise<void>;
   processCheckout: (payload: CheckoutRequestDTO) => Promise<Record<string, unknown>>;
   voidCheckout: (id: string) => Promise<VoidCheckoutResultDTO>;
@@ -1295,6 +1302,36 @@ export function useCashier(): UseCashierReturn {
     [cashierService, clearError]
   );
 
+  const listKdsTickets = useCallback(
+    async (params?: KdsTicketFilterDTO) => {
+      clearError();
+      try {
+        return await cashierService.listKdsTickets(params);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to load KDS tickets";
+        setError(message);
+        throw err;
+      }
+    },
+    [cashierService, clearError]
+  );
+
+  const getKdsTicketById = useCallback(
+    async (ticketId: string) => {
+      clearError();
+      try {
+        return await cashierService.getKdsTicketById(ticketId);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to load KDS ticket";
+        setError(message);
+        throw err;
+      }
+    },
+    [cashierService, clearError]
+  );
+
   const processCheckout = useCallback(
     async (payload: CheckoutRequestDTO) => {
       setIsLoading(true);
@@ -1414,6 +1451,8 @@ export function useCashier(): UseCashierReturn {
       addProductToTableSession,
       getCounterOrderById,
       pickupCounterOrder,
+      listKdsTickets,
+      getKdsTicketById,
       addPayment,
       processCheckout,
       voidCheckout,
@@ -1492,6 +1531,8 @@ export function useCashier(): UseCashierReturn {
       addProductToTableSession,
       getCounterOrderById,
       pickupCounterOrder,
+      listKdsTickets,
+      getKdsTicketById,
       addPayment,
       processCheckout,
       voidCheckout,

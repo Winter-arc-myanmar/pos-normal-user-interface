@@ -833,7 +833,50 @@
     "empty": "Enter an order ID to load order lines and KDS tickets.",
     "findFailed": "Unable to find counter order",
     "pickupFailed": "Unable to confirm pickup",
-    "pickedUp": "Counter order marked as picked up"
+    "pickedUp": "Counter order marked as picked up",
+    "statuses": {
+      "active": "Active",
+      "pending": "Pending",
+      "preparing": "Preparing",
+      "ready": "Ready",
+      "expedited": "Expedited"
+    },
+    "selectTicket": "Select a KDS ticket to print.",
+    "ticketsFailed": "Unable to load KDS tickets",
+    "ticketFailed": "Unable to load KDS ticket",
+    "queues": {
+      "printJob": "Print job ({{count}})",
+      "pending": "Waiting",
+      "preparing": "Preparing",
+      "ready": "Ready",
+      "expedited": "Expedited"
+    },
+    "allStations": "All stations",
+    "station": "Station",
+    "noStation": "No station",
+    "unlinked": "Unlinked print item ({{count}})",
+    "refresh": "Refresh tickets",
+    "printTicket": "Print {{ticket}}",
+    "previous": "Previous page",
+    "next": "Next page",
+    "pageLabel": "Page {{page}} / {{pages}}",
+    "print": {
+      "lobbyTitle": "Lobby Print",
+      "lobbyHint": "Order Bill/Customer Bill/Finance Bill and Order Summary",
+      "labelTitle": "Label Printing",
+      "labelHint": "Item label will be printed after the order is placed successfully.",
+      "averageTitle": "Average distribution",
+      "averageHint": "During peak hours, the order volume of a single device is too large, resulting in slow efficiency. You can configure average distribution to divert orders.",
+      "kitchenTitle": "Kitchen Print",
+      "kitchenHint": "For kitchen printing, please configure it in the module of Merchant Background - Business Settings - Kitchen Print",
+      "net": "+ Net Printer",
+      "usb": "+ USB Printer",
+      "bluetooth": "+ Bluetooth Printer",
+      "ticketNumber": "Ticket",
+      "course": "Course",
+      "firedAt": "Fired",
+      "orderRef": "Sales order"
+    }
   },
   "notFound": {
     "title": "Page not found",

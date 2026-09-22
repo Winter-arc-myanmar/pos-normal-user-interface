@@ -217,6 +217,8 @@ export const API_ENDPOINTS = {
 
   KDS: {
     FIRE: "/api/v1/kds/fire",
+    TICKETS: "/api/v1/kds/tickets",
+    TICKET: (id: string) => `/api/v1/kds/tickets/${id}`,
   },
 
   DISCOUNT_REASONS: {

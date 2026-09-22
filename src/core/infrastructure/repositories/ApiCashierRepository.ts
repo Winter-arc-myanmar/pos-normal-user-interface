@@ -6,6 +6,8 @@ import {
   CreateWaitlistEntryDTO,
   DiningTableFilterDTO,
   FireKdsDTO,
+  KdsTicketFilterDTO,
+  KdsTicketListDTO,
   OpenTableSessionDTO,
   PosRegisterFilterDTO,
   PosSessionFilterDTO,
@@ -33,6 +35,7 @@ import {
   DiningTable,
   DiningZone,
   InventoryLocation,
+  KdsTicket,
   OrderPayment,
   PaymentMethod,
   PosRegister,
@@ -326,6 +329,51 @@ const asList = <T>(response: unknown): T[] => {
   }
 
   return [];
+};
+
+const toKdsTicket = (item: Record<string, unknown>) =>
+  new KdsTicket({
+    id: String(item.id || ""),
+    tenantId: String(item.tenantId || ""),
+    sessionId: String(item.sessionId || ""),
+    salesOrderId: String(item.salesOrderId || ""),
+    stationId: String(item.stationId || ""),
+    ticketNumber: String(item.ticketNumber || ""),
+    courseType: String(item.courseType || ""),
+    firedAt: item.firedAt ? String(item.firedAt) : "",
+    startedAt: item.startedAt ? String(item.startedAt) : null,
+    bumpedAt: item.bumpedAt ? String(item.bumpedAt) : null,
+    status: String(item.status || "PENDING") as KdsTicket["status"],
+    createdAt: String(item.createdAt || ""),
+    updatedAt: String(item.updatedAt || ""),
+  });
+
+const toKdsTicketList = (
+  response: unknown,
+  tickets: KdsTicket[],
+  fallbackLimit: number
+): KdsTicketListDTO & { tickets: KdsTicket[] } => {
+  const envelope =
+    response && typeof response === "object"
+      ? (response as Record<string, unknown>)
+      : {};
+  const meta =
+    envelope.meta && typeof envelope.meta === "object"
+      ? (envelope.meta as Record<string, unknown>)
+      : {};
+  const limit = Number(meta.limit || fallbackLimit || tickets.length || 1);
+  const total = Number(meta.total ?? tickets.length);
+  const page = Number(meta.page || 1);
+  const totalPages = Number(
+    meta.totalPages || Math.max(1, Math.ceil(total / Math.max(limit, 1)))
+  );
+  return {
+    tickets,
+    total: Number.isFinite(total) ? total : tickets.length,
+    page: Number.isFinite(page) && page > 0 ? page : 1,
+    limit: Number.isFinite(limit) && limit > 0 ? limit : fallbackLimit,
+    totalPages: Number.isFinite(totalPages) && totalPages > 0 ? totalPages : 1,
+  };
 };
 
 const toWaitlistEntry = (item: Record<string, unknown>) =>
@@ -1163,6 +1211,24 @@ export class ApiCashierRepository implements ICashierRepository {
     await this.httpClient.delete(
       API_ENDPOINTS.TIP_POOLS.ALLOCATIONS.DELETE(poolId, allocationId)
     );
+  }
+
+  async listKdsTickets(
+    params?: KdsTicketFilterDTO
+  ): Promise<KdsTicketListDTO & { tickets: KdsTicket[] }> {
+    const response = await this.httpClient.get<ApiEnvelope<Record<string, unknown>[]>>(
+      API_ENDPOINTS.KDS.TICKETS,
+      { params }
+    );
+    const tickets = asList<Record<string, unknown>>(response).map(toKdsTicket);
+    return toKdsTicketList(response, tickets, params?.limit || 50);
+  }
+
+  async getKdsTicketById(id: string): Promise<KdsTicket> {
+    const response = await this.httpClient.get<ApiEnvelope<Record<string, unknown>>>(
+      API_ENDPOINTS.KDS.TICKET(id)
+    );
+    return toKdsTicket(unwrap(response));
   }
 
   async getCounterOrderById(id: string): Promise<Record<string, unknown>> {

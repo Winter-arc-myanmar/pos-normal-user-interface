@@ -219,6 +219,26 @@ export class TableSession {
   }
 }
 
+export class KdsTicket {
+  id!: string;
+  tenantId!: string;
+  sessionId!: string;
+  salesOrderId!: string;
+  stationId!: string;
+  ticketNumber!: string;
+  courseType!: string;
+  firedAt!: string;
+  startedAt?: string | null;
+  bumpedAt?: string | null;
+  status!: "PENDING" | "PREPARING" | "READY" | "EXPEDITED";
+  createdAt!: string;
+  updatedAt!: string;
+
+  constructor(data: Partial<KdsTicket>) {
+    Object.assign(this, data);
+  }
+}
+
 export class AdjustmentReason {
   id!: string;
   tenantId!: string;

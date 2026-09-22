@@ -8,6 +8,8 @@ import {
   CreateWaitlistEntryDTO,
   DiningTableFilterDTO,
   FireKdsDTO,
+  KdsTicketFilterDTO,
+  KdsTicketListDTO,
   OpenTableSessionDTO,
   PosRegisterFilterDTO,
   PosSessionFilterDTO,
@@ -44,6 +46,7 @@ import {
   ProductVariant,
   SalesOrder,
   SalesOrderLine,
+  KdsTicket,
   TableSession,
   TipPool,
   TipPoolAllocation,
@@ -464,6 +467,17 @@ export class CashierService implements ICashierService {
   async pickupCounterOrder(id: string): Promise<Record<string, unknown>> {
     if (!id?.trim()) throw new Error("Counter order ID is required");
     return this.cashierRepository.pickupCounterOrder(id);
+  }
+
+  async listKdsTickets(
+    params?: KdsTicketFilterDTO
+  ): Promise<KdsTicketListDTO & { tickets: KdsTicket[] }> {
+    return this.cashierRepository.listKdsTickets(params);
+  }
+
+  async getKdsTicketById(id: string): Promise<KdsTicket> {
+    if (!id?.trim()) throw new Error("KDS ticket ID is required");
+    return this.cashierRepository.getKdsTicketById(id);
   }
 
   async checkout(payload: CheckoutRequestDTO): Promise<Record<string, unknown>> {

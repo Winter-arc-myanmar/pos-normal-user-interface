@@ -6,6 +6,8 @@ import {
   CreateWaitlistEntryDTO,
   DiningTableFilterDTO,
   FireKdsDTO,
+  KdsTicketFilterDTO,
+  KdsTicketListDTO,
   OpenTableSessionDTO,
   PosRegisterFilterDTO,
   PosSessionFilterDTO,
@@ -40,6 +42,7 @@ import {
   ProductVariant,
   SalesOrder,
   SalesOrderLine,
+  KdsTicket,
   TableSession,
   TipPool,
   TipPoolAllocation,
@@ -131,6 +134,10 @@ export interface ICashierService {
   deleteTipPoolAllocation(poolId: string, allocationId: string): Promise<void>;
   getCounterOrderById(id: string): Promise<Record<string, unknown>>;
   pickupCounterOrder(id: string): Promise<Record<string, unknown>>;
+  listKdsTickets(
+    params?: KdsTicketFilterDTO
+  ): Promise<KdsTicketListDTO & { tickets: KdsTicket[] }>;
+  getKdsTicketById(id: string): Promise<KdsTicket>;
   checkout(payload: CheckoutRequestDTO): Promise<Record<string, unknown>>;
   voidCheckout(id: string): Promise<VoidCheckoutResultDTO>;
 }
