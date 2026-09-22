@@ -411,7 +411,7 @@ describe("ApiCashierRepository", () => {
     });
   });
 
-  it("creates a sales order with the API serviceType", async () => {
+  it("creates a sales order without serviceType", async () => {
     const post = vi.fn().mockResolvedValue({
       data: {
         id: "order-1",
@@ -439,7 +439,6 @@ describe("ApiCashierRepository", () => {
       customerId: undefined,
       orderNumber: undefined,
       salesChannel: "POS",
-      serviceType: "TAKEAWAY",
       idempotencyKey: undefined,
       subtotal: undefined,
       totalDiscount: undefined,

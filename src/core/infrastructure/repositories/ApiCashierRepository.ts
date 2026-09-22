@@ -19,7 +19,6 @@ import {
   TipPoolAllocationDTO,
   TipPoolFilterDTO,
   fromApiServiceType,
-  toApiServiceType,
   UpdateTableSessionStateDTO,
   UpdateSalesOrderLineDTO,
   UpdateTipPoolDTO,
@@ -658,9 +657,6 @@ export class ApiCashierRepository implements ICashierRepository {
         customerId: payload.customerId,
         orderNumber: payload.orderNumber,
         salesChannel: payload.salesChannel,
-        ...(payload.serviceType
-          ? { serviceType: toApiServiceType(payload.serviceType) }
-          : {}),
         idempotencyKey: payload.idempotencyKey,
         subtotal: payload.subtotal,
         totalDiscount: payload.totalDiscount,

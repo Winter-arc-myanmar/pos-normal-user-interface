@@ -1742,7 +1742,6 @@ export function CashierPage() {
           tenantId: context.tenantId,
           locationId: context.locationId,
           salesChannel: "POS",
-          serviceType: activeServiceType,
           status: "DRAFT",
           subtotal: "0.0000",
           totalDiscount: "0.0000",

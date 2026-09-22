@@ -310,9 +310,10 @@ export class ApiSalesOrderRepository implements ISalesOrderRepository {
   }
 
   async createSalesOrder(payload: CreateSalesOrderDTO): Promise<SalesOrder> {
+    const { serviceType: _serviceType, ...body } = payload;
     const response = await this.httpClient.post<ApiEnvelope<Record<string, unknown>>>(
       API_ENDPOINTS.SALES_ORDERS.CREATE,
-      payload
+      body
     );
     return toSalesOrder(asRecord(unwrap(response)) || {});
   }
