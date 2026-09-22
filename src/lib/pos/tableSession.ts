@@ -5,6 +5,14 @@ type TableSessionLike = {
   openedAt?: string | null;
 };
 
+export function normalizeDiningTableStatus(status?: string | null): string {
+  return String(status || "AVAILABLE").trim().toUpperCase();
+}
+
+export function isOccupiedDiningTable(status?: string | null): boolean {
+  return normalizeDiningTableStatus(status) === "OCCUPIED";
+}
+
 export function isOpenTableSession(
   session?: TableSessionLike | null
 ): boolean {

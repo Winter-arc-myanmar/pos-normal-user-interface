@@ -531,4 +531,40 @@ describe("ApiCashierRepository", () => {
       sessionState: "ORDERING",
     });
   });
+
+  it("keeps table status and closed sessions from being misread", async () => {
+    const get = vi.fn().mockImplementation((url: string) => {
+      if (String(url).includes("dining-tables")) {
+        return Promise.resolve({
+          data: {
+            items: [
+              { id: "table-free", tableNumber: "T1", status: "available" },
+              { id: "table-busy", tableNumber: "T2", status: " occupied " },
+            ],
+          },
+        });
+      }
+      return Promise.resolve({
+        data: {
+          items: [
+            {
+              id: "session-closed",
+              tableId: "table-free",
+              openedAt: "2026-09-21T12:00:00.000Z",
+              closedAt: "2026-09-21T13:00:00.000Z",
+            },
+          ],
+        },
+      });
+    });
+    const repository = new ApiCashierRepository({
+      get,
+    } as unknown as HttpClient);
+
+    const tables = await repository.getDiningTables({ page: 1, limit: 200 });
+    const sessions = await repository.getTableSessions({ page: 1, limit: 200 });
+
+    expect(tables.map((table) => table.status)).toEqual(["AVAILABLE", "OCCUPIED"]);
+    expect(sessions[0]?.sessionState).toBe("CLOSED");
+  });
 });

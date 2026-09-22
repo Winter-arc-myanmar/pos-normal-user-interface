@@ -95,7 +95,7 @@ interface UseCashierReturn {
   fetchDiningZones: () => Promise<void>;
   fetchDiningTables: (params?: DiningTableFilterDTO) => Promise<void>;
   fetchTableSessions: (params?: TableSessionFilterDTO) => Promise<TableSession[]>;
-  refreshDiningTableStatus: () => Promise<boolean>;
+  refreshDiningTableStatus: (part?: "tables" | "sessions") => Promise<boolean>;
   updateDiningTableStatus: (
     tableId: string,
     status: DiningTable["status"]
@@ -1021,25 +1021,32 @@ export function useCashier(): UseCashierReturn {
     [cashierService, clearError]
   );
 
-  const refreshDiningTableStatus = useCallback(async () => {
-    try {
-      const [tables, sessions] = await Promise.all([
-        cashierService.getDiningTables({ page: 1, limit: 200 }),
-        cashierService.getTableSessions({
-          page: 1,
-          limit: 200,
-          sortBy: "openedAt",
-          sortOrder: "desc",
-        }),
-      ]);
-      setDiningTables(tables);
-      setTableSessions(sessions);
-      return true;
-    } catch {
-      // Keep the last known floor state if a background refresh fails.
-      return false;
-    }
-  }, [cashierService]);
+  const refreshDiningTableStatus = useCallback(
+    async (part: "tables" | "sessions" = "tables") => {
+      try {
+        if (part === "tables") {
+          const tables = await cashierService.getDiningTables({
+            page: 1,
+            limit: 200,
+          });
+          setDiningTables(tables);
+        } else {
+          const sessions = await cashierService.getTableSessions({
+            page: 1,
+            limit: 200,
+            sortBy: "openedAt",
+            sortOrder: "desc",
+          });
+          setTableSessions(sessions);
+        }
+        return true;
+      } catch {
+        // Keep the last known floor state if a background refresh fails.
+        return false;
+      }
+    },
+    [cashierService]
+  );
 
   const updateDiningTableStatus = useCallback(
     async (tableId: string, status: DiningTable["status"]) => {

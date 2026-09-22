@@ -64,8 +64,8 @@ import {
 } from "@/lib/pos/splitPayments";
 
 const BOARD_PAGE_SIZE = 15;
-const TABLE_STATUS_POLL_MS = 30_000;
-const TABLE_STATUS_BACKOFF_MS = 120_000;
+const TABLE_STATUS_POLL_MS = 60_000;
+const TABLE_STATUS_BACKOFF_MS = 180_000;
 
 export function CashierPage() {
   const { t } = useTranslation();
@@ -185,15 +185,25 @@ export function CashierPage() {
       fetchSalesOrders({ page: 1, limit: 100 }),
       fetchPaymentMethods(),
       fetchDiningZones(),
-      fetchDiningTables({ page: 1, limit: 200 }),
-      fetchTableSessions({
+      fetchDiscountReasons(),
+    ]);
+    // Table list and sessions share a strict rate limit. Load them after the
+    // rest of the board, and never in the same burst.
+    try {
+      await fetchDiningTables({ page: 1, limit: 200 });
+    } catch {
+      // The hook already records the error.
+    }
+    try {
+      await fetchTableSessions({
         page: 1,
         limit: 200,
         sortBy: "openedAt",
         sortOrder: "desc",
-      }),
-      fetchDiscountReasons(),
-    ]);
+      });
+    } catch {
+      // The hook already records the error.
+    }
   }, [
     clearError,
     fetchDiningTables,
@@ -257,25 +267,26 @@ export function CashierPage() {
   useEffect(() => {
     if (!usesTableBoard) return;
 
+    let stopped = false;
     let inFlight = false;
-    let lastStartedAt = 0;
     let backoffUntil = 0;
+    let phase: "tables" | "sessions" = "tables";
 
     const pollTableStatus = async () => {
-      const now = Date.now();
       if (
+        stopped ||
         document.visibilityState === "hidden" ||
         inFlight ||
         isBusyRef.current ||
-        now < backoffUntil ||
-        now - lastStartedAt < TABLE_STATUS_POLL_MS - 1_000
+        Date.now() < backoffUntil
       ) {
         return;
       }
       inFlight = true;
-      lastStartedAt = now;
+      const part = phase;
+      phase = part === "tables" ? "sessions" : "tables";
       try {
-        const refreshed = await refreshDiningTableStatus();
+        const refreshed = await refreshDiningTableStatus(part);
         if (!refreshed) {
           backoffUntil = Date.now() + TABLE_STATUS_BACKOFF_MS;
         }
@@ -287,11 +298,10 @@ export function CashierPage() {
     const timer = window.setInterval(() => {
       void pollTableStatus();
     }, TABLE_STATUS_POLL_MS);
-    document.addEventListener("visibilitychange", pollTableStatus);
 
     return () => {
+      stopped = true;
       window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", pollTableStatus);
     };
   }, [refreshDiningTableStatus, usesTableBoard]);
 
@@ -879,6 +889,19 @@ export function CashierPage() {
     }
     const table = diningTables.find((item) => item.id === tableId);
     if (!table) return;
+
+    const currentTableId = activeTableId || selectedOrderSession?.tableId || null;
+    if (currentTableId && currentTableId !== table.id) {
+      clearOrderSelection();
+      setTableOrderIds([]);
+      setMultiOrderLines({});
+      setSelectedMergeOrderIds([]);
+      if (!pendingLines.length) {
+        setIsDirectCheckoutMode(false);
+        setDirectCartLines([]);
+      }
+    }
+    setActiveTableId(table.id);
 
     try {
       const context = await requireCashierContext();

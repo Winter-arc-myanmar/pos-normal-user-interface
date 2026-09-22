@@ -12,7 +12,11 @@ import { TableWarningStatusDTO } from "@/core/application/dtos/CashierDTO";
 import { ApiLoadingState } from "@/components/ApiLoadingState";
 import { NotificationBell } from "@/components/ui/NotificationBell";
 import { isSettledSalesOrder } from "@/lib/pos/orderStatus";
-import { isOpenTableSession } from "@/lib/pos/tableSession";
+import {
+  isOccupiedDiningTable,
+  isOpenTableSession,
+  normalizeDiningTableStatus,
+} from "@/lib/pos/tableSession";
 
 const serviceTabs: Array<{ key: ServiceType; labelKey: string }> = [
   { key: "TABLE", labelKey: "cashier.serviceTypes.table" },
@@ -53,7 +57,7 @@ interface CashierBoardProps {
 }
 
 const boardTileClass =
-  "relative flex h-24 items-center justify-center border border-slate-700 bg-[#181818] transition hover:border-blue-500";
+  "relative flex h-24 items-center justify-center border border-slate-700 transition hover:border-blue-500";
 
 export function CashierBoard({
   serviceType,
@@ -147,24 +151,25 @@ export function CashierBoard({
           <div className="grid grid-cols-3 gap-2 min-[900px]:grid-cols-4 min-[1200px]:grid-cols-5">
             {serviceType === "TABLE" || serviceType === "DINE_IN"
               ? tables.map((table) => {
-                  const session = getLatestSession(table.id);
+                  const latestSession = getLatestSession(table.id);
+                  const session = isOpenTableSession(latestSession)
+                    ? latestSession
+                    : undefined;
                   const orderCount = getOrderCount?.(table.id) || 0;
                   const selected =
                     !!selectedOrderId && session?.salesOrderId === selectedOrderId;
                   const isCircle =
                     String(table.shape || "").toUpperCase() === "CIRCLE";
-                  const occupied =
-                    table.status === "OCCUPIED" ||
-                    isOpenTableSession(session) ||
-                    Boolean(session && !session.closedAt);
+                  const tableStatus = normalizeDiningTableStatus(table.status);
+                  const occupied = isOccupiedDiningTable(tableStatus);
                   const warning = occupied
                     ? getTableWarning?.(session?.openedAt)
                     : null;
                   const warningClass =
                     warning?.level === "CRITICAL"
-                      ? "border-red-500 bg-red-950/40"
+                      ? "border-red-500"
                       : warning?.level === "WARNING"
-                        ? "border-amber-400 bg-amber-950/30"
+                        ? "border-amber-500"
                         : "";
                   const showCircle = isCircle && !occupied && orderCount <= 1;
 
@@ -175,30 +180,49 @@ export function CashierBoard({
                       className={[
                         boardTileClass,
                         showCircle ? "rounded-full" : "rounded-md",
-                        selected ? "ring-2 ring-blue-400 ring-offset-2 ring-offset-[#070707]" : "",
+                        selected
+                          ? occupied
+                            ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-white"
+                            : "ring-2 ring-blue-400 ring-offset-2 ring-offset-[#070707]"
+                          : "",
+                        occupied ? "border-slate-300 bg-white text-slate-900" : "bg-[#181818]",
                         warningClass,
                       ].join(" ")}
                       onClick={() => onTableSelect(table.id)}
                     >
-                      <span className="absolute left-2 top-2 max-w-[45%] truncate text-sm font-semibold">
+                      <span
+                        className={[
+                          "absolute left-2 top-2 max-w-[42%] truncate text-sm font-semibold",
+                          occupied ? "text-slate-900" : "",
+                        ].join(" ")}
+                      >
                         {table.tableNumber}
                       </span>
                       {warning ? (
                         <span
                           className={[
-                            "absolute right-2 top-2 rounded px-1.5 py-0.5 text-[9px] font-bold",
+                            "absolute right-1.5 top-1.5 max-w-[56%] truncate rounded px-1.5 py-0.5 text-[9px] font-bold",
                             warning.level === "CRITICAL"
                               ? "bg-red-500 text-white"
                               : warning.level === "WARNING"
                                 ? "bg-amber-400 text-slate-950"
                                 : "bg-emerald-500 text-slate-950",
                           ].join(" ")}
+                          title={t(`cashier.tableWarning.${warning.level.toLowerCase()}`)}
                         >
-                          {warning.elapsedLabel}
+                          {warning.elapsedLabel}{" "}
+                          {t(`cashier.tableWarning.${warning.level.toLowerCase()}`)}
                         </span>
                       ) : null}
                       {!occupied ? (
                         <span className="text-4xl leading-none text-white/90">+</span>
+                      ) : session ? (
+                        <span
+                          className="mb-4 max-w-[90%] truncate text-[11px] font-semibold text-sky-700"
+                          title={t("cashier.orderPanel.sessionState")}
+                        >
+                          {session.sessionState}
+                        </span>
                       ) : null}
                       {orderCount > 1 ? (
                         <span className="absolute left-2 bottom-2 rounded bg-emerald-500 px-1.5 py-0.5 text-[9px] font-bold text-slate-950">
@@ -207,10 +231,17 @@ export function CashierBoard({
                           })}
                         </span>
                       ) : null}
-                      <span className="absolute bottom-2 right-2 max-w-[55%] truncate text-[10px] text-slate-300">
-                        {warning
-                          ? t(`cashier.tableWarning.${warning.level.toLowerCase()}`)
-                          : session?.sessionState || table.status}
+                      <span
+                        className={[
+                          "absolute bottom-1.5 max-w-[55%] truncate text-[10px]",
+                          occupied ? "text-slate-600" : "text-slate-300",
+                          orderCount > 1 ? "right-2" : "left-2",
+                        ].join(" ")}
+                        title={t("cashier.orderPanel.tableStatus")}
+                      >
+                        {t("cashier.orderPanel.tableStatusOption", {
+                          status: tableStatus,
+                        })}
                       </span>
                     </button>
                   );
@@ -223,7 +254,7 @@ export function CashierBoard({
                     type="button"
                     className={[
                       boardTileClass,
-                      "rounded-md",
+                      "rounded-md bg-[#181818]",
                       selectedOrderId === order.id ? "border-blue-500" : "",
                       settled ? "opacity-80" : "",
                     ].join(" ")}

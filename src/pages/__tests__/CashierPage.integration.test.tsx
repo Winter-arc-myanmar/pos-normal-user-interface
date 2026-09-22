@@ -352,9 +352,10 @@ describe("CashierPage integration", () => {
 
       expect(mocks.refreshDiningTableStatus).not.toHaveBeenCalled();
 
-      await vi.advanceTimersByTimeAsync(30_000);
+      await vi.advanceTimersByTimeAsync(60_000);
 
       expect(mocks.refreshDiningTableStatus).toHaveBeenCalledTimes(1);
+      expect(mocks.refreshDiningTableStatus).toHaveBeenCalledWith("tables");
     } finally {
       vi.useRealTimers();
     }

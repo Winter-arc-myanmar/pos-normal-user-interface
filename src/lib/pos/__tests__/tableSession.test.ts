@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { findOpenTableSession, isOpenTableSession } from "../tableSession";
+import {
+  findOpenTableSession,
+  isOccupiedDiningTable,
+  isOpenTableSession,
+  normalizeDiningTableStatus,
+} from "../tableSession";
 
 describe("isOpenTableSession", () => {
   it("treats CLOSED or closedAt as finished", () => {
@@ -34,5 +39,14 @@ describe("isOpenTableSession", () => {
         "table-1"
       )?.sessionState
     ).toBe("ORDERING");
+  });
+});
+
+describe("dining table occupancy", () => {
+  it("follows the table status instead of a leftover session", () => {
+    expect(normalizeDiningTableStatus(" available ")).toBe("AVAILABLE");
+    expect(isOccupiedDiningTable("AVAILABLE")).toBe(false);
+    expect(isOccupiedDiningTable("occupied")).toBe(true);
+    expect(isOccupiedDiningTable(" OCCUPIED ")).toBe(true);
   });
 });

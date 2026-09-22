@@ -500,8 +500,10 @@ const toTableSession = (
       nestedId(item.salesOrder) ||
       nestedId(item.order),
     sessionState: String(
-      item.sessionState || fallbackState || "SEATED"
-    ) as TableSession["sessionState"],
+      item.sessionState ||
+        fallbackState ||
+        (item.closedAt ? "CLOSED" : "SEATED")
+    ).toUpperCase() as TableSession["sessionState"],
     posRegisterId: item.posRegisterId ? String(item.posRegisterId) : undefined,
     openedByPosSessionId: item.openedByPosSessionId
       ? String(item.openedByPosSessionId)
@@ -895,7 +897,9 @@ export class ApiCashierRepository implements ICashierRepository {
           posX: item.posX ? String(item.posX) : undefined,
           posY: item.posY ? String(item.posY) : undefined,
           shape: item.shape ? String(item.shape) : undefined,
-          status: String(item.status || "AVAILABLE") as DiningTable["status"],
+          status: String(item.status || "AVAILABLE")
+            .trim()
+            .toUpperCase() as DiningTable["status"],
         })
     );
   }
@@ -918,7 +922,9 @@ export class ApiCashierRepository implements ICashierRepository {
       posX: item.posX ? String(item.posX) : undefined,
       posY: item.posY ? String(item.posY) : undefined,
       shape: item.shape ? String(item.shape) : undefined,
-      status: String(item.status || "AVAILABLE") as DiningTable["status"],
+      status: String(item.status || "AVAILABLE")
+        .trim()
+        .toUpperCase() as DiningTable["status"],
     });
   }
 
