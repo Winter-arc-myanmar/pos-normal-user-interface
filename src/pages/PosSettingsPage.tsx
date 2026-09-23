@@ -9,12 +9,12 @@ import {
   SettingsSection,
   SettingsToggleRow,
 } from "./settings/settingsUi";
-import { DevicesSettingsPanel } from "./settings/DevicesSettingsPanel";
+// import { DevicesSettingsPanel } from "./settings/DevicesSettingsPanel";
 import { PrinterSettingsPanel } from "./settings/PrinterSettingsPanel";
 
 type SettingsTab =
   | "cashier"
-  | "devices"
+  // | "devices"
   | "printer"
   | "print-template"
   | "pos-terminal"
@@ -22,7 +22,7 @@ type SettingsTab =
 
 const tabIds: SettingsTab[] = [
   "cashier",
-  "devices",
+  // "devices",
   "printer",
   "print-template",
   "pos-terminal",
@@ -85,7 +85,7 @@ export function PosSettingsPage() {
     () =>
       ({
         cashier: t("settings.tabs.cashier"),
-        devices: t("settings.tabs.devices"),
+        // devices: t("settings.tabs.devices"),
         printer: t("settings.tabs.printer"),
         "print-template": t("settings.tabs.printTemplate"),
         "pos-terminal": t("settings.tabs.posTerminal"),
@@ -222,7 +222,7 @@ export function PosSettingsPage() {
           </div>
         ) : null}
 
-        {activeTab === "devices" ? <DevicesSettingsPanel /> : null}
+        {/* {activeTab === "devices" ? <DevicesSettingsPanel /> : null} */}
 
         {activeTab === "printer" ? (
           <div className="mx-auto max-w-5xl">

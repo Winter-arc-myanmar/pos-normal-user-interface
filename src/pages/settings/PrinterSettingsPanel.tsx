@@ -44,7 +44,7 @@ export function PrinterSettingsPanel() {
   const [ipAddress, setIpAddress] = useState("");
   const [port, setPort] = useState("9100");
   const [deviceName, setDeviceName] = useState("");
-  const [isActive, setIsActive] = useState(true);
+  const [isActive, setIsActive] = useState(false);
   const [isDefault, setIsDefault] = useState(false);
   const [categoryId, setCategoryId] = useState("");
   const [stationId, setStationId] = useState("");
@@ -71,7 +71,7 @@ export function PrinterSettingsPanel() {
     setIpAddress("");
     setPort("9100");
     setDeviceName("");
-    setIsActive(true);
+    setIsActive(false);
     setIsDefault(false);
     setCategoryId("");
     setStationId("");
@@ -107,7 +107,7 @@ export function PrinterSettingsPanel() {
     setIpAddress(binding.host || "");
     setPort(String(binding.port || 9100));
     setDeviceName(binding.deviceName || "");
-    setIsActive(true);
+    setIsActive(Boolean(binding.lastVerifiedAt) && !binding.lastError);
     setIsDefault(connection.defaultBinding?.id === binding.id);
     setStationId(binding.stationId || "");
     setVerifiedBinding(binding);
@@ -141,9 +141,11 @@ export function PrinterSettingsPanel() {
       const verified = await connection.verify(draftBinding());
       setVerifiedBinding(verified);
       setSelectedBindingId(verified.id);
+      setIsActive(true);
       setNotice(t("settings.printer.testSucceeded"));
     } catch (caught) {
       setVerifiedBinding(null);
+      setIsActive(false);
       setLocalError(
         caught instanceof Error
           ? caught.message
@@ -155,42 +157,75 @@ export function PrinterSettingsPanel() {
   const save = async () => {
     setNotice(null);
     setLocalError(null);
-    if (!verifiedBinding) {
-      setLocalError(t("settings.printer.testRequired"));
+    const draft = draftBinding();
+    let connected = false;
+    let verified: PrinterBinding | null = null;
+    try {
+      verified = await connection.verify(draft);
+      connected = true;
+      setVerifiedBinding(verified);
+      setSelectedBindingId(verified.id);
+    } catch (caught) {
+      setVerifiedBinding(null);
+      setLocalError(
+        caught instanceof Error ? caught.message : t("settings.printer.testFailed")
+      );
+    }
+    setIsActive(connected);
+
+    if (transport !== "NETWORK") {
+      if (!connected || !verified) return;
+      connection.saveBinding(
+        { ...verified, stationId: stationId.trim() || undefined },
+        isDefault
+      );
+      setNotice(t("settings.printer.saved"));
       return;
     }
+
+    const portNumber = Number(port);
+    if (
+      !activeLocationId ||
+      !name.trim() ||
+      !ipAddress.trim() ||
+      !Number.isInteger(portNumber) ||
+      portNumber < 1 ||
+      portNumber > 65535
+    ) {
+      setLocalError(t("settings.printer.saveFailed"));
+      return;
+    }
+
     try {
-      let binding = {
-        ...verifiedBinding,
-        displayName: name.trim(),
-        transport,
-        stationId: stationId.trim() || undefined,
-        categoryIds: verifiedBinding.categoryIds,
+      const payload = {
+        locationId: activeLocationId,
+        name: name.trim(),
+        ipAddress: ipAddress.trim(),
+        port: portNumber,
+        isActive: connected,
       };
-      if (transport === "NETWORK") {
-        const payload = {
-          locationId: activeLocationId,
-          name: name.trim(),
-          ipAddress: ipAddress.trim(),
-          port: Number(port),
-          isActive,
-        };
-        const printer = selectedBackendId
-          ? await updatePrinter(selectedBackendId, payload)
-          : await createPrinter({ tenantId, ...payload });
-        binding = {
-          ...binding,
-          id: binding.id || printer.id,
+      const printer = selectedBackendId
+        ? await updatePrinter(selectedBackendId, payload)
+        : await createPrinter({ tenantId, ...payload });
+      setSelectedBackendId(printer.id);
+      if (connected && verified) {
+        const binding = {
+          ...verified,
+          id: verified.id || printer.id,
           backendPrinterId: printer.id,
           host: printer.ipAddress,
           port: printer.port,
+          stationId: stationId.trim() || undefined,
         };
-        setSelectedBackendId(printer.id);
+        connection.saveBinding(binding, isDefault);
+        setSelectedBindingId(binding.id);
+        setVerifiedBinding(binding);
+      } else if (selectedBindingId) {
+        connection.removeBinding(selectedBindingId);
       }
-      connection.saveBinding(binding, isDefault);
-      setSelectedBindingId(binding.id);
-      setVerifiedBinding(binding);
-      setNotice(t("settings.printer.saved"));
+      setNotice(
+        connected ? t("settings.printer.saved") : t("settings.printer.savedInactive")
+      );
     } catch (caught) {
       setLocalError(
         caught instanceof Error ? caught.message : t("settings.printer.saveFailed")
@@ -249,15 +284,6 @@ export function PrinterSettingsPanel() {
       );
     }
   };
-
-  const verificationMatches =
-    verifiedBinding &&
-    verifiedBinding.displayName === name.trim() &&
-    verifiedBinding.transport === transport &&
-    (transport !== "NETWORK" ||
-      (verifiedBinding.host === ipAddress.trim() &&
-        verifiedBinding.port === Number(port))) &&
-    (transport === "NETWORK" || verifiedBinding.deviceName === deviceName);
 
   return (
     <div className="grid min-h-[34rem] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:grid-cols-[16rem_minmax(0,1fr)]">
@@ -369,16 +395,14 @@ export function PrinterSettingsPanel() {
           </div>
         </dl>
 
-        {(localError || apiError || connection.error || notice) && (
-          <p
-            className={[
-              "mt-4 rounded p-3 text-sm",
-              localError || apiError || connection.error
-                ? "bg-red-50 text-red-700"
-                : "bg-emerald-50 text-emerald-700",
-            ].join(" ")}
-          >
-            {localError || apiError || connection.error || notice}
+        {(localError || apiError || connection.error) && (
+          <p className="mt-4 rounded bg-red-50 p-3 text-sm text-red-700">
+            {localError || apiError || connection.error}
+          </p>
+        )}
+        {notice && (
+          <p className="mt-4 rounded bg-emerald-50 p-3 text-sm text-emerald-700">
+            {notice}
           </p>
         )}
 
@@ -470,15 +494,13 @@ export function PrinterSettingsPanel() {
           )}
         </div>
 
+        <p className="mt-4 text-sm text-slate-600">
+          {t("settings.printer.active")}:{" "}
+          <span className={isActive ? "font-semibold text-emerald-700" : "font-semibold text-slate-500"}>
+            {isActive ? t("settings.printer.yes") : t("settings.printer.no")}
+          </span>
+        </p>
         <div className="mt-4 flex flex-wrap gap-4 text-sm">
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={isActive}
-              onChange={(event) => setIsActive(event.target.checked)}
-            />
-            {t("settings.printer.active")}
-          </label>
           <label className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -539,8 +561,8 @@ export function PrinterSettingsPanel() {
           </Button>
           <Button
             type="button"
-            isLoading={isLoading}
-            disabled={!verificationMatches || !activeLocationId || !tenantId}
+            isLoading={isLoading || connection.isConnecting}
+            disabled={!name.trim() || !activeLocationId || !tenantId}
             onClick={() => void save()}
           >
             {t("settings.printer.save")}
