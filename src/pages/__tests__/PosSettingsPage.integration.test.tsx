@@ -52,6 +52,7 @@ const printerMocks = vi.hoisted(() => ({
   verify: vi.fn(),
   saveBinding: vi.fn(),
   create: vi.fn(),
+  update: vi.fn(),
 }));
 
 vi.mock("@/core/presentation/hooks/useAuth", () => ({
@@ -75,7 +76,7 @@ vi.mock("@/core/presentation/hooks/useKitchenPrinterManagement", () => ({
     error: null,
     listPrinters: printerMocks.list,
     createPrinter: printerMocks.create,
-    updatePrinter: vi.fn(),
+    updatePrinter: printerMocks.update,
     deletePrinter: vi.fn(),
     attachCategory: vi.fn(),
     detachCategory: vi.fn(),
@@ -127,14 +128,11 @@ describe("PosSettingsPage integration", () => {
     expect(screen.getByText("Auto Check Out")).toBeInTheDocument();
     expect(screen.getByText("Quick Order")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Devices & IP" }));
-    expect(screen.getByRole("heading", { name: "Devices & IP" })).toBeInTheDocument();
-
     fireEvent.click(screen.getByRole("button", { name: "Logout" }));
     expect(screen.getByText("Sign out")).toBeInTheDocument();
   });
 
-  it("requires a successful test before saving a network printer", async () => {
+  it("sends isActive true only after the printer connects", async () => {
     printerMocks.verify.mockResolvedValue({
       id: "draft-1",
       transport: "NETWORK",
@@ -158,12 +156,30 @@ describe("PosSettingsPage integration", () => {
       target: { value: "192.168.1.50" },
     });
 
-    expect(
-      screen.getByRole("button", { name: "settings.printer.save" })
-    ).toBeDisabled();
-    fireEvent.click(
-      screen.getByRole("button", { name: "settings.printer.testPrint" })
+    fireEvent.click(screen.getByRole("button", { name: "settings.printer.save" }));
+
+    await screen.findByText("settings.printer.saved");
+    expect(printerMocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "Kitchen",
+        ipAddress: "192.168.1.50",
+        isActive: true,
+      })
     );
-    expect(await screen.findByText("settings.printer.testSucceeded")).toBeInTheDocument();
+
+    printerMocks.verify.mockRejectedValue(new Error("Printer offline"));
+    printerMocks.update.mockResolvedValue({
+      id: "printer-1",
+      name: "Kitchen",
+      ipAddress: "192.168.1.50",
+      port: 9100,
+      isActive: false,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "settings.printer.save" }));
+    await screen.findByText("settings.printer.savedInactive");
+    expect(printerMocks.update).toHaveBeenCalledWith(
+      "printer-1",
+      expect.objectContaining({ isActive: false })
+    );
   });
 });
