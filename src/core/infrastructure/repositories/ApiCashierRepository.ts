@@ -292,6 +292,26 @@ const asRecord = (value: unknown): Record<string, unknown> | undefined =>
     ? (value as Record<string, unknown>)
     : undefined;
 
+const readProductCategory = (
+  item: Record<string, unknown>
+): { categoryId?: string; categoryName?: string } => {
+  const nested =
+    asRecord(item.category) ||
+    asRecord(item.menuCategory) ||
+    asRecord(item.productCategory);
+  const categoryId = item.categoryId || nested?.id;
+  const categoryName =
+    item.categoryName ||
+    item.categoryShortName ||
+    nested?.shortName ||
+    nested?.name ||
+    nested?.code;
+  return {
+    categoryId: categoryId ? String(categoryId) : undefined,
+    categoryName: categoryName ? String(categoryName) : undefined,
+  };
+};
+
 const asList = <T>(response: unknown): T[] => {
   const value = unwrap(response);
   if (Array.isArray(value)) return value as T[];
@@ -607,10 +627,12 @@ export class ApiCashierRepository implements ICashierRepository {
     const data = asList<Record<string, unknown>>(response);
     return data.map((item) => {
       const taxRate = asRecord(item.taxRate);
+      const category = readProductCategory(item);
       return new Product({
         id: String(item.id || ""),
         tenantId: String(item.tenantId || ""),
-        categoryId: item.categoryId ? String(item.categoryId) : undefined,
+        categoryId: category.categoryId,
+        categoryName: category.categoryName,
         name: String(item.name || ""),
         basePrice: String(item.basePrice || "0"),
         baseSku: item.baseSku ? String(item.baseSku) : undefined,

@@ -74,6 +74,7 @@ interface OrderPanelProps {
   requiresTableAssignment?: boolean;
   onOpenPay?: () => void;
   onCheckout: () => void;
+  onPrintFinance?: () => void;
   onFireKds: () => void;
   onCancelOrder?: () => void;
   onPickup: () => void;
@@ -135,6 +136,7 @@ export function OrderPanel({
   requiresTableAssignment = false,
   onOpenPay,
   onCheckout,
+  onPrintFinance,
   onFireKds,
   onCancelOrder,
   onPickup,
@@ -512,6 +514,11 @@ export function OrderPanel({
           >
             {isPayView ? t("cashier.confirmPay") : t("cashier.payNow")}
           </Button>
+          {isPayView && onPrintFinance ? (
+            <Button fullWidth variant="outline" onClick={onPrintFinance}>
+              {t("cashier.printFinance")}
+            </Button>
+          ) : null}
           {onCancelOrder ? (
             confirmCancelOrder ? (
               <div className="space-y-2 rounded-lg border border-rose-200 bg-rose-50 p-2">

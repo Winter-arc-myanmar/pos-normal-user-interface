@@ -7,6 +7,7 @@ import { OrderStatus } from "@/core/application/dtos/CashierDTO";
 import { SalesOrder } from "@/core/domain/entities/Cashier";
 import { useAuth } from "@/core/presentation/hooks/useAuth";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
+import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
 import { useSalesOrderManagement } from "@/core/presentation/hooks/useSalesOrderManagement";
 import { useDateFormatter, useNumberFormatter } from "@/lib/i18n/formatters";
 import {
@@ -17,6 +18,34 @@ import {
 } from "@/lib/pos/orderListDisplay";
 
 type StatusTab = "open" | "completed" | "voided";
+type ServiceFilter = "ALL" | "DINE_IN" | "TAKE_AWAY" | "DELIVERY" | "PICK_UP";
+
+const serviceFilters: { id: ServiceFilter; labelKey: string }[] = [
+  { id: "ALL", labelKey: "salesOrders.serviceFilters.all" },
+  { id: "DINE_IN", labelKey: "salesOrders.serviceFilters.dineIn" },
+  { id: "TAKE_AWAY", labelKey: "salesOrders.serviceFilters.takeAway" },
+  { id: "DELIVERY", labelKey: "salesOrders.serviceFilters.delivery" },
+  { id: "PICK_UP", labelKey: "salesOrders.serviceFilters.pickUp" },
+];
+
+const matchesServiceFilter = (order: SalesOrder, filter: ServiceFilter) => {
+  if (filter === "ALL") return true;
+  const type = String(order.serviceType || "").toUpperCase();
+  if (filter === "DINE_IN") return type === "DINE_IN" || type === "TABLE";
+  if (filter === "TAKE_AWAY") return type === "TAKE_AWAY" || type === "TAKEAWAY";
+  if (filter === "DELIVERY") return type === "DELIVERY";
+  return type === "PICK_UP" || type === "COUNTER";
+};
+
+const statusBadgeClass = (status?: string) => {
+  const key = salesOrderStatusKey(status);
+  if (key.endsWith("completed")) return "bg-emerald-500 text-white";
+  if (key.endsWith("voided")) return "bg-red-500 text-white";
+  if (key.endsWith("refunded") || key.endsWith("partiallyRefunded")) {
+    return "bg-amber-500 text-slate-950";
+  }
+  return "bg-[#087cf0] text-white";
+};
 
 const statusTabFilters: Record<StatusTab, OrderStatus | undefined> = {
   open: "DRAFT",
@@ -49,7 +78,7 @@ export function SalesOrdersPage() {
   const { formatDateTime } = useDateFormatter();
   const { formatCurrency } = useNumberFormatter();
   const { user } = useAuth();
-  const { activeLocationId } = usePosWorkspace();
+  const { activeLocationId, activePosRegisterId } = usePosWorkspace();
   const {
     orders,
     page,
@@ -70,12 +99,14 @@ export function SalesOrdersPage() {
   } = useSalesOrderManagement();
 
   const [statusTab, setStatusTab] = useState<StatusTab>("open");
+  const [serviceFilter, setServiceFilter] = useState<ServiceFilter>("ALL");
   const [search, setSearch] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const tenantId = String(user?.tenantId || "");
   const locationId = activeLocationId;
+  const printer = usePrinterConnection(tenantId, activePosRegisterId);
 
   const statusFilter = statusTabFilters[statusTab];
 
@@ -90,7 +121,10 @@ export function SalesOrdersPage() {
     });
   }, [fetchOrders, search, statusFilter]);
 
-  const visibleOrders = useMemo(() => orders, [orders]);
+  const visibleOrders = useMemo(
+    () => orders.filter((order) => matchesServiceFilter(order, serviceFilter)),
+    [orders, serviceFilter]
+  );
 
   const handleSelectOrder = async (order: SalesOrder) => {
     setLocalError(null);
@@ -146,6 +180,32 @@ export function SalesOrdersPage() {
       });
     } catch {
       // surfaced via hook error
+    }
+  };
+
+  const handlePrintCheckout = async () => {
+    if (!selectedOrder) return;
+    setLocalError(null);
+    try {
+      await printer.printReceipt({
+        title: selectedOrder.orderNumber || "RECEIPT",
+        place: "CHECKOUT",
+        showLogo: true,
+        showPrices: true,
+        receiptId: selectedOrder.orderNumber,
+        lines: orderLines.map((line) => ({
+          name: lineDisplayName(line) || t("salesOrders.item"),
+          quantity: String(line.quantity || "1"),
+          unitPrice: String(line.unitPrice || ""),
+        })),
+        subtotal: selectedOrder.subtotal,
+        discount: selectedOrder.totalDiscount,
+        tax: selectedOrder.totalTax,
+        tip: selectedOrder.tipAmount,
+        total: selectedOrder.grandTotal,
+      });
+    } catch (caught) {
+      setLocalError(caught instanceof Error ? caught.message : t("salesOrders.printFailed"));
     }
   };
 
@@ -245,7 +305,7 @@ export function SalesOrdersPage() {
         </p>
       ) : null}
 
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(18rem,0.9fr)] gap-3 overflow-hidden px-4 pb-4">
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)_6.5rem] gap-3 overflow-hidden px-4 pb-4">
         <div className="min-h-0 overflow-y-auto rounded-md bg-[#101010]">
           {isLoading && visibleOrders.length === 0 ? (
             <ApiLoadingState label={t("salesOrders.loading")} />
@@ -265,24 +325,39 @@ export function SalesOrdersPage() {
                       aria-label={order.orderNumber || order.id}
                       onClick={() => void handleSelectOrder(order)}
                       className={[
-                        "flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition",
+                        "w-full px-4 py-3 text-left transition",
                         isSelected ? "bg-[#087cf0]/20" : "hover:bg-white/5",
                       ].join(" ")}
                     >
-                      <div className="min-w-0">
+                      <div className="flex items-start justify-between gap-3">
                         <p className="truncate font-semibold">
                           {order.orderNumber || order.id.slice(0, 8)}
                         </p>
-                        <p className="truncate text-xs text-slate-400">
-                          {orderSummary(order)}
-                        </p>
+                        <p className="shrink-0 font-semibold">{money(order.grandTotal)}</p>
                       </div>
-                      <div className="shrink-0 text-right">
-                        <p className="font-semibold">{money(order.grandTotal)}</p>
-                        <p className="text-[10px] text-slate-400">
-                          {formatDateTime(order.createdAt)}
-                        </p>
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        {formatDateTime(order.createdAt)}
+                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span
+                          className={[
+                            "rounded px-2 py-0.5 text-[10px] font-semibold uppercase",
+                            statusBadgeClass(order.status),
+                          ].join(" ")}
+                        >
+                          {t(salesOrderStatusKey(order.status))}
+                        </span>
+                        <span className="text-[11px] text-slate-400">
+                          {order.itemCount === 1
+                            ? t("salesOrders.itemCountOne")
+                            : t("salesOrders.itemCount", {
+                                count: order.itemCount || 0,
+                              })}
+                        </span>
                       </div>
+                      <p className="mt-1 truncate text-xs text-slate-500">
+                        {orderSummary(order)}
+                      </p>
                     </button>
                   </li>
                 );
@@ -335,43 +410,57 @@ export function SalesOrdersPage() {
           ) : null}
         </div>
 
-        <aside className="flex min-h-0 flex-col overflow-hidden rounded-md bg-[#101010]">
+        <aside className="flex min-h-0 flex-col overflow-hidden rounded-md bg-white text-slate-900">
           {selectedOrder ? (
             <>
-              <div className="border-b border-white/10 px-4 py-3">
+              <div className="border-b border-slate-200 px-4 py-3">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-slate-400">
-                      {t("salesOrders.detailTitle")}
-                    </p>
                     <h2 className="text-lg font-bold">
-                      {selectedOrder.orderNumber || selectedOrder.id}
+                      {selectedOrder.customerName || t("salesOrders.walkIn")}
                     </h2>
+                    <p className="text-sm text-slate-500">
+                      {selectedOrder.orderNumber || selectedOrder.id}
+                    </p>
                     <p className="text-xs text-slate-400">
-                      {t(salesOrderStatusKey(selectedOrder.status))} ·{" "}
-                      {t(salesOrderServiceTypeKey(selectedOrder.serviceType))}
-                      {selectedOrder.customerName
-                        ? ` · ${selectedOrder.customerName}`
-                        : ` · ${t("salesOrders.walkIn")}`}
+                      {formatDateTime(selectedOrder.createdAt)}
                     </p>
                   </div>
+                  <span
+                    className={[
+                      "rounded px-2 py-1 text-[10px] font-semibold uppercase",
+                      statusBadgeClass(selectedOrder.status),
+                    ].join(" ")}
+                  >
+                    {t(salesOrderStatusKey(selectedOrder.status))}
+                  </span>
+                </div>
+                <p className="mt-2 text-xs text-slate-500">
+                  {t(salesOrderServiceTypeKey(selectedOrder.serviceType))}
+                </p>
+                <div className="mt-3 flex gap-2">
                   <button
                     type="button"
                     onClick={clearSelectedOrder}
-                    className="text-xs text-slate-400 hover:text-white"
+                    className="text-xs text-slate-500 hover:text-slate-900"
                   >
                     {t("common.cancel")}
                   </button>
-                </div>
-                <div className="mt-3 flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    isLoading={isLoading}
+                  <button
+                    type="button"
+                    disabled={isLoading}
                     onClick={() => void handleDeleteOrder()}
+                    className="text-xs text-red-600 hover:text-red-700"
                   >
                     {t("common.delete")}
-                  </Button>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handlePrintCheckout()}
+                    className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+                  >
+                    {t("salesOrders.printCheckout")}
+                  </button>
                 </div>
               </div>
 
@@ -382,58 +471,64 @@ export function SalesOrdersPage() {
                 {orderLines.length === 0 ? (
                   <p className="text-sm text-slate-500">{t("salesOrders.noLines")}</p>
                 ) : (
-                  <ul className="space-y-2">
+                  <ul className="divide-y divide-slate-100">
                     {orderLines.map((line) => (
-                      <li
-                        key={line.id}
-                        className="rounded border border-white/10 bg-black/30 p-3 text-sm"
-                      >
+                      <li key={line.id} className="py-2 text-sm">
                         <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <p className="font-medium">
-                              {lineDisplayName(line) || t("salesOrders.item")}
-                            </p>
-                            <p className="text-xs text-slate-400">
-                              × {formatPosQuantity(line.quantity)} @ {money(line.unitPrice)}
-                            </p>
-                          </div>
-                          <span className="rounded bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase">
-                            {line.status || "PENDING"}
-                          </span>
+                          <p className="font-medium">
+                            {formatPosQuantity(line.quantity)}{" "}
+                            {lineDisplayName(line) || t("salesOrders.item")}
+                          </p>
+                          <span>{money(Number(line.unitPrice) * Number(line.quantity))}</span>
                         </div>
-                        <div className="mt-2 flex flex-wrap gap-1">
-                          <button
-                            type="button"
-                            className="rounded bg-slate-700 px-2 py-1 text-[10px]"
-                            onClick={() => void runLineAction(line.id, "fire")}
-                          >
-                            {t("salesOrders.fire")}
-                          </button>
-                          <button
-                            type="button"
-                            className="rounded bg-slate-700 px-2 py-1 text-[10px]"
-                            onClick={() => void runLineAction(line.id, "ready")}
-                          >
-                            {t("salesOrders.ready")}
-                          </button>
-                          <button
-                            type="button"
-                            className="rounded bg-slate-700 px-2 py-1 text-[10px]"
-                            onClick={() => void runLineAction(line.id, "serve")}
-                          >
-                            {t("salesOrders.serve")}
-                          </button>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {(["fire", "ready", "serve"] as const).map((action) => (
+                            <button
+                              key={action}
+                              type="button"
+                              className="rounded bg-slate-100 px-2 py-1 text-[10px] text-slate-600"
+                              onClick={() => void runLineAction(line.id, action)}
+                            >
+                              {t(`salesOrders.${action}`)}
+                            </button>
+                          ))}
                         </div>
                       </li>
                     ))}
                   </ul>
                 )}
-              </div>
 
-              <div className="border-t border-white/10 px-4 py-3">
-                <div className="flex items-center justify-between font-semibold">
-                  <span>{t("salesOrders.total")}</span>
-                  <span>{money(selectedOrder.grandTotal)}</span>
+                <div className="mt-4 space-y-1 border-t border-slate-200 pt-3 text-sm">
+                  {(
+                    [
+                      ["subtotal", selectedOrder.subtotal],
+                      ["discount", selectedOrder.totalDiscount],
+                      ["tax", selectedOrder.totalTax],
+                      ["serviceCharge", selectedOrder.serviceCharge],
+                      ["tip", selectedOrder.tipAmount],
+                    ] as const
+                  ).map(([label, value]) =>
+                    Number(value) ? (
+                      <div key={label} className="flex justify-between text-slate-600">
+                        <span>{t(`salesOrders.${label}`)}</span>
+                        <span>{money(value)}</span>
+                      </div>
+                    ) : null
+                  )}
+                  <div className="flex justify-between pt-1 text-base font-bold">
+                    <span>{t("salesOrders.total")}</span>
+                    <span>{money(selectedOrder.grandTotal)}</span>
+                  </div>
+                </div>
+
+                <div className="mt-4 border-t border-slate-200 pt-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    {t("salesOrders.paymentDetail")}
+                  </p>
+                  <div className="mt-2 flex justify-between text-sm">
+                    <span>{t(salesOrderStatusKey(selectedOrder.status))}</span>
+                    <span className="font-semibold">{money(selectedOrder.grandTotal)}</span>
+                  </div>
                 </div>
               </div>
             </>
@@ -445,6 +540,22 @@ export function SalesOrdersPage() {
               </p>
             </div>
           )}
+        </aside>
+
+        <aside className="flex min-h-0 flex-col overflow-y-auto rounded-md bg-[#161616] p-1.5">
+          {serviceFilters.map((filter) => (
+            <button
+              key={filter.id}
+              type="button"
+              onClick={() => setServiceFilter(filter.id)}
+              className={[
+                "mb-1 min-h-10 rounded px-2 py-2 text-left text-xs",
+                serviceFilter === filter.id ? "bg-[#087cf0]" : "bg-slate-600",
+              ].join(" ")}
+            >
+              {t(filter.labelKey)}
+            </button>
+          ))}
         </aside>
       </div>
     </section>

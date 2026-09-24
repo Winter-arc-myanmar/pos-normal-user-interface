@@ -14,6 +14,8 @@ describe("ApiCashierRepository", () => {
             {
               id: "product-1",
               tenantId: "tenant-1",
+              categoryId: "cat-drinks",
+              category: { id: "cat-drinks", name: "Drinks" },
               name: "Coffee",
               basePrice: "10.0000",
               baseSku: "COFFEE",
@@ -38,6 +40,8 @@ describe("ApiCashierRepository", () => {
     expect(products).toHaveLength(1);
     expect(products[0]).toMatchObject({
       id: "product-1",
+      categoryId: "cat-drinks",
+      categoryName: "Drinks",
       name: "Coffee",
       basePrice: "10.0000",
       isTaxable: true,

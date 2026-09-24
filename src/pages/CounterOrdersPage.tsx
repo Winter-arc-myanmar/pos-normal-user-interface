@@ -5,6 +5,7 @@ import { KdsTicket } from "@/core/domain/entities/Cashier";
 import { useAuth } from "@/core/presentation/hooks/useAuth";
 import { useCashier } from "@/core/presentation/hooks/useCashier";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
+import { useKdsStationManagement } from "@/core/presentation/hooks/useKdsStationManagement";
 import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
 
 const PAGE_LIMIT = 50;
@@ -46,7 +47,8 @@ function shortStation(stationId?: string): string {
 export function CounterOrdersPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const { activePosRegisterId } = usePosWorkspace();
+  const { activePosRegisterId, activeLocationId } = usePosWorkspace();
+  const { listStations } = useKdsStationManagement();
   const { error, listKdsTickets, getKdsTicketById } = useCashier();
   const printerConnection = usePrinterConnection(
     String(user?.tenantId || ""),
@@ -99,7 +101,18 @@ export function CounterOrdersPage() {
     setLocalError(null);
     try {
       const detail = ticket.id ? await getKdsTicketById(ticket.id) : ticket;
-      await printerConnection.printTicket(detail);
+      const listed = activeLocationId
+        ? await listStations({ page: 1, limit: 100, locationId: activeLocationId })
+        : { stations: [] };
+      await printerConnection.printTicket(
+        detail,
+        listed.stations.map((station) => ({
+          id: station.id,
+          name: station.name,
+          printerId: station.printerId,
+          categoryIds: station.routingRules.categoryIds,
+        }))
+      );
     } catch (caught) {
       setLocalError(
         caught instanceof Error ? caught.message : t("counterOrders.ticketFailed")

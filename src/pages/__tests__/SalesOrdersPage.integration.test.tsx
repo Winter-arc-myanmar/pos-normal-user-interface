@@ -72,6 +72,14 @@ vi.mock("@/core/presentation/hooks/useAuth", () => ({
 vi.mock("@/core/presentation/hooks/usePosWorkspace", () => ({
   usePosWorkspace: () => ({
     activeLocationId: "location-1",
+    activePosRegisterId: "register-1",
+  }),
+}));
+
+vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
+  usePrinterConnection: () => ({
+    printReceipt: vi.fn().mockResolvedValue(undefined),
+    printKitchen: vi.fn().mockResolvedValue([]),
   }),
 }));
 

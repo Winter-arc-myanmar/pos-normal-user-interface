@@ -9,22 +9,26 @@ import {
   SettingsSection,
   SettingsToggleRow,
 } from "./settings/settingsUi";
-// import { DevicesSettingsPanel } from "./settings/DevicesSettingsPanel";
+import { DevicesSettingsPanel } from "./settings/DevicesSettingsPanel";
 import { PrinterSettingsPanel } from "./settings/PrinterSettingsPanel";
+import { PrintTemplateSettingsPanel } from "./settings/PrintTemplateSettingsPanel";
+import { KdsStationSettingsPanel } from "./settings/KdsStationSettingsPanel";
 
 type SettingsTab =
   | "cashier"
-  // | "devices"
+  | "devices"
   | "printer"
   | "print-template"
+  | "kds-station"
   | "pos-terminal"
   | "logout";
 
 const tabIds: SettingsTab[] = [
   "cashier",
-  // "devices",
+  "devices",
   "printer",
   "print-template",
+  "kds-station",
   "pos-terminal",
   "logout",
 ];
@@ -74,9 +78,6 @@ export function PosSettingsPage() {
   const [quickOrder, setQuickOrder] = useState(true);
   const [priorityOrderMemo, setPriorityOrderMemo] = useState(false);
 
-  const [templateName, setTemplateName] = useState("Default receipt");
-  const [templatePaperWidth, setTemplatePaperWidth] = useState("80mm");
-
   const [terminalName, setTerminalName] = useState("");
   const [terminalRegisterId, setTerminalRegisterId] = useState("");
   const [receiptHeader, setReceiptHeader] = useState("");
@@ -85,9 +86,10 @@ export function PosSettingsPage() {
     () =>
       ({
         cashier: t("settings.tabs.cashier"),
-        // devices: t("settings.tabs.devices"),
+        devices: t("settings.tabs.devices"),
         printer: t("settings.tabs.printer"),
         "print-template": t("settings.tabs.printTemplate"),
+        "kds-station": t("settings.tabs.kdsStation"),
         "pos-terminal": t("settings.tabs.posTerminal"),
         logout: t("settings.tabs.logout"),
       }) satisfies Record<SettingsTab, string>,
@@ -222,7 +224,7 @@ export function PosSettingsPage() {
           </div>
         ) : null}
 
-        {/* {activeTab === "devices" ? <DevicesSettingsPanel /> : null} */}
+        {activeTab === "devices" ? <DevicesSettingsPanel /> : null}
 
         {activeTab === "printer" ? (
           <div className="mx-auto max-w-5xl">
@@ -231,30 +233,14 @@ export function PosSettingsPage() {
         ) : null}
 
         {activeTab === "print-template" ? (
-          <div className="mx-auto max-w-2xl space-y-4">
-            <SettingsSection title={t("settings.printTemplate.title")}>
-              <div className="space-y-3">
-                <SettingsField
-                  label={t("settings.printTemplate.name")}
-                  value={templateName}
-                  onChange={setTemplateName}
-                />
-                <label className="block text-sm text-slate-600">
-                  {t("settings.printTemplate.paperWidth")}
-                  <select
-                    className="mt-1 min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500"
-                    value={templatePaperWidth}
-                    onChange={(event) => setTemplatePaperWidth(event.target.value)}
-                  >
-                    <option value="58mm">58mm</option>
-                    <option value="80mm">80mm</option>
-                  </select>
-                </label>
-              </div>
-              <div className="mt-4 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
-                {t("settings.printTemplate.preview")}
-              </div>
-            </SettingsSection>
+          <div className="mx-auto max-w-5xl">
+            <PrintTemplateSettingsPanel />
+          </div>
+        ) : null}
+
+        {activeTab === "kds-station" ? (
+          <div className="mx-auto max-w-5xl">
+            <KdsStationSettingsPanel />
           </div>
         ) : null}
 

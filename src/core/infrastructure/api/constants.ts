@@ -219,6 +219,14 @@ export const API_ENDPOINTS = {
     FIRE: "/api/v1/kds/fire",
     TICKETS: "/api/v1/kds/tickets",
     TICKET: (id: string) => `/api/v1/kds/tickets/${id}`,
+    STATIONS: "/api/v1/kds/stations",
+    STATION: (id: string) => `/api/v1/kds/stations/${id}`,
+  },
+
+  CATEGORIES: {
+    LIST: "/api/v1/categories",
+    TREE: "/api/v1/categories/tree",
+    BY_ID: (id: string) => `/api/v1/categories/${id}`,
   },
 
   KITCHEN_PRINTERS: {
@@ -250,6 +258,15 @@ export const API_ENDPOINTS = {
     SEAT: (id: string) => `/api/v1/waitlist/${id}/seat`,
     CANCEL: (id: string) => `/api/v1/waitlist/${id}/cancel`,
     NO_SHOW: (id: string) => `/api/v1/waitlist/${id}/no-show`,
+  },
+
+  PRINT_TEMPLATES: {
+    LIST: "/api/v1/print-templates",
+    CREATE: "/api/v1/print-templates",
+    RESOLVE: "/api/v1/print-templates/resolve",
+    BY_ID: (id: string) => `/api/v1/print-templates/${id}`,
+    UPDATE: (id: string) => `/api/v1/print-templates/${id}`,
+    DELETE: (id: string) => `/api/v1/print-templates/${id}`,
   },
 
   TIP_POOLS: {

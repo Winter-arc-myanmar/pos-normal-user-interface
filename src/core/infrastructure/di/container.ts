@@ -35,6 +35,18 @@ import { IKitchenPrinterRepository } from "../../domain/repositories/IKitchenPri
 import { ApiKitchenPrinterRepository } from "../repositories/ApiKitchenPrinterRepository";
 import { IKitchenPrinterService } from "../../domain/services/IKitchenPrinterService";
 import { KitchenPrinterService } from "../../application/services/KitchenPrinterService";
+import { IPrintTemplateRepository } from "../../domain/repositories/IPrintTemplateRepository";
+import { ApiPrintTemplateRepository } from "../repositories/ApiPrintTemplateRepository";
+import { IPrintTemplateService } from "../../domain/services/IPrintTemplateService";
+import { PrintTemplateService } from "../../application/services/PrintTemplateService";
+import { ICategoryRepository } from "../../domain/repositories/ICategoryRepository";
+import { ApiCategoryRepository } from "../repositories/ApiCategoryRepository";
+import { ICategoryService } from "../../domain/services/ICategoryService";
+import { CategoryService } from "../../application/services/CategoryService";
+import { IKdsStationRepository } from "../../domain/repositories/IKdsStationRepository";
+import { ApiKdsStationRepository } from "../repositories/ApiKdsStationRepository";
+import { IKdsStationService } from "../../domain/services/IKdsStationService";
+import { KdsStationService } from "../../application/services/KdsStationService";
 
 /**
  * Dependency Injection Container
@@ -88,6 +100,18 @@ class Container {
       "kitchenPrinterRepository",
       new ApiKitchenPrinterRepository(this.resolve("httpClient"))
     );
+    this.register<IPrintTemplateRepository>(
+      "printTemplateRepository",
+      new ApiPrintTemplateRepository(this.resolve("httpClient"))
+    );
+    this.register<ICategoryRepository>(
+      "categoryRepository",
+      new ApiCategoryRepository(this.resolve("httpClient"))
+    );
+    this.register<IKdsStationRepository>(
+      "kdsStationRepository",
+      new ApiKdsStationRepository(this.resolve("httpClient"))
+    );
 
     this.register<IAuthService>(
       "authService",
@@ -126,6 +150,18 @@ class Container {
     this.register<IKitchenPrinterService>(
       "kitchenPrinterService",
       new KitchenPrinterService(this.resolve("kitchenPrinterRepository"))
+    );
+    this.register<IPrintTemplateService>(
+      "printTemplateService",
+      new PrintTemplateService(this.resolve("printTemplateRepository"))
+    );
+    this.register<ICategoryService>(
+      "categoryService",
+      new CategoryService(this.resolve("categoryRepository"))
+    );
+    this.register<IKdsStationService>(
+      "kdsStationService",
+      new KdsStationService(this.resolve("kdsStationRepository"))
     );
   }
 

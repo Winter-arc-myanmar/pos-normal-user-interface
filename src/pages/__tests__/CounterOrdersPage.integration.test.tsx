@@ -55,7 +55,25 @@ vi.mock("@/core/presentation/hooks/useAuth", () => ({
 }));
 
 vi.mock("@/core/presentation/hooks/usePosWorkspace", () => ({
-  usePosWorkspace: () => ({ activePosRegisterId: "register-1" }),
+  usePosWorkspace: () => ({
+    activePosRegisterId: "register-1",
+    activeLocationId: "location-1",
+  }),
+}));
+
+vi.mock("@/core/presentation/hooks/useKdsStationManagement", () => ({
+  useKdsStationManagement: () => ({
+    listStations: vi.fn().mockResolvedValue({
+      stations: [
+        {
+          id: "station-kitchen",
+          name: "Kitchen",
+          printerId: "printer-1",
+          routingRules: { categoryIds: ["snack"] },
+        },
+      ],
+    }),
+  }),
 }));
 
 vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
@@ -93,7 +111,15 @@ describe("CounterOrdersPage integration", () => {
     fireEvent.click(screen.getByRole("button", { name: "Print KDS-9" }));
     await waitFor(() => {
       expect(mocks.getTicket).toHaveBeenCalledWith("ticket-9");
-      expect(mocks.printTicket).toHaveBeenCalledWith(ticket);
+      expect(mocks.printTicket).toHaveBeenCalledWith(
+        ticket,
+        [
+          expect.objectContaining({
+            id: "station-kitchen",
+            printerId: "printer-1",
+          }),
+        ]
+      );
     });
   });
 
