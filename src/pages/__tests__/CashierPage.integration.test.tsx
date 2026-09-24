@@ -33,12 +33,23 @@ const mocks = vi.hoisted(() => ({
 const product = {
   id: "product-1",
   tenantId: "tenant-1",
+  categoryId: "cat-drinks",
+  categoryName: "Drinks",
   name: "Coffee",
   basePrice: "10.0000",
   baseSku: "COFFEE",
   isTaxable: true,
   taxRate: 5,
   isPriceInclusive: false,
+};
+
+const soup = {
+  id: "product-2",
+  tenantId: "tenant-1",
+  categoryId: "cat-main",
+  categoryName: "Main",
+  name: "Deli Soup",
+  basePrice: "8.0000",
 };
 
 const variant = {
@@ -125,7 +136,7 @@ vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
 
 vi.mock("@/core/presentation/hooks/useCashier", () => ({
   useCashier: () => ({
-    products: [product],
+    products: [product, soup],
     variantsByProductId: { "product-1": [variant] },
     salesOrders: [order],
     selectedOrder: order,
@@ -315,6 +326,27 @@ describe("CashierPage integration", () => {
     expect(mocks.updateTableSessionState).toHaveBeenCalledWith("session-1", {
       sessionState: "ORDERING",
     });
+  });
+
+  it("shows menu categories in the menu session and filters products", () => {
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=menu"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    expect(
+      screen.getByRole("button", { name: "cashier.productMenu.allCategories" })
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Drinks" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Main" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Coffee/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Deli Soup/ })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Main" }));
+
+    expect(screen.queryByRole("button", { name: /Coffee/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Deli Soup/ })).toBeInTheDocument();
   });
 
   it("syncs totals and connects checkout, KDS, and pickup actions", async () => {

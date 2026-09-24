@@ -35,6 +35,10 @@ import { IKitchenPrinterRepository } from "../../domain/repositories/IKitchenPri
 import { ApiKitchenPrinterRepository } from "../repositories/ApiKitchenPrinterRepository";
 import { IKitchenPrinterService } from "../../domain/services/IKitchenPrinterService";
 import { KitchenPrinterService } from "../../application/services/KitchenPrinterService";
+import { IPrintTemplateRepository } from "../../domain/repositories/IPrintTemplateRepository";
+import { ApiPrintTemplateRepository } from "../repositories/ApiPrintTemplateRepository";
+import { IPrintTemplateService } from "../../domain/services/IPrintTemplateService";
+import { PrintTemplateService } from "../../application/services/PrintTemplateService";
 
 /**
  * Dependency Injection Container
@@ -88,6 +92,10 @@ class Container {
       "kitchenPrinterRepository",
       new ApiKitchenPrinterRepository(this.resolve("httpClient"))
     );
+    this.register<IPrintTemplateRepository>(
+      "printTemplateRepository",
+      new ApiPrintTemplateRepository(this.resolve("httpClient"))
+    );
 
     this.register<IAuthService>(
       "authService",
@@ -126,6 +134,10 @@ class Container {
     this.register<IKitchenPrinterService>(
       "kitchenPrinterService",
       new KitchenPrinterService(this.resolve("kitchenPrinterRepository"))
+    );
+    this.register<IPrintTemplateService>(
+      "printTemplateService",
+      new PrintTemplateService(this.resolve("printTemplateRepository"))
     );
   }
 

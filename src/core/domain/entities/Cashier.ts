@@ -16,6 +16,7 @@ export class Product {
   id!: string;
   tenantId!: string;
   categoryId?: string;
+  categoryName?: string;
   name!: string;
   basePrice!: string;
   baseSku?: string;

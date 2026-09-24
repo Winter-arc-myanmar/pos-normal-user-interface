@@ -252,6 +252,15 @@ export const API_ENDPOINTS = {
     NO_SHOW: (id: string) => `/api/v1/waitlist/${id}/no-show`,
   },
 
+  PRINT_TEMPLATES: {
+    LIST: "/api/v1/print-templates",
+    CREATE: "/api/v1/print-templates",
+    RESOLVE: "/api/v1/print-templates/resolve",
+    BY_ID: (id: string) => `/api/v1/print-templates/${id}`,
+    UPDATE: (id: string) => `/api/v1/print-templates/${id}`,
+    DELETE: (id: string) => `/api/v1/print-templates/${id}`,
+  },
+
   TIP_POOLS: {
     LIST: "/api/v1/tip-pools",
     CREATE: "/api/v1/tip-pools",
