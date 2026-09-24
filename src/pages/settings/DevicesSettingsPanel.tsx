@@ -8,7 +8,19 @@ import { useKitchenPrinterManagement } from "@/core/presentation/hooks/useKitche
 import { usePosSync } from "@/core/presentation/hooks/usePosSync";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
 import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
+import {
+  LOCAL_DATA_VERSION,
+  readDeviceWorkstation,
+  resetDeviceSyncPassword,
+  saveDeviceWorkstation,
+  validateDeviceNetwork,
+} from "@/lib/pos/deviceNetworkStorage";
 import { SettingsField, SettingsSection } from "./settingsUi";
+
+const qzVersion = String(packageJson.dependencies["qz-tray"] || "").replace(
+  /^[\^~]/,
+  ""
+);
 
 const bootedAt = new Date();
 
@@ -78,10 +90,25 @@ export function DevicesSettingsPanel() {
     posSessionId: activePosSessionId,
   });
   const register = posRegisters.find((item) => item.id === activePosRegisterId);
-  const [deviceName, setDeviceName] = useState(register?.name || "");
+  const [deviceName, setDeviceName] = useState("");
   const [deviceIp, setDeviceIp] = useState("");
   const [subnetMask, setSubnetMask] = useState("");
   const [gateway, setGateway] = useState("");
+  const [syncPassword, setSyncPassword] = useState("");
+  const [loadedScope, setLoadedScope] = useState("");
+  const [localMessage, setLocalMessage] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const workstationScope = `${tenantId}:${activePosRegisterId}`;
+
+  if (loadedScope !== workstationScope) {
+    const saved = readDeviceWorkstation(tenantId, activePosRegisterId);
+    setLoadedScope(workstationScope);
+    setDeviceName(saved?.network.deviceName || register?.name || "");
+    setDeviceIp(saved?.network.ipAddress || "");
+    setSubnetMask(saved?.network.subnetMask || "");
+    setGateway(saved?.network.gateway || "");
+    setSyncPassword(saved?.syncPassword || "");
+  }
 
   useEffect(() => {
     void listPrinters({ page: 1, limit: 100 }).catch(() => undefined);
@@ -91,6 +118,53 @@ export function DevicesSettingsPanel() {
     typeof navigator === "undefined"
       ? "Web POS"
       : navigator.platform || "Web POS";
+  const localDataReady = Boolean(sync.lastSettingsSyncAt && sync.lastItemSyncAt);
+  const invalidKey = {
+    name: "settings.devices.invalidName",
+    ip: "settings.devices.invalidIp",
+    mask: "settings.devices.invalidMask",
+    gateway: "settings.devices.invalidGateway",
+  } as const;
+
+  const saveNetwork = () => {
+    const profile = {
+      deviceName,
+      ipAddress: deviceIp,
+      subnetMask,
+      gateway,
+    };
+    const invalid = validateDeviceNetwork(profile);
+    if (invalid) {
+      setLocalError(t(invalidKey[invalid]));
+      setLocalMessage(null);
+      return;
+    }
+    const saved = saveDeviceWorkstation(tenantId, activePosRegisterId, profile);
+    setSyncPassword(saved.syncPassword);
+    setLocalError(null);
+    setLocalMessage(t("settings.devices.networkSaved"));
+  };
+
+  const resetPassword = () => {
+    const password = resetDeviceSyncPassword(tenantId, activePosRegisterId);
+    setSyncPassword(password);
+    setLocalError(null);
+    setLocalMessage(t("settings.devices.syncPasswordReset", { password }));
+  };
+
+  const reloadLocalData = async () => {
+    setLocalError(null);
+    setLocalMessage(null);
+    try {
+      await sync.pullLatestSettings();
+      await sync.pullItemUpdates();
+      setLocalMessage(t("settings.devices.localDataReady"));
+    } catch (caught) {
+      setLocalError(
+        caught instanceof Error ? caught.message : t("settings.devices.localDataMissing")
+      );
+    }
+  };
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
@@ -109,7 +183,20 @@ export function DevicesSettingsPanel() {
             <InfoRow label={t("settings.devices.systemVersion")} value={systemVersion} />
             <InfoRow
               label={t("settings.devices.deviceModel")}
-              value={register?.name || t("settings.devices.browserPos")}
+              value={deviceName || register?.name || t("settings.devices.browserPos")}
+            />
+            <InfoRow
+              label={t("settings.devices.databaseVersion")}
+              value={String(LOCAL_DATA_VERSION)}
+            />
+            <InfoRow label={t("settings.devices.ipAddress")} value={deviceIp || "—"} />
+            <InfoRow
+              label={t("settings.devices.syncPassword")}
+              value={
+                syncPassword
+                  ? t("settings.devices.syncPasswordSet")
+                  : t("settings.devices.syncPasswordMissing")
+              }
             />
             <InfoRow
               label={t("settings.devices.systemTime")}
@@ -128,18 +215,26 @@ export function DevicesSettingsPanel() {
           <p className="mt-3 text-xs leading-5 text-slate-500">
             {t("settings.devices.deviceKeyNote")}
           </p>
-          <Button
-            type="button"
-            variant="secondary"
-            className="mt-4"
-            isLoading={sync.isLoading}
-            onClick={() => void sync.pullLatestSettings().catch(() => undefined)}
-          >
-            {t("settings.devices.initializeData")}
-          </Button>
-          {sync.notice || sync.error ? (
-            <p className={`mt-3 text-sm ${sync.error ? "text-red-600" : "text-emerald-700"}`}>
-              {sync.error || sync.notice}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              isLoading={sync.isLoading}
+              onClick={() => void reloadLocalData()}
+            >
+              {t("settings.devices.initializeData")}
+            </Button>
+            <Button type="button" variant="secondary" onClick={resetPassword}>
+              {t("settings.devices.resetSyncPassword")}
+            </Button>
+          </div>
+          {localMessage || localError || sync.notice || sync.error ? (
+            <p
+              className={`mt-3 text-sm ${
+                localError || sync.error ? "text-red-600" : "text-emerald-700"
+              }`}
+            >
+              {localError || sync.error || localMessage || sync.notice}
             </p>
           ) : null}
         </SettingsSection>
@@ -148,15 +243,34 @@ export function DevicesSettingsPanel() {
           <div
             className={[
               "mb-3 rounded-lg px-3 py-2 text-sm",
-              connection.defaultBinding
+              localDataReady
                 ? "bg-emerald-500 text-white"
                 : "bg-amber-100 text-amber-900",
             ].join(" ")}
           >
-            {connection.defaultBinding
-              ? t("settings.devices.localPrintingReady")
-              : t("settings.devices.localPrintingMissing")}
+            {localDataReady
+              ? t("settings.devices.localDataReady")
+              : t("settings.devices.localDataMissing")}
           </div>
+          <Button
+            type="button"
+            variant="secondary"
+            className="mb-3"
+            isLoading={sync.isLoading}
+            onClick={() => void reloadLocalData()}
+          >
+            {t("settings.devices.recoverData")}
+          </Button>
+          <StatusRow
+            label={t("settings.devices.printingDeployment")}
+            value={qzVersion || "—"}
+            ok={connection.isConnected}
+          />
+          <StatusRow
+            label={t("settings.devices.licensePrinting")}
+            value={t("settings.devices.qzFreeLicense")}
+            ok={connection.isConnected}
+          />
           <StatusRow
             label={t("settings.devices.qzTray")}
             value={
@@ -179,13 +293,31 @@ export function DevicesSettingsPanel() {
               ok={printer.isActive}
             />
           ))}
-          <button
-            type="button"
-            onClick={() => navigate("/settings/printer")}
-            className="mt-4 text-sm font-semibold text-blue-600"
-          >
-            {t("settings.devices.openPrinters")}
-          </button>
+          <StatusRow
+            label={t("settings.devices.prepaidCard")}
+            value={
+              activeLocationId
+                ? t("settings.devices.prepaidReady")
+                : t("settings.devices.prepaidMissing")
+            }
+            ok={Boolean(activeLocationId)}
+          />
+          <div className="mt-4 flex flex-wrap gap-4">
+            <button
+              type="button"
+              onClick={() => navigate("/settings/printer")}
+              className="text-sm font-semibold text-blue-600"
+            >
+              {t("settings.devices.openPrinters")}
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/cards")}
+              className="text-sm font-semibold text-blue-600"
+            >
+              {t("settings.devices.prepaidCard")}
+            </button>
+          </div>
         </SettingsSection>
       </div>
 
@@ -213,6 +345,9 @@ export function DevicesSettingsPanel() {
             onChange={setGateway}
           />
         </div>
+        <Button type="button" className="mt-4" onClick={saveNetwork}>
+          {t("settings.devices.saveNetwork")}
+        </Button>
         <p className="mt-4 text-xs text-slate-400">{t("settings.devices.hint")}</p>
       </SettingsSection>
     </div>
