@@ -17,6 +17,7 @@ import {
 import { useAuth } from "@/core/presentation/hooks/useAuth";
 import { useCashier } from "@/core/presentation/hooks/useCashier";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
+import { useKdsStationManagement } from "@/core/presentation/hooks/useKdsStationManagement";
 import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
 import { useSalesOrderManagement } from "@/core/presentation/hooks/useSalesOrderManagement";
 import { CashierBoard } from "./cashier/CashierBoard";
@@ -133,6 +134,7 @@ export function CashierPage() {
     isPosSessionLoading,
     requireCashierContext,
   } = usePosWorkspace();
+  const { listStations } = useKdsStationManagement();
   const printer = usePrinterConnection(
     String(user?.tenantId || ""),
     activePosRegisterId
@@ -1393,6 +1395,9 @@ export function CashierPage() {
 
       const paidReceipt = {
         title: "RECEIPT",
+        place: "CHECKOUT" as const,
+        showLogo: true,
+        showPrices: true,
         receiptId: selectedOrder?.orderNumber,
         lines: displayOrderLines
           .filter((line) => !line.voidedAt)
@@ -1406,6 +1411,8 @@ export function CashierPage() {
                 line.variantName ||
                 "Item",
               quantity: String(line.quantity || "1"),
+              unitPrice: String(line.unitPrice || ""),
+              categoryId: product?.categoryId,
             };
           }),
         subtotal: lineSubtotal.toFixed(4),
@@ -1866,13 +1873,31 @@ export function CashierPage() {
       );
 
       try {
-        await printer.printKitchen({
-          title: selectedOrder?.orderNumber || "KITCHEN",
-          courseType: displayOrderLines.find((line) => line.courseType)?.courseType,
-          firedAt: new Date().toISOString(),
-          orderRef: salesOrderId || sessionId,
-          lines: kitchenLines,
-        });
+        const listed = locationId
+          ? await listStations({ page: 1, limit: 100, locationId })
+          : { stations: [] };
+        const unrouted = await printer.printKitchen(
+          {
+            title: selectedOrder?.orderNumber || "KITCHEN",
+            courseType: displayOrderLines.find((line) => line.courseType)?.courseType,
+            firedAt: new Date().toISOString(),
+            orderRef: salesOrderId || sessionId,
+            lines: kitchenLines,
+          },
+          listed.stations.map((station) => ({
+            id: station.id,
+            name: station.name,
+            printerId: station.printerId,
+            categoryIds: station.routingRules.categoryIds,
+          }))
+        );
+        if (unrouted.length) {
+          setLocalError(
+            t("cashier.errors.kdsUnrouted", {
+              items: unrouted.map((line) => line.name).join(", "),
+            })
+          );
+        }
       } catch (printError) {
         setLocalError(
           printError instanceof Error
@@ -2079,6 +2104,23 @@ export function CashierPage() {
         requiresTableAssignment={requiresTableAssignment}
         onOpenPay={handleOpenPay}
         onCheckout={() => void handleCheckout()}
+        onPrintFinance={() =>
+          void printer.printReceipt({
+            title: "FINANCE",
+            place: "FINANCE",
+            showLogo: false,
+            showPrices: true,
+            receiptId: selectedOrder?.orderNumber,
+            lines: displayOrderLines
+              .filter((line) => !line.voidedAt)
+              .map((line) => ({
+                name: line.productName || line.variantName || "Item",
+                quantity: String(line.quantity || "1"),
+                unitPrice: String(line.unitPrice || ""),
+              })),
+            total: orderTotal,
+          })
+        }
         onFireKds={() => void handleFireKds()}
         onCancelOrder={() => void handleCancelOrder()}
         onPickup={() => void handlePickup()}

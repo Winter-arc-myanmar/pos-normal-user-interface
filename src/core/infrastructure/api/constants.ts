@@ -219,6 +219,14 @@ export const API_ENDPOINTS = {
     FIRE: "/api/v1/kds/fire",
     TICKETS: "/api/v1/kds/tickets",
     TICKET: (id: string) => `/api/v1/kds/tickets/${id}`,
+    STATIONS: "/api/v1/kds/stations",
+    STATION: (id: string) => `/api/v1/kds/stations/${id}`,
+  },
+
+  CATEGORIES: {
+    LIST: "/api/v1/categories",
+    TREE: "/api/v1/categories/tree",
+    BY_ID: (id: string) => `/api/v1/categories/${id}`,
   },
 
   KITCHEN_PRINTERS: {

@@ -292,20 +292,44 @@ export function PrintTemplateSettingsPanel() {
               </select>
             </label>
             <label className="text-sm text-slate-600">
-              {t("settings.printTemplate.type")}
+              {t("settings.printTemplate.place")}
               <select
                 className={fieldClass}
-                value={draft.type}
+                value={
+                  draft.type === "KITCHEN"
+                    ? "KDS"
+                    : draft.isDefault
+                      ? "CHECKOUT"
+                      : "FINANCE"
+                }
                 disabled={Boolean(draft.id)}
-                onChange={(event) =>
+                onChange={(event) => {
+                  const place = event.target.value;
                   setDraft((current) => ({
                     ...current,
-                    type: event.target.value as PrintTemplateType,
-                  }))
-                }
+                    type: place === "KDS" ? "KITCHEN" : "RECEIPT",
+                    isDefault: place !== "FINANCE",
+                    settings: {
+                      ...current.settings,
+                      header: {
+                        ...current.settings.header,
+                        logo: place === "CHECKOUT",
+                        address: place !== "FINANCE",
+                        contact: place !== "FINANCE",
+                      },
+                      item: {
+                        ...current.settings.item,
+                        price: place !== "KDS",
+                        modifiers: place !== "FINANCE",
+                        productRemarks: place !== "FINANCE",
+                      },
+                    },
+                  }));
+                }}
               >
-                <option value="RECEIPT">{t("settings.printTemplate.receipt")}</option>
-                <option value="KITCHEN">{t("settings.printTemplate.kitchen")}</option>
+                <option value="KDS">{t("settings.printTemplate.placeKds")}</option>
+                <option value="CHECKOUT">{t("settings.printTemplate.placeCheckout")}</option>
+                <option value="FINANCE">{t("settings.printTemplate.placeFinance")}</option>
               </select>
             </label>
             <label className="text-sm text-slate-600">

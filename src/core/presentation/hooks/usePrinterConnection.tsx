@@ -2,7 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import { KdsTicket } from "../../domain/entities/Cashier";
 import { qzTrayClient } from "../../infrastructure/printing/QzTrayClient";
 import { KitchenSlip, SaleReceipt } from "@/lib/printing/formatKdsTicket";
-import { groupKitchenJobs } from "@/lib/printing/routeKitchenPrint";
+import {
+  groupKitchenJobs,
+  StationRoute,
+} from "@/lib/printing/routeKitchenPrint";
 import {
   PRINTER_BINDINGS_CHANGED,
   PrinterBinding,
@@ -115,20 +118,22 @@ export function usePrinterConnection(tenantId: string, registerId: string) {
   }, [registerId, tenantId]);
 
   const printKitchen = useCallback(
-    async (slip: KitchenSlip) => {
+    async (slip: KitchenSlip, stations: StationRoute[] = []) => {
       const current = currentBindings();
-      const jobs = groupKitchenJobs(
+      const plan = groupKitchenJobs(
         slip.lines || [],
         current.bindings,
         current.defaultBinding,
-        slip.stationId
+        slip.stationId,
+        stations
       );
-      for (const job of jobs) {
+      for (const job of plan.jobs) {
         await qzTrayClient.printKitchen(job.binding, {
           ...slip,
           lines: job.lines,
         });
       }
+      return plan.unrouted;
     },
     [currentBindings]
   );
@@ -137,22 +142,32 @@ export function usePrinterConnection(tenantId: string, registerId: string) {
     async (receipt: SaleReceipt) => {
       const target = currentBindings().defaultBinding;
       if (!target) throw new Error("No default printer is connected");
-      await qzTrayClient.printReceipt(target, receipt);
+      await qzTrayClient.printReceipt(target, {
+        ...receipt,
+        place: receipt.place || "CHECKOUT",
+        showLogo: receipt.place === "FINANCE" ? false : receipt.showLogo,
+      });
     },
     [currentBindings]
   );
 
   const printTicket = useCallback(
-    async (ticket: KdsTicket) => {
-      await printKitchen({
-        title: ticket.ticketNumber || ticket.id,
-        status: ticket.status,
-        courseType: ticket.courseType,
-        firedAt: ticket.firedAt,
-        stationId: ticket.stationId,
-        orderRef: ticket.salesOrderId,
-        lines: ticket.lines,
-      });
+    async (ticket: KdsTicket, stations: StationRoute[] = []) => {
+      const routed = ticket.stationId
+        ? stations.filter((station) => station.id === ticket.stationId)
+        : stations;
+      return printKitchen(
+        {
+          title: ticket.ticketNumber || ticket.id,
+          status: ticket.status,
+          courseType: ticket.courseType,
+          firedAt: ticket.firedAt,
+          stationId: ticket.stationId,
+          orderRef: ticket.salesOrderId,
+          lines: ticket.lines,
+        },
+        routed
+      );
     },
     [printKitchen]
   );

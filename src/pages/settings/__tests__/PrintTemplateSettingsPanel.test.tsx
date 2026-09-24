@@ -64,14 +64,14 @@ describe("PrintTemplateSettingsPanel", () => {
     fireEvent.change(screen.getByLabelText("settings.printTemplate.paperWidth"), {
       target: { value: "MM58" },
     });
-    fireEvent.change(screen.getByLabelText("settings.printTemplate.type"), {
-      target: { value: "KITCHEN" },
+    fireEvent.change(screen.getByLabelText("settings.printTemplate.place"), {
+      target: { value: "KDS" },
     });
 
     expect(screen.getAllByText("settings.printTemplate.logo")).toHaveLength(1);
     expect(screen.queryAllByText("10.00")).toHaveLength(0);
     expect(screen.getByText("ကော်ဖီ")).toBeInTheDocument();
-    expect(screen.getAllByText("settings.printTemplate.kitchen")).toHaveLength(2);
+    expect(screen.getByText("settings.printTemplate.kitchen")).toBeInTheDocument();
     expect(screen.getByText("Coffee").closest("div")).toHaveClass("text-base");
   });
 });

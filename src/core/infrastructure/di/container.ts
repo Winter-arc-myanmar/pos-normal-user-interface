@@ -39,6 +39,14 @@ import { IPrintTemplateRepository } from "../../domain/repositories/IPrintTempla
 import { ApiPrintTemplateRepository } from "../repositories/ApiPrintTemplateRepository";
 import { IPrintTemplateService } from "../../domain/services/IPrintTemplateService";
 import { PrintTemplateService } from "../../application/services/PrintTemplateService";
+import { ICategoryRepository } from "../../domain/repositories/ICategoryRepository";
+import { ApiCategoryRepository } from "../repositories/ApiCategoryRepository";
+import { ICategoryService } from "../../domain/services/ICategoryService";
+import { CategoryService } from "../../application/services/CategoryService";
+import { IKdsStationRepository } from "../../domain/repositories/IKdsStationRepository";
+import { ApiKdsStationRepository } from "../repositories/ApiKdsStationRepository";
+import { IKdsStationService } from "../../domain/services/IKdsStationService";
+import { KdsStationService } from "../../application/services/KdsStationService";
 
 /**
  * Dependency Injection Container
@@ -96,6 +104,14 @@ class Container {
       "printTemplateRepository",
       new ApiPrintTemplateRepository(this.resolve("httpClient"))
     );
+    this.register<ICategoryRepository>(
+      "categoryRepository",
+      new ApiCategoryRepository(this.resolve("httpClient"))
+    );
+    this.register<IKdsStationRepository>(
+      "kdsStationRepository",
+      new ApiKdsStationRepository(this.resolve("httpClient"))
+    );
 
     this.register<IAuthService>(
       "authService",
@@ -138,6 +154,14 @@ class Container {
     this.register<IPrintTemplateService>(
       "printTemplateService",
       new PrintTemplateService(this.resolve("printTemplateRepository"))
+    );
+    this.register<ICategoryService>(
+      "categoryService",
+      new CategoryService(this.resolve("categoryRepository"))
+    );
+    this.register<IKdsStationService>(
+      "kdsStationService",
+      new KdsStationService(this.resolve("kdsStationRepository"))
     );
   }
 

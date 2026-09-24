@@ -12,12 +12,14 @@ import {
 import { DevicesSettingsPanel } from "./settings/DevicesSettingsPanel";
 import { PrinterSettingsPanel } from "./settings/PrinterSettingsPanel";
 import { PrintTemplateSettingsPanel } from "./settings/PrintTemplateSettingsPanel";
+import { KdsStationSettingsPanel } from "./settings/KdsStationSettingsPanel";
 
 type SettingsTab =
   | "cashier"
   | "devices"
   | "printer"
   | "print-template"
+  | "kds-station"
   | "pos-terminal"
   | "logout";
 
@@ -26,6 +28,7 @@ const tabIds: SettingsTab[] = [
   "devices",
   "printer",
   "print-template",
+  "kds-station",
   "pos-terminal",
   "logout",
 ];
@@ -86,6 +89,7 @@ export function PosSettingsPage() {
         devices: t("settings.tabs.devices"),
         printer: t("settings.tabs.printer"),
         "print-template": t("settings.tabs.printTemplate"),
+        "kds-station": t("settings.tabs.kdsStation"),
         "pos-terminal": t("settings.tabs.posTerminal"),
         logout: t("settings.tabs.logout"),
       }) satisfies Record<SettingsTab, string>,
@@ -231,6 +235,12 @@ export function PosSettingsPage() {
         {activeTab === "print-template" ? (
           <div className="mx-auto max-w-5xl">
             <PrintTemplateSettingsPanel />
+          </div>
+        ) : null}
+
+        {activeTab === "kds-station" ? (
+          <div className="mx-auto max-w-5xl">
+            <KdsStationSettingsPanel />
           </div>
         ) : null}
 

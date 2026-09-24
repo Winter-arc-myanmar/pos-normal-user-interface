@@ -3,10 +3,15 @@ import { KdsTicket } from "@/core/domain/entities/Cashier";
 const ESC = "\x1b";
 const GS = "\x1d";
 
+export type PrintPlace = "KDS" | "CHECKOUT" | "FINANCE";
+
 export interface PrintLine {
   name: string;
   quantity: string;
   categoryId?: string;
+  unitPrice?: string;
+  modifiers?: string;
+  remarks?: string;
 }
 
 export interface KitchenSlip {
@@ -29,17 +34,22 @@ export interface SaleReceipt {
   tip?: string;
   total: string;
   payments?: Array<{ name: string; amount: string }>;
+  place?: PrintPlace;
+  showLogo?: boolean;
+  showPrices?: boolean;
 }
 
 const detail = (label: string, value?: string | null) =>
   value ? `${label}: ${value}\n` : "";
 
-const itemLines = (lines: PrintLine[] = []) =>
+const itemLines = (lines: PrintLine[] = [], showPrices = false) =>
   lines
     .map((item) => {
       const qty = Number(item.quantity);
       const quantity = Number.isFinite(qty) ? String(qty) : item.quantity;
-      return `${quantity}  ${item.name}\n`;
+      const price = showPrices && item.unitPrice ? `  ${item.unitPrice}` : "";
+      const extras = [item.modifiers, item.remarks].filter(Boolean).join("\n  ");
+      return `${quantity}  ${item.name}${price}\n${extras ? `  ${extras}\n` : ""}`;
     })
     .join("");
 
@@ -61,31 +71,38 @@ export function formatKitchenSlip(slip: KitchenSlip): string {
       detail("Station", slip.stationId),
       detail("Sales order", slip.orderRef),
       "--------------------------------\n",
-      itemLines(slip.lines),
+      itemLines(slip.lines, false),
       slip.lines?.length ? "--------------------------------\n" : "",
     ].join("")
   );
 }
 
 export function formatSaleReceipt(receipt: SaleReceipt): string {
-  const payments = (receipt.payments || [])
-    .map((payment) => `${payment.name}  ${payment.amount}\n`)
-    .join("");
+  const place = receipt.place || "CHECKOUT";
+  const finance = place === "FINANCE";
+  const showLogo = finance ? false : receipt.showLogo !== false;
+  const showPrices = receipt.showPrices !== false;
+  const payments = finance
+    ? ""
+    : (receipt.payments || [])
+        .map((payment) => `${payment.name}  ${payment.amount}\n`)
+        .join("");
   return wrap(
     [
       `${ESC}a\x01`,
+      showLogo ? "LOGO\n" : "",
       `${ESC}!\x20`,
       `${receipt.title}\n`,
       `${ESC}!\x00`,
-      receipt.receiptId ? `${receipt.receiptId}\n` : "",
+      finance ? "" : receipt.receiptId ? `${receipt.receiptId}\n` : "",
       `${ESC}a\x00`,
       "--------------------------------\n",
-      itemLines(receipt.lines),
+      itemLines(receipt.lines, showPrices),
       "--------------------------------\n",
-      detail("Subtotal", receipt.subtotal),
-      detail("Discount", receipt.discount),
-      detail("Tax", receipt.tax),
-      detail("Tip", receipt.tip),
+      finance ? "" : detail("Subtotal", receipt.subtotal),
+      finance ? "" : detail("Discount", receipt.discount),
+      finance ? "" : detail("Tax", receipt.tax),
+      finance ? "" : detail("Tip", receipt.tip),
       `${ESC}!\x10`,
       `TOTAL  ${receipt.total}\n`,
       `${ESC}!\x00`,

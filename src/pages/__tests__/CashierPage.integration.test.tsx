@@ -126,6 +126,18 @@ vi.mock("@/core/presentation/hooks/usePosWorkspace", () => ({
   }),
 }));
 
+vi.mock("@/core/presentation/hooks/useKdsStationManagement", () => ({
+  useKdsStationManagement: () => ({
+    stations: [],
+    isLoading: false,
+    error: null,
+    listStations: vi.fn().mockResolvedValue({ stations: [] }),
+    createStation: vi.fn(),
+    updateStation: vi.fn(),
+    deleteStation: vi.fn(),
+  }),
+}));
+
 vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
   usePrinterConnection: () => ({
     printKitchen: mocks.printKitchen,
@@ -290,7 +302,7 @@ describe("CashierPage integration", () => {
     mocks.getCounterOrderById.mockResolvedValue({ id: "order-1" });
     mocks.pickupCounterOrder.mockResolvedValue({ id: "order-1" });
     mocks.fireToKds.mockResolvedValue({});
-    mocks.printKitchen.mockResolvedValue(undefined);
+    mocks.printKitchen.mockResolvedValue([]);
     mocks.printReceipt.mockResolvedValue(undefined);
     mocks.checkoutTableSession.mockResolvedValue({
       ...session,
