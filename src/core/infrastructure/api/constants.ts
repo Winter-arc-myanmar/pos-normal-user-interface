@@ -260,6 +260,14 @@ export const API_ENDPOINTS = {
     NO_SHOW: (id: string) => `/api/v1/waitlist/${id}/no-show`,
   },
 
+  REPORTS: {
+    SALES_SUMMARY: "/api/v1/reports/sales-summary",
+    ITEM_SALES: "/api/v1/reports/item-sales",
+    SALES_BY_CATEGORY: "/api/v1/reports/sales-by-category",
+    SALES_BY_ITEM: "/api/v1/reports/sales-by-item",
+    Z_REPORT: "/api/v1/reports/z-report",
+  },
+
   PRINT_TEMPLATES: {
     LIST: "/api/v1/print-templates",
     CREATE: "/api/v1/print-templates",

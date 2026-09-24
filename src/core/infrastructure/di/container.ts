@@ -47,6 +47,10 @@ import { IKdsStationRepository } from "../../domain/repositories/IKdsStationRepo
 import { ApiKdsStationRepository } from "../repositories/ApiKdsStationRepository";
 import { IKdsStationService } from "../../domain/services/IKdsStationService";
 import { KdsStationService } from "../../application/services/KdsStationService";
+import { IReportRepository } from "../../domain/repositories/IReportRepository";
+import { ApiReportRepository } from "../repositories/ApiReportRepository";
+import { IReportService } from "../../domain/services/IReportService";
+import { ReportService } from "../../application/services/ReportService";
 
 /**
  * Dependency Injection Container
@@ -112,6 +116,10 @@ class Container {
       "kdsStationRepository",
       new ApiKdsStationRepository(this.resolve("httpClient"))
     );
+    this.register<IReportRepository>(
+      "reportRepository",
+      new ApiReportRepository(this.resolve("httpClient"))
+    );
 
     this.register<IAuthService>(
       "authService",
@@ -162,6 +170,10 @@ class Container {
     this.register<IKdsStationService>(
       "kdsStationService",
       new KdsStationService(this.resolve("kdsStationRepository"))
+    );
+    this.register<IReportService>(
+      "reportService",
+      new ReportService(this.resolve("reportRepository"))
     );
   }
 

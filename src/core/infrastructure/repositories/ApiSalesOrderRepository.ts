@@ -189,6 +189,19 @@ const toSalesOrder = (item: Record<string, unknown>): SalesOrder => {
   });
 };
 
+const lineCategoryName = (item: Record<string, unknown>) => {
+  const product = asRecord(item.product);
+  const nested =
+    asRecord(item.category) ||
+    asRecord(product?.category) ||
+    asRecord(product?.menuCategory);
+  const name =
+    asHumanName(item.categoryName) ||
+    asHumanName(product?.categoryName) ||
+    nestedName(nested, ["name", "shortName", "code"]);
+  return name;
+};
+
 const toSalesOrderLine = (
   item: Record<string, unknown>,
   salesOrderId?: string
@@ -220,6 +233,7 @@ const toSalesOrderLine = (
     productName: catalog.productName,
     variantName: catalog.variantName,
     sku: catalog.sku,
+    categoryName: lineCategoryName(item),
     createdAt: item.createdAt ? String(item.createdAt) : undefined,
     updatedAt: item.updatedAt ? String(item.updatedAt) : undefined,
   });

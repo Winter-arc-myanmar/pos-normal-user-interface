@@ -1,10 +1,35 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { I18nextProvider } from "react-i18next";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { LanguageSwitcher } from "../LanguageSwitcher";
 import i18n, { setAppLanguage } from "@/lib/i18n";
 import { DashboardPage } from "@/pages/DashboardPage";
+
+vi.mock("@/core/presentation/hooks/usePosWorkspace", () => ({
+  usePosWorkspace: () => ({ activeLocationId: "" }),
+}));
+
+vi.mock("@/core/presentation/hooks/useReports", () => ({
+  useReports: () => ({
+    isLoading: false,
+    error: null,
+    salesSummary: vi.fn().mockResolvedValue({
+      orders: { count: 0 },
+      sales: { netSales: "0", grossSales: "0", grandTotal: "0", lineDiscounts: "0", orderDiscounts: "0", totalDiscounts: "0" },
+      refunds: { count: 0, total: "0" },
+      netAfterRefunds: "0",
+      payments: { byMethod: [], tendered: "0", changeGiven: "0" },
+      byServiceType: [],
+    }),
+    itemSales: vi.fn().mockResolvedValue({ categories: [], items: [] }),
+    zReport: vi.fn().mockResolvedValue({
+      orders: { completed: 0, voided: 0, refunded: 0 },
+      totals: { grandTotal: "0", totalTax: "0" },
+      payments: [],
+    }),
+  }),
+}));
 
 function renderDashboard() {
   return render(
@@ -27,7 +52,7 @@ describe("LanguageSwitcher", () => {
     renderDashboard();
 
     expect(
-      screen.getByText("Neutral starter home. Replace this page with your product overview.")
+      screen.getByText("Sales summary, payments, item sales, and the end-of-day shift report.")
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText("Switch language"));
@@ -37,14 +62,11 @@ describe("LanguageSwitcher", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("heading", { name: "ပင်မစာမျက်နှာ" })
+        screen.getByRole("heading", { name: "အရောင်းခွဲခြမ်းစိတ်ဖြာ" })
       ).toBeInTheDocument();
       expect(
-        screen.getByText(
-          "ထုတ်ကုန်အနှစ်ချုပ်ဖြင့် အစားထိုးနိုင်သော စတင်သည့်စာမျက်နှာ။"
-        )
+        screen.getByText("အရောင်းအနှစ်ချုပ်၊ ငွေပေးချေမှု၊ ပစ္စည်းအရောင်းနှင့် အဆိုင်းအစီရင်ခံစာ။")
       ).toBeInTheDocument();
-      expect(screen.getByText("နောက်ထပ်လုပ်ရန်များ")).toBeInTheDocument();
     });
   });
 
