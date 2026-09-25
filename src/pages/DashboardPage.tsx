@@ -243,7 +243,7 @@ export function DashboardPage() {
           {error}
         </p>
       ) : null}
-      {isLoading ? <ApiLoadingState /> : null}
+      {isLoading ? <ApiLoadingState label={t("common.loading")} /> : null}
 
       {tab === "summary" ? (
         <>

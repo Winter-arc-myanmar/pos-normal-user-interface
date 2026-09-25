@@ -100,6 +100,7 @@ export class SalesOrderLine {
   productName?: string;
   variantName?: string;
   sku?: string;
+  categoryName?: string;
   createdAt?: string;
   updatedAt?: string;
 
