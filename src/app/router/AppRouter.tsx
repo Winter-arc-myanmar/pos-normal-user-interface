@@ -31,6 +31,16 @@ const CashierPage = lazy(() =>
     default: module.CashierPage,
   }))
 );
+const KtvBoardPage = lazy(() =>
+  import("../../pages/KtvBoardPage").then((module) => ({
+    default: module.KtvBoardPage,
+  }))
+);
+const KtvRoomPage = lazy(() =>
+  import("../../pages/KtvRoomPage").then((module) => ({
+    default: module.KtvRoomPage,
+  }))
+);
 const WaitlistPage = lazy(() =>
   import("../../pages/WaitlistPage").then((module) => ({
     default: module.WaitlistPage,
@@ -200,6 +210,22 @@ export function AppRouter() {
                     requiredPermissions={PAGE_PERMISSIONS.cashier}
                   >
                     <CashierPage />
+                  </RequirePermission>
+                }
+              />
+              <Route
+                path="/ktv"
+                element={
+                  <RequirePermission requiredPermissions={PAGE_PERMISSIONS.ktv}>
+                    <KtvBoardPage />
+                  </RequirePermission>
+                }
+              />
+              <Route
+                path="/ktv/room/:roomId"
+                element={
+                  <RequirePermission requiredPermissions={PAGE_PERMISSIONS.ktv}>
+                    <KtvRoomPage />
                   </RequirePermission>
                 }
               />

@@ -110,14 +110,53 @@ export class SalesOrderLine {
 
 export class OrderPayment {
   id!: string;
+  tenantId?: string;
   salesOrderId!: string;
   paymentMethodId!: string;
+  posSessionId?: string;
   amount!: string;
   tipAmount?: string;
   transactionReference?: string;
   paymentDate?: string;
+  walletLedgerEntryId?: string | null;
+  updatedAt?: string;
 
   constructor(data: Partial<OrderPayment>) {
+    Object.assign(this, data);
+  }
+}
+
+export class KdsTicketLine {
+  id!: string;
+  ticketId!: string;
+  salesOrderLineId!: string;
+  productName!: string;
+  quantity!: string;
+  seatNumber?: number;
+  kitchenModifiers?: string;
+  status!: string;
+  bumpedAt?: string | null;
+  createdAt!: string;
+  updatedAt!: string;
+
+  constructor(data: Partial<KdsTicketLine>) {
+    Object.assign(this, data);
+  }
+}
+
+export class KdsStation {
+  id!: string;
+  tenantId!: string;
+  locationId!: string;
+  name!: string;
+  displayColor?: string;
+  printerId?: string;
+  routingRules?: Record<string, unknown>;
+  deletedAt?: string | null;
+  createdAt!: string;
+  updatedAt!: string;
+
+  constructor(data: Partial<KdsStation>) {
     Object.assign(this, data);
   }
 }
@@ -233,11 +272,29 @@ export class KdsTicket {
   bumpedAt?: string | null;
   status!: "PENDING" | "PREPARING" | "READY" | "EXPEDITED";
   lines?: Array<{ name: string; quantity: string; categoryId?: string }>;
+  kdsTicketLines?: KdsTicketLine[];
+  station?: KdsStation;
   createdAt!: string;
   updatedAt!: string;
 
   constructor(data: Partial<KdsTicket>) {
     Object.assign(this, data);
+  }
+}
+
+export class CounterOrderDetail extends SalesOrder {
+  salesOrderLines!: SalesOrderLine[];
+  orderPayments!: OrderPayment[];
+  kdsTickets!: KdsTicket[];
+
+  constructor(data: Partial<CounterOrderDetail>) {
+    super(data);
+    Object.assign(this, {
+      salesOrderLines: [],
+      orderPayments: [],
+      kdsTickets: [],
+      ...data,
+    });
   }
 }
 

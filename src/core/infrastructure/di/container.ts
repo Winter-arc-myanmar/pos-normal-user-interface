@@ -47,6 +47,10 @@ import { IKdsStationRepository } from "../../domain/repositories/IKdsStationRepo
 import { ApiKdsStationRepository } from "../repositories/ApiKdsStationRepository";
 import { IKdsStationService } from "../../domain/services/IKdsStationService";
 import { KdsStationService } from "../../application/services/KdsStationService";
+import { IKtvRepository } from "../../domain/repositories/IKtvRepository";
+import { ApiKtvRepository } from "../repositories/ApiKtvRepository";
+import { IKtvService } from "../../domain/services/IKtvService";
+import { KtvService } from "../../application/services/KtvService";
 
 /**
  * Dependency Injection Container
@@ -112,6 +116,10 @@ class Container {
       "kdsStationRepository",
       new ApiKdsStationRepository(this.resolve("httpClient"))
     );
+    this.register<IKtvRepository>(
+      "ktvRepository",
+      new ApiKtvRepository(this.resolve("httpClient"))
+    );
 
     this.register<IAuthService>(
       "authService",
@@ -162,6 +170,10 @@ class Container {
     this.register<IKdsStationService>(
       "kdsStationService",
       new KdsStationService(this.resolve("kdsStationRepository"))
+    );
+    this.register<IKtvService>(
+      "ktvService",
+      new KtvService(this.resolve("ktvRepository"))
     );
   }
 

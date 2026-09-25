@@ -32,10 +32,13 @@ import {
 import { ICashierRepository } from "../../domain/repositories/ICashierRepository";
 import {
   AdjustmentReason,
+  CounterOrderDetail,
   DiningTable,
   DiningZone,
   InventoryLocation,
   KdsTicket,
+  KdsTicketLine,
+  KdsStation,
   OrderPayment,
   PaymentMethod,
   PosRegister,
@@ -369,6 +372,85 @@ const toTicketLines = (item: Record<string, unknown>) => {
   return undefined;
 };
 
+const toSalesOrder = (item: Record<string, unknown>) =>
+  new SalesOrder({
+    id: String(item.id || ""),
+    tenantId: String(item.tenantId || ""),
+    customerId: item.customerId ? String(item.customerId) : undefined,
+    locationId: String(item.locationId || ""),
+    orderNumber: String(item.orderNumber || ""),
+    businessDate: item.businessDate ? String(item.businessDate) : undefined,
+    salesChannel: String(item.salesChannel || "POS"),
+    serviceType: fromApiServiceType(String(item.serviceType || "DINE_IN")),
+    idempotencyKey: item.idempotencyKey
+      ? String(item.idempotencyKey)
+      : undefined,
+    status: String(item.status || "DRAFT") as SalesOrder["status"],
+    subtotal: String(item.subtotal || "0.0000"),
+    totalDiscount: String(item.totalDiscount || "0.0000"),
+    discountReasonId: item.discountReasonId
+      ? String(item.discountReasonId)
+      : undefined,
+    totalTax: String(item.totalTax || "0.0000"),
+    tipAmount: item.tipAmount ? String(item.tipAmount) : undefined,
+    serviceCharge: item.serviceCharge
+      ? String(item.serviceCharge)
+      : undefined,
+    grandTotal: String(item.grandTotal || "0.0000"),
+    pickupNumber: item.pickupNumber ? String(item.pickupNumber) : undefined,
+    pickedUpAt: item.pickedUpAt ? String(item.pickedUpAt) : null,
+    createdAt: String(item.createdAt || ""),
+    updatedAt: String(item.updatedAt || ""),
+  });
+
+const toCounterOrderLine = (value: unknown) => {
+  const item = asRecord(value) || {};
+  return new SalesOrderLine({
+    id: String(item.id || ""),
+    salesOrderId: String(item.salesOrderId || ""),
+    variantId: String(item.variantId || ""),
+    quantity: String(item.quantity || "0.0000"),
+    unitPrice: String(item.unitPrice || "0.0000"),
+    lineDiscount: String(item.lineDiscount || "0.0000"),
+    taxRateId: item.taxRateId ? String(item.taxRateId) : undefined,
+    taxAmount: item.taxAmount ? String(item.taxAmount) : undefined,
+    appliedPromotionId: item.appliedPromotionId
+      ? String(item.appliedPromotionId)
+      : undefined,
+    status: item.status ? String(item.status) : undefined,
+    firedAt: item.firedAt ? String(item.firedAt) : undefined,
+    voidedAt: item.voidedAt ? String(item.voidedAt) : undefined,
+    voidReasonId: item.voidReasonId ? String(item.voidReasonId) : undefined,
+    compReasonId: item.compReasonId ? String(item.compReasonId) : undefined,
+    courseType: item.courseType ? String(item.courseType) : undefined,
+    selectedModifiers: asRecord(item.selectedModifiers),
+    seatNumber: toNumber(item.seatNumber),
+    createdAt: item.createdAt ? String(item.createdAt) : undefined,
+    updatedAt: item.updatedAt ? String(item.updatedAt) : undefined,
+  });
+};
+
+const toCounterOrderPayment = (value: unknown) => {
+  const item = asRecord(value) || {};
+  return new OrderPayment({
+    id: String(item.id || ""),
+    tenantId: item.tenantId ? String(item.tenantId) : undefined,
+    salesOrderId: String(item.salesOrderId || ""),
+    paymentMethodId: String(item.paymentMethodId || ""),
+    posSessionId: item.posSessionId ? String(item.posSessionId) : undefined,
+    amount: String(item.amount || "0.0000"),
+    tipAmount: item.tipAmount ? String(item.tipAmount) : undefined,
+    transactionReference: item.transactionReference
+      ? String(item.transactionReference)
+      : undefined,
+    paymentDate: item.paymentDate ? String(item.paymentDate) : undefined,
+    walletLedgerEntryId: item.walletLedgerEntryId
+      ? String(item.walletLedgerEntryId)
+      : null,
+    updatedAt: item.updatedAt ? String(item.updatedAt) : undefined,
+  });
+};
+
 const toKdsTicket = (item: Record<string, unknown>) =>
   new KdsTicket({
     id: String(item.id || ""),
@@ -383,6 +465,35 @@ const toKdsTicket = (item: Record<string, unknown>) =>
     bumpedAt: item.bumpedAt ? String(item.bumpedAt) : null,
     status: String(item.status || "PENDING") as KdsTicket["status"],
     lines: toTicketLines(item),
+    kdsTicketLines: Array.isArray(item.kdsTicketLines)
+      ? item.kdsTicketLines.map((value) => {
+          const line = asRecord(value) || {};
+          return new KdsTicketLine({
+            id: String(line.id || ""),
+            ticketId: String(line.ticketId || ""),
+            salesOrderLineId: String(line.salesOrderLineId || ""),
+            productName: String(line.productName || ""),
+            quantity: String(line.quantity || "0.0000"),
+            seatNumber: toNumber(line.seatNumber),
+            kitchenModifiers: line.kitchenModifiers
+              ? String(line.kitchenModifiers)
+              : undefined,
+            status: String(line.status || "PENDING"),
+            bumpedAt: line.bumpedAt ? String(line.bumpedAt) : null,
+            createdAt: String(line.createdAt || ""),
+            updatedAt: String(line.updatedAt || ""),
+          });
+        })
+      : [],
+    station: item.station
+      ? new KdsStation({
+          ...(asRecord(item.station) || {}),
+          id: String(asRecord(item.station)?.id || ""),
+          tenantId: String(asRecord(item.station)?.tenantId || ""),
+          locationId: String(asRecord(item.station)?.locationId || ""),
+          name: String(asRecord(item.station)?.name || ""),
+        })
+      : undefined,
     createdAt: String(item.createdAt || ""),
     updatedAt: String(item.updatedAt || ""),
   });
@@ -1272,18 +1383,39 @@ export class ApiCashierRepository implements ICashierRepository {
     return toKdsTicket(unwrap(response));
   }
 
-  async getCounterOrderById(id: string): Promise<Record<string, unknown>> {
+  async getCounterOrderById(id: string): Promise<CounterOrderDetail> {
     const response = await this.httpClient.get<ApiEnvelope<Record<string, unknown>>>(
       API_ENDPOINTS.COUNTER_ORDERS.BY_ID(id)
     );
-    return unwrap(response);
+    const payload = unwrap(response);
+    const order = asRecord(payload.order) || payload;
+    const lines = Array.isArray(payload.salesOrderLines)
+      ? payload.salesOrderLines
+      : Array.isArray(payload.lines)
+        ? payload.lines
+        : [];
+    const payments = Array.isArray(payload.orderPayments)
+      ? payload.orderPayments
+      : [];
+    const tickets = Array.isArray(payload.kdsTickets)
+      ? payload.kdsTickets
+      : [];
+    return new CounterOrderDetail({
+      ...toSalesOrder(order),
+      salesOrderLines: lines.map(toCounterOrderLine),
+      orderPayments: payments.map(toCounterOrderPayment),
+      kdsTickets: tickets.map((ticket) =>
+        toKdsTicket(asRecord(ticket) || {})
+      ),
+    });
   }
 
-  async pickupCounterOrder(id: string): Promise<Record<string, unknown>> {
-    const response = await this.httpClient.post<ApiEnvelope<Record<string, unknown>>>(
-      API_ENDPOINTS.COUNTER_ORDERS.PICKUP(id)
-    );
-    return unwrap(response);
+  async pickupCounterOrder(id: string): Promise<SalesOrder | null> {
+    const response = await this.httpClient.post<
+      ApiEnvelope<Record<string, unknown>> | Record<string, unknown> | undefined
+    >(API_ENDPOINTS.COUNTER_ORDERS.PICKUP(id));
+    const item = asRecord(unwrap(response));
+    return item ? toSalesOrder(item) : null;
   }
 
   async checkout(payload: CheckoutRequestDTO): Promise<Record<string, unknown>> {

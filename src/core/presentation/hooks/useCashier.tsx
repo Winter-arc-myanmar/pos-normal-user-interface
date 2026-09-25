@@ -48,6 +48,7 @@ import {
   TipPool,
   TipPoolAllocation,
   WaitlistEntry,
+  CounterOrderDetail,
 } from "../../domain/entities/Cashier";
 import { ICashierService } from "../../domain/services/ICashierService";
 import container from "../../infrastructure/di/container";
@@ -169,8 +170,8 @@ interface UseCashierReturn {
     quantity?: number,
     keepSelectedOrderId?: string
   ) => Promise<SalesOrderLine>;
-  getCounterOrderById: (counterOrderId: string) => Promise<Record<string, unknown>>;
-  pickupCounterOrder: (counterOrderId: string) => Promise<Record<string, unknown>>;
+  getCounterOrderById: (counterOrderId: string) => Promise<CounterOrderDetail>;
+  pickupCounterOrder: (counterOrderId: string) => Promise<SalesOrder | null>;
   listKdsTickets: (
     params?: KdsTicketFilterDTO
   ) => Promise<KdsTicketListDTO & { tickets: KdsTicket[] }>;
