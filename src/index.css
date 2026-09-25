@@ -54,23 +54,30 @@
   overscroll-behavior: contain;
 }
 
-/* Narrow windows keep the side rails and columns. The page scrolls
-   instead of being scaled, which was resizing the viewport in a loop. */
+/* Narrow windows: same side rails and columns, squeezed to the screen
+   width. Only the page scrolls vertically. */
 @media (max-width: 1099px) {
   html,
   body,
   #root {
     height: auto;
     min-height: 100%;
-    overflow: auto;
+    max-width: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    touch-action: pan-y;
     -webkit-overflow-scrolling: touch;
-    overscroll-behavior: auto;
+    overscroll-behavior-x: none;
   }
 
   .pos-app-shell {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     height: auto;
     min-height: 100dvh;
-    overflow: visible;
+    overflow-x: hidden;
+    overflow-y: visible;
   }
 
   .pos-app-shell > aside {
@@ -79,13 +86,18 @@
     align-self: start;
     height: 100dvh;
     max-height: 100dvh;
+    min-width: 0;
     overflow: hidden;
   }
 
   .pos-app-shell main {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     height: auto;
     min-height: 100dvh;
-    overflow: visible;
+    overflow-x: hidden;
+    overflow-y: visible;
   }
 
   .pos-app-shell main :where(
@@ -93,12 +105,51 @@
       .h-screen,
       .overflow-hidden,
       .overflow-y-auto,
+      .overflow-x-auto,
       .overflow-x-hidden,
+      .overflow-x-scroll,
       .min-h-0
     ):not(.fixed, .fixed *) {
     height: auto;
     max-height: none;
-    overflow: visible;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+    overflow-y: visible;
+  }
+
+  .pos-app-shell main .pos-split {
+    display: grid;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pos-app-shell main .pos-split:has(> :nth-child(2):last-child) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .pos-app-shell main .pos-split:has(> :nth-child(3):last-child) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 0.7fr);
+  }
+
+  .pos-app-shell main .pos-split > * {
+    width: auto;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .pos-app-shell main table {
+    width: 100%;
+    max-width: 100%;
+    table-layout: fixed;
+  }
+
+  .pos-app-shell main th,
+  .pos-app-shell main td {
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 }
 
