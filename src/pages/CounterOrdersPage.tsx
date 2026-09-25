@@ -177,7 +177,7 @@ export function CounterOrdersPage() {
         </p>
       )}
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 min-[900px]:grid-cols-[14rem_minmax(0,1fr)]">
+      <div className="pos-split grid min-h-0 flex-1 grid-cols-1 min-[900px]:grid-cols-[14rem_minmax(0,1fr)]">
         <aside className="border-r border-slate-200 bg-slate-50">
           <button
             type="button"

@@ -245,7 +245,7 @@ export function PrintTemplateSettingsPanel() {
   const { settings } = draft;
 
   return (
-    <form onSubmit={(event) => void save(event)} className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+    <form onSubmit={(event) => void save(event)} className="pos-split grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
       <div className="space-y-4">
         <section className="rounded-xl bg-white p-4 shadow-sm">
           <div className="grid gap-3 sm:grid-cols-2">

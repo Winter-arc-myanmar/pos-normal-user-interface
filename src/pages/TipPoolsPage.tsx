@@ -289,7 +289,7 @@ export function TipPoolsPage() {
   };
 
   return (
-    <section className="grid h-full min-h-0 grid-cols-[16rem_minmax(0,1fr)] overflow-hidden bg-slate-100">
+    <section className="pos-split grid h-full min-h-0 grid-cols-[16rem_minmax(0,1fr)] overflow-hidden bg-slate-100">
       <aside className="flex min-h-0 flex-col border-r border-slate-200 bg-white p-3">
         <h1 className="text-xl font-bold">{t("cashier.tipPool.title")}</h1>
         <div className="my-3 grid grid-cols-3 gap-1">

@@ -370,7 +370,7 @@ export function WaitlistPage() {
     entry.status === "WAITING" || entry.status === "NOTIFIED";
 
   return (
-    <section className="grid h-full min-h-0 grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)] overflow-hidden bg-slate-100">
+    <section className="pos-split grid h-full min-h-0 grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)] overflow-hidden bg-slate-100">
       <aside className="flex min-h-0 flex-col border-r border-slate-200 bg-white">
         <header className="border-b border-slate-200 p-4">
           <div className="flex items-center justify-between gap-2">

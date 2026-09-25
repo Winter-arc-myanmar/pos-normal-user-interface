@@ -123,7 +123,7 @@ export function KdsStationSettingsPanel() {
   };
 
   return (
-    <form onSubmit={(event) => void save(event)} className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+    <form onSubmit={(event) => void save(event)} className="pos-split grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
       <aside className="rounded-xl bg-white p-3 shadow-sm">
         <button
           type="button"

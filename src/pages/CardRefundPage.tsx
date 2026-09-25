@@ -308,7 +308,7 @@ export function CardRefundPage() {
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 gap-4 p-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="pos-split grid min-h-0 flex-1 gap-4 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <section className="min-h-0 rounded-xl border border-slate-800 bg-[#151821] p-5">
           {step === "detect" ? (
             <div className="mx-auto flex max-w-xl flex-col gap-4">

@@ -54,9 +54,8 @@
   overscroll-behavior: contain;
 }
 
-/* Phone and tablet portrait: the shell is a fixed 100dvh box with overflow
-   hidden, so lists taller than the screen are clipped and the page itself
-   cannot scroll. Let the document scroll instead. */
+/* Phone and tablet portrait, and narrow landscape: stack the POS chrome
+   and multi-column pages so content uses the full screen width and scrolls. */
 @media (orientation: portrait), (max-width: 900px) {
   html,
   body,
@@ -69,24 +68,87 @@
   }
 
   .pos-app-shell {
+    display: flex;
+    flex-direction: column;
     height: auto;
     min-height: 100dvh;
     min-width: 0;
+    width: 100%;
+    max-width: 100%;
     overflow: visible;
   }
 
-  .pos-app-shell > aside {
+  .pos-icon-rail {
     position: sticky;
     top: 0;
-    align-self: start;
-    height: 100dvh;
-    max-height: 100dvh;
-    overflow: hidden;
+    z-index: 30;
+    height: auto;
+    width: 100%;
+    max-height: none;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.25rem;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid rgb(255 255 255 / 0.1);
+  }
+
+  .pos-icon-rail > div:first-child {
+    margin-bottom: 0;
+  }
+
+  .pos-icon-rail nav {
+    flex: 1 1 auto;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .pos-icon-rail > span {
+    display: none;
+  }
+
+  .pos-action-rail {
+    position: sticky;
+    bottom: 0;
+    z-index: 30;
+    height: auto;
+    width: 100%;
+    max-height: none;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+    overflow-x: auto;
+    border-left: 0;
+    border-top: 1px solid rgb(255 255 255 / 0.1);
+  }
+
+  .pos-action-rail > div:first-child {
+    flex-direction: row;
+    align-items: center;
+    width: auto;
+  }
+
+  .pos-action-buttons {
+    margin-top: 0;
+    display: flex;
+    flex: 1 1 auto;
+    grid-template-columns: none;
+  }
+
+  .pos-action-buttons > button {
+    flex: 1 1 0;
+    min-width: 4.5rem;
+    min-height: 3rem;
   }
 
   .pos-app-shell main {
+    order: 0;
+    width: 100%;
+    max-width: 100%;
     height: auto;
-    min-height: 100dvh;
+    min-height: 0;
+    min-width: 0;
     overflow: visible;
   }
 
@@ -101,6 +163,35 @@
     height: auto;
     max-height: none;
     overflow: visible;
+  }
+
+  .pos-split {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    overflow: visible;
+  }
+
+  .pos-split > * {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+  }
+
+  .pos-app-shell main img,
+  .pos-app-shell main video,
+  .pos-app-shell main canvas,
+  .pos-app-shell main input,
+  .pos-app-shell main select,
+  .pos-app-shell main textarea {
+    max-width: 100%;
+  }
+
+  .pos-app-shell main .overflow-x-auto {
+    max-width: 100%;
+    overflow-x: auto;
   }
 }
 

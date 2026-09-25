@@ -177,7 +177,7 @@ export function PaymentView({
   }, [confirmClose, requestClosePay]);
 
   return (
-    <section className="grid h-full min-h-0 grid-cols-[minmax(11rem,16rem)_4.5rem_minmax(0,1fr)] overflow-hidden bg-[#202020] text-white">
+    <section className="pos-split grid h-full min-h-0 grid-cols-[minmax(11rem,16rem)_4.5rem_minmax(0,1fr)] overflow-hidden bg-[#202020] text-white">
       <aside className="flex min-h-0 flex-col border-r border-white/10 p-2">
         <div className="rounded bg-white p-3 text-slate-900">
           <p className="text-sm font-semibold">{t("cashier.payment.bill")}</p>

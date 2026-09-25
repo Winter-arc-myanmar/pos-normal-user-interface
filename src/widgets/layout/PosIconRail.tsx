@@ -54,7 +54,7 @@ export function PosIconRail({
   onNotificationsClick,
 }: PosIconRailProps) {
   return (
-    <aside className="pos-safe-y flex min-h-0 flex-col items-center border-r border-white/10 bg-black px-1.5 py-2 text-white">
+    <aside className="pos-icon-rail pos-safe-y flex min-h-0 flex-col items-center border-r border-white/10 bg-black px-1.5 py-2 text-white">
       <div
         className="mb-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white text-sm font-black text-black"
         aria-hidden="true"

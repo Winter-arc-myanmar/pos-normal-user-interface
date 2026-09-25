@@ -1037,7 +1037,7 @@ export function CustomersPage() {
                   : t("crm.closeCardTitle");
 
   return (
-    <section className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)] overflow-hidden bg-slate-100">
+    <section className="pos-split grid h-full min-h-0 grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)] overflow-hidden bg-slate-100">
       <aside className="flex min-h-0 flex-col bg-white">
         {(error || localError || walletError) && (
           <p className="m-4 rounded bg-red-50 p-3 text-sm text-red-700">

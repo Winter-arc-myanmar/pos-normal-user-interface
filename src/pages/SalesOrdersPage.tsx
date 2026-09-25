@@ -305,7 +305,7 @@ export function SalesOrdersPage() {
         </p>
       ) : null}
 
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)_6.5rem] gap-3 overflow-hidden px-4 pb-4">
+      <div className="pos-split grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)_6.5rem] gap-3 overflow-hidden px-4 pb-4">
         <div className="min-h-0 overflow-y-auto rounded-md bg-[#101010]">
           {isLoading && visibleOrders.length === 0 ? (
             <ApiLoadingState label={t("salesOrders.loading")} />

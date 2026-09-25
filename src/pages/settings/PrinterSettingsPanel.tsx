@@ -286,7 +286,7 @@ export function PrinterSettingsPanel() {
   };
 
   return (
-    <div className="grid min-h-[34rem] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:grid-cols-[16rem_minmax(0,1fr)]">
+    <div className="pos-split grid min-h-[34rem] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:grid-cols-[16rem_minmax(0,1fr)]">
       <aside className="border-r border-slate-200 bg-slate-50 p-3">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-bold">{t("settings.printer.devices")}</h2>

@@ -106,8 +106,8 @@ export function PosSettingsPage() {
   };
 
   return (
-    <section className="flex h-full min-h-0 overflow-hidden bg-slate-100">
-      <aside className="flex w-56 shrink-0 flex-col border-r border-slate-200 bg-white">
+    <section className="pos-split flex h-full min-h-0 overflow-hidden bg-slate-100">
+      <aside className="flex w-56 shrink-0 flex-col border-r border-slate-200 bg-white max-[900px]:w-full portrait:w-full">
         <div className="border-b border-slate-100 px-4 py-5 text-center">
           <div className="flex justify-center">
             <UserAvatar name={displayName} />
