@@ -237,6 +237,10 @@ export function AppShell() {
     openCashierView(view);
   };
 
+  const isCheckout =
+    (location.pathname.startsWith("/cashier") && cashierView === "pay") ||
+    (Boolean(ktvRoomMatch) && ktvView === "pay");
+
   const handleBranchChange = async (branchId: string) => {
     try {
       await setActiveBranch(branchId);
@@ -247,7 +251,14 @@ export function AppShell() {
   };
 
   return (
-    <div className="pos-app-shell pos-touch-scroll grid h-[100dvh] min-h-[480px] min-w-0 grid-cols-[3.5rem_minmax(0,1fr)_6.5rem] overflow-hidden bg-black">
+    <div
+      className={[
+        "pos-app-shell pos-touch-scroll grid h-[100dvh] min-h-[480px] min-w-0 overflow-hidden bg-black",
+        isCheckout
+          ? "grid-cols-[3.5rem_minmax(0,1fr)_6.5rem]"
+          : "grid-cols-[3.5rem_minmax(0,1fr)]",
+      ].join(" ")}
+    >
       <PosIconRail
         items={railItems}
         userName={currentUserName}
@@ -275,31 +286,24 @@ export function AppShell() {
         <Outlet />
       </main>
 
-      <PosActionRail
-        drawerLabel={t("shell.drawer")}
-        menuLabel={t("shell.menu")}
-        ordersLabel={t("shell.orders")}
-        payLabel={t("shell.pay")}
-        branchLabel={t("shell.branch")}
-        activeBranchId={user?.activeBranchId}
-        branches={branchIds}
-        onBranchChange={(branchId) => void handleBranchChange(branchId)}
-        onMenu={() => openActivePosView("menu")}
-        onOrders={() =>
-          ktvRoomMatch ? openActivePosView("orders") : navigate("/counter-orders")
-        }
-        onPay={() =>
-          openActivePosView(
-            (ktvRoomMatch ? ktvView : cashierView) === "pay" ? "menu" : "pay"
-          )
-        }
-        activeView={
-          (ktvRoomMatch ? ktvView : cashierView) === "menu" ||
-          (ktvRoomMatch ? ktvView : cashierView) === "pay"
-            ? ((ktvRoomMatch ? ktvView : cashierView) as "menu" | "pay")
-            : null
-        }
-      />
+      {isCheckout ? (
+        <PosActionRail
+          drawerLabel={t("shell.drawer")}
+          menuLabel={t("shell.menu")}
+          ordersLabel={t("shell.orders")}
+          payLabel={t("shell.pay")}
+          branchLabel={t("shell.branch")}
+          activeBranchId={user?.activeBranchId}
+          branches={branchIds}
+          onBranchChange={(branchId) => void handleBranchChange(branchId)}
+          onMenu={() => openActivePosView("menu")}
+          onOrders={() =>
+            ktvRoomMatch ? openActivePosView("orders") : navigate("/counter-orders")
+          }
+          onPay={() => openActivePosView("menu")}
+          activeView="pay"
+        />
+      ) : null}
     </div>
   );
 }

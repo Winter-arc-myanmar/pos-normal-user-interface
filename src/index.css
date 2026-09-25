@@ -54,102 +54,50 @@
   overscroll-behavior: contain;
 }
 
-/* Phone and tablet portrait, and narrow landscape: stack the POS chrome
-   and multi-column pages so content uses the full screen width and scrolls. */
-@media (orientation: portrait), (max-width: 900px) {
+/* Narrow windows: same side rails and columns, squeezed to the screen
+   width. Only the page scrolls vertically. */
+@media (max-width: 1099px) {
   html,
   body,
   #root {
     height: auto;
     min-height: 100%;
-    overflow: auto;
+    max-width: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    touch-action: pan-y;
     -webkit-overflow-scrolling: touch;
-    overscroll-behavior: auto;
+    overscroll-behavior-x: none;
   }
 
   .pos-app-shell {
-    display: flex;
-    flex-direction: column;
-    height: auto;
-    min-height: 100dvh;
-    min-width: 0;
     width: 100%;
     max-width: 100%;
-    overflow: visible;
+    min-width: 0;
+    height: auto;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: visible;
   }
 
-  .pos-icon-rail {
+  .pos-app-shell > aside {
     position: sticky;
     top: 0;
-    z-index: 30;
-    height: auto;
-    width: 100%;
-    max-height: none;
-    flex-direction: row;
-    align-items: center;
-    gap: 0.25rem;
-    overflow-x: auto;
-    border-right: 0;
-    border-bottom: 1px solid rgb(255 255 255 / 0.1);
-  }
-
-  .pos-icon-rail > div:first-child {
-    margin-bottom: 0;
-  }
-
-  .pos-icon-rail nav {
-    flex: 1 1 auto;
-    flex-direction: row;
-    overflow-x: auto;
-    overflow-y: hidden;
-  }
-
-  .pos-icon-rail > span {
-    display: none;
-  }
-
-  .pos-action-rail {
-    position: sticky;
-    bottom: 0;
-    z-index: 30;
-    height: auto;
-    width: 100%;
-    max-height: none;
-    flex-direction: row;
-    align-items: center;
-    gap: 0.5rem;
-    overflow-x: auto;
-    border-left: 0;
-    border-top: 1px solid rgb(255 255 255 / 0.1);
-  }
-
-  .pos-action-rail > div:first-child {
-    flex-direction: row;
-    align-items: center;
-    width: auto;
-  }
-
-  .pos-action-buttons {
-    margin-top: 0;
-    display: flex;
-    flex: 1 1 auto;
-    grid-template-columns: none;
-  }
-
-  .pos-action-buttons > button {
-    flex: 1 1 0;
-    min-width: 4.5rem;
-    min-height: 3rem;
+    align-self: start;
+    height: 100dvh;
+    max-height: 100dvh;
+    min-width: 0;
+    overflow: hidden;
   }
 
   .pos-app-shell main {
-    order: 0;
     width: 100%;
     max-width: 100%;
-    height: auto;
-    min-height: 0;
     min-width: 0;
-    overflow: visible;
+    height: auto;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: visible;
   }
 
   .pos-app-shell main :where(
@@ -157,41 +105,51 @@
       .h-screen,
       .overflow-hidden,
       .overflow-y-auto,
+      .overflow-x-auto,
       .overflow-x-hidden,
+      .overflow-x-scroll,
       .min-h-0
-    ):not(.fixed, .fixed *) {
+    ):not(.fixed, .fixed *, .pos-split, .pos-split *) {
     height: auto;
     max-height: none;
-    overflow: visible;
-  }
-
-  .pos-split {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
+    max-width: 100%;
     min-width: 0;
-    height: auto;
-    overflow: visible;
+    overflow-x: hidden;
+    overflow-y: visible;
   }
 
-  .pos-split > * {
+  .pos-app-shell main .pos-split {
+    display: grid;
     width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pos-app-shell main .pos-split:has(> :nth-child(2):last-child) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .pos-app-shell main .pos-split:has(> :nth-child(3):last-child) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 0.7fr);
+  }
+
+  .pos-app-shell main .pos-split > * {
+    min-width: 0;
     max-width: none;
-    min-width: 0;
+    overflow-x: clip;
   }
 
-  .pos-app-shell main img,
-  .pos-app-shell main video,
-  .pos-app-shell main canvas,
-  .pos-app-shell main input,
-  .pos-app-shell main select,
-  .pos-app-shell main textarea {
+  .pos-app-shell main table {
+    width: 100%;
     max-width: 100%;
+    table-layout: fixed;
   }
 
-  .pos-app-shell main .overflow-x-auto {
-    max-width: 100%;
-    overflow-x: auto;
+  .pos-app-shell main th,
+  .pos-app-shell main td {
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 }
 

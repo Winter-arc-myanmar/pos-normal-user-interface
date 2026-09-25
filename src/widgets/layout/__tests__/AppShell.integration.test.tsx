@@ -69,7 +69,7 @@ describe("AppShell POS actions", () => {
 
   it("switches branches and routes Menu to the product catalog", async () => {
     render(
-      <MemoryRouter initialEntries={["/dashboard"]}>
+      <MemoryRouter initialEntries={["/cashier?view=pay"]}>
         <Routes>
           <Route element={<AppShell />}>
             <Route path="*" element={<LocationDisplay />} />
