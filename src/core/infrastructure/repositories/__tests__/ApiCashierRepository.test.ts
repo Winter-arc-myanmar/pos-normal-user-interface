@@ -84,11 +84,18 @@ describe("ApiCashierRepository", () => {
         })
         .mockResolvedValueOnce({
           data: {
-            data: {
-              order: { id: "counter-1" },
-              lines: [{ id: "line-1" }],
-              kdsTickets: [{ id: "ticket-1" }],
-            },
+            id: "counter-1",
+            serviceType: "DINE_IN",
+            salesOrderLines: [{ id: "line-1", quantity: "2.0000" }],
+            orderPayments: [{ id: "payment-1", amount: "100.0000" }],
+            kdsTickets: [
+              {
+                id: "ticket-1",
+                kdsTicketLines: [
+                  { id: "ticket-line-1", productName: "Cheeseburger" },
+                ],
+              },
+            ],
           },
         }),
     };
@@ -111,8 +118,10 @@ describe("ApiCashierRepository", () => {
       amount: "25.0000",
     });
     expect(counterOrder).toMatchObject({
-      order: { id: "counter-1" },
-      lines: [{ id: "line-1" }],
+      id: "counter-1",
+      salesOrderLines: [{ id: "line-1" }],
+      orderPayments: [{ id: "payment-1" }],
+      kdsTickets: [{ id: "ticket-1" }],
     });
   });
 
@@ -148,6 +157,37 @@ describe("ApiCashierRepository", () => {
         lineDiscount: 0,
       }
     );
+  });
+
+  it("supports pickup responses with and without an order body", async () => {
+    const post = vi
+      .fn()
+      .mockResolvedValueOnce({
+        data: {
+          id: "counter-1",
+          serviceType: "TAKEAWAY",
+          status: "COMPLETED",
+          pickedUpAt: "2026-09-22T20:00:00.000Z",
+        },
+      })
+      .mockResolvedValueOnce(undefined);
+    const repository = new ApiCashierRepository({
+      post,
+    } as unknown as HttpClient);
+
+    const pickedUp = await repository.pickupCounterOrder("counter-1");
+    const noContent = await repository.pickupCounterOrder("counter-2");
+
+    expect(post).toHaveBeenNthCalledWith(
+      1,
+      "/api/v1/counter-orders/counter-1/pickup"
+    );
+    expect(pickedUp).toMatchObject({
+      id: "counter-1",
+      status: "COMPLETED",
+      pickedUpAt: "2026-09-22T20:00:00.000Z",
+    });
+    expect(noContent).toBeNull();
   });
 
   it("sends decimal strings for sales order lines", async () => {

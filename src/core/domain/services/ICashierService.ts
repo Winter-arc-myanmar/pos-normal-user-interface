@@ -47,6 +47,7 @@ import {
   TipPool,
   TipPoolAllocation,
   WaitlistEntry,
+  CounterOrderDetail,
 } from "../entities/Cashier";
 
 export interface ICashierService {
@@ -132,8 +133,8 @@ export interface ICashierService {
     payload: Partial<TipPoolAllocationDTO>
   ): Promise<TipPoolAllocation>;
   deleteTipPoolAllocation(poolId: string, allocationId: string): Promise<void>;
-  getCounterOrderById(id: string): Promise<Record<string, unknown>>;
-  pickupCounterOrder(id: string): Promise<Record<string, unknown>>;
+  getCounterOrderById(id: string): Promise<CounterOrderDetail>;
+  pickupCounterOrder(id: string): Promise<SalesOrder | null>;
   listKdsTickets(
     params?: KdsTicketFilterDTO
   ): Promise<KdsTicketListDTO & { tickets: KdsTicket[] }>;

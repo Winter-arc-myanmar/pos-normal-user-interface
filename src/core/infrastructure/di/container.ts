@@ -51,6 +51,10 @@ import { IReportRepository } from "../../domain/repositories/IReportRepository";
 import { ApiReportRepository } from "../repositories/ApiReportRepository";
 import { IReportService } from "../../domain/services/IReportService";
 import { ReportService } from "../../application/services/ReportService";
+import { IKtvRepository } from "../../domain/repositories/IKtvRepository";
+import { ApiKtvRepository } from "../repositories/ApiKtvRepository";
+import { IKtvService } from "../../domain/services/IKtvService";
+import { KtvService } from "../../application/services/KtvService";
 
 /**
  * Dependency Injection Container
@@ -120,6 +124,10 @@ class Container {
       "reportRepository",
       new ApiReportRepository(this.resolve("httpClient"))
     );
+    this.register<IKtvRepository>(
+      "ktvRepository",
+      new ApiKtvRepository(this.resolve("httpClient"))
+    );
 
     this.register<IAuthService>(
       "authService",
@@ -174,6 +182,10 @@ class Container {
     this.register<IReportService>(
       "reportService",
       new ReportService(this.resolve("reportRepository"))
+    );
+    this.register<IKtvService>(
+      "ktvService",
+      new KtvService(this.resolve("ktvRepository"))
     );
   }
 

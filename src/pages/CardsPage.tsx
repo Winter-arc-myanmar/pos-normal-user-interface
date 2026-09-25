@@ -506,6 +506,25 @@ export function CardsPage() {
                     <Button type="button" variant="secondary" onClick={resetFlow}>
                       {t("cardTopup.newTopup")}
                     </Button>
+                    {(location.state as CardTopupPrefill | null)?.returnTo ? (
+                      <Button
+                        type="button"
+                        onClick={() =>
+                          navigate(
+                            (location.state as CardTopupPrefill).returnTo || "/cards",
+                            {
+                              state: {
+                                cardNumber: receipt.cardNumber,
+                                balance: receipt.balanceAfter,
+                                walletId: detectedWallet?.id,
+                              },
+                            }
+                          )
+                        }
+                      >
+                        {t("cardTopup.back")}
+                      </Button>
+                    ) : null}
                   </>
                 )}
               </div>

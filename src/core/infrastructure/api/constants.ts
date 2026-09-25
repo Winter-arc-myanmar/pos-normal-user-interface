@@ -215,6 +215,28 @@ export const API_ENDPOINTS = {
     CHECKOUT: (id: string) => `/api/v1/table-sessions/${id}/checkout`,
   },
 
+  KTV_ROOMS: {
+    LIST: "/api/v1/ktv-rooms",
+    CREATE: "/api/v1/ktv-rooms",
+    BOARD: "/api/v1/ktv-rooms/board",
+    BY_ID: (id: string) => `/api/v1/ktv-rooms/${id}`,
+    UPDATE: (id: string) => `/api/v1/ktv-rooms/${id}`,
+    DELETE: (id: string) => `/api/v1/ktv-rooms/${id}`,
+    READY: (id: string) => `/api/v1/ktv-rooms/${id}/ready`,
+  },
+
+  KTV_SESSIONS: {
+    CREATE: "/api/v1/ktv-sessions",
+    QUOTE: (id: string) => `/api/v1/ktv-sessions/${id}/quote`,
+    PAUSE: (id: string) => `/api/v1/ktv-sessions/${id}/pause`,
+    RESUME: (id: string) => `/api/v1/ktv-sessions/${id}/resume`,
+    CLOSE: (id: string) => `/api/v1/ktv-sessions/${id}/close`,
+  },
+  ROOM_TABLET: {
+    MENU: "/api/v1/room-tablet/menu",
+    SESSION: "/api/v1/room-tablet/session",
+  },
+
   KDS: {
     FIRE: "/api/v1/kds/fire",
     TICKETS: "/api/v1/kds/tickets",

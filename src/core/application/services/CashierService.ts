@@ -51,6 +51,7 @@ import {
   TipPool,
   TipPoolAllocation,
   WaitlistEntry,
+  CounterOrderDetail,
 } from "../../domain/entities/Cashier";
 import { PosPaymentCatalog } from "./PosPaymentCatalog";
 import { TableWarningPolicy } from "./TableWarningPolicy";
@@ -459,12 +460,12 @@ export class CashierService implements ICashierService {
     return this.cashierRepository.deleteTipPoolAllocation(poolId, allocationId);
   }
 
-  async getCounterOrderById(id: string): Promise<Record<string, unknown>> {
+  async getCounterOrderById(id: string): Promise<CounterOrderDetail> {
     if (!id?.trim()) throw new Error("Counter order ID is required");
     return this.cashierRepository.getCounterOrderById(id);
   }
 
-  async pickupCounterOrder(id: string): Promise<Record<string, unknown>> {
+  async pickupCounterOrder(id: string): Promise<SalesOrder | null> {
     if (!id?.trim()) throw new Error("Counter order ID is required");
     return this.cashierRepository.pickupCounterOrder(id);
   }

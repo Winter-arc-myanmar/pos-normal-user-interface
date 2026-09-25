@@ -22,6 +22,7 @@ export interface CardTopupPrefill {
   customerPhone?: string;
   tenantId?: string;
   walletId?: string;
+  returnTo?: string;
 }
 
 export interface CardTopupReceipt {

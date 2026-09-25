@@ -28,6 +28,15 @@ function CashierIcon() {
   );
 }
 
+function KtvIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass} aria-hidden="true">
+      <path d="M5 5h14v14H5zM9 9h6M8 13h8M10 17h4" />
+      <circle cx="12" cy="9" r="1" />
+    </svg>
+  );
+}
+
 function UsersIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass} aria-hidden="true">
@@ -113,6 +122,7 @@ export function AppShell() {
   const location = useLocation();
   const isPosWorkspace = [
     "/cashier",
+    "/ktv",
     "/sales-orders",
     "/waitlist",
     "/tip-pools",
@@ -137,6 +147,10 @@ export function AppShell() {
   const cashierView = location.pathname.startsWith("/cashier")
     ? new URLSearchParams(location.search).get("view")
     : null;
+  const ktvRoomMatch = location.pathname.match(/^\/ktv\/room\/([^/]+)/);
+  const ktvView = ktvRoomMatch
+    ? new URLSearchParams(location.search).get("view")
+    : null;
 
   const railItems: PosRailItem[] = [
     {
@@ -144,6 +158,12 @@ export function AppShell() {
       label: t("shell.cashierTitle"),
       icon: <CashierIcon />,
       visible: canAccess(PAGE_PERMISSIONS.cashier),
+    },
+    {
+      to: "/ktv",
+      label: t("shell.ktvTitle"),
+      icon: <KtvIcon />,
+      visible: canAccess(PAGE_PERMISSIONS.ktv),
     },
     {
       to: "/counter-orders",
@@ -205,6 +225,18 @@ export function AppShell() {
     navigate(`/cashier?view=${view}`);
   };
 
+  const openActivePosView = (view: "menu" | "orders" | "pay") => {
+    if (ktvRoomMatch) {
+      if (view === "orders") {
+        navigate("/ktv");
+        return;
+      }
+      navigate(`/ktv/room/${ktvRoomMatch[1]}?view=${view}`);
+      return;
+    }
+    openCashierView(view);
+  };
+
   const handleBranchChange = async (branchId: string) => {
     try {
       await setActiveBranch(branchId);
@@ -252,13 +284,20 @@ export function AppShell() {
         activeBranchId={user?.activeBranchId}
         branches={branchIds}
         onBranchChange={(branchId) => void handleBranchChange(branchId)}
-        onMenu={() => openCashierView("menu")}
-        onOrders={() => navigate("/counter-orders")}
+        onMenu={() => openActivePosView("menu")}
+        onOrders={() =>
+          ktvRoomMatch ? openActivePosView("orders") : navigate("/counter-orders")
+        }
         onPay={() =>
-          openCashierView(cashierView === "pay" ? "menu" : "pay")
+          openActivePosView(
+            (ktvRoomMatch ? ktvView : cashierView) === "pay" ? "menu" : "pay"
+          )
         }
         activeView={
-          cashierView === "menu" || cashierView === "pay" ? cashierView : null
+          (ktvRoomMatch ? ktvView : cashierView) === "menu" ||
+          (ktvRoomMatch ? ktvView : cashierView) === "pay"
+            ? ((ktvRoomMatch ? ktvView : cashierView) as "menu" | "pay")
+            : null
         }
       />
     </div>
