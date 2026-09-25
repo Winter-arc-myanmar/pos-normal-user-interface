@@ -215,7 +215,7 @@ export function AppShell() {
   };
 
   return (
-    <div className="pos-app-shell grid h-[100dvh] min-h-[480px] min-w-[768px] grid-cols-[3.5rem_minmax(0,1fr)_6.5rem] overflow-hidden bg-black">
+    <div className="pos-app-shell pos-touch-scroll grid h-[100dvh] min-h-[480px] min-w-0 grid-cols-[3.5rem_minmax(0,1fr)_6.5rem] overflow-x-auto overflow-y-hidden bg-black max-[900px]:min-w-[768px]">
       <PosIconRail
         items={railItems}
         userName={currentUserName}
@@ -232,12 +232,12 @@ export function AppShell() {
 
       <main
         className={[
-          "min-h-0 min-w-0 overflow-hidden",
+          "pos-touch-scroll min-h-0 min-w-0",
           isPosWorkspace
-            ? "bg-[#080808]"
+            ? "overflow-y-auto overflow-x-hidden bg-[#080808]"
             : isFullBleedLightPage
-              ? "overflow-hidden bg-slate-100"
-              : "overflow-y-auto bg-slate-100 p-4 text-slate-900 sm:p-5",
+              ? "overflow-y-auto overflow-x-hidden bg-slate-100"
+              : "overflow-y-auto overflow-x-hidden bg-slate-100 p-4 text-slate-900 sm:p-5",
         ].join(" ")}
       >
         <Outlet />

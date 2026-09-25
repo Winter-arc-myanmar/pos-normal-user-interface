@@ -26,10 +26,11 @@ const serviceTabs: Array<{ key: ServiceType; labelKey: string }> = [
   { key: "PICK_UP", labelKey: "cashier.serviceTypes.pickUp" },
 ];
 
-const statusTabs: Array<{ key: "ALL" | "DRAFT" | "CONFIRMED"; labelKey: string }> = [
+const statusTabs: Array<{ key: "ALL" | "DRAFT" | "CONFIRMED" | "COMPLETED"; labelKey: string }> = [
   { key: "ALL", labelKey: "cashier.status.all" },
   { key: "DRAFT", labelKey: "cashier.status.pending" },
   { key: "CONFIRMED", labelKey: "cashier.status.placed" },
+  { key: "COMPLETED", labelKey: "cashier.status.paid" },
 ];
 
 interface CashierBoardProps {

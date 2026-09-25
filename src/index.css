@@ -6,9 +6,11 @@
   html {
     @apply antialiased;
     -webkit-text-size-adjust: 100%;
-    touch-action: manipulation;
     height: 100%;
     overflow: hidden;
+    /* pan must stay enabled. `manipulation` on a non-scrolling root
+       lets Median's WebView drop touch drags before inner lists see them. */
+    touch-action: pan-x pan-y;
   }
 
   body {
@@ -16,13 +18,13 @@
     height: 100%;
     overflow: hidden;
     overscroll-behavior: none;
-    -webkit-user-select: none;
-    user-select: none;
+    touch-action: pan-x pan-y;
   }
 
   #root {
     height: 100%;
-    min-height: 100%;
+    min-height: 0;
+    overflow: hidden;
   }
 
   button,
@@ -37,6 +39,19 @@
     -webkit-user-select: text;
     user-select: text;
   }
+}
+
+/* Median.io (WKWebView / Android WebView) only touch-scrolls a box when it
+   opts into momentum scrolling. Mouse wheels still move `overflow: auto`. */
+.overflow-y-auto,
+.overflow-x-auto,
+.overflow-auto,
+.overflow-y-scroll,
+.overflow-x-scroll,
+.pos-touch-scroll {
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+  overscroll-behavior: contain;
 }
 
 @layer utilities {

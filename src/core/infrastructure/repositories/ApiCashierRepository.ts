@@ -21,6 +21,7 @@ import {
   TipPoolAllocationDTO,
   TipPoolFilterDTO,
   fromApiServiceType,
+  toApiServiceType,
   UpdateTableSessionStateDTO,
   UpdateSalesOrderLineDTO,
   UpdateTipPoolDTO,
@@ -762,7 +763,11 @@ export class ApiCashierRepository implements ICashierRepository {
       locationId: String(item.locationId || ""),
       orderNumber: String(item.orderNumber || ""),
       salesChannel: String(item.salesChannel || "POS"),
-      serviceType: fromApiServiceType(String(item.serviceType || "DINE_IN")),
+      serviceType: item.serviceType
+        ? fromApiServiceType(String(item.serviceType))
+        : payload.serviceType
+          ? fromApiServiceType(toApiServiceType(payload.serviceType))
+          : "DINE_IN",
       status: String(item.status || "DRAFT") as SalesOrder["status"],
       subtotal: String(item.subtotal || "0"),
       totalDiscount: String(item.totalDiscount || "0"),

@@ -78,6 +78,8 @@ export interface SalesOrderFilterDTO extends PaginatedQueryDTO {
   customerId?: string;
   dateFrom?: string;
   dateTo?: string;
+  serviceType?: ApiServiceType;
+  waitingPickup?: boolean;
 }
 
 export interface DiningTableFilterDTO extends PaginatedQueryDTO {
