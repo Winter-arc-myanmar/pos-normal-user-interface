@@ -109,7 +109,7 @@
       .overflow-x-hidden,
       .overflow-x-scroll,
       .min-h-0
-    ):not(.fixed, .fixed *) {
+    ):not(.fixed, .fixed *, .pos-split, .pos-split *) {
     height: auto;
     max-height: none;
     max-width: 100%;
@@ -135,9 +135,9 @@
   }
 
   .pos-app-shell main .pos-split > * {
-    width: auto;
-    max-width: 100%;
     min-width: 0;
+    max-width: none;
+    overflow-x: clip;
   }
 
   .pos-app-shell main table {
