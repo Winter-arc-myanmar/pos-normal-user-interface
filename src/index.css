@@ -54,6 +54,56 @@
   overscroll-behavior: contain;
 }
 
+/* Phone and tablet portrait: the shell is a fixed 100dvh box with overflow
+   hidden, so lists taller than the screen are clipped and the page itself
+   cannot scroll. Let the document scroll instead. */
+@media (orientation: portrait), (max-width: 900px) {
+  html,
+  body,
+  #root {
+    height: auto;
+    min-height: 100%;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: auto;
+  }
+
+  .pos-app-shell {
+    height: auto;
+    min-height: 100dvh;
+    min-width: 0;
+    overflow: visible;
+  }
+
+  .pos-app-shell > aside {
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+  }
+
+  .pos-app-shell main {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .pos-app-shell main :where(
+      .h-full,
+      .h-screen,
+      .overflow-hidden,
+      .overflow-y-auto,
+      .overflow-x-hidden,
+      .min-h-0
+    ):not(.fixed, .fixed *) {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+}
+
 @layer utilities {
   .pos-safe-y {
     padding-top: max(0.5rem, env(safe-area-inset-top));

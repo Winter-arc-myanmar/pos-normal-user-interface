@@ -215,7 +215,7 @@ export function AppShell() {
   };
 
   return (
-    <div className="pos-app-shell pos-touch-scroll grid h-[100dvh] min-h-[480px] min-w-0 grid-cols-[3.5rem_minmax(0,1fr)_6.5rem] overflow-x-auto overflow-y-hidden bg-black max-[900px]:min-w-[768px]">
+    <div className="pos-app-shell pos-touch-scroll grid h-[100dvh] min-h-[480px] min-w-0 grid-cols-[3.5rem_minmax(0,1fr)_6.5rem] overflow-hidden bg-black">
       <PosIconRail
         items={railItems}
         userName={currentUserName}
