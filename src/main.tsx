@@ -17,7 +17,9 @@ function fitPosViewport() {
   const meta = document.querySelector('meta[name="viewport"]')
   if (!meta) return
   const width = windowCssWidth()
-  if (width < POS_LAYOUT_WIDTH - 1) {
+  const scaled = width < POS_LAYOUT_WIDTH - 1
+  document.documentElement.classList.toggle('pos-scaled', scaled)
+  if (scaled) {
     const scale = Math.max(width / POS_LAYOUT_WIDTH, 0.2)
     meta.setAttribute(
       'content',

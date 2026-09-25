@@ -54,6 +54,52 @@
   overscroll-behavior: contain;
 }
 
+/* Smaller windows keep the side-rail layout, scaled to fit the width.
+   Let the page itself scroll when a list is taller than the screen. */
+html.pos-scaled,
+html.pos-scaled body,
+html.pos-scaled #root {
+  height: auto;
+  min-height: 100%;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: auto;
+}
+
+html.pos-scaled .pos-app-shell {
+  height: auto;
+  min-height: 100dvh;
+  overflow: visible;
+}
+
+html.pos-scaled .pos-app-shell > aside {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+html.pos-scaled .pos-app-shell main {
+  height: auto;
+  min-height: 100dvh;
+  overflow: visible;
+}
+
+html.pos-scaled .pos-app-shell main :where(
+    .h-full,
+    .h-screen,
+    .overflow-hidden,
+    .overflow-y-auto,
+    .overflow-x-hidden,
+    .min-h-0
+  ):not(.fixed, .fixed *) {
+  height: auto;
+  max-height: none;
+  overflow: visible;
+}
+
 @layer utilities {
   .pos-safe-y {
     padding-top: max(0.5rem, env(safe-area-inset-top));
