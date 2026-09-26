@@ -1068,6 +1068,8 @@
     "unlinked": "Unlinked print item ({{count}})",
     "refresh": "Refresh tickets",
     "printTicket": "Print {{ticket}}",
+    "details": "Details",
+    "closeDetails": "Close",
     "previous": "Previous page",
     "next": "Next page",
     "pageLabel": "Page {{page}} / {{pages}}",

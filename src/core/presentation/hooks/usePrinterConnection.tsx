@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { KdsTicket } from "../../domain/entities/Cashier";
 import { qzTrayClient } from "../../infrastructure/printing/QzTrayClient";
-import { KitchenSlip, SaleReceipt } from "@/lib/printing/formatKdsTicket";
+import {
+  kdsTicketPrintLines,
+  KitchenSlip,
+  SaleReceipt,
+} from "@/lib/printing/formatKdsTicket";
 import {
   groupKitchenJobs,
   StationRoute,
@@ -153,20 +157,36 @@ export function usePrinterConnection(tenantId: string, registerId: string) {
 
   const printTicket = useCallback(
     async (ticket: KdsTicket, stations: StationRoute[] = []) => {
-      const routed = ticket.stationId
-        ? stations.filter((station) => station.id === ticket.stationId)
-        : stations;
+      const stationId = ticket.stationId || ticket.station?.id;
+      const listed = stationId
+        ? stations.find((station) => station.id === stationId)
+        : undefined;
+      const station: StationRoute | undefined = listed
+        ? {
+            ...listed,
+            printerId: listed.printerId || ticket.station?.printerId,
+            name: ticket.station?.name || listed.name,
+          }
+        : ticket.station
+          ? {
+              id: ticket.station.id,
+              name: ticket.station.name,
+              printerId: ticket.station.printerId,
+              categoryIds: [],
+            }
+          : undefined;
       return printKitchen(
         {
           title: ticket.ticketNumber || ticket.id,
           status: ticket.status,
           courseType: ticket.courseType,
           firedAt: ticket.firedAt,
-          stationId: ticket.stationId,
+          stationId,
+          stationName: station?.name,
           orderRef: ticket.salesOrderId,
-          lines: ticket.lines,
+          lines: kdsTicketPrintLines(ticket),
         },
-        routed
+        station ? [station] : []
       );
     },
     [printKitchen]

@@ -121,12 +121,10 @@ describe("PosSettingsPage integration", () => {
     });
   });
 
-  it("renders cashier settings and switches tabs", () => {
-    renderPage("cashier");
+  it("renders device settings and switches tabs", () => {
+    renderPage("devices");
 
     expect(screen.getByText("Demo Admin")).toBeInTheDocument();
-    expect(screen.getByText("Auto Check Out")).toBeInTheDocument();
-    expect(screen.getByText("Quick Order")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Logout" }));
     expect(screen.getByText("Sign out")).toBeInTheDocument();

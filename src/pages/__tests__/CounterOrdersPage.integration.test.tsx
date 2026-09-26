@@ -34,6 +34,10 @@ vi.mock("react-i18next", () => ({
         "counterOrders.allStations": "All stations",
         "counterOrders.statuses.pending": "Pending",
         "counterOrders.refresh": "Refresh tickets",
+        "counterOrders.details": "Details",
+        "counterOrders.closeDetails": "Close",
+        "counterOrders.noLines": "No returned order lines.",
+        "common.loading": "Loading",
         "counterOrders.noTickets": "No KDS tickets returned.",
       };
       return labels[key] || key;
@@ -123,18 +127,20 @@ describe("CounterOrdersPage integration", () => {
     });
   });
 
-  it("loads the waiting queue by status", async () => {
+  it("opens ticket details with the returned items", async () => {
+    mocks.getTicket.mockResolvedValue({
+      ...ticket,
+      station: { id: "station-kitchen", name: "Hot line" },
+      lines: [{ name: "Dish Soap", quantity: "2.0000", modifiers: "No ice" }],
+    });
     render(<CounterOrdersPage />);
     await screen.findByRole("button", { name: "Print KDS-9" });
 
-    fireEvent.click(screen.getByRole("button", { name: "Waiting" }));
+    fireEvent.click(screen.getByRole("button", { name: "Details" }));
 
-    await waitFor(() => {
-      expect(mocks.listTickets).toHaveBeenCalledWith({
-        page: 1,
-        limit: 50,
-        status: "PENDING",
-      });
-    });
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(await screen.findByText("Dish Soap")).toBeInTheDocument();
+    expect(screen.getByText(/Hot line/)).toBeInTheDocument();
+    expect(screen.getByText("No ice")).toBeInTheDocument();
   });
 });

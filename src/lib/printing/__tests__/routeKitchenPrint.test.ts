@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { PrinterBinding } from "@/lib/pos/printerBindingStorage";
-import { formatKitchenSlip, formatSaleReceipt } from "../formatKdsTicket";
+import {
+  formatKdsTicket,
+  formatKitchenSlip,
+  formatSaleReceipt,
+} from "../formatKdsTicket";
+import { KdsTicket } from "@/core/domain/entities/Cashier";
 import { groupKitchenJobs } from "../routeKitchenPrint";
 
 const binding = (id: string, backendPrinterId: string): PrinterBinding => ({
@@ -127,5 +132,33 @@ describe("station print routing", () => {
     expect(finance).toContain("5.00");
     expect(checkout).toContain("LOGO");
     expect(checkout).toContain("5.00");
+  });
+
+  it("prints ticket items and the station name from kdsTicketLines", () => {
+    const slip = formatKdsTicket(
+      new KdsTicket({
+        ticketNumber: "KDS-1",
+        stationId: "station-1",
+        station: { id: "station-1", name: "Hot line", printerId: "printer-hot" },
+        kdsTicketLines: [
+          {
+            id: "line-1",
+            ticketId: "ticket-1",
+            salesOrderLineId: "order-line-1",
+            productName: "Dish Soap",
+            quantity: "2.0000",
+            kitchenModifiers: "No ice",
+            status: "PENDING",
+            createdAt: "",
+            updatedAt: "",
+          },
+        ],
+      })
+    );
+
+    expect(slip).toContain("Dish Soap");
+    expect(slip).toContain("2  Dish Soap");
+    expect(slip).toContain("No ice");
+    expect(slip).toContain("Station: Hot line");
   });
 });
