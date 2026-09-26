@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { KitchenPrinter } from "@/core/domain/entities/KitchenPrinter";
 import { useAuth } from "@/core/presentation/hooks/useAuth";
 import { useKdsStationManagement } from "@/core/presentation/hooks/useKdsStationManagement";
+import { useCategoryManagement } from "@/core/presentation/hooks/useCategoryManagement";
 import { useKitchenPrinterManagement } from "@/core/presentation/hooks/useKitchenPrinterManagement";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
 import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
@@ -43,6 +44,11 @@ export function PrinterSettingsPanel() {
     listStations,
   } = useKdsStationManagement();
   const connection = usePrinterConnection(tenantId, activePosRegisterId);
+  const {
+    categories,
+    isLoading: categoriesLoading,
+    listCategories,
+  } = useCategoryManagement();
 
   const [selectedBackendId, setSelectedBackendId] = useState("");
   const [selectedBindingId, setSelectedBindingId] = useState("");
@@ -73,6 +79,15 @@ export function PrinterSettingsPanel() {
       sortOrder: "desc",
     }).catch(() => undefined);
   }, [listPrinters]);
+
+  useEffect(() => {
+    void listCategories({
+      page: 1,
+      limit: 200,
+      sortBy: "name",
+      sortOrder: "asc",
+    }).catch(() => undefined);
+  }, [listCategories]);
 
   useEffect(() => {
     void listStations({
@@ -512,15 +527,24 @@ export function PrinterSettingsPanel() {
               {t("settings.printer.categoryRouting")}
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
-              <input
-                className="min-h-10 min-w-56 flex-1 rounded border border-slate-200 px-3 text-sm"
+              <select
+                className="min-h-10 min-w-56 flex-1 rounded border border-slate-200 bg-white px-3 text-sm"
                 value={categoryId}
+                disabled={categoriesLoading}
+                aria-label={t("settings.printer.categoryRouting")}
                 onChange={(event) => setCategoryId(event.target.value)}
-                placeholder={t("settings.printer.categoryId")}
-              />
+              >
+                <option value="">{t("settings.printer.selectCategory")}</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
               <Button
                 type="button"
                 variant="secondary"
+                disabled={!categoryId}
                 onClick={() => void routeCategory(true)}
               >
                 {t("settings.printer.attach")}
@@ -528,11 +552,22 @@ export function PrinterSettingsPanel() {
               <Button
                 type="button"
                 variant="secondary"
+                disabled={!categoryId}
                 onClick={() => void routeCategory(false)}
               >
                 {t("settings.printer.detach")}
               </Button>
             </div>
+            {verifiedBinding?.categoryIds?.length ? (
+              <p className="mt-2 text-xs text-slate-500">
+                {verifiedBinding.categoryIds
+                  .map(
+                    (id) =>
+                      categories.find((category) => category.id === id)?.name || id
+                  )
+                  .join(", ")}
+              </p>
+            ) : null}
           </div>
         ) : null}
 

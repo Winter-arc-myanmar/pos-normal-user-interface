@@ -529,6 +529,7 @@
       "deleteFailed": "Unable to delete printer.",
       "categoryRouting": "Category routing",
       "categoryId": "Category ID",
+      "selectCategory": "Select a category",
       "attach": "Attach",
       "detach": "Detach",
       "categoryAttached": "Category routed to this printer.",
