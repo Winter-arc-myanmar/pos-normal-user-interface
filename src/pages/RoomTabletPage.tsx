@@ -81,6 +81,9 @@ export function RoomTabletPage() {
   const lastTouch = useRef(Date.now());
 
   const tabletRoom: TabletRoom | undefined = rooms.find((room) => room.roomId === setup?.roomId);
+  const byTheHour = tabletRoom?.kind === "KTV";
+  const tu = (key: string, options?: Record<string, unknown>) =>
+    t(byTheHour ? `tablet.ktv.${key}` : `tablet.${key}`, options);
   const myRoom: TabletVisitRoom | undefined = visit?.rooms.find(
     (room) => room.roomId === setup?.roomId
   );
@@ -227,7 +230,7 @@ export function RoomTabletPage() {
           deviceName,
         });
         setDoneMessage(
-          t("tablet.started", {
+          tu("started", {
             count: sessions,
             amount: money(result.charged),
             balance: money(result.balanceAfter),
@@ -262,7 +265,7 @@ export function RoomTabletPage() {
           deviceName,
         });
         setDoneMessage(
-          t("tablet.timeAdded", {
+          tu("timeAdded", {
             count: sessions,
             amount: money(result.charged),
             balance: money(result.balanceAfter),
@@ -464,7 +467,7 @@ export function RoomTabletPage() {
         </button>
       </div>
       <p className="text-slate-300">
-        {t("tablet.sessionsOf", { count: sessions, minutes: sessions * sessionMinutes })}
+        {tu("sessionsOf", { count: sessions, minutes: sessions * sessionMinutes })}
       </p>
       {sessionPrice ? (
         <p className="text-xl font-bold text-teal-300">{money(sessionPrice * sessions)}</p>
@@ -580,7 +583,7 @@ export function RoomTabletPage() {
               <p className="text-3xl font-bold">{t("tablet.welcome")}</p>
               {tabletRoom.sessionPrice ? (
                 <p className="text-slate-300">
-                  {t("tablet.pricePerSession", {
+                  {tu("pricePerSession", {
                     minutes: tabletRoom.sessionMinutes,
                     amount: money(tabletRoom.sessionPrice),
                   })}
@@ -597,7 +600,7 @@ export function RoomTabletPage() {
                   setScreen("start");
                 }}
               >
-                {t("tablet.startTreatment")}
+                {tu("startTreatment")}
               </Button>
             </div>
           ) : tabletRoom.status === "IN_USE" ? (
@@ -634,7 +637,7 @@ export function RoomTabletPage() {
               <p className="font-bold">{t("tablet.review")}</p>
               <p className="flex justify-between text-sm">
                 <span>
-                  {t("tablet.sessionsOf", { count: sessions, minutes: sessions * sessionMinutes })}
+                  {tu("sessionsOf", { count: sessions, minutes: sessions * sessionMinutes })}
                 </span>
                 <span>{money(sessionPrice * sessions)}</span>
               </p>

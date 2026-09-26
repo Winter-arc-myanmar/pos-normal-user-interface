@@ -6,7 +6,7 @@ export type KtvRoomStatus =
   | "CLEANING"
   | "OUT_OF_SERVICE";
 
-export type KtvSessionState = "OPEN" | "PAUSED" | "CLOSED";
+export type KtvSessionState = "OPEN" | "PAUSED" | "PAYMENT_PENDING" | "CLOSED";
 
 export class KtvSession {
   id!: string;
@@ -45,6 +45,10 @@ export class KtvRoom {
   name!: string;
   capacity!: number;
   rateVariantId!: string;
+  sessionPrice?: number;
+  priceNow?: number;
+  rateLabel?: string;
+  rateProductId?: string;
   minimumMinutes!: number;
   incrementMinutes!: number;
   graceMinutes!: number;
@@ -88,6 +92,8 @@ export class KtvSessionQuote {
   roomCharge!: string;
   fnbCharge!: string;
   runningTotal!: string;
+  prepaid!: boolean;
+  paidTotal!: string;
 
   constructor(data: Partial<KtvSessionQuote>) {
     Object.assign(this, { segments: [], ...data });

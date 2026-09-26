@@ -60,7 +60,7 @@ const toOrder = (value: unknown): TabletVisitOrder => {
 const toRoom = (value: unknown): TabletVisitRoom => {
   const item = asRecord(value);
   return {
-    kind: "SPA",
+    kind: text(item.kind, "SPA") === "KTV" ? "KTV" : "SPA",
     sessionId: text(item.sessionId),
     roomId: text(item.roomId),
     roomNumber: text(item.roomNumber),
@@ -171,6 +171,7 @@ export class ApiRoomTabletRepository implements IRoomTabletRepository {
     return asList(unwrap(response)).map((value) => {
       const item = asRecord(value);
       return {
+        kind: text(item.kind, "SPA") === "KTV" ? "KTV" : "SPA",
         roomId: text(item.roomId),
         roomNumber: text(item.roomNumber),
         name: orNull(item.name),

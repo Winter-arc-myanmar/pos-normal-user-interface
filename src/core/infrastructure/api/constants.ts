@@ -232,6 +232,11 @@ export const API_ENDPOINTS = {
     PAUSE: (id: string) => `/api/v1/ktv-sessions/${id}/pause`,
     RESUME: (id: string) => `/api/v1/ktv-sessions/${id}/resume`,
     CLOSE: (id: string) => `/api/v1/ktv-sessions/${id}/close`,
+    EXTEND: (id: string) => `/api/v1/ktv-sessions/${id}/extend`,
+    CHARGES: (id: string) => `/api/v1/ktv-sessions/${id}/charges`,
+    FOC: (id: string) => `/api/v1/ktv-sessions/${id}/foc`,
+    REFUND_LINE: (id: string, lineId: string) =>
+      `/api/v1/ktv-sessions/${id}/lines/${lineId}/refund`,
   },
   SPA_ROOMS: {
     CREATE: "/api/v1/spa-rooms",
