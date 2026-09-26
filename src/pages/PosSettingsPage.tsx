@@ -24,14 +24,16 @@ type SettingsTab =
   | "logout";
 
 const tabIds: SettingsTab[] = [
-  "cashier",
+  // "cashier",
   "devices",
   "printer",
   "print-template",
   "kds-station",
-  "pos-terminal",
+  // "pos-terminal",
   "logout",
 ];
+
+const DEFAULT_SETTINGS_TAB: SettingsTab = "devices";
 
 const serviceTypes = ["DINE_IN", "TAKE_AWAY", "DELIVERY", "PICK_UP"] as const;
 
@@ -62,7 +64,7 @@ export function PosSettingsPage() {
 
   const activeTab = tabIds.includes((tab || "") as SettingsTab)
     ? (tab as SettingsTab)
-    : "cashier";
+    : DEFAULT_SETTINGS_TAB;
 
   const displayName = user?.nickname || user?.name || t("shell.userFallback");
 

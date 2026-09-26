@@ -20,6 +20,7 @@ export interface KitchenSlip {
   courseType?: string;
   firedAt?: string;
   stationId?: string;
+  stationName?: string;
   orderRef?: string;
   lines?: PrintLine[];
 }
@@ -72,7 +73,7 @@ export function formatKitchenSlip(slip: KitchenSlip): string {
       "--------------------------------\n",
       detail("Course", slip.courseType),
       detail("Fired", slip.firedAt),
-      detail("Station", slip.stationId),
+      detail("Station", slip.stationName || slip.stationId),
       detail("Sales order", slip.orderRef),
       "--------------------------------\n",
       itemLines(slip.lines, false),
@@ -115,15 +116,31 @@ export function formatSaleReceipt(receipt: SaleReceipt): string {
   );
 }
 
+export function kdsTicketPrintLines(ticket: KdsTicket): PrintLine[] {
+  if (ticket.lines?.length) {
+    return ticket.lines.map((line) => ({
+      name: line.name,
+      quantity: line.quantity,
+      categoryId: line.categoryId,
+    }));
+  }
+  return (ticket.kdsTicketLines || []).map((line) => ({
+    name: line.productName || "Item",
+    quantity: line.quantity || "1",
+    modifiers: line.kitchenModifiers,
+  }));
+}
+
 export function formatKdsTicket(ticket: KdsTicket): string {
   return formatKitchenSlip({
     title: ticket.ticketNumber || ticket.id,
     status: ticket.status,
     courseType: ticket.courseType,
     firedAt: ticket.firedAt,
-    stationId: ticket.stationId,
+    stationId: ticket.stationId || ticket.station?.id,
+    stationName: ticket.station?.name,
     orderRef: ticket.salesOrderId,
-    lines: ticket.lines,
+    lines: kdsTicketPrintLines(ticket),
   });
 }
 

@@ -1,15 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { KitchenPrinter } from "@/core/domain/entities/KitchenPrinter";
 import { useAuth } from "@/core/presentation/hooks/useAuth";
 import { useKdsStationManagement } from "@/core/presentation/hooks/useKdsStationManagement";
+import { useCategoryManagement } from "@/core/presentation/hooks/useCategoryManagement";
 import { useKitchenPrinterManagement } from "@/core/presentation/hooks/useKitchenPrinterManagement";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
 import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
 import {
   PrinterBinding,
   PrinterTransport,
+  removeLocalOnlyPrinterBindings,
 } from "@/lib/pos/printerBindingStorage";
 
 const fieldClass =
@@ -42,6 +44,11 @@ export function PrinterSettingsPanel() {
     listStations,
   } = useKdsStationManagement();
   const connection = usePrinterConnection(tenantId, activePosRegisterId);
+  const {
+    categories,
+    isLoading: categoriesLoading,
+    listCategories,
+  } = useCategoryManagement();
 
   const [selectedBackendId, setSelectedBackendId] = useState("");
   const [selectedBindingId, setSelectedBindingId] = useState("");
@@ -61,6 +68,10 @@ export function PrinterSettingsPanel() {
   const [localError, setLocalError] = useState<string | null>(null);
 
   useEffect(() => {
+    removeLocalOnlyPrinterBindings(tenantId, activePosRegisterId || "");
+  }, [activePosRegisterId, tenantId]);
+
+  useEffect(() => {
     void listPrinters({
       page: 1,
       limit: 100,
@@ -68,6 +79,15 @@ export function PrinterSettingsPanel() {
       sortOrder: "desc",
     }).catch(() => undefined);
   }, [listPrinters]);
+
+  useEffect(() => {
+    void listCategories({
+      page: 1,
+      limit: 200,
+      sortBy: "name",
+      sortOrder: "asc",
+    }).catch(() => undefined);
+  }, [listCategories]);
 
   useEffect(() => {
     void listStations({
@@ -103,7 +123,9 @@ export function PrinterSettingsPanel() {
     setSelectedBackendId(printer.id);
     setSelectedBindingId(binding?.id || printer.id);
     setName(printer.name);
-    setTransport("NETWORK");
+    setTransport(
+      binding?.transport || (printer.ipAddress ? "NETWORK" : "USB")
+    );
     setIpAddress(printer.ipAddress);
     setPort(String(printer.port));
     setDeviceName(binding?.deviceName || "");
@@ -114,27 +136,6 @@ export function PrinterSettingsPanel() {
     setNotice(null);
     setLocalError(null);
   };
-
-  const selectLocalBinding = (binding: PrinterBinding) => {
-    setSelectedBackendId(binding.backendPrinterId || "");
-    setSelectedBindingId(binding.id);
-    setName(binding.displayName);
-    setTransport(binding.transport);
-    setIpAddress(binding.host || "");
-    setPort(String(binding.port || 9100));
-    setDeviceName(binding.deviceName || "");
-    setIsActive(Boolean(binding.lastVerifiedAt) && !binding.lastError);
-    setIsDefault(connection.defaultBinding?.id === binding.id);
-    setStationId(binding.stationId || "");
-    setVerifiedBinding(binding);
-    setNotice(null);
-    setLocalError(null);
-  };
-
-  const localOnlyBindings = useMemo(
-    () => connection.bindings.filter((binding) => !binding.backendPrinterId),
-    [connection.bindings]
-  );
 
   const draftBinding = (): PrinterBinding => ({
     id: selectedBindingId || selectedBackendId || localId(),
@@ -189,21 +190,11 @@ export function PrinterSettingsPanel() {
     }
     setIsActive(connected);
 
-    if (transport !== "NETWORK") {
-      if (!connected || !verified) return;
-      connection.saveBinding(
-        { ...verified, stationId: stationId.trim() || undefined },
-        isDefault
-      );
-      setNotice(t("settings.printer.saved"));
-      return;
-    }
-
-    const portNumber = Number(port);
+    const portNumber = Number(port) || 9100;
+    const networkAddress = transport === "NETWORK" ? ipAddress.trim() : "";
     if (
       !activeLocationId ||
       !name.trim() ||
-      !ipAddress.trim() ||
       !Number.isInteger(portNumber) ||
       portNumber < 1 ||
       portNumber > 65535
@@ -211,12 +202,13 @@ export function PrinterSettingsPanel() {
       setLocalError(t("settings.printer.saveFailed"));
       return;
     }
+    if (transport !== "NETWORK" && (!connected || !verified)) return;
 
     try {
       const payload = {
         locationId: activeLocationId,
         name: name.trim(),
-        ipAddress: ipAddress.trim(),
+        ...(networkAddress ? { ipAddress: networkAddress } : {}),
         port: portNumber,
         isActive: connected,
       };
@@ -329,27 +321,9 @@ export function PrinterSettingsPanel() {
             >
               <span className="block truncate font-semibold">{printer.name}</span>
               <span className="mt-1 block text-xs text-slate-500">
-                {printer.ipAddress}:{printer.port}
-              </span>
-            </button>
-          ))}
-          {localOnlyBindings.map((binding) => (
-            <button
-              key={binding.id}
-              type="button"
-              onClick={() => selectLocalBinding(binding)}
-              className={[
-                "w-full rounded-lg border p-3 text-left text-sm",
-                selectedBindingId === binding.id
-                  ? "border-blue-500 bg-blue-50"
-                  : "border-slate-200 bg-white",
-              ].join(" ")}
-            >
-              <span className="block truncate font-semibold">
-                {binding.displayName}
-              </span>
-              <span className="mt-1 block text-xs text-slate-500">
-                {binding.transport} · {binding.deviceName}
+                {printer.ipAddress
+                  ? `${printer.ipAddress}:${printer.port}`
+                  : t("settings.printer.noIp")}
               </span>
             </button>
           ))}
@@ -553,15 +527,24 @@ export function PrinterSettingsPanel() {
               {t("settings.printer.categoryRouting")}
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
-              <input
-                className="min-h-10 min-w-56 flex-1 rounded border border-slate-200 px-3 text-sm"
+              <select
+                className="min-h-10 min-w-56 flex-1 rounded border border-slate-200 bg-white px-3 text-sm"
                 value={categoryId}
+                disabled={categoriesLoading}
+                aria-label={t("settings.printer.categoryRouting")}
                 onChange={(event) => setCategoryId(event.target.value)}
-                placeholder={t("settings.printer.categoryId")}
-              />
+              >
+                <option value="">{t("settings.printer.selectCategory")}</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
               <Button
                 type="button"
                 variant="secondary"
+                disabled={!categoryId}
                 onClick={() => void routeCategory(true)}
               >
                 {t("settings.printer.attach")}
@@ -569,11 +552,22 @@ export function PrinterSettingsPanel() {
               <Button
                 type="button"
                 variant="secondary"
+                disabled={!categoryId}
                 onClick={() => void routeCategory(false)}
               >
                 {t("settings.printer.detach")}
               </Button>
             </div>
+            {verifiedBinding?.categoryIds?.length ? (
+              <p className="mt-2 text-xs text-slate-500">
+                {verifiedBinding.categoryIds
+                  .map(
+                    (id) =>
+                      categories.find((category) => category.id === id)?.name || id
+                  )
+                  .join(", ")}
+              </p>
+            ) : null}
           </div>
         ) : null}
 

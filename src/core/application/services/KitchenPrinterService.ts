@@ -24,13 +24,17 @@ export class KitchenPrinterService implements IKitchenPrinterService {
     if (!payload.tenantId.trim() || !payload.locationId.trim()) {
       throw new Error("Tenant and location are required");
     }
-    if (!payload.name.trim() || !payload.ipAddress.trim()) {
-      throw new Error("Printer name and IP address are required");
+    if (!payload.name.trim()) {
+      throw new Error("Printer name is required");
     }
     if (!Number.isInteger(payload.port) || payload.port < 1 || payload.port > 65535) {
       throw new Error("Printer port must be between 1 and 65535");
     }
-    return this.repository.create(payload);
+    const ipAddress = payload.ipAddress?.trim();
+    return this.repository.create({
+      ...payload,
+      ...(ipAddress ? { ipAddress } : { ipAddress: undefined }),
+    });
   }
 
   update(id: string, payload: UpdateKitchenPrinterDTO): Promise<KitchenPrinter> {

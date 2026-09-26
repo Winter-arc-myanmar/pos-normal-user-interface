@@ -4,7 +4,7 @@ export interface CreateKitchenPrinterDTO {
   tenantId: string;
   locationId: string;
   name: string;
-  ipAddress: string;
+  ipAddress?: string;
   port: number;
   isActive: boolean;
 }
