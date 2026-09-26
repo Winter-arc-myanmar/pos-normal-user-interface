@@ -1,18 +1,26 @@
 import { useCallback, useEffect, useState } from "react";
 import { KdsTicket } from "../../domain/entities/Cashier";
-import { qzTrayClient } from "../../infrastructure/printing/QzTrayClient";
+import { IPrintTemplateService } from "../../domain/services/IPrintTemplateService";
+import container from "../../infrastructure/di/container";
+import { browserPrinterClient } from "../../infrastructure/printing/BrowserPrinterClient";
+import { getPrinterClient } from "../../infrastructure/printing/getPrinterClient";
+import type { IPrinterClient } from "../../infrastructure/printing/IPrinterClient";
+import { isBrowserPrinting } from "../../infrastructure/printing/PrinterClient";
 import {
   kdsTicketPrintLines,
   KitchenSlip,
+  PrintPlace,
   SaleReceipt,
 } from "@/lib/printing/formatKdsTicket";
 import {
   groupKitchenJobs,
   StationRoute,
 } from "@/lib/printing/routeKitchenPrint";
+import { selectPrintTemplate } from "@/lib/printing/selectPrintTemplate";
 import {
   PRINTER_BINDINGS_CHANGED,
   PrinterBinding,
+  PrinterTransport,
   listStoredPrinterBindings,
   readPrinterBindings,
   removePrinterBinding,
@@ -20,11 +28,26 @@ import {
   setDefaultPrinterBinding,
 } from "@/lib/pos/printerBindingStorage";
 
-export function usePrinterConnection(tenantId: string, registerId: string) {
+const configureClient = async (
+  tenantId: string,
+  registerId: string
+): Promise<IPrinterClient> => {
+  const client = await getPrinterClient();
+  if (client === browserPrinterClient) {
+    browserPrinterClient.configureScope(tenantId, registerId);
+  }
+  return client;
+};
+
+export function usePrinterConnection(
+  tenantId: string,
+  registerId: string,
+  locationId?: string
+) {
   const [, setRevision] = useState(0);
   const [deviceNames, setDeviceNames] = useState<string[]>([]);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [isConnected, setIsConnected] = useState(qzTrayClient.isConnected());
+  const [isConnected, setIsConnected] = useState(isBrowserPrinting());
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -47,57 +70,70 @@ export function usePrinterConnection(tenantId: string, registerId: string) {
     setIsConnecting(true);
     setError(null);
     try {
-      await qzTrayClient.connect();
-      setIsConnected(true);
+      const client = await configureClient(tenantId, registerId);
+      await client.connect();
+      setIsConnected(client.isConnected());
     } catch (caught) {
       const message =
-        caught instanceof Error ? caught.message : "Unable to connect to QZ Tray";
+        caught instanceof Error
+          ? caught.message
+          : isBrowserPrinting()
+            ? "Unable to start mobile printing"
+            : "Unable to connect to QZ Tray";
       setError(message);
       setIsConnected(false);
       throw caught;
     } finally {
       setIsConnecting(false);
     }
-  }, []);
+  }, [registerId, tenantId]);
 
   useEffect(() => {
     void connect().catch(() => undefined);
   }, [connect]);
 
-  const discover = useCallback(async () => {
-    setIsConnecting(true);
-    setError(null);
-    try {
-      const names = await qzTrayClient.findPrinters();
-      setDeviceNames(names);
-      setIsConnected(true);
-      return names;
-    } catch (caught) {
-      const message =
-        caught instanceof Error ? caught.message : "Unable to discover printers";
-      setError(message);
-      throw caught;
-    } finally {
-      setIsConnecting(false);
-    }
-  }, []);
+  const discover = useCallback(
+    async (transport?: PrinterTransport) => {
+      setIsConnecting(true);
+      setError(null);
+      try {
+        const client = await configureClient(tenantId, registerId);
+        const names = await client.findPrinters(transport);
+        setDeviceNames(names);
+        setIsConnected(client.isConnected());
+        return names;
+      } catch (caught) {
+        const message =
+          caught instanceof Error ? caught.message : "Unable to discover printers";
+        setError(message);
+        throw caught;
+      } finally {
+        setIsConnecting(false);
+      }
+    },
+    [registerId, tenantId]
+  );
 
-  const verify = useCallback(async (binding: PrinterBinding) => {
-    setIsConnecting(true);
-    setError(null);
-    try {
-      await qzTrayClient.testPrint(binding);
-      setIsConnected(true);
-      return { ...binding, lastVerifiedAt: new Date().toISOString(), lastError: null };
-    } catch (caught) {
-      const message =
-        caught instanceof Error ? caught.message : "Printer test failed";
-      setError(message);
-      throw caught;
-    } finally {
-      setIsConnecting(false);
-    }
-  }, []);
+  const verify = useCallback(
+    async (binding: PrinterBinding) => {
+      setIsConnecting(true);
+      setError(null);
+      try {
+        const client = await configureClient(tenantId, registerId);
+        await client.testPrint(binding);
+        setIsConnected(client.isConnected());
+        return { ...binding, lastVerifiedAt: new Date().toISOString(), lastError: null };
+      } catch (caught) {
+        const message =
+          caught instanceof Error ? caught.message : "Printer test failed";
+        setError(message);
+        throw caught;
+      } finally {
+        setIsConnecting(false);
+      }
+    },
+    [registerId, tenantId]
+  );
 
   const saveBinding = useCallback(
     (binding: PrinterBinding, makeDefault = false) =>
@@ -120,9 +156,28 @@ export function usePrinterConnection(tenantId: string, registerId: string) {
     [registerId, tenantId]
   );
 
+  const templateFor = useCallback(
+    async (place: PrintPlace) => {
+      try {
+        const service = container.resolve<IPrintTemplateService>("printTemplateService");
+        const result = await service.list({
+          page: 1,
+          limit: 50,
+          type: place === "KDS" ? "KITCHEN" : "RECEIPT",
+        });
+        return selectPrintTemplate(place, result.templates, locationId);
+      } catch {
+        return undefined;
+      }
+    },
+    [locationId]
+  );
+
   const printKitchen = useCallback(
     async (slip: KitchenSlip, stations: StationRoute[] = []) => {
+      const client = await configureClient(tenantId, registerId);
       const current = currentBindings();
+      const template = slip.template || (await templateFor("KDS"));
       const plan = groupKitchenJobs(
         slip.lines || [],
         current.bindings,
@@ -131,28 +186,33 @@ export function usePrinterConnection(tenantId: string, registerId: string) {
         stations
       );
       for (const job of plan.jobs) {
-        await qzTrayClient.printKitchen(job.binding, {
+        await client.printKitchen(job.binding, {
           ...slip,
+          template,
           lines: job.lines,
         });
       }
       return plan.unrouted;
     },
-    [currentBindings]
+    [currentBindings, registerId, templateFor, tenantId]
   );
 
   const printReceipt = useCallback(
     async (receipt: SaleReceipt) => {
+      const client = await configureClient(tenantId, registerId);
       const current = currentBindings();
       const target = current.defaultBinding || current.bindings[0] || null;
       if (!target) throw new Error("No default printer is connected");
-      await qzTrayClient.printReceipt(target, {
+      const place = receipt.place || "CHECKOUT";
+      const template = receipt.template || (await templateFor(place));
+      await client.printReceipt(target, {
         ...receipt,
-        place: receipt.place || "CHECKOUT",
-        showLogo: receipt.place === "FINANCE" ? false : receipt.showLogo,
+        place,
+        template,
+        showLogo: place === "FINANCE" ? false : receipt.showLogo,
       });
     },
-    [currentBindings]
+    [currentBindings, registerId, templateFor, tenantId]
   );
 
   const printTicket = useCallback(

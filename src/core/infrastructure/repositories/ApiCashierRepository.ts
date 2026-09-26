@@ -244,7 +244,6 @@ const normalizeTableSessionCheckoutPayload = (
 const normalizeCheckoutPayload = (
   payload: CheckoutRequestDTO
 ): Record<string, unknown> => ({
-  tenantId: payload.tenantId,
   locationId: payload.locationId,
   salesChannel: payload.salesChannel,
   serviceType: payload.serviceType,

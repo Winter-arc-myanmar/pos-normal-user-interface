@@ -275,7 +275,6 @@ describe("ApiCashierRepository", () => {
     });
 
     expect(post).toHaveBeenCalledWith("/api/v1/checkout", {
-      tenantId: "tenant-1",
       locationId: "location-1",
       salesChannel: "POS",
       serviceType: "DINE_IN",
@@ -324,7 +323,6 @@ describe("ApiCashierRepository", () => {
     });
 
     expect(post).toHaveBeenCalledWith("/api/v1/checkout", {
-      tenantId: "tenant-1",
       locationId: "location-1",
       salesChannel: "POS",
       serviceType: "DINE_IN",
@@ -384,7 +382,6 @@ describe("ApiCashierRepository", () => {
     });
 
     expect(post).toHaveBeenCalledWith("/api/v1/checkout", {
-      tenantId: "tenant-1",
       locationId: "location-1",
       salesChannel: "POS",
       serviceType: "DINE_IN",
