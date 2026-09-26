@@ -1689,12 +1689,6 @@ export function CashierPage() {
     setNotice(t("cashier.payment.splitOpened"));
   };
 
-  const handleCloseSplit = () => {
-    setLocalError(null);
-    setNotice(t("cashier.payment.splitClosed"));
-    closePayView();
-  };
-
   const handleClosePay = () => {
     setLocalError(null);
     setNotice(null);
@@ -2094,15 +2088,12 @@ export function CashierPage() {
         onLookupMemberCard={() => void handleLookupMemberCard()}
         onPaymentAmountChange={setPaymentAmount}
         onPaymentMethodChange={setPaymentMethodId}
-        onOpenSplit={handleOpenSplit}
-        onCloseSplit={handleCloseSplit}
         isSplitMode={isSplitMode}
         splitTenderCount={splitTenders.length}
         splitRemaining={remainingReceivable(
           orderTotal,
           isSplitMode ? splitTenders : []
         )}
-        showSplitButton={activeView !== "pay"}
         isPayView={activeView === "pay"}
         requiresTableAssignment={requiresTableAssignment}
         onOpenPay={handleOpenPay}

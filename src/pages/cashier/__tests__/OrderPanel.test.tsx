@@ -156,6 +156,9 @@ describe("OrderPanel", () => {
       />
     );
 
+    expect(
+      screen.getByRole("button", { name: "cashier.orderPanel.adjustments" })
+    ).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("cashier.orderPanel.adjustments")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("cashier.orderPanel.discount"), {
       target: { value: "8.0000" },
@@ -167,5 +170,36 @@ describe("OrderPanel", () => {
     expect(onRemoveDiscount).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.foc" }));
     expect(onToggleFoc).toHaveBeenCalledTimes(1);
+  });
+
+  it("collapses checkout adjustments until the cashier opens them", () => {
+    render(
+      <OrderPanel
+        {...defaultProps}
+        selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
+        discountAmount="0.0000"
+        discountReasons={[]}
+        serviceCharge="0.0000"
+        tipAmount="0.0000"
+        memberCardUid=""
+        onDiscountAmountChange={vi.fn()}
+        onDiscountReasonChange={vi.fn()}
+        onRemoveDiscount={vi.fn()}
+        onServiceChargeChange={vi.fn()}
+        onTipAmountChange={vi.fn()}
+        onMemberCardUidChange={vi.fn()}
+        onLookupMemberCard={vi.fn()}
+      />
+    );
+
+    const toggle = screen.getByRole("button", {
+      name: "cashier.orderPanel.adjustments",
+    });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByLabelText("cashier.orderPanel.discount")).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByLabelText("cashier.orderPanel.discount")).toBeInTheDocument();
   });
 });
