@@ -52,6 +52,28 @@ const itemFont = (size?: string) => {
   return `${ESC}!\x00`;
 };
 
+const plainItemLines = (
+  lines: PrintLine[] = [],
+  options: {
+    showPrices: boolean;
+    showModifiers: boolean;
+    showRemarks: boolean;
+    qtyFirst: boolean;
+  }
+) => {
+  const rows: string[] = [];
+  for (const item of lines) {
+    const qty = Number(item.quantity);
+    const quantity = Number.isFinite(qty) ? String(qty) : item.quantity;
+    const price = options.showPrices && item.unitPrice ? `  ${item.unitPrice}` : "";
+    const lead = options.qtyFirst ? `${quantity}  ${item.name}` : `${item.name}  ${quantity}`;
+    rows.push(`${lead}${price}`);
+    if (options.showModifiers && item.modifiers) rows.push(`  ${item.modifiers}`);
+    if (options.showRemarks && item.remarks) rows.push(`  ${item.remarks}`);
+  }
+  return rows;
+};
+
 const itemLines = (
   lines: PrintLine[] = [],
   options: {
@@ -211,4 +233,80 @@ export function formatPrinterTest(name: string): string {
     bottomMargin,
     `${GS}V\x00`,
   ].join("");
+}
+
+export function buildKitchenSlipLines(slip: KitchenSlip): string[] {
+  const settings = slip.template;
+  const showPrices = showsPrice(settings, false);
+  const rows: string[] = [];
+  if (settings?.header.logo) rows.push("LOGO");
+  rows.push(slip.title);
+  if (slip.status) rows.push(slip.status);
+  rows.push("--------------------------------");
+  if (slip.courseType) rows.push(`Course: ${slip.courseType}`);
+  if (slip.firedAt) rows.push(`Fired: ${slip.firedAt}`);
+  if (slip.stationName || slip.stationId) {
+    rows.push(`Station: ${slip.stationName || slip.stationId}`);
+  }
+  if ((!settings || settings.other.orderNumber) && slip.orderRef) {
+    rows.push(`Sales order: ${slip.orderRef}`);
+  }
+  rows.push("--------------------------------");
+  rows.push(
+    ...plainItemLines(slip.lines, {
+      showPrices,
+      showModifiers: settings ? settings.item.modifiers : true,
+      showRemarks: settings ? settings.item.productRemarks : true,
+      qtyFirst: settings ? settings.item.qtyFirst : true,
+    })
+  );
+  if (slip.lines?.length) rows.push("--------------------------------");
+  if (settings?.other.footerText) rows.push(settings.other.footerText);
+  return rows;
+}
+
+export function buildSaleReceiptLines(receipt: SaleReceipt): string[] {
+  const place = receipt.place || "CHECKOUT";
+  const finance = place === "FINANCE";
+  const settings = receipt.template;
+  const showLogo = settings
+    ? settings.header.logo
+    : finance
+      ? false
+      : receipt.showLogo !== false;
+  const showPrices = showsPrice(settings, receipt.showPrices !== false);
+  const showBreakdown = settings ? settings.bill.amountAfterDiscount : !finance;
+  const showTotal = settings ? settings.bill.totalPayment : true;
+  const showPayments = settings ? settings.bill.totalPayment : !finance;
+  const showOrderNumber = settings ? settings.other.orderNumber : !finance;
+  const rows: string[] = [];
+  if (showLogo) rows.push("LOGO");
+  rows.push(receipt.title);
+  if (showOrderNumber && receipt.receiptId) rows.push(receipt.receiptId);
+  rows.push("--------------------------------");
+  rows.push(
+    ...plainItemLines(receipt.lines, {
+      showPrices,
+      showModifiers: settings ? settings.item.modifiers : !finance,
+      showRemarks: settings ? settings.item.productRemarks : !finance,
+      qtyFirst: settings ? settings.item.qtyFirst : true,
+    })
+  );
+  rows.push("--------------------------------");
+  if (showBreakdown && receipt.subtotal) rows.push(`Subtotal: ${receipt.subtotal}`);
+  if (showBreakdown && receipt.discount) rows.push(`Discount: ${receipt.discount}`);
+  if (showBreakdown && receipt.tax) rows.push(`Tax: ${receipt.tax}`);
+  if (showBreakdown && receipt.tip) rows.push(`Tip: ${receipt.tip}`);
+  if (showTotal) rows.push(`TOTAL  ${receipt.total}`);
+  if (showPayments) {
+    for (const payment of receipt.payments || []) {
+      rows.push(`${payment.name}  ${payment.amount}`);
+    }
+  }
+  if (settings?.other.footerText) rows.push(settings.other.footerText);
+  return rows;
+}
+
+export function buildPrinterTestLines(name: string): string[] {
+  return ["PRINTER TEST", name, "Connection verified", new Date().toLocaleString()];
 }

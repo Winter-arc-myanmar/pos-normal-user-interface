@@ -8,6 +8,7 @@ import { useKdsStationManagement } from "@/core/presentation/hooks/useKdsStation
 // import { useCategoryManagement } from "@/core/presentation/hooks/useCategoryManagement";
 import { useKitchenPrinterManagement } from "@/core/presentation/hooks/useKitchenPrinterManagement";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
+import { isBrowserPrinting } from "@/core/infrastructure/printing/PrinterClient";
 import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
 import {
   PrinterBinding,
@@ -336,7 +337,9 @@ export function PrinterSettingsPanel() {
           <div>
             <h2 className="text-base font-bold">{t("settings.printer.title")}</h2>
             <p className="mt-1 text-xs text-slate-500">
-              {t("settings.printer.qzRequirement")}
+              {isBrowserPrinting()
+                ? t("settings.printer.mobileRequirement")
+                : t("settings.printer.qzRequirement")}
             </p>
           </div>
           <span
@@ -348,8 +351,16 @@ export function PrinterSettingsPanel() {
             ].join(" ")}
           >
             {connection.isConnected
-              ? t("settings.printer.connected")
-              : t("settings.printer.disconnected")}
+              ? t(
+                  isBrowserPrinting()
+                    ? "settings.printer.mobileConnected"
+                    : "settings.printer.connected"
+                )
+              : t(
+                  isBrowserPrinting()
+                    ? "settings.printer.mobileDisconnected"
+                    : "settings.printer.disconnected"
+                )}
           </span>
         </div>
 
@@ -476,7 +487,7 @@ export function PrinterSettingsPanel() {
                   variant="secondary"
                   className="mt-1"
                   isLoading={connection.isConnecting}
-                  onClick={() => void connection.discover()}
+                  onClick={() => void connection.discover(transport)}
                 >
                   {t("settings.printer.discover")}
                 </Button>
