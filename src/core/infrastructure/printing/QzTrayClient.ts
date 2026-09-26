@@ -45,7 +45,7 @@ export class QzTrayClient {
         retries: 5,
         delay: 1,
         usingSecure: window.location.protocol === "https:",
-      })
+      } as Parameters<typeof qz.websocket.connect>[0])
       .catch((caught: unknown) => {
         throw qzError(caught);
       })
