@@ -58,6 +58,44 @@ describe("ApiSalesOrderRepository", () => {
     });
   });
 
+  it("uses line quantities and _count when list payloads omit itemCount", async () => {
+    const get = vi.fn().mockResolvedValue({
+      data: [
+        {
+          id: "order-2",
+          tenantId: "tenant-1",
+          locationId: "location-1",
+          orderNumber: "SO-002",
+          serviceType: "DINE_IN",
+          status: "DRAFT",
+          grandTotal: "30.0000",
+          itemCount: 0,
+          _count: { lines: 2 },
+        },
+        {
+          id: "order-3",
+          tenantId: "tenant-1",
+          locationId: "location-1",
+          orderNumber: "SO-003",
+          serviceType: "DINE_IN",
+          status: "DRAFT",
+          grandTotal: "15.0000",
+          lines: [
+            { id: "line-a", quantity: "2.0000", unitPrice: "5.0000" },
+            { id: "line-b", quantity: "1.0000", unitPrice: "5.0000" },
+          ],
+        },
+      ],
+    });
+    const repository = new ApiSalesOrderRepository({
+      get,
+    } as unknown as HttpClient);
+
+    const result = await repository.getSalesOrders({ page: 1, limit: 20 });
+    expect(result.orders[0].itemCount).toBe(2);
+    expect(result.orders[1].itemCount).toBe(3);
+  });
+
   it("settles a bill through the settle endpoint and reads the result", async () => {
     const post = vi.fn().mockResolvedValue({
       data: {
