@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/Button";
 import { KitchenPrinter } from "@/core/domain/entities/KitchenPrinter";
 import { useAuth } from "@/core/presentation/hooks/useAuth";
 import { useKdsStationManagement } from "@/core/presentation/hooks/useKdsStationManagement";
-import { useCategoryManagement } from "@/core/presentation/hooks/useCategoryManagement";
+// Category routing is not part of printer create. Send KDS uses station categories.
+// import { useCategoryManagement } from "@/core/presentation/hooks/useCategoryManagement";
 import { useKitchenPrinterManagement } from "@/core/presentation/hooks/useKitchenPrinterManagement";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
 import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
@@ -35,8 +36,8 @@ export function PrinterSettingsPanel() {
     createPrinter,
     updatePrinter,
     deletePrinter,
-    attachCategory,
-    detachCategory,
+    // attachCategory,
+    // detachCategory,
   } = useKitchenPrinterManagement();
   const {
     stations,
@@ -44,11 +45,11 @@ export function PrinterSettingsPanel() {
     listStations,
   } = useKdsStationManagement();
   const connection = usePrinterConnection(tenantId, activePosRegisterId);
-  const {
-    categories,
-    isLoading: categoriesLoading,
-    listCategories,
-  } = useCategoryManagement();
+  // const {
+  //   categories,
+  //   isLoading: categoriesLoading,
+  //   listCategories,
+  // } = useCategoryManagement();
 
   const [selectedBackendId, setSelectedBackendId] = useState("");
   const [selectedBindingId, setSelectedBindingId] = useState("");
@@ -59,7 +60,7 @@ export function PrinterSettingsPanel() {
   const [deviceName, setDeviceName] = useState("");
   const [isActive, setIsActive] = useState(false);
   const [isDefault, setIsDefault] = useState(false);
-  const [categoryId, setCategoryId] = useState("");
+  // const [categoryId, setCategoryId] = useState("");
   const [stationId, setStationId] = useState("");
   const [verifiedBinding, setVerifiedBinding] = useState<PrinterBinding | null>(
     null
@@ -80,14 +81,14 @@ export function PrinterSettingsPanel() {
     }).catch(() => undefined);
   }, [listPrinters]);
 
-  useEffect(() => {
-    void listCategories({
-      page: 1,
-      limit: 200,
-      sortBy: "name",
-      sortOrder: "asc",
-    }).catch(() => undefined);
-  }, [listCategories]);
+  // useEffect(() => {
+  //   void listCategories({
+  //     page: 1,
+  //     limit: 200,
+  //     sortBy: "name",
+  //     sortOrder: "asc",
+  //   }).catch(() => undefined);
+  // }, [listCategories]);
 
   useEffect(() => {
     void listStations({
@@ -109,7 +110,7 @@ export function PrinterSettingsPanel() {
     setDeviceName("");
     setIsActive(false);
     setIsDefault(false);
-    setCategoryId("");
+    // setCategoryId("");
     setStationId("");
     setVerifiedBinding(null);
     setNotice(null);
@@ -146,7 +147,7 @@ export function PrinterSettingsPanel() {
     host: transport === "NETWORK" ? ipAddress.trim() : undefined,
     port: transport === "NETWORK" ? Number(port) : undefined,
     stationId: stationId.trim() || undefined,
-    categoryIds: verifiedBinding?.categoryIds,
+    // categoryIds: verifiedBinding?.categoryIds,
     lastVerifiedAt: "",
     lastError: null,
   });
@@ -258,40 +259,40 @@ export function PrinterSettingsPanel() {
     }
   };
 
-  const routeCategory = async (attach: boolean) => {
-    if (!selectedBackendId || !categoryId.trim()) return;
-    setLocalError(null);
-    try {
-      const nextCategoryId = categoryId.trim();
-      if (attach) await attachCategory(selectedBackendId, nextCategoryId);
-      else await detachCategory(selectedBackendId, nextCategoryId);
-      if (verifiedBinding) {
-        const categoryIds = new Set(verifiedBinding.categoryIds || []);
-        if (attach) categoryIds.add(nextCategoryId);
-        else categoryIds.delete(nextCategoryId);
-        const nextBinding = {
-          ...verifiedBinding,
-          categoryIds: Array.from(categoryIds),
-        };
-        connection.saveBinding(nextBinding, isDefault);
-        setVerifiedBinding(nextBinding);
-      }
-      setNotice(
-        t(
-          attach
-            ? "settings.printer.categoryAttached"
-            : "settings.printer.categoryDetached"
-        )
-      );
-      setCategoryId("");
-    } catch (caught) {
-      setLocalError(
-        caught instanceof Error
-          ? caught.message
-          : t("settings.printer.categoryFailed")
-      );
-    }
-  };
+  // const routeCategory = async (attach: boolean) => {
+  //   if (!selectedBackendId || !categoryId.trim()) return;
+  //   setLocalError(null);
+  //   try {
+  //     const nextCategoryId = categoryId.trim();
+  //     if (attach) await attachCategory(selectedBackendId, nextCategoryId);
+  //     else await detachCategory(selectedBackendId, nextCategoryId);
+  //     if (verifiedBinding) {
+  //       const categoryIds = new Set(verifiedBinding.categoryIds || []);
+  //       if (attach) categoryIds.add(nextCategoryId);
+  //       else categoryIds.delete(nextCategoryId);
+  //       const nextBinding = {
+  //         ...verifiedBinding,
+  //         categoryIds: Array.from(categoryIds),
+  //       };
+  //       connection.saveBinding(nextBinding, isDefault);
+  //       setVerifiedBinding(nextBinding);
+  //     }
+  //     setNotice(
+  //       t(
+  //         attach
+  //           ? "settings.printer.categoryAttached"
+  //           : "settings.printer.categoryDetached"
+  //       )
+  //     );
+  //     setCategoryId("");
+  //   } catch (caught) {
+  //     setLocalError(
+  //       caught instanceof Error
+  //         ? caught.message
+  //         : t("settings.printer.categoryFailed")
+  //     );
+  //   }
+  // };
 
   return (
     <div className="pos-split grid min-h-[34rem] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:grid-cols-[16rem_minmax(0,1fr)]">
@@ -521,6 +522,7 @@ export function PrinterSettingsPanel() {
           </select>
         </label>
 
+        {/* Category routing is not used when saving a printer.
         {selectedBackendId ? (
           <div className="mt-5 rounded-lg border border-slate-200 p-3">
             <p className="text-sm font-semibold">
@@ -570,6 +572,7 @@ export function PrinterSettingsPanel() {
             ) : null}
           </div>
         ) : null}
+        */}
 
         <div className="mt-6 flex flex-wrap gap-2">
           <Button

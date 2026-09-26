@@ -42,7 +42,8 @@ export function CounterOrdersPage() {
   const { error, listKdsTickets, getKdsTicketById } = useCashier();
   const printerConnection = usePrinterConnection(
     String(user?.tenantId || ""),
-    activePosRegisterId
+    activePosRegisterId,
+    activeLocationId
   );
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);

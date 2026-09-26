@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
 import { KdsTicket } from "../../domain/entities/Cashier";
+import { IPrintTemplateService } from "../../domain/services/IPrintTemplateService";
+import container from "../../infrastructure/di/container";
 import { qzTrayClient } from "../../infrastructure/printing/QzTrayClient";
 import {
   kdsTicketPrintLines,
   KitchenSlip,
+  PrintPlace,
   SaleReceipt,
 } from "@/lib/printing/formatKdsTicket";
 import {
   groupKitchenJobs,
   StationRoute,
 } from "@/lib/printing/routeKitchenPrint";
+import { selectPrintTemplate } from "@/lib/printing/selectPrintTemplate";
 import {
   PRINTER_BINDINGS_CHANGED,
   PrinterBinding,
@@ -20,7 +24,11 @@ import {
   setDefaultPrinterBinding,
 } from "@/lib/pos/printerBindingStorage";
 
-export function usePrinterConnection(tenantId: string, registerId: string) {
+export function usePrinterConnection(
+  tenantId: string,
+  registerId: string,
+  locationId?: string
+) {
   const [, setRevision] = useState(0);
   const [deviceNames, setDeviceNames] = useState<string[]>([]);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -120,9 +128,27 @@ export function usePrinterConnection(tenantId: string, registerId: string) {
     [registerId, tenantId]
   );
 
+  const templateFor = useCallback(
+    async (place: PrintPlace) => {
+      try {
+        const service = container.resolve<IPrintTemplateService>("printTemplateService");
+        const result = await service.list({
+          page: 1,
+          limit: 50,
+          type: place === "KDS" ? "KITCHEN" : "RECEIPT",
+        });
+        return selectPrintTemplate(place, result.templates, locationId);
+      } catch {
+        return undefined;
+      }
+    },
+    [locationId]
+  );
+
   const printKitchen = useCallback(
     async (slip: KitchenSlip, stations: StationRoute[] = []) => {
       const current = currentBindings();
+      const template = slip.template || (await templateFor("KDS"));
       const plan = groupKitchenJobs(
         slip.lines || [],
         current.bindings,
@@ -133,12 +159,13 @@ export function usePrinterConnection(tenantId: string, registerId: string) {
       for (const job of plan.jobs) {
         await qzTrayClient.printKitchen(job.binding, {
           ...slip,
+          template,
           lines: job.lines,
         });
       }
       return plan.unrouted;
     },
-    [currentBindings]
+    [currentBindings, templateFor]
   );
 
   const printReceipt = useCallback(
@@ -146,13 +173,16 @@ export function usePrinterConnection(tenantId: string, registerId: string) {
       const current = currentBindings();
       const target = current.defaultBinding || current.bindings[0] || null;
       if (!target) throw new Error("No default printer is connected");
+      const place = receipt.place || "CHECKOUT";
+      const template = receipt.template || (await templateFor(place));
       await qzTrayClient.printReceipt(target, {
         ...receipt,
-        place: receipt.place || "CHECKOUT",
-        showLogo: receipt.place === "FINANCE" ? false : receipt.showLogo,
+        place,
+        template,
+        showLogo: place === "FINANCE" ? false : receipt.showLogo,
       });
     },
-    [currentBindings]
+    [currentBindings, templateFor]
   );
 
   const printTicket = useCallback(

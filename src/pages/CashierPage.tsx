@@ -137,7 +137,8 @@ export function CashierPage() {
   const { listStations } = useKdsStationManagement();
   const printer = usePrinterConnection(
     String(user?.tenantId || ""),
-    activePosRegisterId
+    activePosRegisterId,
+    activeLocationId
   );
   const { lookupCard, getWallet } = useGuestWalletManagement();
 

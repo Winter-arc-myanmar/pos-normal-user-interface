@@ -6,7 +6,14 @@ import { ItemSalesReport, SalesSummaryReport, ZReport } from "@/core/domain/enti
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
 import { useReports } from "@/core/presentation/hooks/useReports";
 import { useNumberFormatter } from "@/lib/i18n/formatters";
-import { downloadCsv } from "@/lib/pos/exportReport";
+import {
+  downloadExcel,
+  itemSalesSheets,
+  paymentSheets,
+  ReportExportLabels,
+  salesSummarySheets,
+  shiftSheets,
+} from "@/lib/pos/exportReport";
 import { ColumnChart, PieChart, RankChart } from "./dashboard/ReportChart";
 
 type ReportTab = "summary" | "payments" | "items" | "shift";
@@ -99,64 +106,82 @@ export function DashboardPage() {
     };
   }, [activeLocationId, from, itemSales, salesSummary, to, zReport]);
 
+  const exportLabels = (): ReportExportLabels => ({
+    from: t("dashboard.from"),
+    to: t("dashboard.to"),
+    netSales: t("dashboard.netSales"),
+    grossSales: t("dashboard.grossSales"),
+    orders: t("dashboard.orders"),
+    grandTotal: t("dashboard.grandTotal"),
+    discounts: t("dashboard.discounts"),
+    lineDiscounts: t("dashboard.lineDiscounts"),
+    orderDiscounts: t("dashboard.orderDiscounts"),
+    refunds: t("dashboard.refunds"),
+    netAfterRefunds: t("dashboard.netAfterRefunds"),
+    serviceTypes: t("dashboard.serviceTypes"),
+    byDay: t("dashboard.byDay"),
+    byHour: t("dashboard.byHour"),
+    byOutlet: t("dashboard.byOutlet"),
+    totals: t("dashboard.totals"),
+    method: t("dashboard.method"),
+    count: t("dashboard.count"),
+    amount: t("dashboard.amount"),
+    categories: t("dashboard.categories"),
+    items: t("dashboard.items"),
+    payments: t("dashboard.tabs.payments"),
+    tendered: t("dashboard.tendered"),
+    changeGiven: t("dashboard.changeGiven"),
+    topItems: t("dashboard.topItems"),
+    shifts: t("dashboard.shifts"),
+    completed: t("dashboard.completed"),
+    voided: t("dashboard.voided"),
+    refunded: t("dashboard.refunded"),
+    summary: t("dashboard.tabs.summary"),
+    metric: t("dashboard.columns.metric"),
+    value: t("dashboard.columns.value"),
+    date: t("dashboard.columns.date"),
+    hour: t("dashboard.columns.hour"),
+    outlet: t("dashboard.columns.outlet"),
+    share: t("dashboard.columns.share"),
+    quantity: t("dashboard.columns.quantity"),
+    sku: t("dashboard.columns.sku"),
+    product: t("dashboard.columns.product"),
+    category: t("dashboard.columns.category"),
+    averagePrice: t("dashboard.columns.averagePrice"),
+    serviceCharge: t("dashboard.columns.serviceCharge"),
+    tips: t("dashboard.columns.tips"),
+    tax: t("dashboard.columns.tax"),
+    subtotal: t("dashboard.columns.subtotal"),
+    kind: t("dashboard.columns.kind"),
+    tip: t("dashboard.columns.tip"),
+    voidedOrders: t("dashboard.columns.voidedOrders"),
+    voidedAmount: t("dashboard.columns.voidedAmount"),
+    voidedLines: t("dashboard.columns.voidedLines"),
+    compedLines: t("dashboard.columns.compedLines"),
+    compedAmount: t("dashboard.columns.compedAmount"),
+    averageNetSales: t("dashboard.columns.averageNetSales"),
+    averageGrandTotal: t("dashboard.columns.averageGrandTotal"),
+    refundCount: t("dashboard.columns.refundCount"),
+    refundSubtotal: t("dashboard.columns.refundSubtotal"),
+    refundTax: t("dashboard.columns.refundTax"),
+    returned: t("dashboard.columns.returned"),
+    refundAmount: t("dashboard.columns.refundAmount"),
+    netQuantity: t("dashboard.columns.netQuantity"),
+  });
+
   const exportCurrent = () => {
+    const labels = exportLabels();
     if (tab === "summary") {
-      downloadCsv(`sales-summary-${from}-${to}.csv`, [
-        [t("dashboard.netSales"), summary.sales.netSales],
-        [t("dashboard.grossSales"), summary.sales.grossSales],
-        [t("dashboard.orders"), String(summary.orders.count)],
-        [t("dashboard.grandTotal"), summary.sales.grandTotal],
-        [t("dashboard.discounts"), summary.sales.totalDiscounts],
-        [t("dashboard.refunds"), summary.refunds.total],
-        [],
-        [t("dashboard.serviceTypes"), t("dashboard.orders"), t("dashboard.grandTotal")],
-        ...summary.byServiceType.map((row) => [
-          row.serviceType,
-          String(row.orderCount),
-          row.grandTotal,
-        ]),
-        [],
-        ["Date", t("dashboard.orders"), t("dashboard.netSales"), t("dashboard.grandTotal")],
-        ...summary.byDay.map((row) => [
-          row.businessDate,
-          String(row.orderCount),
-          row.netSales,
-          row.grandTotal,
-        ]),
-      ]);
+      downloadExcel(`sales-summary-${from}-${to}.xlsx`, salesSummarySheets(labels, summary));
     }
     if (tab === "payments") {
-      downloadCsv(`payments-${from}-${to}.csv`, [
-        [t("dashboard.tendered"), summary.payments.tendered],
-        [t("dashboard.changeGiven"), summary.payments.changeGiven],
-        [],
-        [t("dashboard.method"), t("dashboard.count"), t("dashboard.amount")],
-        ...summary.payments.byMethod.map((row) => [row.name, String(row.count), row.amount]),
-      ]);
+      downloadExcel(`payments-${from}-${to}.xlsx`, paymentSheets(labels, summary));
     }
     if (tab === "items") {
-      downloadCsv(`item-sales-${from}-${to}.csv`, [
-        [t("dashboard.categories"), t("dashboard.netSales"), "Share"],
-        ...(items?.categories || []).map((row) => [
-          row.categoryName,
-          row.netSales,
-          row.shareOfNetSales,
-        ]),
-        [],
-        [t("dashboard.items"), "Qty", t("dashboard.netSales")],
-        ...(items?.items || []).map((row) => [row.productName, row.quantitySold, row.netSales]),
-      ]);
+      downloadExcel(`item-sales-${from}-${to}.xlsx`, itemSalesSheets(labels, items));
     }
     if (tab === "shift" && shift) {
-      downloadCsv(`shift-${to}.csv`, [
-        [t("dashboard.completed"), String(shift.orders.completed)],
-        [t("dashboard.voided"), String(shift.orders.voided)],
-        [t("dashboard.refunded"), String(shift.orders.refunded)],
-        [t("dashboard.grandTotal"), shift.totals.grandTotal],
-        [],
-        [t("dashboard.method"), t("dashboard.amount")],
-        ...shift.payments.map((row) => [row.method, row.total]),
-      ]);
+      downloadExcel(`shift-${to}.xlsx`, shiftSheets(labels, shift));
     }
   };
 

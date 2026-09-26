@@ -448,7 +448,11 @@ export function OrderPanel({
             {isPayView ? t("cashier.confirmPay") : t("cashier.payNow")}
           </Button>
           {isPayView && onPrintFinance ? (
-            <Button fullWidth variant="outline" onClick={onPrintFinance}>
+            <Button
+              fullWidth
+              className="!border-emerald-600 !bg-emerald-600 !text-white hover:!border-emerald-700 hover:!bg-emerald-700"
+              onClick={onPrintFinance}
+            >
               {t("cashier.printFinance")}
             </Button>
           ) : null}
