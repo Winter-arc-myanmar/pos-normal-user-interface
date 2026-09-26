@@ -102,6 +102,26 @@ export function savePrinterBinding(
   });
 }
 
+export function removeLocalOnlyPrinterBindings(
+  tenantId: string,
+  registerId: string
+): void {
+  const store = readPrinterBindings(tenantId, registerId);
+  const bindings = Object.fromEntries(
+    Object.entries(store.bindings).filter(([, binding]) => binding.backendPrinterId)
+  );
+  if (Object.keys(bindings).length === Object.keys(store.bindings).length) return;
+  const nextDefault =
+    store.defaultBindingId && bindings[store.defaultBindingId]
+      ? store.defaultBindingId
+      : Object.keys(bindings)[0];
+  write(tenantId, registerId, {
+    ...store,
+    bindings,
+    defaultBindingId: nextDefault,
+  });
+}
+
 export function removePrinterBinding(
   tenantId: string,
   registerId: string,

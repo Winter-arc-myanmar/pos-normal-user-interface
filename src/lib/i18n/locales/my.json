@@ -498,6 +498,7 @@
       "connectionNetwork": "ကွန်ရက်",
       "connectionUsb": "USB",
       "connectionBluetooth": "ဘလူးတုသ်",
+      "noIp": "IP မရှိ",
       "devices": "စက်များနှင့် IP",
       "add": "ထည့်မည်",
       "port": "ပေါက်",

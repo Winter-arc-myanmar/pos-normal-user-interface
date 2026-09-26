@@ -498,6 +498,7 @@
       "connectionNetwork": "Network",
       "connectionUsb": "USB",
       "connectionBluetooth": "Bluetooth",
+      "noIp": "No IP address",
       "devices": "Devices & IP",
       "add": "Add",
       "port": "Port",
