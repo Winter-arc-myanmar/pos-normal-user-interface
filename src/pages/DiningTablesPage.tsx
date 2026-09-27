@@ -316,7 +316,8 @@ export function DiningTablesPage() {
   };
 
   return (
-    <section className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_minmax(18rem,0.85fr)] gap-3 overflow-hidden bg-[#080808] p-3 text-slate-100 min-[1100px]:grid-cols-[minmax(0,1.45fr)_minmax(20rem,24rem)] min-[1100px]:grid-rows-[auto_minmax(0,1fr)]">
+    <section className="flex h-full min-h-0 flex-col overflow-hidden bg-[#080808] text-slate-100 min-[1100px]:grid min-[1100px]:grid-cols-[minmax(0,1.45fr)_minmax(20rem,24rem)] min-[1100px]:grid-rows-[auto_minmax(0,1fr)] min-[1100px]:gap-3 min-[1100px]:p-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 min-[1100px]:contents">
       <header className="flex min-w-0 flex-wrap items-center gap-2 min-[1100px]:col-span-2">
         <div className="min-w-0 flex-1">
           <h1 className="text-lg font-semibold">{t("diningTables.title")}</h1>
@@ -341,7 +342,7 @@ export function DiningTablesPage() {
         </Button>
       </header>
 
-      <div className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-slate-800 bg-[#101010]">
+      <div className="flex h-80 shrink-0 min-w-0 flex-col overflow-hidden rounded-xl border border-slate-800 bg-[#101010] min-[1100px]:h-full min-[1100px]:min-h-0">
         <div className="flex shrink-0 gap-2 overflow-x-auto border-b border-slate-800 p-2">
           <FilterChip
             active={zoneId === "ALL"}
@@ -388,7 +389,7 @@ export function DiningTablesPage() {
           <p className="mx-2 rounded bg-red-950/50 px-3 py-2 text-sm text-red-200">{error}</p>
         ) : null}
         <p className="px-3 text-xs text-slate-500">{t("diningTables.dragHint")}</p>
-        <div className="pos-pane-scroll relative m-2 min-h-48 rounded-lg bg-[radial-gradient(circle_at_1px_1px,rgba(148,163,184,0.18)_1px,transparent_0)] [background-size:18px_18px]">
+        <div className="relative m-2 min-h-0 flex-1 overflow-auto rounded-lg bg-[radial-gradient(circle_at_1px_1px,rgba(148,163,184,0.18)_1px,transparent_0)] [background-size:18px_18px]">
           {isLoading && tables.length === 0 ? (
             <ApiLoadingState label={t("diningTables.loading")} />
           ) : tables.length === 0 && !placing ? (
@@ -512,8 +513,9 @@ export function DiningTablesPage() {
       </div>
 
       <form
+        id="dining-table-form"
         onSubmit={(event) => void save(event)}
-        className="pos-pane-scroll min-h-0 rounded-xl border border-slate-800 bg-slate-950 p-4"
+        className="shrink-0 rounded-xl border border-slate-800 bg-slate-950 p-4 min-[1100px]:min-h-0 min-[1100px]:overflow-y-auto"
       >
         <h2 className="text-base font-semibold">
           {draft.id ? t("diningTables.edit") : t("diningTables.create")}
@@ -604,7 +606,7 @@ export function DiningTablesPage() {
             {t("diningTables.zoneHint", { zone: zoneName.get(draft.zoneId) })}
           </p>
         ) : null}
-        <div className="mt-4 flex gap-2">
+        <div className="mt-4 hidden gap-2 min-[1100px]:flex">
           <Button type="submit" isLoading={isLoading} fullWidth>
             {t("common.save")}
           </Button>
@@ -619,6 +621,21 @@ export function DiningTablesPage() {
           ) : null}
         </div>
       </form>
+      </div>
+      <div className="flex shrink-0 gap-2 border-t border-slate-800 bg-slate-950 p-3 min-[1100px]:hidden">
+        <Button type="submit" form="dining-table-form" isLoading={isLoading} fullWidth>
+          {t("common.save")}
+        </Button>
+        {draft.id ? (
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={() => (confirmDelete ? void remove() : setConfirmDelete(true))}
+          >
+            {confirmDelete ? t("diningTables.confirmDelete") : t("common.delete")}
+          </Button>
+        ) : null}
+      </div>
     </section>
   );
 }
