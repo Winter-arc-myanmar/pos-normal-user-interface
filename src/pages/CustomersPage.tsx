@@ -138,13 +138,13 @@ function PosKeyboard({
   };
 
   return (
-    <div className="mt-3 w-full min-w-0 shrink-0 rounded-lg border border-slate-800 bg-[#111111] p-1.5">
+    <div className="pos-member-keys mt-2 w-full min-w-0 shrink-0 rounded-lg border border-slate-800 bg-[#111111] p-1 min-[1100px]:mt-3 min-[1100px]:p-1.5">
       {keyboardRows.map((row, index) => (
-        <div key={row.join("")} className="mb-1 flex min-w-0 justify-center gap-1">
+        <div key={row.join("")} className="mb-0.5 flex min-w-0 justify-center gap-0.5 min-[1100px]:mb-1 min-[1100px]:gap-1">
           {index === 3 ? (
             <button
               type="button"
-              className="h-7 min-w-0 flex-[1.4] rounded bg-slate-800 px-1 text-[10px] font-semibold text-slate-200"
+              className="h-6 min-w-0 flex-[1.4] rounded bg-slate-800 px-1 text-[10px] font-semibold text-slate-200 min-[1100px]:h-8"
               onClick={() => setShifted((current) => !current)}
             >
               shift
@@ -154,7 +154,7 @@ function PosKeyboard({
             <button
               key={key}
               type="button"
-              className="h-7 min-w-0 flex-1 basis-0 rounded bg-slate-700 px-0 text-xs font-semibold text-white hover:bg-slate-600"
+              className="h-6 min-w-0 flex-1 basis-0 rounded bg-slate-700 px-0 text-[11px] font-semibold text-white hover:bg-slate-600 min-[1100px]:h-8 min-[1100px]:text-xs"
               onClick={() => press(key)}
             >
               {shifted ? key.toUpperCase() : key}
@@ -163,7 +163,7 @@ function PosKeyboard({
           {index === 3 ? (
             <button
               type="button"
-              className="h-7 min-w-0 flex-[1.4] rounded bg-slate-800 px-1 text-xs font-semibold text-slate-200"
+              className="h-6 min-w-0 flex-[1.4] rounded bg-slate-800 px-1 text-xs font-semibold text-slate-200 min-[1100px]:h-8"
               onClick={onBackspace}
             >
               ⌫
@@ -171,38 +171,38 @@ function PosKeyboard({
           ) : null}
         </div>
       ))}
-      <div className="flex min-w-0 justify-center gap-1">
+      <div className="flex min-w-0 justify-center gap-0.5 min-[1100px]:gap-1">
         <button
           type="button"
-          className="h-7 min-w-0 flex-1 basis-0 rounded bg-slate-700 px-1 text-xs font-semibold text-white"
+          className="h-6 min-w-0 flex-1 basis-0 rounded bg-slate-700 px-1 text-xs font-semibold text-white min-[1100px]:h-8"
           onClick={() => onInput("@")}
         >
           @
         </button>
         <button
           type="button"
-          className="h-7 min-w-0 flex-1 basis-0 rounded bg-slate-700 px-1 text-xs font-semibold text-white"
+          className="h-6 min-w-0 flex-1 basis-0 rounded bg-slate-700 px-1 text-xs font-semibold text-white min-[1100px]:h-8"
           onClick={() => onInput(".")}
         >
           .
         </button>
         <button
           type="button"
-          className="h-7 min-w-0 flex-1 basis-0 rounded bg-slate-700 px-1 text-xs font-semibold text-white"
+          className="h-6 min-w-0 flex-1 basis-0 rounded bg-slate-700 px-1 text-xs font-semibold text-white min-[1100px]:h-8"
           onClick={() => onInput("/")}
         >
           /
         </button>
         <button
           type="button"
-          className="h-7 min-w-0 flex-[2.4] rounded bg-slate-700 px-1 text-xs font-semibold text-white"
+          className="h-6 min-w-0 flex-[2.4] rounded bg-slate-700 px-1 text-xs font-semibold text-white min-[1100px]:h-8"
           onClick={() => onInput(" ")}
         >
           space
         </button>
         <button
           type="button"
-          className="h-7 min-w-0 flex-[1.3] rounded bg-blue-600 px-1 text-xs font-semibold text-white"
+          className="h-6 min-w-0 flex-[1.3] rounded bg-blue-600 px-1 text-xs font-semibold text-white min-[1100px]:h-8"
           onClick={onEnter}
         >
           ↵
@@ -1038,7 +1038,7 @@ export function CustomersPage() {
 
   return (
     <section className="pos-split pos-member-split grid h-full min-h-0 grid-cols-[minmax(0,0.7fr)_minmax(0,1.3fr)] overflow-hidden bg-slate-100 min-[1100px]:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]">
-      <aside className="flex min-h-0 min-w-0 flex-col bg-white">
+      <aside className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-white">
         {(error || localError || walletError) && (
           <p className="m-4 rounded bg-red-50 p-3 text-sm text-red-700">
             {localError || walletError || error}
@@ -1056,20 +1056,20 @@ export function CustomersPage() {
             <p className="mt-4 text-sm text-slate-500">{t("crm.selectMember")}</p>
           </div>
         ) : (
-          <div className="min-h-0 flex-1 overflow-y-auto p-6">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-100 text-lg font-bold text-blue-700">
+          <div className="pos-member-detail min-h-0 flex-1 overflow-y-auto p-6">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700 min-[1100px]:h-14 min-[1100px]:w-14 min-[1100px]:text-lg">
                   {initials(selectedCustomer.name)}
                 </div>
-        <div>
+                <div className="min-w-0">
                   <h2 className="text-2xl font-bold text-slate-900">
                     {selectedCustomer.name}
                   </h2>
-                  <p className="text-sm text-slate-500">{selectedCustomer.phone}</p>
+                  <p className="truncate text-sm text-slate-500">{selectedCustomer.phone}</p>
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
                   variant="secondary"
@@ -1106,7 +1106,7 @@ export function CustomersPage() {
             </dl>
 
             <section className="mt-8 rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
                 <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
                   {t("crm.membershipCard")}
                 </h3>
@@ -1570,7 +1570,7 @@ export function CustomersPage() {
         )}
       </aside>
 
-      <main className="flex h-full min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto bg-slate-950 p-3 text-slate-100 min-[1100px]:overflow-hidden min-[1100px]:p-4">
+      <main className="pos-member-pane flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-slate-950 p-2 text-slate-100 min-[1100px]:p-4">
         <div className="flex items-center gap-2">
           <div className="flex-1">
             <SearchInput
@@ -1649,7 +1649,7 @@ export function CustomersPage() {
           )}
         </div>
 
-        <div className="mt-3 flex items-center justify-center gap-4 text-sm text-slate-200">
+        <div className="mt-2 flex shrink-0 items-center justify-center gap-4 text-sm text-slate-200 min-[1100px]:mt-3">
           <button
             type="button"
             className="min-h-10 min-w-10 rounded bg-slate-800 disabled:opacity-40"

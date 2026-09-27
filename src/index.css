@@ -68,8 +68,8 @@
 }
 
 .pos-member-list {
-  min-height: 9rem;
-  flex: 1 1 auto;
+  min-height: 5.5rem;
+  flex: 1 1 0%;
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -157,7 +157,58 @@
   }
 
   .pos-app-shell > main .pos-split.pos-member-split:has(> :nth-child(2):last-child) {
-    grid-template-columns: minmax(0, 0.35fr) minmax(0, 1.65fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  }
+
+  .pos-member-detail {
+    padding: 0.75rem;
+  }
+
+  .pos-member-detail h2 {
+    font-size: 1.05rem;
+    line-height: 1.3rem;
+    overflow-wrap: anywhere;
+  }
+
+  .pos-member-detail dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pos-member-pane {
+    display: grid;
+    grid-template-rows: auto auto minmax(3.5rem, 1fr) auto minmax(6.5rem, 8.5rem);
+    align-content: stretch;
+  }
+
+  .pos-member-pane > .pos-member-list {
+    min-height: 0;
+    height: auto;
+  }
+
+  .pos-member-keys {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    margin-top: 0.35rem;
+    padding: 0.25rem;
+    overflow: hidden;
+  }
+
+  .pos-member-keys > div {
+    flex: 1 1 0;
+    min-height: 0;
+    margin-bottom: 0.15rem;
+  }
+
+  .pos-member-keys > div:last-child {
+    margin-bottom: 0;
+  }
+
+  .pos-member-keys button {
+    height: 100%;
+    min-height: 0;
+    font-size: 11px;
   }
 
   .pos-app-shell > main .pos-split:has(> :nth-child(3):last-child:not(.hidden)) {
