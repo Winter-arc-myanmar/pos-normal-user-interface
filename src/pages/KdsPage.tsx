@@ -114,7 +114,7 @@ export function KdsPage() {
         </p>
       ) : null}
 
-      <section className="grid min-h-0 flex-1 grid-cols-2 gap-4 overflow-hidden p-4 sm:p-5">
+      <section className="grid min-h-0 flex-1 grid-rows-2 gap-4 overflow-hidden p-4 sm:p-5 lg:grid-cols-2 lg:grid-rows-1">
         {columns.map((column) => {
           const list = tickets.filter((ticket) =>
             column.key === "PENDING"
@@ -126,7 +126,7 @@ export function KdsPage() {
               <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
                 {column.title} · {list.length}
               </h2>
-              <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto xl:grid xl:grid-cols-2 xl:content-start">
+              <div className="pos-pane-scroll flex flex-col gap-3 xl:grid xl:grid-cols-2 xl:content-start">
                 {list.length === 0 ? (
                   <p className="text-sm text-slate-600">{t("kds.empty")}</p>
                 ) : (

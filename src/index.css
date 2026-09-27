@@ -140,10 +140,22 @@
     min-width: 0;
   }
 
+  /* Fit visible panes to the screen. A hidden trailing pane, such as the
+     checkout category rail, must not reserve an empty column. */
+  .pos-app-shell > main .pos-split:has(> :nth-child(2):last-child) {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  }
+
+  .pos-app-shell > main .pos-split:has(> :nth-child(3):last-child:not(.hidden)) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) minmax(4.5rem, 0.55fr);
+  }
+
   .pos-app-shell > main .pos-split > * {
     min-width: 0;
+    min-height: 0;
     max-width: none;
-    overflow-x: clip;
   }
 
   .pos-app-shell > main table {
