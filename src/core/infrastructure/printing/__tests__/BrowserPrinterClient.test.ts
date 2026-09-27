@@ -9,9 +9,11 @@ describe("BrowserPrinterClient", () => {
     delete window.median;
   });
 
-  it("falls back to PDF when raw ESC/POS is unavailable", async () => {
+  it("opens the browser print dialog when raw ESC/POS is unavailable", async () => {
     vi.spyOn(printerCapabilities, "canSendRawEscPos").mockReturnValue(false);
-    const pdf = vi.spyOn(documentPrint, "printLinesAsPdf").mockResolvedValue(undefined);
+    const printDialog = vi
+      .spyOn(documentPrint, "printLinesWithBrowserDialog")
+      .mockResolvedValue(undefined);
     const client = new BrowserPrinterClient();
     client.configureScope("tenant-1", "register-1");
 
@@ -25,7 +27,7 @@ describe("BrowserPrinterClient", () => {
       lastError: null,
     });
 
-    expect(pdf).toHaveBeenCalledWith(
+    expect(printDialog).toHaveBeenCalledWith(
       expect.arrayContaining(["PRINTER TEST", "Kitchen"]),
       "printer-test"
     );

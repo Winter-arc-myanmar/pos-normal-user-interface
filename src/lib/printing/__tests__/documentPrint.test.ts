@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildReceiptPdf, printLinesAsPdf } from "../documentPrint";
+import {
+  buildReceiptPdf,
+  printLinesAsPdf,
+  printLinesWithBrowserDialog,
+} from "../documentPrint";
 
 describe("documentPrint", () => {
   it("builds a narrow receipt pdf", () => {
@@ -29,5 +33,31 @@ describe("documentPrint", () => {
     await printLinesAsPdf(["Kitchen ticket"], "ticket-1");
 
     expect(open).toHaveBeenCalledWith("blob:receipt", "_blank", "noopener,noreferrer");
+  });
+
+  it("opens a print-ready browser document for Android printing", async () => {
+    const printDocument = {
+      open: vi.fn(),
+      write: vi.fn(),
+      close: vi.fn(),
+    };
+    const printWindow = {
+      document: printDocument,
+      opener: null,
+      close: vi.fn(),
+    };
+    const open = vi.fn().mockReturnValue(printWindow);
+    vi.stubGlobal("open", open);
+
+    await printLinesWithBrowserDialog(["Coffee <large>", "TOTAL  10.00"], "Receipt & test");
+
+    expect(open).toHaveBeenCalledWith("about:blank", "_blank");
+    expect(printDocument.write).toHaveBeenCalledWith(
+      expect.stringContaining("Coffee &lt;large&gt;")
+    );
+    expect(printDocument.write).toHaveBeenCalledWith(
+      expect.stringContaining("window.print()")
+    );
+    expect(printDocument.close).toHaveBeenCalled();
   });
 });

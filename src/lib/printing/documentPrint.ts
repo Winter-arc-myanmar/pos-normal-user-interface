@@ -8,6 +8,14 @@ const FONT_SIZE = 8;
 const sanitizeFilename = (title: string) =>
   title.replace(/[^\w.-]+/g, "-").replace(/^-+|-+$/g, "") || "receipt";
 
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
 const measureLines = (doc: jsPDF, lines: string[], widthMm: number) => {
   const maxWidth = widthMm - MARGIN_MM * 2;
   let count = 0;
@@ -60,6 +68,104 @@ const downloadPdf = (url: string, filename: string) => {
   link.click();
   link.remove();
 };
+
+/**
+ * Opens a print-ready receipt document and invokes the operating system's
+ * print dialog. This matches the browser-print flow used by the Android POS
+ * reference application, so Median can hand printing to Android without QZ
+ * Tray or a custom native printer plugin.
+ */
+export async function printLinesWithBrowserDialog(
+  lines: string[],
+  title: string,
+  paperWidthMm = 80
+): Promise<void> {
+  if (typeof window === "undefined") {
+    throw new Error("Browser printing is only available in the browser");
+  }
+
+  const printWindow = window.open("about:blank", "_blank");
+  if (!printWindow) {
+    throw new Error("Unable to open the print dialog. Allow popups and try again.");
+  }
+
+  const safeTitle = escapeHtml(title);
+  const receiptLines = lines
+    .map((line) => `<div class="line">${escapeHtml(line)}</div>`)
+    .join("");
+
+  try {
+    printWindow.opener = null;
+    printWindow.document.open();
+    printWindow.document.write(`<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${safeTitle}</title>
+    <style>
+      @page { size: ${paperWidthMm}mm auto; margin: 0; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: #e5e7eb;
+        color: #111827;
+        font: 600 12px/1.35 "Courier New", monospace;
+      }
+      .toolbar {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        padding: 10px;
+        text-align: center;
+        background: #111827;
+      }
+      .toolbar button {
+        border: 0;
+        border-radius: 4px;
+        padding: 8px 14px;
+        color: #fff;
+        background: #2563eb;
+        font: inherit;
+      }
+      .receipt {
+        width: ${paperWidthMm}mm;
+        min-height: 40mm;
+        margin: 12px auto;
+        padding: 4mm;
+        overflow: hidden;
+        background: #fff;
+      }
+      .line {
+        min-height: 1.35em;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      @media print {
+        body { background: #fff; }
+        .toolbar { display: none; }
+        .receipt { margin: 0; box-shadow: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="toolbar"><button type="button" onclick="window.print()">Print</button></div>
+    <main class="receipt">${receiptLines}</main>
+    <script>
+      window.addEventListener("load", function () {
+        window.setTimeout(function () { window.print(); }, 0);
+      });
+    <\/script>
+  </body>
+</html>`);
+    printWindow.document.close();
+  } catch (caught) {
+    printWindow.close();
+    throw caught instanceof Error
+      ? caught
+      : new Error("Unable to create the print document");
+  }
+}
 
 export async function printLinesAsPdf(
   lines: string[],

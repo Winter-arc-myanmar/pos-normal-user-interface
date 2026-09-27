@@ -1,6 +1,6 @@
 import { KdsTicket } from "../../domain/entities/Cashier";
 import { PrinterBinding, PrinterTransport } from "@/lib/pos/printerBindingStorage";
-import { printLinesAsPdf } from "@/lib/printing/documentPrint";
+import { printLinesWithBrowserDialog } from "@/lib/printing/documentPrint";
 import {
   buildKitchenSlipLines,
   buildPrinterTestLines,
@@ -125,7 +125,7 @@ export class BrowserPrinterClient implements IPrinterClient {
         if (!isBrowserPrinting()) throw caught;
       }
     }
-    await printLinesAsPdf(pdfLines, pdfTitle);
+    await printLinesWithBrowserDialog(pdfLines, pdfTitle);
   }
 
   testPrint(binding: PrinterBinding): Promise<void> {
