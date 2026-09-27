@@ -3,8 +3,11 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { CardCaptureStatus } from "@/components/ui/CardCaptureStatus";
 import { useCardCapture } from "@/core/presentation/hooks/useCardCapture";
+import type { RoomKind } from "@/core/presentation/hooks/useRoomPos";
+import { useRoomText } from "@/core/presentation/hooks/useRoomText";
 
 export function CardTapDialog({
+  kind = "spa",
   title,
   children,
   error,
@@ -12,6 +15,7 @@ export function CardTapDialog({
   onCardRead,
   onCancel,
 }: {
+  kind?: RoomKind;
   title: string;
   children?: ReactNode;
   error?: string | null;
@@ -20,6 +24,7 @@ export function CardTapDialog({
   onCancel: () => void;
 }) {
   const { t } = useTranslation();
+  const tr = useRoomText(kind);
   const [uid, setUid] = useState("");
   const { nfcSupported, nfcActive, nfcError, lastUid, startNfc } = useCardCapture({
     enabled: !isBusy,
@@ -39,7 +44,7 @@ export function CardTapDialog({
       >
         <div>
           <h2 className="text-lg font-bold">{title}</h2>
-          <p className="mt-1 text-sm text-slate-400">{t("spa.tapPrompt")}</p>
+          <p className="mt-1 text-sm text-slate-400">{tr("tapPrompt")}</p>
         </div>
         {children ? (
           <div className="max-h-56 overflow-y-auto rounded border border-slate-800 bg-slate-900/60 p-3 text-sm">
@@ -57,11 +62,11 @@ export function CardTapDialog({
           <input
             value={uid}
             onChange={(event) => setUid(event.target.value)}
-            placeholder={t("spa.cardUid")}
+            placeholder={tr("cardUid")}
             className="min-w-0 flex-1 rounded border border-slate-700 bg-slate-900 px-3 py-2"
           />
           <Button type="submit" isLoading={isBusy} disabled={!uid.trim()}>
-            {t("spa.checkCard")}
+            {tr("checkCard")}
           </Button>
         </div>
         {error ? (

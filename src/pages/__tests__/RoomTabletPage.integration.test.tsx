@@ -143,4 +143,20 @@ describe("RoomTabletPage", () => {
     tap("OTHER");
     expect(await screen.findByText("tablet.errors.wrongCard")).toBeInTheDocument();
   });
+
+  it("sells a KTV room by the hour", async () => {
+    state = { ...state, rooms: [{ ...freeRoom, kind: "KTV", sessionPrice: "35000.0000" }] };
+    render(page);
+    fireEvent.click(screen.getByRole("button", { name: "tablet.ktv.startTreatment" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "tablet.more" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "tablet.payAndStart" }));
+    tap();
+
+    await waitFor(() =>
+      expect(mocks.startRoom).toHaveBeenCalledWith(
+        expect.objectContaining({ roomId: "room-2", sessions: 2 })
+      )
+    );
+    expect(await screen.findByText("tablet.ktv.started")).toBeInTheDocument();
+  });
 });

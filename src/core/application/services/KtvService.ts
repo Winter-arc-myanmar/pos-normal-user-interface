@@ -1,11 +1,15 @@
 import {
+  ChargeKtvItemsDTO,
   CloseKtvSessionDTO,
   CreateKtvRoomDTO,
+  ExtendKtvSessionDTO,
+  KtvChargeResultDTO,
   KtvRoomFilterDTO,
   KtvRoomListDTO,
   OpenKtvSessionDTO,
   UpdateKtvRoomDTO,
 } from "../dtos/KtvDTO";
+import { GiveFreeItemsDTO } from "../dtos/SpaDTO";
 import {
   KtvRoom,
   KtvSession,
@@ -39,10 +43,16 @@ export class KtvService implements IKtvService {
   createRoom(payload: CreateKtvRoomDTO): Promise<KtvRoom> {
     requireId(payload.locationId, "Location");
     requireId(payload.roomNumber, "Room number");
-    requireId(payload.name, "Room name");
-    requireId(payload.rateVariantId, "Rate variant");
+    if (payload.sessionPrice === undefined) {
+      requireId(payload.rateVariantId || "", "Room price");
+    } else if (!(payload.sessionPrice >= 0)) {
+      throw new Error("Room price must be zero or more");
+    }
     if (payload.capacity < 1) throw new Error("Room capacity must be at least 1");
-    if (payload.minimumMinutes < 1 || payload.incrementMinutes < 1) {
+    if (
+      (payload.minimumMinutes !== undefined && payload.minimumMinutes < 1) ||
+      (payload.incrementMinutes !== undefined && payload.incrementMinutes < 1)
+    ) {
       throw new Error("Room billing minutes must be greater than zero");
     }
     return this.repository.createRoom(payload);
@@ -65,7 +75,7 @@ export class KtvService implements IKtvService {
 
   openSession(payload: OpenKtvSessionDTO): Promise<KtvSession> {
     requireId(payload.roomId, "Room");
-    if (payload.guestCount < 1) {
+    if (payload.guestCount !== undefined && payload.guestCount < 1) {
       throw new Error("Guest count must be at least 1");
     }
     return this.repository.openSession(payload);
@@ -93,6 +103,33 @@ export class KtvService implements IKtvService {
     requireId(id, "Session ID");
     if (!payload.closedAt.trim()) throw new Error("Close time is required");
     return this.repository.closeSession(id, payload);
+  }
+
+  extendSession(id: string, payload: ExtendKtvSessionDTO): Promise<KtvChargeResultDTO> {
+    requireId(id, "Session ID");
+    if (payload.hours < 1) throw new Error("Add at least one hour");
+    return this.repository.extendSession(id, payload);
+  }
+
+  chargeItems(id: string, payload: ChargeKtvItemsDTO): Promise<KtvChargeResultDTO> {
+    requireId(id, "Session ID");
+    if (!payload.items.length) throw new Error("Nothing to charge");
+    return this.repository.chargeItems(id, payload);
+  }
+
+  giveFree(id: string, payload: GiveFreeItemsDTO): Promise<KtvChargeResultDTO> {
+    requireId(id, "Session ID");
+    if (!payload.compReasonId && !payload.reason?.trim()) {
+      throw new Error("FOC reason is required");
+    }
+    if (!payload.items.length) throw new Error("Nothing to give");
+    return this.repository.giveFree(id, payload);
+  }
+
+  refundLine(id: string, lineId: string, reason?: string): Promise<KtvChargeResultDTO> {
+    requireId(id, "Session ID");
+    requireId(lineId, "Line ID");
+    return this.repository.refundLine(id, lineId, reason);
   }
 
   getRoomTabletMenu(): Promise<RoomTabletMenu> {

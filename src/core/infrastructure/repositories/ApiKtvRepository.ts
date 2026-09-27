@@ -1,11 +1,15 @@
 import {
+  ChargeKtvItemsDTO,
   CloseKtvSessionDTO,
   CreateKtvRoomDTO,
+  ExtendKtvSessionDTO,
+  KtvChargeResultDTO,
   KtvRoomFilterDTO,
   KtvRoomListDTO,
   OpenKtvSessionDTO,
   UpdateKtvRoomDTO,
 } from "../../application/dtos/KtvDTO";
+import { GiveFreeItemsDTO } from "../../application/dtos/SpaDTO";
 import {
   KtvQuoteSegment,
   KtvRoom,
@@ -95,6 +99,10 @@ const toRoom = (value: unknown) => {
     name: String(item.name || ""),
     capacity: Number(item.capacity || 0),
     rateVariantId: String(item.rateVariantId || ""),
+    sessionPrice: item.sessionPrice == null ? undefined : Number(item.sessionPrice),
+    priceNow: item.priceNow == null ? undefined : Number(item.priceNow),
+    rateLabel: item.rateLabel ? String(item.rateLabel) : undefined,
+    rateProductId: item.rateProductId ? String(item.rateProductId) : undefined,
     minimumMinutes: Number(item.minimumMinutes || 0),
     incrementMinutes: Number(item.incrementMinutes || 0),
     graceMinutes: Number(item.graceMinutes || 0),
@@ -138,7 +146,18 @@ const toQuote = (value: unknown) => {
     roomCharge: String(item.roomCharge || "0.0000"),
     fnbCharge: String(item.fnbCharge || "0.0000"),
     runningTotal: String(item.runningTotal || "0.0000"),
+    prepaid: Boolean(item.prepaid),
+    paidTotal: String(item.paidTotal || "0.0000"),
   });
+};
+
+const toChargeResult = (value: unknown): KtvChargeResultDTO => {
+  const item = asRecord(value);
+  return {
+    charged: String(item.charged || "0.0000"),
+    balanceAfter: String(item.balanceAfter || "0.0000"),
+    quote: toQuote(item.quote),
+  };
 };
 
 const toRoomTabletMenu = (value: unknown) => {
@@ -310,6 +329,38 @@ export class ApiKtvRepository implements IKtvRepository {
       payload
     );
     return toQuote(unwrap(response));
+  }
+
+  async extendSession(id: string, payload: ExtendKtvSessionDTO): Promise<KtvChargeResultDTO> {
+    const response = await this.httpClient.post<ApiEnvelope<unknown>>(
+      API_ENDPOINTS.KTV_SESSIONS.EXTEND(id),
+      payload
+    );
+    return toChargeResult(unwrap(response));
+  }
+
+  async chargeItems(id: string, payload: ChargeKtvItemsDTO): Promise<KtvChargeResultDTO> {
+    const response = await this.httpClient.post<ApiEnvelope<unknown>>(
+      API_ENDPOINTS.KTV_SESSIONS.CHARGES(id),
+      payload
+    );
+    return toChargeResult(unwrap(response));
+  }
+
+  async giveFree(id: string, payload: GiveFreeItemsDTO): Promise<KtvChargeResultDTO> {
+    const response = await this.httpClient.post<ApiEnvelope<unknown>>(
+      API_ENDPOINTS.KTV_SESSIONS.FOC(id),
+      payload
+    );
+    return toChargeResult(unwrap(response));
+  }
+
+  async refundLine(id: string, lineId: string, reason?: string): Promise<KtvChargeResultDTO> {
+    const response = await this.httpClient.post<ApiEnvelope<unknown>>(
+      API_ENDPOINTS.KTV_SESSIONS.REFUND_LINE(id, lineId),
+      reason ? { reason } : {}
+    );
+    return toChargeResult(unwrap(response));
   }
 
   async getRoomTabletMenu(): Promise<RoomTabletMenu> {

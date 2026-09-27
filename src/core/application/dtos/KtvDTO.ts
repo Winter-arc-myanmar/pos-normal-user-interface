@@ -1,7 +1,9 @@
 import {
   KtvRoom,
   KtvRoomStatus,
+  KtvSessionQuote,
 } from "../../domain/entities/Ktv";
+import { SpaCardChargeDTO } from "./SpaDTO";
 
 export interface KtvRoomFilterDTO {
   page?: number;
@@ -24,11 +26,12 @@ export interface CreateKtvRoomDTO {
   roomNumber: string;
   name: string;
   capacity: number;
-  rateVariantId: string;
-  minimumMinutes: number;
-  incrementMinutes: number;
-  graceMinutes: number;
-  roundingMode: "UP" | "DOWN" | "NEAREST";
+  rateVariantId?: string;
+  sessionPrice?: number;
+  minimumMinutes?: number;
+  incrementMinutes?: number;
+  graceMinutes?: number;
+  roundingMode?: "UP" | "DOWN" | "NEAREST";
 }
 
 export type UpdateKtvRoomDTO = Partial<CreateKtvRoomDTO> & {
@@ -37,14 +40,31 @@ export type UpdateKtvRoomDTO = Partial<CreateKtvRoomDTO> & {
 
 export interface OpenKtvSessionDTO {
   roomId: string;
-  guestCount: number;
+  guestCount?: number;
   guestWalletId?: string;
   hostUserId?: string;
   posRegisterId?: string;
   openedByPosSessionId?: string;
   salesChannel: "POS";
+  hours?: number;
+  items?: { variantId: string; quantity: number }[];
+  prepay?: SpaCardChargeDTO;
 }
 
 export interface CloseKtvSessionDTO {
   closedAt: string;
+}
+
+export interface ExtendKtvSessionDTO extends SpaCardChargeDTO {
+  hours: number;
+}
+
+export interface ChargeKtvItemsDTO extends SpaCardChargeDTO {
+  items: { variantId: string; quantity: number }[];
+}
+
+export interface KtvChargeResultDTO {
+  charged: string;
+  balanceAfter: string;
+  quote: KtvSessionQuote;
 }

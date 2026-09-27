@@ -1458,7 +1458,14 @@
     "started": "ပျော်ရွှင်ပါစေ! ဆက်ရှင် {{count}} ခု စတင်ပြီး · {{amount}} နုတ်ပြီး · လက်ကျန် {{balance}}",
     "tryAgain": "ထပ်ကြိုးစားမည်",
     "loadingRooms": "အခန်းများ ဖွင့်နေသည်…",
-    "noRoomsSetUp": "စပါအခန်း မသတ်မှတ်ရသေးပါ။ SPA ဘုတ်တွင် အခန်းများ အရင်ထည့်ပါ။"
+    "noRoomsSetUp": "စပါအခန်း မသတ်မှတ်ရသေးပါ။ SPA ဘုတ်တွင် အခန်းများ အရင်ထည့်ပါ။",
+    "ktv": {
+      "started": "ပျော်ရွှင်ပါစေ! {{count}} နာရီ စတင်ပြီး · {{amount}} ဖြတ်ပြီး · လက်ကျန် {{balance}}",
+      "timeAdded": "{{count}} နာရီ တိုးပြီး · {{amount}} ဖြတ်ပြီး · လက်ကျန် {{balance}}",
+      "sessionsOf": "နောက်ထပ် {{count}} နာရီ · {{minutes}} မိနစ်",
+      "pricePerSession": "တစ်နာရီလျှင် {{amount}}",
+      "startTreatment": "အခန်း စတင်မည်"
+    }
   },
   "kds": {
     "title": "မီးဖိုချောင် ဖန်သားပြင်",
@@ -1484,5 +1491,39 @@
     "printHere": "တက်ဘလက် မှာယူမှုများကို ဤနေရာတွင် ပုံနှိပ်မည်",
     "printFailed": "လက်မှတ် ပုံနှိပ်၍ မရပါ။",
     "started": "တက်ဘလက်မှ စတင်ပြီး"
+  },
+  "ktvPos": {
+    "boardTitle": "KTV အခန်းဘုတ်",
+    "sessions": "နာရီ",
+    "newSession": "{{room}} တွင် ဧည့်သည်အသစ်",
+    "sessionsSummary": "စုစုပေါင်း {{minutes}} မိနစ်",
+    "startSession": "အခန်းစတင်မည်",
+    "startAndPay": "စတင်မည် · {{amount}} ပေးမည်",
+    "startSummary": "{{room}} · {{sessions}} နာရီ ({{minutes}} မိနစ်) · ဧည့်သည် {{count}} ဦး",
+    "confirmStartTitle": "{{room}} စတင်မည်",
+    "treatmentCharge": "အခန်းခ",
+    "treatmentSoFar": "အခန်းခ",
+    "servicesCharge": "အစားအသောက်",
+    "endTreatment": "အခန်းပိတ်မည်",
+    "endTitle": "{{room}} ပိတ်မလား?",
+    "treatmentStarted": "အခန်း စတင်ပြီး",
+    "treatmentEnded": "{{room}} ပိတ်ပြီး · {{amount}} ပေးပြီး",
+    "extendTitle": "အချိန်တိုးမည် · {{room}}",
+    "moreSessionsLabel": "နာရီ ထပ်တိုး",
+    "moreSessions": "တစ်နာရီ တိုးမည်",
+    "fewerSessions": "တစ်နာရီ လျှော့မည်",
+    "confirmExtendTitle": "{{count}} နာရီ တိုးမည်",
+    "perSession": "/ နာရီ",
+    "sessionPriceLabel": "တစ်နာရီလျှင် အခန်းခ",
+    "priceSummary": "တစ်နာရီလျှင် {{price}} ပေးရမည်။ အထူးအချိန် ဈေးနှုန်းများ သက်ရောက်ဆဲ။",
+    "priceHint": "ဤအခန်း တစ်နာရီအတွက် ကျသင့်ငွေ ထည့်ပါ။",
+    "minutesOfBooked": "{{count}}/{{booked}} မိနစ် ({{sessions}} နာရီ)",
+    "treatmentMinutes": "{{count}} မိနစ်",
+    "sessionOption": "{{time}} မှစ၍ · ဧည့်သည် {{count}} ဦး",
+    "noRooms": "KTV အခန်း မရှိသေးပါ။ စတင်ရန် အခန်းထည့်ပါ။",
+    "errors": {
+      "openSession": "အခန်း စတင်၍ မရပါ",
+      "sessionRequired": "အခန်းကို အရင်စတင်ပါ"
+    }
   }
 }

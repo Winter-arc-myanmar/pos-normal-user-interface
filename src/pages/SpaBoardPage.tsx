@@ -16,7 +16,8 @@ import { useCashier } from "@/core/presentation/hooks/useCashier";
 import { useGuestWalletManagement } from "@/core/presentation/hooks/useGuestWalletManagement";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
 import { useSalesOrderManagement } from "@/core/presentation/hooks/useSalesOrderManagement";
-import { useSpaManagement } from "@/core/presentation/hooks/useSpaManagement";
+import { RoomKind, useRoomPos } from "@/core/presentation/hooks/useRoomPos";
+import { useRoomText } from "@/core/presentation/hooks/useRoomText";
 import { getKtvWarning } from "@/lib/ktv/session";
 import { isUnspendableWalletStatus } from "@/lib/pos/guestWalletAmounts";
 import {
@@ -47,21 +48,22 @@ import { SpaRoomTile } from "./spa/SpaRoomTile";
 type SpaStep = "rooms" | "sessions" | "menu" | "pay";
 type CardAction = "add" | "open" | "extend" | "pay";
 
-const RESUME_KEY = "spa-pos-resume";
 type ResumeState = { roomId?: string; session?: SpaSession; pending?: PendingItem[] };
 
-const readResume = (): ResumeState | null => {
+const resumeKey = (kind: RoomKind) => `${kind}-pos-resume`;
+
+const readResume = (kind: RoomKind): ResumeState | null => {
   try {
-    const raw = window.sessionStorage.getItem(RESUME_KEY);
+    const raw = window.sessionStorage.getItem(resumeKey(kind));
     return raw ? (JSON.parse(raw) as ResumeState) : null;
   } catch {
     return null;
   }
 };
-const writeResume = (value: ResumeState | null) => {
+const writeResume = (kind: RoomKind, value: ResumeState | null) => {
   try {
-    if (value) window.sessionStorage.setItem(RESUME_KEY, JSON.stringify(value));
-    else window.sessionStorage.removeItem(RESUME_KEY);
+    if (value) window.sessionStorage.setItem(resumeKey(kind), JSON.stringify(value));
+    else window.sessionStorage.removeItem(resumeKey(kind));
   } catch {
     // Storage can be blocked; the cashier then re-selects the room after a top-up.
   }
@@ -79,8 +81,9 @@ const emptyRoomForm = {
 const money = (value: string | number | undefined) =>
   Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
 
-export function SpaBoardPage() {
+export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const { t } = useTranslation();
+  const tr = useRoomText(kind);
   const navigate = useNavigate();
   const location = useLocation();
   const {
@@ -103,7 +106,7 @@ export function SpaBoardPage() {
     giveFree,
     refundLine,
     clearQuote,
-  } = useSpaManagement();
+  } = useRoomPos(kind);
   const {
     products,
     variantsByProductId,
@@ -185,9 +188,9 @@ export function SpaBoardPage() {
         names[variant.id] = product.name;
       }
     }
-    if (room) names[room.rateVariantId] = t("spa.treatmentCharge");
+    if (room) names[room.rateVariantId] = tr("treatmentCharge");
     return names;
-  }, [products, room, t, variantsByProductId]);
+  }, [products, room, tr, variantsByProductId]);
   const pendingByProduct = useMemo(
     () =>
       pending.reduce<Record<string, number>>((counts, item) => {
@@ -234,13 +237,13 @@ export function SpaBoardPage() {
       const foundCard = await lookupCard(uid.trim());
       const foundWallet = foundCard.wallet || (await getWallet(foundCard.walletId));
       if (isUnspendableWalletStatus(foundWallet.status)) {
-        throw new Error(t("spa.errors.walletUnavailable"));
+        throw new Error(tr("errors.walletUnavailable"));
       }
       setCard(foundCard);
       setWallet(foundWallet);
       return { foundCard, foundWallet };
     },
-    [getWallet, lookupCard, t]
+    [getWallet, lookupCard, tr]
   );
 
   useEffect(() => {
@@ -268,7 +271,7 @@ export function SpaBoardPage() {
   useEffect(() => {
     const returned = location.state as { cardNumber?: string } | null;
     if (!returned?.cardNumber) return;
-    const resume = readResume();
+    const resume = readResume(kind);
     void acceptCard(returned.cardNumber)
       .then(async () => {
         if (resume?.session) {
@@ -278,10 +281,10 @@ export function SpaBoardPage() {
           await loadBill(resume.session);
           setStep(resume.session.sessionState === "CLOSED" ? "pay" : "menu");
         }
-        setNotice(t("spa.cardAccepted"));
+        setNotice(tr("cardAccepted"));
       })
-      .catch(() => setActionError(t("spa.errors.cardLookup")));
-  }, [acceptCard, loadBill, location.state, t]);
+      .catch(() => setActionError(tr("errors.cardLookup")));
+  }, [acceptCard, kind, loadBill, location.state, tr]);
 
   useEffect(() => {
     if (!session || billClosed || (step !== "menu" && step !== "pay")) return;
@@ -329,7 +332,7 @@ export function SpaBoardPage() {
 
   const openTopup = () => {
     if (!card || !wallet) return;
-    writeResume(session ? { roomId: selectedRoomId, session, pending } : null);
+    writeResume(kind, session ? { roomId: selectedRoomId, session, pending } : null);
     navigate("/cards", {
       state: {
         cardNumber: card.cardUid,
@@ -338,7 +341,7 @@ export function SpaBoardPage() {
         customerPhone: wallet.guestPhone,
         tenantId: wallet.tenantId,
         walletId: wallet.id,
-        returnTo: "/spa",
+        returnTo: kind === "ktv" ? "/ktv" : "/spa",
       },
     });
   };
@@ -384,7 +387,7 @@ export function SpaBoardPage() {
 
   const chargeFrom = async (action: CardAction, payerCard: GuestCard) => {
     if (!cardMethod || cardMethod.id === LOCAL_MEMBER_CARD_METHOD_ID) {
-      throw new Error(t("spa.errors.paymentUnavailable"));
+      throw new Error(tr("errors.paymentUnavailable"));
     }
     const context = await requireCashierContext();
     return {
@@ -401,7 +404,7 @@ export function SpaBoardPage() {
   const showCharged = (payer: GuestWallet, charged: string, balanceAfter: string) => {
     setWallet({ ...payer, balance: balanceAfter });
     setNotice(
-      t("spa.charged", { amount: money(charged), balance: money(balanceAfter) })
+      tr("charged", { amount: money(charged), balance: money(balanceAfter) })
     );
   };
 
@@ -424,9 +427,9 @@ export function SpaBoardPage() {
       await fetchBoard();
       await selectSession(created);
       setWallet(await getWallet(payer.id));
-      setNotice(t("spa.treatmentStarted"));
+      setNotice(tr("treatmentStarted"));
     } catch (caught) {
-      setActionError(caught instanceof Error ? caught.message : t("spa.errors.openSession"));
+      setActionError(caught instanceof Error ? caught.message : tr("errors.openSession"));
     }
   };
 
@@ -448,7 +451,7 @@ export function SpaBoardPage() {
       await fetchBoard();
       await refreshBill(session);
     } catch (caught) {
-      setActionError(caught instanceof Error ? caught.message : t("spa.errors.extend"));
+      setActionError(caught instanceof Error ? caught.message : tr("errors.extend"));
     } finally {
       setIsAdding(false);
     }
@@ -480,7 +483,7 @@ export function SpaBoardPage() {
         setPending(focPending);
         showCharged(payer, result.charged, result.balanceAfter);
       } catch (caught) {
-        setActionError(caught instanceof Error ? caught.message : t("spa.errors.editLine"));
+        setActionError(caught instanceof Error ? caught.message : tr("errors.editLine"));
       } finally {
         setIsAdding(false);
         await refreshBill(session);
@@ -500,9 +503,9 @@ export function SpaBoardPage() {
         remaining = remaining.filter((entry) => entry !== item);
         added += item.quantity;
       }
-      setNotice(t("spa.itemsAdded", { count: added }));
+      setNotice(tr("itemsAdded", { count: added }));
     } catch (caught) {
-      setActionError(caught instanceof Error ? caught.message : t("spa.errors.editLine"));
+      setActionError(caught instanceof Error ? caught.message : tr("errors.editLine"));
     } finally {
       setPending(remaining);
       setIsAdding(false);
@@ -534,11 +537,11 @@ export function SpaBoardPage() {
       const rest = paidPending(pending);
       setPending(rest);
       setShowFoc(false);
-      setNotice(t("spa.focGiven", { count }));
+      setNotice(tr("focGiven", { count }));
       await refreshBill(session);
       if (rest.length) requestCard("add");
     } catch (caught) {
-      setActionError(caught instanceof Error ? caught.message : t("spa.errors.foc"));
+      setActionError(caught instanceof Error ? caught.message : tr("errors.foc"));
     } finally {
       setIsGivingFoc(false);
     }
@@ -568,7 +571,7 @@ export function SpaBoardPage() {
         session.guestWalletId !== foundWallet.id
       ) {
         forgetCard();
-        setCardPromptError(t("spa.errors.wrongSessionCard"));
+        setCardPromptError(tr("errors.wrongSessionCard"));
         return;
       }
       const action = cardPrompt;
@@ -577,7 +580,7 @@ export function SpaBoardPage() {
     } catch (caught) {
       forgetCard();
       setCardPromptError(
-        caught instanceof Error ? caught.message : t("spa.errors.cardLookup")
+        caught instanceof Error ? caught.message : tr("errors.cardLookup")
       );
     } finally {
       setIsCheckingCard(false);
@@ -587,24 +590,24 @@ export function SpaBoardPage() {
   const endTreatment = async () => {
     if (!session) return;
     if (pending.length) {
-      setActionError(t("spa.errors.pendingItems"));
+      setActionError(tr("errors.pendingItems"));
       return;
     }
     setActionError(null);
     setIsPaying(true);
     try {
       const final = await closeSession(session.id, {});
-      writeResume(null);
+      writeResume(kind, null);
       await fetchBoard();
       backToBoard();
       setNotice(
-        t("spa.treatmentEnded", {
+        tr("treatmentEnded", {
           room: final.roomNumber || room?.roomNumber || "",
           amount: money(final.paidTotal),
         })
       );
     } catch (caught) {
-      setActionError(caught instanceof Error ? caught.message : t("spa.errors.pay"));
+      setActionError(caught instanceof Error ? caught.message : tr("errors.pay"));
     } finally {
       setIsPaying(false);
       setConfirmEnd(false);
@@ -617,7 +620,7 @@ export function SpaBoardPage() {
   };
 
   const handleAddProduct = async (product: Product, variantId: string, quantity: number) => {
-    if (!session || billClosed) throw new Error(t("spa.errors.sessionRequired"));
+    if (!session || billClosed) throw new Error(tr("errors.sessionRequired"));
     const variants = variantsByProductId[product.id]?.length
       ? variantsByProductId[product.id]
       : await fetchProductVariants(product.id);
@@ -646,7 +649,7 @@ export function SpaBoardPage() {
       addPending(current, {
         variantId: line.variantId,
         productId: product?.id || line.variantId,
-        name: line.productName || itemNames[line.variantId] || t("spa.item"),
+        name: line.productName || itemNames[line.variantId] || tr("item"),
         unitPrice: Number(line.unitPrice || 0),
       })
     );
@@ -661,7 +664,7 @@ export function SpaBoardPage() {
       else await updateOrderLine(session.salesOrderId, line.id, { quantity: next.toFixed(4) });
       await refreshBill(session);
     } catch (caught) {
-      setActionError(caught instanceof Error ? caught.message : t("spa.errors.editLine"));
+      setActionError(caught instanceof Error ? caught.message : tr("errors.editLine"));
     }
   };
 
@@ -672,9 +675,9 @@ export function SpaBoardPage() {
       try {
         await refundLine(session.id, line.id);
         await refreshBill(session);
-        setNotice(t("spa.lineRemoved"));
+        setNotice(tr("lineRemoved"));
       } catch (caught) {
-        setActionError(caught instanceof Error ? caught.message : t("spa.errors.editLine"));
+        setActionError(caught instanceof Error ? caught.message : tr("errors.editLine"));
       }
       return;
     }
@@ -684,22 +687,22 @@ export function SpaBoardPage() {
         await refreshBill(session);
         if (wallet) setWallet({ ...wallet, balance: result.balanceAfter });
         setNotice(
-          t("spa.refunded", {
+          tr("refunded", {
             amount: money(Math.abs(Number(result.charged))),
             balance: money(result.balanceAfter),
           })
         );
       } catch (caught) {
-        setActionError(caught instanceof Error ? caught.message : t("spa.errors.editLine"));
+        setActionError(caught instanceof Error ? caught.message : tr("errors.editLine"));
       }
       return;
     }
     try {
       await deleteOrderLine(session.salesOrderId, line.id);
       await refreshBill(session);
-      setNotice(t("spa.lineRemoved"));
+      setNotice(tr("lineRemoved"));
     } catch (caught) {
-      setActionError(caught instanceof Error ? caught.message : t("spa.errors.editLine"));
+      setActionError(caught instanceof Error ? caught.message : tr("errors.editLine"));
     }
   };
 
@@ -719,11 +722,11 @@ export function SpaBoardPage() {
       return;
     }
     if (!cardMethod || cardMethod.id === LOCAL_MEMBER_CARD_METHOD_ID) {
-      setActionError(t("spa.errors.paymentUnavailable"));
+      setActionError(tr("errors.paymentUnavailable"));
       return;
     }
     if (cashValue > 0 && !cashMethod) {
-      setActionError(t("spa.errors.cashUnavailable"));
+      setActionError(tr("errors.cashUnavailable"));
       return;
     }
     setActionError(null);
@@ -739,7 +742,7 @@ export function SpaBoardPage() {
           cash: cashValue,
         });
         if (!cardCanCover(wallet, estimate)) {
-          setActionError(t("spa.errors.balanceShort"));
+          setActionError(tr("errors.balanceShort"));
           return;
         }
         await closeSession(session.id, {});
@@ -757,11 +760,11 @@ export function SpaBoardPage() {
         idempotencyKey: spaSettleKey(session.id),
       });
       setPaid(result);
-      writeResume(null);
+      writeResume(kind, null);
       setWallet(await getWallet(wallet.id));
       await fetchBoard();
     } catch (caught) {
-      setActionError(caught instanceof Error ? caught.message : t("spa.errors.pay"));
+      setActionError(caught instanceof Error ? caught.message : tr("errors.pay"));
     } finally {
       setIsPaying(false);
     }
@@ -769,7 +772,7 @@ export function SpaBoardPage() {
 
   const goToPay = () => {
     if (pending.length) {
-      setActionError(t("spa.errors.pendingItems"));
+      setActionError(tr("errors.pendingItems"));
       return;
     }
     requestCard("pay");
@@ -798,7 +801,7 @@ export function SpaBoardPage() {
       setShowRoomForm(false);
       await fetchBoard();
     } catch (caught) {
-      setActionError(caught instanceof Error ? caught.message : t("spa.errors.saveRoom"));
+      setActionError(caught instanceof Error ? caught.message : tr("errors.saveRoom"));
     }
   };
 
@@ -823,25 +826,25 @@ export function SpaBoardPage() {
 
   const cardPromptTitle =
     cardPrompt === "add"
-      ? t("spa.confirmAddTitle")
+      ? tr("confirmAddTitle")
       : cardPrompt === "open"
-        ? t("spa.confirmStartTitle", { room: room?.roomNumber || "" })
+        ? tr("confirmStartTitle", { room: room?.roomNumber || "" })
         : cardPrompt === "extend"
-          ? t("spa.confirmExtendTitle", { count: extendCount })
-          : t("spa.confirmPayTitle");
+          ? tr("confirmExtendTitle", { count: extendCount })
+          : tr("confirmPayTitle");
 
   return (
     <section className="flex h-full min-h-0 flex-col bg-[#080808] p-4 text-white">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
         <div>
-          <h1 className="text-xl font-bold">{t("spa.boardTitle")}</h1>
-          <p className="text-sm text-slate-400">{t(`spa.steps.${step}`)}</p>
+          <h1 className="text-xl font-bold">{tr("boardTitle")}</h1>
+          <p className="text-sm text-slate-400">{tr(`steps.${step}`)}</p>
         </div>
         <div className="flex items-center gap-2">
           <LanguageSwitcher />
           {step !== "rooms" && !(step === "pay" && billClosed) && !paid ? (
             <Button variant="secondary" onClick={goBack}>
-              {step === "pay" ? t("cardTopup.back") : t("spa.backToBoard")}
+              {step === "pay" ? t("cardTopup.back") : tr("backToBoard")}
             </Button>
           ) : null}
           <Button
@@ -852,7 +855,7 @@ export function SpaBoardPage() {
               setShowRoomForm(true);
             }}
           >
-            {t("spa.addRoom")}
+            {tr("addRoom")}
           </Button>
         </div>
       </header>
@@ -872,17 +875,18 @@ export function SpaBoardPage() {
                 }`}
                 onClick={() => setFilter(value)}
               >
-                {t(`spa.filters.${value.toLowerCase()}`)}
+                {tr(`filters.${value.toLowerCase()}`)}
               </button>
             ))}
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
             {visibleRooms.length === 0 ? (
-              <p className="mt-10 text-center text-slate-400">{t("spa.noRooms")}</p>
+              <p className="mt-10 text-center text-slate-400">{tr("noRooms")}</p>
             ) : (
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-4">
                 {visibleRooms.map((item) => (
                   <SpaRoomTile
+                    kind={kind}
                     key={item.id}
                     room={item}
                     nowMs={nowMs}
@@ -910,17 +914,17 @@ export function SpaBoardPage() {
               >
                 <p className="text-lg font-bold">{room.roomNumber}</p>
                 <p className="text-sm text-slate-300">
-                  {t("spa.sessionOption", {
+                  {tr("sessionOption", {
                     time: new Date(item.openedAt).toLocaleTimeString(),
                     count: item.guestCount,
                   })}
                 </p>
                 <p className="mt-2 text-sm">
                   {warning.level === "EXPIRED"
-                    ? t("spa.timeUp")
+                    ? tr("timeUp")
                     : item.endsAt
-                      ? t("spa.minutesRemaining", { count: warning.remainingMinutes })
-                      : t(`spa.status.${item.sessionState.toLowerCase()}`)}
+                      ? tr("minutesRemaining", { count: warning.remainingMinutes })
+                      : tr(`status.${item.sessionState.toLowerCase()}`)}
                 </p>
               </button>
             );
@@ -930,13 +934,13 @@ export function SpaBoardPage() {
               className="space-y-3 rounded-lg border border-slate-600 bg-slate-900 p-4"
               onSubmit={handleOpenSession}
             >
-              <p className="font-bold">{t("spa.newSession", { room: room.roomNumber })}</p>
+              <p className="font-bold">{tr("newSession", { room: room.roomNumber })}</p>
               <div className="flex items-center justify-between gap-3">
-                <span className="text-sm text-slate-300">{t("spa.sessions")}</span>
+                <span className="text-sm text-slate-300">{tr("sessions")}</span>
                 <div className="flex items-center rounded bg-slate-800">
                   <button
                     type="button"
-                    aria-label={t("spa.fewerSessions")}
+                    aria-label={tr("fewerSessions")}
                     className="h-9 w-9 text-lg disabled:opacity-40"
                     disabled={sessionCount <= 1}
                     onClick={() => setSessionCount((count) => Math.max(1, count - 1))}
@@ -946,7 +950,7 @@ export function SpaBoardPage() {
                   <span className="w-8 text-center font-semibold">{sessionCount}</span>
                   <button
                     type="button"
-                    aria-label={t("spa.moreSessions")}
+                    aria-label={tr("moreSessions")}
                     className="h-9 w-9 text-lg"
                     onClick={() => setSessionCount((count) => count + 1)}
                   >
@@ -955,7 +959,7 @@ export function SpaBoardPage() {
                 </div>
               </div>
               <p className="text-sm text-slate-300">
-                {t("spa.sessionsSummary", {
+                {tr("sessionsSummary", {
                   minutes: sessionCount * sessionMinutes(room),
                   perSession: sessionMinutes(room),
                 })}
@@ -964,7 +968,7 @@ export function SpaBoardPage() {
                   : ""}
               </p>
               <label className="block text-sm text-slate-300">
-                {t("spa.guestCountLabel")}
+                {tr("guestCountLabel")}
                 <input
                   type="number"
                   min={1}
@@ -976,15 +980,15 @@ export function SpaBoardPage() {
               </label>
               <Button type="submit" isLoading={isLoading}>
                 {roomSessionPrice !== undefined
-                  ? t("spa.startAndPay", { amount: money(startCharge) })
-                  : t("spa.startSession")}
+                  ? tr("startAndPay", { amount: money(startCharge) })
+                  : tr("startSession")}
               </Button>
             </form>
           ) : null}
           {openSessions.length === 0 && room.status !== "AVAILABLE" ? (
             <p className="text-slate-400">
-              {t("spa.roomNotAvailable", {
-                status: t(`spa.status.${room.status.toLowerCase()}`),
+              {tr("roomNotAvailable", {
+                status: tr(`status.${room.status.toLowerCase()}`),
               })}
             </p>
           ) : null}
@@ -994,6 +998,7 @@ export function SpaBoardPage() {
       {(step === "menu" || step === "pay") && session ? (
         <div className="mt-4 grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[24rem_minmax(0,1fr)]">
           <SpaBillPanel
+            kind={kind}
             room={room}
             session={liveSession || session}
             card={card}
@@ -1006,15 +1011,15 @@ export function SpaBoardPage() {
             billClosed={billClosed}
             primaryLabel={
               quote?.prepaid
-                ? t("spa.endTreatment")
+                ? tr("endTreatment")
                 : step === "menu"
-                  ? t("spa.goToPay")
-                  : t("spa.addServices")
+                  ? tr("goToPay")
+                  : tr("addServices")
             }
             onPrimary={() =>
               quote?.prepaid
                 ? pending.length
-                  ? setActionError(t("spa.errors.pendingItems"))
+                  ? setActionError(tr("errors.pendingItems"))
                   : setConfirmEnd(true)
                 : step === "menu"
                   ? goToPay()
@@ -1050,36 +1055,36 @@ export function SpaBoardPage() {
             />
           ) : paid ? (
             <div className="rounded-lg border border-slate-700 bg-slate-900 p-5">
-              <h2 className="text-lg font-semibold text-white">{t("spa.paidTitle")}</h2>
+              <h2 className="text-lg font-semibold text-white">{tr("paidTitle")}</h2>
               <p className="mt-3">
-                {t("spa.paidSummary", {
+                {tr("paidSummary", {
                   amount: money(paid.grandTotal),
                   order: paid.orderNumber,
                 })}
               </p>
               {Number(paid.change) > 0 ? (
-                <p>{t("spa.change", { amount: money(paid.change) })}</p>
+                <p>{tr("change", { amount: money(paid.change) })}</p>
               ) : null}
               <p className="mt-2 text-sm text-slate-400">
-                {t("spa.balance", { amount: money(wallet?.balance) })}
+                {tr("balance", { amount: money(wallet?.balance) })}
               </p>
               <Button className="mt-4" onClick={backToBoard}>
-                {t("spa.nextGuest")}
+                {tr("nextGuest")}
               </Button>
             </div>
           ) : (
             <div className="space-y-4 rounded-lg border border-slate-700 p-5">
-              <h2 className="text-lg font-bold">{t("spa.payTitle")}</h2>
+              <h2 className="text-lg font-bold">{tr("payTitle")}</h2>
               {wallet?.discountBpsSnapshot ? (
                 <p className="text-sm text-slate-300">
-                  {t("spa.memberDiscount", {
+                  {tr("memberDiscount", {
                     tier: wallet.tierNameSnapshot,
                     percent: wallet.discountBpsSnapshot / 100,
                   })}
                 </p>
               ) : null}
               <label className="block text-sm">
-                {t("spa.tip")}
+                {tr("tip")}
                 <input
                   type="number"
                   min={0}
@@ -1094,11 +1099,11 @@ export function SpaBoardPage() {
                   checked={splitCash}
                   onChange={(event) => setSplitCash(event.target.checked)}
                 />
-                {t("spa.splitCash")}
+                {tr("splitCash")}
               </label>
               {splitCash ? (
                 <label className="block text-sm">
-                  {t("spa.cashAmount")}
+                  {tr("cashAmount")}
                   <input
                     type="number"
                     min={0}
@@ -1109,14 +1114,14 @@ export function SpaBoardPage() {
                 </label>
               ) : null}
               <p className="text-sm text-slate-300">
-                {t("spa.estimatedCard", { amount: money(estimatedCard) })}
+                {tr("estimatedCard", { amount: money(estimatedCard) })}
               </p>
               <div className="grid grid-cols-2 gap-2">
                 <Button variant="secondary" disabled={!wallet} onClick={openTopup}>
-                  {t("spa.topUpCard")}
+                  {tr("topUpCard")}
                 </Button>
                 <Button isLoading={isPaying} onClick={() => void handlePay()}>
-                  {billClosed ? t("spa.retryPay") : t("spa.confirmPay")}
+                  {billClosed ? tr("retryPay") : tr("confirmPay")}
                 </Button>
               </div>
             </div>
@@ -1126,6 +1131,7 @@ export function SpaBoardPage() {
 
       {cardPrompt ? (
         <CardTapDialog
+          kind={kind}
           title={cardPromptTitle}
           error={cardPromptError}
           isBusy={isCheckingCard}
@@ -1143,14 +1149,14 @@ export function SpaBoardPage() {
                 </p>
               ))}
               <p className="mt-1 flex justify-between border-t border-slate-800 pt-1 font-semibold">
-                <span>{t("spa.newItemsTotal")}</span>
+                <span>{tr("newItemsTotal")}</span>
                 <span>{money(pendingTotal(pending))}</span>
               </p>
             </>
           ) : cardPrompt === "extend" ? (
             <p className="flex justify-between font-semibold">
               <span>
-                {t("spa.sessionsSummary", {
+                {tr("sessionsSummary", {
                   minutes: extendCount * sessionMinutes(room),
                   perSession: sessionMinutes(room),
                 })}
@@ -1161,7 +1167,7 @@ export function SpaBoardPage() {
             <>
               <p className="flex justify-between gap-2">
                 <span>
-                  {t("spa.startSummary", {
+                  {tr("startSummary", {
                     room: room?.roomNumber || "",
                     sessions: sessionCount,
                     minutes: sessionCount * sessionMinutes(room),
@@ -1175,7 +1181,7 @@ export function SpaBoardPage() {
             </>
           ) : (
             <p className="flex justify-between font-semibold">
-              <span>{t("spa.runningTotal")}</span>
+              <span>{tr("runningTotal")}</span>
               <span>{money(quote?.runningTotal)}</span>
             </p>
           )}
@@ -1187,9 +1193,9 @@ export function SpaBoardPage() {
           <div className="max-h-[calc(100vh-2rem)] w-full max-w-md space-y-4 overflow-y-auto rounded-lg border border-slate-700 bg-slate-950 p-5">
             <div>
               <h2 className="text-lg font-bold">
-                {t("spa.focTitle", { room: room?.roomNumber || "" })}
+                {tr("focTitle", { room: room?.roomNumber || "" })}
               </h2>
-              <p className="mt-1 text-sm text-slate-400">{t("spa.focDescription")}</p>
+              <p className="mt-1 text-sm text-slate-400">{tr("focDescription")}</p>
             </div>
             <div className="max-h-56 space-y-1 overflow-y-auto rounded border border-slate-800 bg-slate-900/60 p-3 text-sm">
               {focPending(pending).map((item) => (
@@ -1203,18 +1209,18 @@ export function SpaBoardPage() {
                 </p>
               ))}
               <p className="mt-1 flex justify-between border-t border-slate-800 pt-1 font-semibold">
-                <span>{t("spa.toPay")}</span>
+                <span>{tr("toPay")}</span>
                 <span>0</span>
               </p>
             </div>
             <label className="block text-sm">
-              {t("spa.focReason")}
+              {tr("focReason")}
               <input
                 value={focReason}
                 onChange={(event) => setFocReason(event.target.value)}
                 list="foc-reasons"
                 maxLength={100}
-                placeholder={t("spa.focReasonPlaceholder")}
+                placeholder={tr("focReasonPlaceholder")}
                 className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2"
                 autoFocus
               />
@@ -1251,7 +1257,7 @@ export function SpaBoardPage() {
                 disabled={!focReason.trim()}
                 onClick={() => void confirmFoc()}
               >
-                {t("spa.focConfirm")}
+                {tr("focConfirm")}
               </Button>
             </div>
           </div>
@@ -1261,13 +1267,13 @@ export function SpaBoardPage() {
       {showExtend && session ? (
         <div className="fixed inset-0 z-40 grid place-items-center bg-black/75 p-4">
           <div className="w-full max-w-sm space-y-4 rounded-lg border border-slate-700 bg-slate-950 p-5">
-            <h2 className="text-lg font-bold">{t("spa.extendTitle", { room: room?.roomNumber || "" })}</h2>
+            <h2 className="text-lg font-bold">{tr("extendTitle", { room: room?.roomNumber || "" })}</h2>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-300">{t("spa.moreSessionsLabel")}</span>
+              <span className="text-sm text-slate-300">{tr("moreSessionsLabel")}</span>
               <div className="flex items-center rounded bg-slate-800">
                 <button
                   type="button"
-                  aria-label={t("spa.fewerSessions")}
+                  aria-label={tr("fewerSessions")}
                   className="h-9 w-9 text-lg disabled:opacity-40"
                   disabled={extendCount <= 1}
                   onClick={() => setExtendCount((count) => Math.max(1, count - 1))}
@@ -1277,7 +1283,7 @@ export function SpaBoardPage() {
                 <span className="w-8 text-center font-semibold">{extendCount}</span>
                 <button
                   type="button"
-                  aria-label={t("spa.moreSessions")}
+                  aria-label={tr("moreSessions")}
                   className="h-9 w-9 text-lg"
                   onClick={() => setExtendCount((count) => count + 1)}
                 >
@@ -1286,7 +1292,7 @@ export function SpaBoardPage() {
               </div>
             </div>
             <p className="text-sm text-slate-300">
-              {t("spa.sessionsSummary", {
+              {tr("sessionsSummary", {
                 minutes: extendCount * sessionMinutes(room),
                 perSession: sessionMinutes(room),
               })}
@@ -1297,7 +1303,7 @@ export function SpaBoardPage() {
                 {t("common.cancel")}
               </Button>
               <Button isLoading={isAdding} onClick={() => requestCard("extend")}>
-                {t("spa.extendAndPay")}
+                {tr("extendAndPay")}
               </Button>
             </div>
           </div>
@@ -1307,16 +1313,16 @@ export function SpaBoardPage() {
       {confirmEnd && session ? (
         <div className="fixed inset-0 z-40 grid place-items-center bg-black/75 p-4">
           <div className="w-full max-w-sm space-y-4 rounded-lg border border-slate-600 bg-slate-950 p-5">
-            <h2 className="text-lg font-bold">{t("spa.endTitle", { room: room?.roomNumber || "" })}</h2>
+            <h2 className="text-lg font-bold">{tr("endTitle", { room: room?.roomNumber || "" })}</h2>
             <p className="text-sm text-slate-300">
-              {t("spa.endDescription", { amount: money(quote?.paidTotal) })}
+              {tr("endDescription", { amount: money(quote?.paidTotal) })}
             </p>
             <div className="grid grid-cols-2 gap-2">
               <Button variant="secondary" onClick={() => setConfirmEnd(false)}>
                 {t("common.cancel")}
               </Button>
               <Button isLoading={isPaying} onClick={() => void endTreatment()}>
-                {t("spa.endTreatment")}
+                {tr("endTreatment")}
               </Button>
             </div>
           </div>
@@ -1326,9 +1332,9 @@ export function SpaBoardPage() {
       {balanceWarning ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4">
           <div className="w-full max-w-md space-y-3 rounded-lg border border-amber-500/50 bg-slate-950 p-5">
-            <h2 className="text-lg font-semibold text-amber-200">{t("spa.insufficientTitle")}</h2>
+            <h2 className="text-lg font-semibold text-amber-200">{tr("insufficientTitle")}</h2>
             <p className="text-sm text-slate-300">
-              {t("spa.balanceVsTotal", {
+              {tr("balanceVsTotal", {
                 balance: money(balanceWarning.balance),
                 total: money(
                   estimateCardCharge({
@@ -1342,13 +1348,13 @@ export function SpaBoardPage() {
               <Button variant="secondary" onClick={() => setBalanceWarning(null)}>
                 {t("common.cancel")}
               </Button>
-              <Button onClick={openTopup}>{t("spa.topUpCard")}</Button>
+              <Button onClick={openTopup}>{tr("topUpCard")}</Button>
               {!quote?.prepaid && card ? (
                 <Button
                   variant="secondary"
                   onClick={() => void commitPending(balanceWarning, card, true)}
                 >
-                  {t("spa.addAnyway")}
+                  {tr("addAnyway")}
                 </Button>
               ) : null}
             </div>
@@ -1363,7 +1369,7 @@ export function SpaBoardPage() {
             onSubmit={handleSaveRoom}
           >
             <h2 className="col-span-2 text-lg font-bold">
-              {editingRoom ? t("spa.editRoom") : t("spa.addRoom")}
+              {editingRoom ? tr("editRoom") : tr("addRoom")}
             </h2>
             {(
               [
@@ -1385,7 +1391,7 @@ export function SpaBoardPage() {
               </label>
             ))}
             <label className="text-sm">
-              {t("spa.sessionPriceLabel")}
+              {tr("sessionPriceLabel")}
               <input
                 type="number"
                 min={0}
@@ -1399,34 +1405,36 @@ export function SpaBoardPage() {
                 required
               />
             </label>
-            {(
-              [
-                ["treatmentMinutes", "spa.treatmentLengthLabel"],
-                ["graceMinutes", "spa.graceMinutes"],
-              ] as const
-            ).map(([key, label]) => (
-              <label key={key} className="text-sm">
-                {t(label)}
-                <input
-                  type="number"
-                  min={key === "graceMinutes" ? 0 : 1}
-                  value={roomForm[key]}
-                  onChange={(event) =>
-                    setRoomForm((current) => ({ ...current, [key]: event.target.value }))
-                  }
-                  className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2"
-                  required
-                />
-              </label>
-            ))}
+            {kind === "spa"
+              ? (
+                [
+                  ["treatmentMinutes", "spa.treatmentLengthLabel"],
+                  ["graceMinutes", "spa.graceMinutes"],
+                ] as const
+              ).map(([key, label]) => (
+                <label key={key} className="text-sm">
+                  {t(label)}
+                  <input
+                    type="number"
+                    min={key === "graceMinutes" ? 0 : 1}
+                    value={roomForm[key]}
+                    onChange={(event) =>
+                      setRoomForm((current) => ({ ...current, [key]: event.target.value }))
+                    }
+                    className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2"
+                    required
+                  />
+                </label>
+              ))
+              : null}
             <p className="col-span-2 text-xs text-slate-400">
               {roomForm.sessionPrice !== ""
-                ? t("spa.priceSummary", {
+                ? tr("priceSummary", {
                     price: money(roomForm.sessionPrice),
                     minutes: roomForm.treatmentMinutes,
                     grace: roomForm.graceMinutes,
                   })
-                : t("spa.priceHint")}
+                : tr("priceHint")}
             </p>
             <div className="col-span-2 flex justify-end gap-2">
               {editingRoom ? (
@@ -1437,7 +1445,7 @@ export function SpaBoardPage() {
                     void deleteRoom(editingRoom.id).then(() => setShowRoomForm(false))
                   }
                 >
-                  {t("spa.retireRoom")}
+                  {tr("retireRoom")}
                 </Button>
               ) : null}
               <Button variant="secondary" onClick={() => setShowRoomForm(false)}>
