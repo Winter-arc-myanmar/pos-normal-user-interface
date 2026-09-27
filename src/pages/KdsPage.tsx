@@ -82,7 +82,7 @@ export function KdsPage() {
   ];
 
   return (
-    <main className="flex min-h-dvh flex-col bg-[#080808] text-white lg:h-dvh lg:overflow-hidden">
+    <main className="flex h-dvh min-h-0 flex-col overflow-hidden bg-[#080808] text-white">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5">
         <div className="min-w-0">
           <h1 className="text-xl font-bold">{t("kds.title")}</h1>
@@ -114,7 +114,7 @@ export function KdsPage() {
         </p>
       ) : null}
 
-      <section className="flex flex-col gap-6 p-4 sm:p-5 lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-2 lg:gap-4 lg:overflow-hidden">
+      <section className="grid min-h-0 flex-1 grid-cols-2 gap-4 overflow-hidden p-4 sm:p-5">
         {columns.map((column) => {
           const list = tickets.filter((ticket) =>
             column.key === "PENDING"
@@ -122,11 +122,11 @@ export function KdsPage() {
               : ticket.status === "PREPARING" || ticket.status === "EXPEDITED"
           );
           return (
-            <div key={column.key} className="flex flex-col gap-3 lg:min-h-0">
+            <div key={column.key} className="flex min-h-0 flex-col gap-3">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
                 {column.title} · {list.length}
               </h2>
-              <div className="flex flex-col gap-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto xl:grid xl:grid-cols-2 xl:content-start">
+              <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto xl:grid xl:grid-cols-2 xl:content-start">
                 {list.length === 0 ? (
                   <p className="text-sm text-slate-600">{t("kds.empty")}</p>
                 ) : (

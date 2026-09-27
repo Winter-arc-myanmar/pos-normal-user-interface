@@ -297,8 +297,8 @@ export function CardsPage() {
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 gap-4 p-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <section className="min-h-0 rounded-xl border border-slate-800 bg-[#151821] p-5">
+      <div className="grid min-h-0 flex-1 gap-4 overflow-hidden p-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <section className="min-h-0 overflow-y-auto rounded-xl border border-slate-800 bg-[#151821] p-5">
           {step === "menu" ? (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               <button
