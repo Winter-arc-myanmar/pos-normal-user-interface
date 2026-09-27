@@ -2063,7 +2063,7 @@ export function CashierPage() {
         "pos-split grid h-full min-h-0 min-w-0 overflow-hidden bg-[#070707] text-white",
         activeView === "multi-order" || activeView === "pay"
           ? "grid-cols-[13rem_minmax(0,1fr)] min-[1100px]:grid-cols-[18rem_minmax(0,1fr)]"
-          : "grid-cols-[11rem_minmax(0,1fr)] min-[1100px]:grid-cols-[18rem_minmax(0,1fr)_8rem]",
+          : "grid-cols-[11rem_minmax(0,1fr)] min-[1100px]:grid-cols-[minmax(0,18rem)_minmax(0,1fr)_minmax(0,8rem)]",
       ].join(" ")}
     >
       <OrderPanel

@@ -274,7 +274,7 @@ export function AppShell() {
     <>
     <div
       className={[
-        "pos-app-shell pos-touch-scroll grid h-[100dvh] min-h-[480px] min-w-0 overflow-hidden bg-black",
+        "pos-app-shell pos-touch-scroll grid h-[100dvh] min-h-0 min-w-0 overflow-x-hidden overflow-y-hidden bg-black",
         showCheckoutActionRail
           ? "grid-cols-[3.5rem_minmax(0,1fr)_6.5rem]"
           : "grid-cols-[3.5rem_minmax(0,1fr)]",
@@ -298,7 +298,7 @@ export function AppShell() {
         className={[
           "pos-touch-scroll min-h-0 min-w-0",
           isPosWorkspace
-            ? "overflow-y-auto overflow-x-hidden bg-[#080808]"
+            ? "overflow-hidden bg-[#080808]"
             : isFullBleedLightPage
               ? "overflow-y-auto overflow-x-hidden bg-slate-100"
               : "overflow-y-auto overflow-x-hidden bg-slate-100 p-4 text-slate-900 sm:p-5",

@@ -434,7 +434,7 @@ export function SalesOrdersPage() {
           ) : null}
         </div>
 
-        <aside className="flex min-h-0 flex-col overflow-hidden rounded-md bg-white text-slate-900">
+        <aside className="pos-pane-scroll h-full rounded-md bg-white text-slate-900">
           {selectedOrder ? (
             <>
               <div className="border-b border-slate-200 px-4 py-3">
@@ -488,7 +488,7 @@ export function SalesOrdersPage() {
                 </div>
               </div>
 
-              <div className="pos-pane-scroll px-4 py-3">
+              <div className="px-4 py-3">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
                   {t("salesOrders.lines")}
                 </p>
