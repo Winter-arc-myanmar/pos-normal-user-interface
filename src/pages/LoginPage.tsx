@@ -65,7 +65,8 @@ export function LoginPage() {
   };
 
   return (
-    <section className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-10 dark:bg-slate-950">
+    <section className="h-dvh overflow-y-auto bg-slate-100 dark:bg-slate-950">
+      <div className="flex min-h-full items-center justify-center px-4 py-10">
       <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="mb-6 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-900 text-lg font-bold text-white dark:bg-white dark:text-slate-900">
@@ -145,6 +146,7 @@ export function LoginPage() {
             {isLoading ? t("login.submitting") : t("login.submit")}
           </Button>
         </form>
+      </div>
       </div>
     </section>
   );
