@@ -241,7 +241,7 @@ export function PosSettingsPage() {
         ) : null}
 
         {activeTab === "kds-station" ? (
-          <div className="mx-auto max-w-5xl">
+          <div className="mx-auto h-full min-h-0 max-w-5xl">
             <KdsStationSettingsPanel />
           </div>
         ) : null}

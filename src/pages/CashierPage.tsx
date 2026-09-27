@@ -2161,7 +2161,7 @@ export function CashierPage() {
         onSessionStateChange={(state) => void handleSessionStateChange(state)}
       />
 
-      <main className="min-h-0 min-w-0">
+      <main className="h-full min-h-0 min-w-0 overflow-hidden">
         {activeView === "menu" ? (
           <ProductMenu
             products={menuProducts}

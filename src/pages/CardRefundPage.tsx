@@ -308,8 +308,15 @@ export function CardRefundPage() {
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 gap-4 p-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <section className="min-h-0 rounded-xl border border-slate-800 bg-[#151821] p-5">
+      <div
+        className={[
+          "grid min-h-0 flex-1 gap-3 overflow-hidden p-3 sm:p-4 lg:gap-4 lg:p-6",
+          step === "detect" || step === "amount"
+            ? "grid-cols-[minmax(0,1fr)_7rem] sm:grid-cols-[minmax(0,1fr)_9rem] lg:grid-cols-[minmax(0,1fr)_320px]"
+            : "grid-cols-1",
+        ].join(" ")}
+      >
+        <section className="min-h-0 overflow-y-auto rounded-xl border border-slate-800 bg-[#151821] p-5">
           {step === "detect" ? (
             <div className="mx-auto flex max-w-xl flex-col gap-4">
               <div>
@@ -523,7 +530,7 @@ export function CardRefundPage() {
         </section>
 
         {step === "detect" || step === "amount" ? (
-          <aside className="rounded-xl border border-slate-800 bg-[#111111] p-4 print:hidden">
+          <aside className="min-w-0 overflow-y-auto rounded-xl border border-slate-800 bg-[#111111] p-2 sm:p-3 lg:p-4 print:hidden">
             <p className="mb-3 text-sm font-semibold text-slate-300">
               {t("cardRefund.keypad")}
             </p>

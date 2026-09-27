@@ -1038,7 +1038,7 @@ export function CustomersPage() {
 
   return (
     <section className="pos-split grid h-full min-h-0 grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)] overflow-hidden bg-slate-100">
-      <aside className="flex min-h-0 flex-col bg-white">
+      <aside className="flex min-h-0 min-w-0 flex-col bg-white">
         {(error || localError || walletError) && (
           <p className="m-4 rounded bg-red-50 p-3 text-sm text-red-700">
             {localError || walletError || error}
@@ -1570,7 +1570,7 @@ export function CustomersPage() {
         )}
       </aside>
 
-      <main className="flex min-h-0 flex-col bg-slate-950 p-4 text-slate-100">
+      <main className="flex min-h-0 min-w-0 flex-col bg-slate-950 p-4 text-slate-100">
         <div className="flex items-center gap-2">
           <div className="flex-1">
             <SearchInput
@@ -1599,7 +1599,7 @@ export function CustomersPage() {
           />
         </div>
 
-        <div className="mt-4 grid min-h-0 flex-1 grid-cols-2 content-start gap-2 overflow-y-auto">
+        <div className="mt-4 grid min-h-0 min-w-0 flex-1 grid-cols-1 content-start gap-2 overflow-y-auto min-[700px]:grid-cols-2">
           {customers.length === 0 ? (
             <p className="col-span-2 py-8 text-center text-sm text-slate-400">
               {isLoading ? t("crm.loading") : t("crm.empty")}
