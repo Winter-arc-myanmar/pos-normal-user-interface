@@ -54,9 +54,12 @@
   overscroll-behavior: contain;
 }
 
-/* Narrow windows: same side rails and columns, squeezed to the screen
-   width. Only the page scrolls vertically. */
-@media (max-width: 1099px) {
+/* Narrow windows and touch-first WebViews: same side rails and columns,
+   squeezed to the screen width. Median can report a desktop-width viewport,
+   so use its coarse pointer as well as screen width. Only the page scrolls
+   vertically; a height-locked shell prevents Android touch drags from
+   reaching the page. */
+@media (max-width: 1099px), (pointer: coarse) {
   html,
   body,
   #root {
@@ -74,10 +77,10 @@
     width: 100%;
     max-width: 100%;
     min-width: 0;
-    height: auto;
+    height: auto !important;
     min-height: 100dvh;
-    overflow-x: hidden;
-    overflow-y: visible;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
   }
 
   .pos-app-shell > .pos-icon-rail {
@@ -115,10 +118,10 @@
     width: 100%;
     max-width: 100%;
     min-width: 0;
-    height: auto;
+    height: auto !important;
     min-height: 100dvh;
-    overflow-x: hidden;
-    overflow-y: visible;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
   }
 
   .pos-app-shell main :where(

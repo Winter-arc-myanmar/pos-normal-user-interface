@@ -47,16 +47,11 @@ describe("PrintTemplateSettingsPanel", () => {
   it("updates the receipt preview when display settings change", () => {
     render(<PrintTemplateSettingsPanel />);
 
-    expect(screen.getAllByText("settings.printTemplate.logo")).toHaveLength(2);
-    expect(screen.getAllByText("10.00").length).toBeGreaterThan(0);
-    expect(screen.queryByText("ကော်ဖီ")).not.toBeInTheDocument();
+    expect(screen.getByText("Coffee").parentElement).toHaveTextContent("10.00");
+    expect(screen.getByText("+ Large 2.00")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("checkbox", { name: "settings.printTemplate.logo" }));
     fireEvent.click(
-      screen.getByRole("checkbox", { name: "settings.printTemplate.hidePriceOnOrderBill" })
-    );
-    fireEvent.click(
-      screen.getByRole("checkbox", { name: "settings.printTemplate.bilingual" })
+      screen.getByRole("checkbox", { name: "settings.printTemplate.price" })
     );
     fireEvent.change(screen.getByLabelText("settings.printTemplate.fontSize"), {
       target: { value: "LARGE" },
@@ -64,14 +59,21 @@ describe("PrintTemplateSettingsPanel", () => {
     fireEvent.change(screen.getByLabelText("settings.printTemplate.paperWidth"), {
       target: { value: "MM58" },
     });
-    fireEvent.change(screen.getByLabelText("settings.printTemplate.place"), {
-      target: { value: "KDS" },
-    });
 
-    expect(screen.getAllByText("settings.printTemplate.logo")).toHaveLength(1);
-    expect(screen.queryAllByText("10.00")).toHaveLength(0);
-    expect(screen.getByText("ကော်ဖီ")).toBeInTheDocument();
-    expect(screen.getByText("settings.printTemplate.kitchen")).toBeInTheDocument();
+    expect(screen.getByText("Coffee").parentElement).not.toHaveTextContent("10.00");
+    expect(screen.getByText("+ Large")).toBeInTheDocument();
+    expect(screen.queryByText("+ Large 2.00")).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "settings.printTemplate.price" })
+    );
+    expect(screen.getByText("Coffee").parentElement).toHaveTextContent("10.00");
+    expect(screen.getByText("+ Large 2.00")).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "settings.printTemplate.modifiers" })
+    );
+    expect(screen.queryByText("+ Large 2.00")).not.toBeInTheDocument();
     expect(screen.getByText("Coffee").closest("div")).toHaveClass("text-base");
   });
 });

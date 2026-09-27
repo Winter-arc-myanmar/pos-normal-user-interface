@@ -9,6 +9,8 @@ import {
 } from "@/core/domain/entities/PrintTemplate";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
 import { usePrintTemplateManagement } from "@/core/presentation/hooks/usePrintTemplateManagement";
+import { PrintPlace } from "@/lib/printing/formatKdsTicket";
+import { templatesForPrintPlace } from "@/lib/printing/selectPrintTemplate";
 
 const fieldClass =
   "mt-1 min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500";
@@ -22,6 +24,12 @@ type Draft = {
   isDefault: boolean;
   settings: PrintTemplateSettings;
 };
+
+const placeOf = (template: {
+  type: PrintTemplateType;
+  isDefault?: boolean;
+}): PrintPlace =>
+  template.type === "KITCHEN" ? "KDS" : template.isDefault ? "CHECKOUT" : "FINANCE";
 
 const emptyDraft = (): Draft => ({
   id: "",
@@ -70,7 +78,7 @@ function ReceiptPreview({
   type: PrintTemplateType;
 }) {
   const { t } = useTranslation();
-  const showItemPrice = settings.item.price && !settings.item.hidePriceOnOrderBill;
+  const showItemPrice = settings.item.price;
   const isKitchen = type === "KITCHEN";
   return (
     <div
@@ -79,11 +87,6 @@ function ReceiptPreview({
         paperWidth === "MM58" ? "w-[180px]" : "w-[260px]",
       ].join(" ")}
     >
-      {settings.header.logo ? (
-        <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded border border-slate-300 text-[9px]">
-          {t("settings.printTemplate.logo")}
-        </div>
-      ) : null}
       <p className="text-center text-[10px] uppercase tracking-wide text-slate-500">
         {isKitchen
           ? t("settings.printTemplate.kitchen")
@@ -92,16 +95,6 @@ function ReceiptPreview({
       {settings.header.outletName ? (
         <p className="text-center text-sm font-bold">
           {t("settings.printTemplate.previewOutlet")}
-        </p>
-      ) : null}
-      {settings.header.address ? (
-        <p className="text-center text-[11px]">
-          {t("settings.printTemplate.previewAddress")}
-        </p>
-      ) : null}
-      {settings.header.contact ? (
-        <p className="text-center text-[11px]">
-          {t("settings.printTemplate.previewContact")}
         </p>
       ) : null}
       <p className="my-2 border-t border-dashed border-slate-400" />
@@ -120,15 +113,11 @@ function ReceiptPreview({
         {settings.item.qtyFirst ? <span>1</span> : null}
         <span className="flex-1 px-2">
           Coffee
-          {settings.item.bilingual ? (
-            <span className="block font-normal">ကော်ဖီ</span>
-          ) : null}
         </span>
-        {showItemPrice ? <span>10.00</span> : null}
+        {showItemPrice ? <span className="shrink-0">10.00</span> : null}
       </div>
-      {settings.item.modifiers ? <p className="pl-4 text-[11px]">+ Large</p> : null}
-      {settings.item.productRemarks ? (
-        <p className="pl-4 text-[11px]">Less sugar</p>
+      {settings.item.modifiers ? (
+        <p className="pl-4 text-[11px]">{showItemPrice ? "+ Large 2.00" : "+ Large"}</p>
       ) : null}
       {settings.item.categorySubtotal ? (
         <p className="mt-1 text-right text-[11px]">Drinks 10.00</p>
@@ -140,12 +129,6 @@ function ReceiptPreview({
             <div className="flex justify-between text-[11px]">
               <span>{t("settings.printTemplate.amountAfterDiscount")}</span>
               <span>10.00</span>
-            </div>
-          ) : null}
-          {settings.bill.rounding ? (
-            <div className="flex justify-between text-[11px]">
-              <span>{t("settings.printTemplate.rounding")}</span>
-              <span>0.00</span>
             </div>
           ) : null}
           {settings.bill.totalPayment ? (
@@ -185,6 +168,46 @@ export function PrintTemplateSettingsPanel() {
 
   const patchSettings = (settings: PrintTemplateSettings) =>
     setDraft((current) => ({ ...current, settings }));
+
+  const applyPlace = (place: PrintPlace) => {
+    setDraft((current) => ({
+      ...current,
+      type: place === "KDS" ? "KITCHEN" : "RECEIPT",
+      isDefault: place !== "FINANCE",
+      settings: {
+        ...current.settings,
+        header: {
+          ...current.settings.header,
+          logo: place === "CHECKOUT",
+          address: place !== "FINANCE",
+          contact: place !== "FINANCE",
+        },
+        item: {
+          ...current.settings.item,
+          price: place !== "KDS",
+          modifiers: place !== "FINANCE",
+          productRemarks: place !== "FINANCE",
+        },
+      },
+    }));
+  };
+
+  const place = placeOf(draft);
+  const places: PrintPlace[] = ["KDS", "CHECKOUT", "FINANCE"];
+  const placeCopy: Record<PrintPlace, { label: string; hint: string }> = {
+    KDS: {
+      label: t("settings.printTemplate.placeKds"),
+      hint: t("settings.printTemplate.placeKdsHint"),
+    },
+    CHECKOUT: {
+      label: t("settings.printTemplate.placeCheckout"),
+      hint: t("settings.printTemplate.placeCheckoutHint"),
+    },
+    FINANCE: {
+      label: t("settings.printTemplate.placeFinance"),
+      hint: t("settings.printTemplate.placeFinanceHint"),
+    },
+  };
 
   const selectTemplate = (id: string) => {
     const template = templates.find((item) => item.id === id);
@@ -243,10 +266,80 @@ export function PrintTemplateSettingsPanel() {
   };
 
   const { settings } = draft;
+  const otherFields =
+    draft.type === "KITCHEN"
+      ? (["orderNumber"] as const)
+      : ([
+          "orderNumber",
+          "cashier",
+          "serviceType",
+          "tableOrRoom",
+          "pickupCode",
+        ] as const);
+  const billFields =
+    place === "CHECKOUT"
+      ? (["amountAfterDiscount", "totalPayment", "payTime"] as const)
+      : (["amountAfterDiscount", "totalPayment"] as const);
 
   return (
-    <form onSubmit={(event) => void save(event)} className="pos-split grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+    <form onSubmit={(event) => void save(event)} className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
       <div className="space-y-4">
+        <section className="rounded-xl bg-white p-4 shadow-sm">
+          <h2 className="font-semibold text-slate-900">
+            {t("settings.printTemplate.howTitle")}
+          </h2>
+          <p className="mt-1 text-sm leading-6 text-slate-500">
+            {t("settings.printTemplate.howBody")}
+          </p>
+          <div className="mt-4 grid gap-2 sm:grid-cols-3">
+            {places.map((item) => {
+              const competing = templatesForPrintPlace(
+                item,
+                templates,
+                activeLocationId
+              );
+              const active = competing.length === 1 ? competing[0] : undefined;
+              const body = (
+                <>
+                  <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {placeCopy[item].label}
+                  </span>
+                  <span className="mt-1 block text-sm font-semibold text-slate-900">
+                    {active?.name ||
+                      (competing.length > 1
+                        ? competing.map((template) => template.name).join(", ")
+                        : t("settings.printTemplate.notSet"))}
+                  </span>
+                  <span className="mt-1 block text-xs text-slate-500">
+                    {competing.length > 1
+                      ? t("settings.printTemplate.conflict", {
+                          name: competing.map((template) => template.name).join(", "),
+                        })
+                      : t("settings.printTemplate.printingNow")}
+                  </span>
+                </>
+              );
+              return active ? (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => selectTemplate(active.id)}
+                  className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-left hover:border-blue-300"
+                >
+                  {body}
+                </button>
+              ) : (
+                <div
+                  key={item}
+                  className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-left"
+                >
+                  {body}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
         <section className="rounded-xl bg-white p-4 shadow-sm">
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-sm text-slate-600 sm:col-span-2">
@@ -259,7 +352,7 @@ export function PrintTemplateSettingsPanel() {
                 <option value="">{t("settings.printTemplate.newTemplate")}</option>
                 {templates.map((template) => (
                   <option key={template.id} value={template.id}>
-                    {template.name}
+                    {template.name} — {placeCopy[placeOf(template)].label}
                   </option>
                 ))}
               </select>
@@ -274,64 +367,53 @@ export function PrintTemplateSettingsPanel() {
                 }
               />
             </label>
-            <label className="text-sm text-slate-600">
-              {t("settings.printTemplate.location")}
-              <select
-                className={fieldClass}
-                value={draft.locationScope}
-                disabled={Boolean(draft.id)}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    locationScope: event.target.value as Draft["locationScope"],
-                  }))
-                }
-              >
-                <option value="CURRENT">{t("settings.printTemplate.currentBranch")}</option>
-                <option value="ALL">{t("settings.printTemplate.allOutlets")}</option>
-              </select>
-            </label>
-            <label className="text-sm text-slate-600">
-              {t("settings.printTemplate.place")}
-              <select
-                className={fieldClass}
-                value={
-                  draft.type === "KITCHEN"
-                    ? "KDS"
-                    : draft.isDefault
-                      ? "CHECKOUT"
-                      : "FINANCE"
-                }
-                disabled={Boolean(draft.id)}
-                onChange={(event) => {
-                  const place = event.target.value;
-                  setDraft((current) => ({
-                    ...current,
-                    type: place === "KDS" ? "KITCHEN" : "RECEIPT",
-                    isDefault: place !== "FINANCE",
-                    settings: {
-                      ...current.settings,
-                      header: {
-                        ...current.settings.header,
-                        logo: place === "CHECKOUT",
-                        address: place !== "FINANCE",
-                        contact: place !== "FINANCE",
-                      },
-                      item: {
-                        ...current.settings.item,
-                        price: place !== "KDS",
-                        modifiers: place !== "FINANCE",
-                        productRemarks: place !== "FINANCE",
-                      },
-                    },
-                  }));
-                }}
-              >
-                <option value="KDS">{t("settings.printTemplate.placeKds")}</option>
-                <option value="CHECKOUT">{t("settings.printTemplate.placeCheckout")}</option>
-                <option value="FINANCE">{t("settings.printTemplate.placeFinance")}</option>
-              </select>
-            </label>
+            <fieldset className="sm:col-span-2">
+              <legend className="text-sm text-slate-600">
+                {t("settings.printTemplate.usedFor")}
+              </legend>
+              <div className="mt-1 grid gap-2 sm:grid-cols-3">
+                {places.map((item) => {
+                  const locked =
+                    Boolean(draft.id) &&
+                    ((draft.type === "KITCHEN" && item !== "KDS") ||
+                      (draft.type === "RECEIPT" && item === "KDS"));
+                  return (
+                    <button
+                      key={item}
+                      type="button"
+                      aria-pressed={place === item}
+                      disabled={locked}
+                      onClick={() => applyPlace(item)}
+                      className={[
+                        "rounded-lg border px-3 py-3 text-left disabled:cursor-not-allowed disabled:opacity-50",
+                        place === item
+                          ? "border-blue-600 bg-blue-600 text-white"
+                          : "border-slate-200 bg-white text-slate-800",
+                      ].join(" ")}
+                    >
+                      <span className="block text-sm font-semibold">
+                        {placeCopy[item].label}
+                      </span>
+                      <span
+                        className={[
+                          "mt-1 block text-xs leading-5",
+                          place === item ? "text-blue-100" : "text-slate-500",
+                        ].join(" ")}
+                      >
+                        {placeCopy[item].hint}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              {draft.id ? (
+                <p className="mt-2 text-xs leading-5 text-slate-500">
+                  {draft.type === "KITCHEN"
+                    ? t("settings.printTemplate.lockedKitchen")
+                    : t("settings.printTemplate.lockedReceipt")}
+                </p>
+              ) : null}
+            </fieldset>
             <label className="text-sm text-slate-600">
               {t("settings.printTemplate.paperWidth")}
               <select
@@ -349,20 +431,26 @@ export function PrintTemplateSettingsPanel() {
               </select>
             </label>
             <label className="text-sm text-slate-600">
-              {t("settings.printTemplate.status")}
+              {t("settings.printTemplate.location")}
               <select
                 className={fieldClass}
-                value={draft.isDefault ? "DEFAULT" : "CUSTOM"}
+                value={draft.locationScope}
+                disabled={Boolean(draft.id)}
                 onChange={(event) =>
                   setDraft((current) => ({
                     ...current,
-                    isDefault: event.target.value === "DEFAULT",
+                    locationScope: event.target.value as Draft["locationScope"],
                   }))
                 }
               >
-                <option value="DEFAULT">{t("settings.printTemplate.defaultStatus")}</option>
-                <option value="CUSTOM">{t("settings.printTemplate.customStatus")}</option>
+                <option value="CURRENT">{t("settings.printTemplate.currentBranch")}</option>
+                <option value="ALL">{t("settings.printTemplate.allOutlets")}</option>
               </select>
+              {draft.id ? (
+                <span className="mt-1 block text-xs leading-5 text-slate-500">
+                  {t("settings.printTemplate.lockedLocation")}
+                </span>
+              ) : null}
             </label>
           </div>
         </section>
@@ -370,31 +458,10 @@ export function PrintTemplateSettingsPanel() {
         <section className="rounded-xl bg-white p-4 shadow-sm">
           <h3 className="font-semibold">{t("settings.printTemplate.header")}</h3>
           <ToggleField
-            label={t("settings.printTemplate.logo")}
-            checked={settings.header.logo}
-            onChange={(logo) =>
-              patchSettings({ ...settings, header: { ...settings.header, logo } })
-            }
-          />
-          <ToggleField
             label={t("settings.printTemplate.outletName")}
             checked={settings.header.outletName}
             onChange={(outletName) =>
               patchSettings({ ...settings, header: { ...settings.header, outletName } })
-            }
-          />
-          <ToggleField
-            label={t("settings.printTemplate.address")}
-            checked={settings.header.address}
-            onChange={(address) =>
-              patchSettings({ ...settings, header: { ...settings.header, address } })
-            }
-          />
-          <ToggleField
-            label={t("settings.printTemplate.contact")}
-            checked={settings.header.contact}
-            onChange={(contact) =>
-              patchSettings({ ...settings, header: { ...settings.header, contact } })
             }
           />
         </section>
@@ -423,10 +490,7 @@ export function PrintTemplateSettingsPanel() {
               ["qtyFirst", "qtyFirst"],
               ["price", "price"],
               ["modifiers", "modifiers"],
-              ["productRemarks", "productRemarks"],
-              ["bilingual", "bilingual"],
               ["categorySubtotal", "categorySubtotal"],
-              ["hidePriceOnOrderBill", "hidePriceOnOrderBill"],
             ] as const
           ).map(([field, label]) => (
             <ToggleField
@@ -436,26 +500,24 @@ export function PrintTemplateSettingsPanel() {
               onChange={(checked) =>
                 patchSettings({
                   ...settings,
-                  item: { ...settings.item, [field]: checked },
+                  item: {
+                    ...settings.item,
+                    [field]: checked,
+                    ...(field === "price" ? { hidePriceOnOrderBill: !checked } : {}),
+                  },
                 })
               }
             />
           ))}
         </section>
 
+        {draft.type === "KITCHEN" ? null : (
         <section className="rounded-xl bg-white p-4 shadow-sm">
           <h3 className="font-semibold">{t("settings.printTemplate.bill")}</h3>
-          {(
-            [
-              ["amountAfterDiscount", "amountAfterDiscount"],
-              ["totalPayment", "totalPayment"],
-              ["payTime", "payTime"],
-              ["rounding", "rounding"],
-            ] as const
-          ).map(([field, label]) => (
+          {billFields.map((field) => (
             <ToggleField
               key={field}
-              label={t(`settings.printTemplate.${label}`)}
+              label={t(`settings.printTemplate.${field}`)}
               checked={settings.bill[field]}
               onChange={(checked) =>
                 patchSettings({
@@ -466,21 +528,14 @@ export function PrintTemplateSettingsPanel() {
             />
           ))}
         </section>
+        )}
 
         <section className="rounded-xl bg-white p-4 shadow-sm">
           <h3 className="font-semibold">{t("settings.printTemplate.other")}</h3>
-          {(
-            [
-              ["orderNumber", "orderNumber"],
-              ["cashier", "cashier"],
-              ["serviceType", "serviceType"],
-              ["tableOrRoom", "tableOrRoom"],
-              ["pickupCode", "pickupCode"],
-            ] as const
-          ).map(([field, label]) => (
+          {otherFields.map((field) => (
             <ToggleField
               key={field}
-              label={t(`settings.printTemplate.${label}`)}
+              label={t(`settings.printTemplate.${field}`)}
               checked={settings.other[field]}
               onChange={(checked) =>
                 patchSettings({

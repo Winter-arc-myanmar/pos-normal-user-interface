@@ -16,7 +16,10 @@ import {
   groupKitchenJobs,
   StationRoute,
 } from "@/lib/printing/routeKitchenPrint";
-import { selectPrintTemplate } from "@/lib/printing/selectPrintTemplate";
+import {
+  pickPrintTemplate,
+  PrintTemplateSelectionError,
+} from "@/lib/printing/selectPrintTemplate";
 import {
   PRINTER_BINDINGS_CHANGED,
   PrinterBinding,
@@ -160,13 +163,10 @@ export function usePrinterConnection(
     async (place: PrintPlace) => {
       try {
         const service = container.resolve<IPrintTemplateService>("printTemplateService");
-        const result = await service.list({
-          page: 1,
-          limit: 50,
-          type: place === "KDS" ? "KITCHEN" : "RECEIPT",
-        });
-        return selectPrintTemplate(place, result.templates, locationId);
-      } catch {
+        const result = await service.list({ page: 1, limit: 50 });
+        return pickPrintTemplate(place, result.templates, locationId)?.settings;
+      } catch (caught) {
+        if (caught instanceof PrintTemplateSelectionError) throw caught;
         return undefined;
       }
     },
@@ -190,6 +190,8 @@ export function usePrinterConnection(
           ...slip,
           template,
           lines: job.lines,
+          stationId: job.station?.id || slip.stationId,
+          stationName: job.station?.name || slip.stationName,
         });
       }
       return plan.unrouted;

@@ -19,6 +19,7 @@ import { useCashier } from "@/core/presentation/hooks/useCashier";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
 import { useKdsStationManagement } from "@/core/presentation/hooks/useKdsStationManagement";
 import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
+import { modifierPrintText } from "@/lib/printing/modifierText";
 import { useSalesOrderManagement } from "@/core/presentation/hooks/useSalesOrderManagement";
 import { CashierBoard } from "./cashier/CashierBoard";
 import { MultiOrderingView } from "./cashier/MultiOrderingView";
@@ -84,6 +85,7 @@ export function CashierPage() {
     diningZones,
     diningTables,
     tableSessions,
+    inventoryLocations,
     activeServiceType,
     setActiveServiceType,
     isLoading,
@@ -447,6 +449,55 @@ export function CashierPage() {
     [isDirectCheckoutMode, normalizedDirectCartLines, selectedOrderLines]
   );
 
+  const receiptParty = (includePaidAt = false) => {
+    const outlet = inventoryLocations.find((location) => location.id === locationId);
+    const service = String(activeServiceType || selectedOrder?.serviceType || "");
+    const serviceKey = `settings.cashier.serviceTypes.${service}`;
+    const serviceLabel = t(serviceKey);
+    return {
+      outletName: outlet?.name,
+      cashier: user?.name,
+      serviceType: service
+        ? serviceLabel === serviceKey
+          ? service.replaceAll("_", " ")
+          : serviceLabel
+        : undefined,
+      tableOrRoom: displayedOrderTable?.tableNumber,
+      pickupCode: selectedOrder?.pickupNumber,
+      ...(includePaidAt ? { paidAt: new Date().toLocaleString() } : {}),
+    };
+  };
+
+  const printableLines = (
+    lines: Array<{
+      voidedAt?: string | null;
+      variantId: string;
+      productName?: string;
+      variantName?: string;
+      quantity?: string | number;
+      unitPrice?: string;
+      categoryName?: string;
+      selectedModifiers?: Record<string, unknown>;
+    }>
+  ) =>
+    lines
+      .filter((line) => !line.voidedAt)
+      .map((line) => {
+        const variant = variantById[line.variantId];
+        const product = variant ? productById[variant.productId] : undefined;
+        const modifiers = modifierPrintText(line.selectedModifiers);
+        const unitPrice = line.unitPrice?.trim();
+        return {
+          name: line.productName || product?.name || line.variantName || "Item",
+          quantity: String(line.quantity || "1"),
+          unitPrice: unitPrice || undefined,
+          categoryId: product?.categoryId,
+          categoryName: line.categoryName || product?.categoryName,
+          modifiers: modifiers.names,
+          modifierPrices: modifiers.prices,
+        };
+      });
+
   const displayOrderLines = useMemo(() => {
     if (isDirectCheckoutMode) return activeOrderLines;
 
@@ -504,6 +555,14 @@ export function CashierPage() {
         tipAmount: Number(tipAmount),
       }).toFixed(4),
     [discountAmount, lineSubtotal, serviceCharge, tipAmount]
+  );
+
+  const orderTax = useMemo(
+    () =>
+      displayOrderLines
+        .reduce((total, line) => total + Number(line.taxAmount || 0), 0)
+        .toFixed(4),
+    [displayOrderLines]
   );
 
   const checkoutPaymentMethods = useMemo(
@@ -1400,25 +1459,13 @@ export function CashierPage() {
         showLogo: true,
         showPrices: true,
         receiptId: selectedOrder?.orderNumber,
-        lines: displayOrderLines
-          .filter((line) => !line.voidedAt)
-          .map((line) => {
-            const variant = variantById[line.variantId];
-            const product = variant ? productById[variant.productId] : undefined;
-            return {
-              name:
-                line.productName ||
-                product?.name ||
-                line.variantName ||
-                "Item",
-              quantity: String(line.quantity || "1"),
-              unitPrice: String(line.unitPrice || ""),
-              categoryId: product?.categoryId,
-            };
-          }),
+        ...receiptParty(true),
+        lines: printableLines(displayOrderLines),
         subtotal: lineSubtotal.toFixed(4),
         discount: orderDiscount > 0 ? toMoney(orderDiscount) : undefined,
-        tip: tip > 0 ? toMoney(tip) : undefined,
+        // Print template does not support extra fee or tip.
+        // extraFee: extraFee > 0 ? toMoney(extraFee) : undefined,
+        // tip: tip > 0 ? toMoney(tip) : undefined,
         total: orderTotal,
         payments: checkoutPayments.map((payment) => ({
           name:
@@ -1850,22 +1897,7 @@ export function CashierPage() {
         throw new Error(t("cashier.errors.kdsTargetMissing"));
       }
 
-      const kitchenLines = displayOrderLines
-        .filter((line) => !line.voidedAt)
-        .map((line) => {
-          const variant = variantById[line.variantId];
-          const product = variant ? productById[variant.productId] : undefined;
-          return {
-            name:
-              line.productName ||
-              product?.name ||
-              line.variantName ||
-              variant?.variantSku ||
-              "Item",
-            quantity: String(line.quantity || "1"),
-            categoryId: product?.categoryId,
-          };
-        });
+      const kitchenLines = printableLines(displayOrderLines);
 
       await fireToKds(
         sessionId ? { sessionId } : { salesOrderId: salesOrderId! }
@@ -1881,8 +1913,9 @@ export function CashierPage() {
             title: selectedOrder?.orderNumber || "KITCHEN",
             courseType: displayOrderLines.find((line) => line.courseType)?.courseType,
             firedAt: new Date().toISOString(),
-            orderRef: salesOrderId || sessionId,
+            orderRef: selectedOrder?.orderNumber || salesOrderId || sessionId,
             lines: kitchenLines,
+            ...receiptParty(),
           },
           listed.stations.map((station) => ({
             id: station.id,
@@ -2106,13 +2139,18 @@ export function CashierPage() {
             showLogo: false,
             showPrices: true,
             receiptId: selectedOrder?.orderNumber,
-            lines: displayOrderLines
-              .filter((line) => !line.voidedAt)
-              .map((line) => ({
-                name: line.productName || line.variantName || "Item",
-                quantity: String(line.quantity || "1"),
-                unitPrice: String(line.unitPrice || ""),
-              })),
+            ...receiptParty(),
+            lines: printableLines(displayOrderLines),
+            subtotal: lineSubtotal.toFixed(4),
+            discount:
+              Number(discountAmount) > 0
+                ? toMoney(Number(discountAmount))
+                : undefined,
+            tax: Number(orderTax) > 0 ? toMoney(Number(orderTax)) : undefined,
+            // Print template does not support extra fee or tip.
+            // extraFee:
+            //   Number(serviceCharge) > 0 ? toMoney(Number(serviceCharge)) : undefined,
+            // tip: Number(tipAmount) > 0 ? toMoney(Number(tipAmount)) : undefined,
             total: orderTotal,
           })
         }
