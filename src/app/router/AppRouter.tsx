@@ -66,6 +66,11 @@ const DiningTablesPage = lazy(() =>
     default: module.DiningTablesPage,
   }))
 );
+const ProductsPage = lazy(() =>
+  import("../../pages/ProductsPage").then((module) => ({
+    default: module.ProductsPage,
+  }))
+);
 const TipPoolsPage = lazy(() =>
   import("../../pages/TipPoolsPage").then((module) => ({
     default: module.TipPoolsPage,
@@ -291,6 +296,16 @@ export function AppRouter() {
                     requiredPermissions={PAGE_PERMISSIONS.diningTables}
                   >
                     <DiningTablesPage />
+                  </RequirePermission>
+                }
+              />
+              <Route
+                path="/products"
+                element={
+                  <RequirePermission
+                    requiredPermissions={PAGE_PERMISSIONS.products}
+                  >
+                    <ProductsPage />
                   </RequirePermission>
                 }
               />

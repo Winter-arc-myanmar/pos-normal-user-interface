@@ -20,12 +20,19 @@ export class Product {
   name!: string;
   basePrice!: string;
   baseSku?: string;
+  baseUomId?: string;
+  globalAttributes?: Record<string, unknown>;
   imageUrl?: string;
+  sourceImageUrl?: string;
   totalOnHand?: string;
   isTaxable?: boolean;
+  taxRateId?: string;
   taxRate?: number;
   isPriceInclusive?: boolean;
   trackingType?: string;
+  deletedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 
   constructor(data: Partial<Product>) {
     Object.assign(this, data);
@@ -39,12 +46,40 @@ export class ProductVariant {
   barcode?: string;
   priceModifier?: string;
   imageUrl?: string;
+  sourceImageUrl?: string;
   matrixOptions?: Record<string, unknown>;
   isTaxable?: boolean;
   taxRate?: number;
   isPriceInclusive?: boolean;
+  deletedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 
   constructor(data: Partial<ProductVariant>) {
+    Object.assign(this, data);
+  }
+}
+
+export class Uom {
+  id!: string;
+  classId!: string;
+  name!: string;
+  abbreviation!: string;
+  conversionRateToBase!: string;
+
+  constructor(data: Partial<Uom>) {
+    Object.assign(this, data);
+  }
+}
+
+export class TaxRate {
+  id!: string;
+  tenantId!: string;
+  name!: string;
+  ratePercentage!: string;
+  isPriceInclusive?: boolean | null;
+
+  constructor(data: Partial<TaxRate>) {
     Object.assign(this, data);
   }
 }

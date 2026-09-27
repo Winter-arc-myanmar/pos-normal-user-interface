@@ -130,11 +130,25 @@ export const API_ENDPOINTS = {
 
   PRODUCTS: {
     LIST: "/api/v1/products",
+    CREATE: "/api/v1/products",
     BY_ID: (id: string) => `/api/v1/products/${id}`,
+    UPDATE: (id: string) => `/api/v1/products/${id}`,
+    DELETE: (id: string) => `/api/v1/products/${id}`,
     VARIANTS: (productId: string) => ({
       LIST: `/api/v1/products/${productId}/variants`,
+      CREATE: `/api/v1/products/${productId}/variants`,
       BY_ID: (id: string) => `/api/v1/products/${productId}/variants/${id}`,
+      UPDATE: (id: string) => `/api/v1/products/${productId}/variants/${id}`,
+      DELETE: (id: string) => `/api/v1/products/${productId}/variants/${id}`,
     }),
+  },
+
+  UOMS: {
+    LIST: "/api/v1/uoms",
+  },
+
+  TAX_RATES: {
+    LIST: "/api/v1/tax-rates",
   },
 
   SALES_ORDERS: {

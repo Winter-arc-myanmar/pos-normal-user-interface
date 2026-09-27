@@ -73,6 +73,15 @@ function CardsIcon() {
   );
 }
 
+function ProductsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass} aria-hidden="true">
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+      <path d="M3.3 7 12 12l8.7-5M12 22V12" />
+    </svg>
+  );
+}
+
 function TablesIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass} aria-hidden="true">
@@ -149,6 +158,7 @@ export function AppShell() {
     "/sales-orders",
     "/waitlist",
     "/dining-tables",
+    "/products",
     "/tip-pools",
     "/counter-orders",
     "/customers",
@@ -230,6 +240,12 @@ export function AppShell() {
       label: t("shell.diningTablesTitle"),
       icon: <TablesIcon />,
       visible: canAccess(PAGE_PERMISSIONS.diningTables),
+    },
+    {
+      to: "/products",
+      label: t("shell.productsTitle"),
+      icon: <ProductsIcon />,
+      visible: canAccess(PAGE_PERMISSIONS.products),
     },
     // {
     //   to: "/tip-pools",

@@ -739,4 +739,84 @@ describe("ApiCashierRepository", () => {
       },
     ]);
   });
+
+  it("creates a product and variant with decimal prices and matrix options", async () => {
+    const post = vi.fn().mockImplementation((url: string) => {
+      if (String(url).endsWith("/variants")) {
+        return Promise.resolve({
+          success: true,
+          data: {
+            id: "variant-1",
+            productId: "product-1",
+            variantSku: "SKU-IP15-BLK-128",
+            barcode: "1234567890123",
+            matrixOptions: { color: "Black", storage: "128GB" },
+            priceModifier: "50.0000",
+          },
+        });
+      }
+      return Promise.resolve({
+        success: true,
+        meta: { total: 1, page: 1, limit: 20, totalPages: 1 },
+        data: {
+          id: "product-1",
+          tenantId: "tenant-1",
+          name: "iPhone 15",
+          baseSku: "SKU-IP15",
+          basePrice: "999.0000",
+          baseUomId: "uom-1",
+          trackingType: "standard",
+          isTaxable: true,
+          taxRateId: "tax-1",
+          totalOnHand: "250.0000",
+          globalAttributes: { brand: "Apple" },
+        },
+      });
+    });
+    const repository = new ApiCashierRepository({ post } as unknown as HttpClient);
+
+    const product = await repository.createProduct({
+      name: "iPhone 15",
+      tenantId: "tenant-1",
+      baseSku: "SKU-IP15",
+      basePrice: "999",
+      baseUomId: "uom-1",
+      globalAttributes: { brand: "Apple" },
+      trackingType: "STANDARD",
+      isTaxable: true,
+      taxRateId: "tax-1",
+    });
+    const variant = await repository.createVariant("product-1", {
+      variantSku: "SKU-IP15-BLK-128",
+      matrixOptions: { color: "Black", storage: "128GB" },
+      barcode: "1234567890123",
+      priceModifier: "50",
+    });
+
+    expect(post).toHaveBeenNthCalledWith(1, "/api/v1/products", {
+      name: "iPhone 15",
+      tenantId: "tenant-1",
+      baseSku: "SKU-IP15",
+      basePrice: "999.0000",
+      baseUomId: "uom-1",
+      globalAttributes: { brand: "Apple" },
+      trackingType: "STANDARD",
+      isTaxable: true,
+      taxRateId: "tax-1",
+    });
+    expect(product).toMatchObject({
+      id: "product-1",
+      trackingType: "STANDARD",
+      taxRateId: "tax-1",
+      totalOnHand: "250.0000",
+      globalAttributes: { brand: "Apple" },
+    });
+    expect(post).toHaveBeenNthCalledWith(2, "/api/v1/products/product-1/variants", {
+      variantSku: "SKU-IP15-BLK-128",
+      matrixOptions: { color: "Black", storage: "128GB" },
+      barcode: "1234567890123",
+      priceModifier: "50.0000",
+    });
+    expect(variant.matrixOptions).toEqual({ color: "Black", storage: "128GB" });
+  });
 });

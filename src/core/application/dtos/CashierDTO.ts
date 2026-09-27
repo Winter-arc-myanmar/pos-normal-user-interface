@@ -1,4 +1,4 @@
-import { DiningTable } from "../../domain/entities/Cashier";
+import { DiningTable, Product, ProductVariant } from "../../domain/entities/Cashier";
 
 export type ServiceType = "TABLE" | "DINE_IN" | "TAKE_AWAY" | "DELIVERY" | "PICK_UP";
 export type ApiServiceType = "DINE_IN" | "TAKEAWAY" | "DELIVERY" | "COUNTER";
@@ -73,6 +73,71 @@ export interface ProductFilterDTO extends PaginatedQueryDTO {
   trackingType?: string;
   inStockOnly?: boolean;
   locationId?: string;
+}
+
+export type ProductTrackingType = "STANDARD" | "SERIALIZED";
+
+export interface CreateProductDTO {
+  name: string;
+  tenantId: string;
+  baseSku: string;
+  basePrice: string;
+  baseUomId: string;
+  categoryId?: string;
+  globalAttributes?: Record<string, unknown>;
+  imageUrl?: string;
+  trackingType?: string;
+  isTaxable?: boolean;
+  taxRateId?: string;
+}
+
+export interface UpdateProductDTO {
+  name?: string;
+  baseSku?: string;
+  basePrice?: string;
+  baseUomId?: string;
+  categoryId?: string;
+  globalAttributes?: Record<string, unknown>;
+  imageUrl?: string;
+  trackingType?: string;
+  isTaxable?: boolean;
+  taxRateId?: string;
+}
+
+export interface ProductListDTO {
+  products: Product[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface CreateProductVariantDTO {
+  variantSku: string;
+  matrixOptions: Record<string, unknown>;
+  barcode?: string;
+  priceModifier?: string;
+  imageUrl?: string;
+}
+
+export interface UpdateProductVariantDTO {
+  variantSku?: string;
+  matrixOptions?: Record<string, unknown>;
+  barcode?: string;
+  priceModifier?: string;
+  imageUrl?: string;
+}
+
+export interface ProductVariantListDTO {
+  variants: ProductVariant[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface UomFilterDTO extends PaginatedQueryDTO {
+  classId?: string;
 }
 
 export interface SalesOrderFilterDTO extends PaginatedQueryDTO {

@@ -15,7 +15,12 @@ import {
   OpenTableSessionDTO,
   PosRegisterFilterDTO,
   PosSessionFilterDTO,
+  CreateProductDTO,
+  CreateProductVariantDTO,
+  PaginatedQueryDTO,
   ProductFilterDTO,
+  ProductListDTO,
+  ProductVariantListDTO,
   SalesOrderFilterDTO,
   SeatWaitlistEntryDTO,
   TableSessionCheckoutDTO,
@@ -24,7 +29,10 @@ import {
   CreatePosSessionDTO,
   TipPoolAllocationDTO,
   TipPoolFilterDTO,
+  UomFilterDTO,
   toApiServiceType,
+  UpdateProductDTO,
+  UpdateProductVariantDTO,
   UpdateDiningTableDTO,
   UpdateTableSessionStateDTO,
   UpdateTipPoolDTO,
@@ -47,6 +55,8 @@ import {
   PosSession,
   Product,
   ProductVariant,
+  TaxRate,
+  Uom,
   SalesOrder,
   SalesOrderLine,
   KdsTicket,
@@ -75,6 +85,93 @@ export class CashierService implements ICashierService {
       throw new Error("Product ID is required");
     }
     return this.cashierRepository.getVariants(productId);
+  }
+
+  async listProducts(params?: ProductFilterDTO): Promise<ProductListDTO> {
+    return this.cashierRepository.listProducts(params);
+  }
+
+  async getProduct(id: string): Promise<Product> {
+    if (!id?.trim()) throw new Error("Product ID is required");
+    return this.cashierRepository.getProduct(id);
+  }
+
+  async createProduct(payload: CreateProductDTO): Promise<Product> {
+    if (!payload.tenantId?.trim()) throw new Error("Tenant ID is required");
+    if (!payload.name?.trim()) throw new Error("Product name is required");
+    if (!payload.baseSku?.trim()) throw new Error("SKU is required");
+    if (!payload.baseUomId?.trim()) throw new Error("Unit is required");
+    const price = Number(payload.basePrice);
+    if (!Number.isFinite(price) || price < 0) throw new Error("Price is required");
+    return this.cashierRepository.createProduct(payload);
+  }
+
+  async updateProduct(id: string, payload: UpdateProductDTO): Promise<Product> {
+    if (!id?.trim()) throw new Error("Product ID is required");
+    if (payload.name !== undefined && !payload.name.trim()) {
+      throw new Error("Product name is required");
+    }
+    if (payload.baseSku !== undefined && !payload.baseSku.trim()) {
+      throw new Error("SKU is required");
+    }
+    if (payload.basePrice !== undefined) {
+      const price = Number(payload.basePrice);
+      if (!Number.isFinite(price) || price < 0) throw new Error("Price is required");
+    }
+    return this.cashierRepository.updateProduct(id, payload);
+  }
+
+  async deleteProduct(id: string): Promise<Product> {
+    if (!id?.trim()) throw new Error("Product ID is required");
+    return this.cashierRepository.deleteProduct(id);
+  }
+
+  async listVariants(
+    productId: string,
+    params?: PaginatedQueryDTO
+  ): Promise<ProductVariantListDTO> {
+    if (!productId?.trim()) throw new Error("Product ID is required");
+    return this.cashierRepository.listVariants(productId, params);
+  }
+
+  async getVariant(productId: string, id: string): Promise<ProductVariant> {
+    if (!productId?.trim() || !id?.trim()) throw new Error("Variant ID is required");
+    return this.cashierRepository.getVariant(productId, id);
+  }
+
+  async createVariant(
+    productId: string,
+    payload: CreateProductVariantDTO
+  ): Promise<ProductVariant> {
+    if (!productId?.trim()) throw new Error("Product ID is required");
+    if (!payload.variantSku?.trim()) throw new Error("Variant SKU is required");
+    if (!payload.matrixOptions) throw new Error("Variant options are required");
+    return this.cashierRepository.createVariant(productId, payload);
+  }
+
+  async updateVariant(
+    productId: string,
+    id: string,
+    payload: UpdateProductVariantDTO
+  ): Promise<ProductVariant> {
+    if (!productId?.trim() || !id?.trim()) throw new Error("Variant ID is required");
+    if (payload.variantSku !== undefined && !payload.variantSku.trim()) {
+      throw new Error("Variant SKU is required");
+    }
+    return this.cashierRepository.updateVariant(productId, id, payload);
+  }
+
+  async deleteVariant(productId: string, id: string): Promise<ProductVariant> {
+    if (!productId?.trim() || !id?.trim()) throw new Error("Variant ID is required");
+    return this.cashierRepository.deleteVariant(productId, id);
+  }
+
+  async listUoms(params?: UomFilterDTO): Promise<Uom[]> {
+    return this.cashierRepository.listUoms(params);
+  }
+
+  async listTaxRates(params?: PaginatedQueryDTO): Promise<TaxRate[]> {
+    return this.cashierRepository.listTaxRates(params);
   }
 
   async getSalesOrders(params?: SalesOrderFilterDTO): Promise<SalesOrder[]> {
