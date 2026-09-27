@@ -138,13 +138,13 @@ function PosKeyboard({
   };
 
   return (
-    <div className="mt-3 rounded-lg border border-slate-800 bg-[#111111] p-2">
+    <div className="mt-3 w-full min-w-0 shrink-0 rounded-lg border border-slate-800 bg-[#111111] p-1.5">
       {keyboardRows.map((row, index) => (
-        <div key={row.join("")} className="mb-1 flex justify-center gap-1">
+        <div key={row.join("")} className="mb-1 flex min-w-0 justify-center gap-1">
           {index === 3 ? (
             <button
               type="button"
-              className="min-h-10 min-w-14 rounded bg-slate-800 px-2 text-xs font-semibold text-slate-200"
+              className="min-h-8 min-w-0 flex-[1.4] rounded bg-slate-800 px-1 text-[10px] font-semibold text-slate-200"
               onClick={() => setShifted((current) => !current)}
             >
               shift
@@ -154,7 +154,7 @@ function PosKeyboard({
             <button
               key={key}
               type="button"
-              className="min-h-10 min-w-8 rounded bg-slate-700 px-2 text-sm font-semibold text-white hover:bg-slate-600"
+              className="min-h-8 min-w-0 flex-1 basis-0 rounded bg-slate-700 px-0 text-xs font-semibold text-white hover:bg-slate-600"
               onClick={() => press(key)}
             >
               {shifted ? key.toUpperCase() : key}
@@ -163,7 +163,7 @@ function PosKeyboard({
           {index === 3 ? (
             <button
               type="button"
-              className="min-h-10 min-w-16 rounded bg-slate-800 px-2 text-xs font-semibold text-slate-200"
+              className="min-h-8 min-w-0 flex-[1.4] rounded bg-slate-800 px-1 text-xs font-semibold text-slate-200"
               onClick={onBackspace}
             >
               ⌫
@@ -171,38 +171,38 @@ function PosKeyboard({
           ) : null}
         </div>
       ))}
-      <div className="flex justify-center gap-1">
+      <div className="flex min-w-0 justify-center gap-1">
         <button
           type="button"
-          className="min-h-10 min-w-10 rounded bg-slate-700 px-3 text-sm font-semibold text-white"
+          className="min-h-8 min-w-0 flex-1 basis-0 rounded bg-slate-700 px-1 text-xs font-semibold text-white"
           onClick={() => onInput("@")}
         >
           @
         </button>
         <button
           type="button"
-          className="min-h-10 min-w-10 rounded bg-slate-700 px-3 text-sm font-semibold text-white"
+          className="min-h-8 min-w-0 flex-1 basis-0 rounded bg-slate-700 px-1 text-xs font-semibold text-white"
           onClick={() => onInput(".")}
         >
           .
         </button>
         <button
           type="button"
-          className="min-h-10 min-w-10 rounded bg-slate-700 px-3 text-sm font-semibold text-white"
+          className="min-h-8 min-w-0 flex-1 basis-0 rounded bg-slate-700 px-1 text-xs font-semibold text-white"
           onClick={() => onInput("/")}
         >
           /
         </button>
         <button
           type="button"
-          className="min-h-10 flex-1 rounded bg-slate-700 px-3 text-sm font-semibold text-white"
+          className="min-h-8 min-w-0 flex-[2.4] rounded bg-slate-700 px-1 text-xs font-semibold text-white"
           onClick={() => onInput(" ")}
         >
           space
         </button>
         <button
           type="button"
-          className="min-h-10 min-w-16 rounded bg-blue-600 px-3 text-sm font-semibold text-white"
+          className="min-h-8 min-w-0 flex-[1.3] rounded bg-blue-600 px-1 text-xs font-semibold text-white"
           onClick={onEnter}
         >
           ↵
@@ -1037,7 +1037,7 @@ export function CustomersPage() {
                   : t("crm.closeCardTitle");
 
   return (
-    <section className="pos-split grid h-full min-h-0 grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)] overflow-hidden bg-slate-100">
+    <section className="pos-split pos-member-split grid h-full min-h-0 grid-cols-[minmax(0,0.7fr)_minmax(0,1.3fr)] overflow-hidden bg-slate-100 min-[1100px]:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]">
       <aside className="flex min-h-0 min-w-0 flex-col bg-white">
         {(error || localError || walletError) && (
           <p className="m-4 rounded bg-red-50 p-3 text-sm text-red-700">
@@ -1570,7 +1570,7 @@ export function CustomersPage() {
         )}
       </aside>
 
-      <main className="flex min-h-0 min-w-0 flex-col bg-slate-950 p-4 text-slate-100">
+      <main className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-slate-950 p-3 text-slate-100 min-[1100px]:p-4">
         <div className="flex items-center gap-2">
           <div className="flex-1">
             <SearchInput
@@ -1599,7 +1599,7 @@ export function CustomersPage() {
           />
         </div>
 
-        <div className="mt-4 grid min-h-0 min-w-0 flex-1 grid-cols-1 content-start gap-2 overflow-y-auto min-[700px]:grid-cols-2">
+        <div className="pos-pane-scroll mt-3 grid min-h-28 content-start gap-2 min-[1100px]:grid-cols-2">
           {customers.length === 0 ? (
             <p className="col-span-2 py-8 text-center text-sm text-slate-400">
               {isLoading ? t("crm.loading") : t("crm.empty")}
