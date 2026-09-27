@@ -1,22 +1,25 @@
-import { useTranslation } from "react-i18next";
 import { SpaRoom } from "@/core/domain/entities/Spa";
+import type { RoomKind } from "@/core/presentation/hooks/useRoomPos";
+import { useRoomText } from "@/core/presentation/hooks/useRoomText";
 import { getKtvWarning } from "@/lib/ktv/session";
 import { findActiveSpaSession } from "@/lib/spa/session";
 
 export function SpaRoomTile({
+  kind = "spa",
   room,
   nowMs,
   onSelect,
   onReady,
   onManage,
 }: {
+  kind?: RoomKind;
   room: SpaRoom;
   nowMs: number;
   onSelect: () => void;
   onReady: () => void;
   onManage: () => void;
 }) {
-  const { t } = useTranslation();
+  const tr = useRoomText(kind);
   const session = findActiveSpaSession(room);
   const warning = getKtvWarning(session?.endsAt, nowMs);
   const status = String(room.status || "AVAILABLE").toUpperCase();
@@ -55,7 +58,7 @@ export function SpaRoomTile({
           </div>
           <span className="flex items-center gap-1.5 text-xs text-slate-400">
             <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
-            {t(`spa.status.${(session?.sessionState || status).toLowerCase()}`)}
+            {tr(`status.${(session?.sessionState || status).toLowerCase()}`)}
           </span>
         </div>
         <div className="mt-5 grid grid-cols-2 gap-2 text-xs text-slate-300">
@@ -67,12 +70,12 @@ export function SpaRoomTile({
                 })}
               </span>
             ) : null}
-            {t("spa.perSession", { count: room.minimumMinutes })}
+            {tr("perSession", { count: room.minimumMinutes })}
           </span>
           <span className="text-right">
             {session
-              ? t("spa.guestCount", { count: session.guestCount })
-              : t("spa.capacity", { count: room.capacity })}
+              ? tr("guestCount", { count: session.guestCount })
+              : tr("capacity", { count: room.capacity })}
           </span>
         </div>
         {session?.endsAt ? (
@@ -86,8 +89,8 @@ export function SpaRoomTile({
             }`}
           >
             {warning.level === "EXPIRED"
-              ? t("spa.timeUp")
-              : t("spa.minutesRemaining", { count: warning.remainingMinutes })}
+              ? tr("timeUp")
+              : tr("minutesRemaining", { count: warning.remainingMinutes })}
           </p>
         ) : null}
       </button>
@@ -97,7 +100,7 @@ export function SpaRoomTile({
           className="mt-4 w-full rounded border border-slate-600 px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-white/5"
           onClick={onReady}
         >
-          {t("spa.markReady")}
+          {tr("markReady")}
         </button>
       ) : null}
       <button
@@ -105,7 +108,7 @@ export function SpaRoomTile({
         className="mt-2 w-full rounded border border-slate-700 px-3 py-2 text-xs font-medium text-slate-400 hover:bg-white/5 hover:text-slate-200"
         onClick={onManage}
       >
-        {t("spa.manageRoom")}
+        {tr("manageRoom")}
       </button>
     </article>
   );

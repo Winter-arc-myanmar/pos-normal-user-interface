@@ -82,17 +82,17 @@ export function KdsPage() {
   ];
 
   return (
-    <main className="flex min-h-screen flex-col bg-[#080808] text-white">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-3">
-        <div>
+    <main className="flex min-h-dvh flex-col bg-[#080808] text-white lg:h-dvh lg:overflow-hidden">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5">
+        <div className="min-w-0">
           <h1 className="text-xl font-bold">{t("kds.title")}</h1>
           <p className="text-xs text-slate-500">{t("kds.subtitle", { count: tickets.length })}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
           <select
             value={stationId}
             onChange={(event) => chooseStation(event.target.value)}
-            className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
+            className="min-w-0 flex-1 rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm sm:max-w-xs sm:flex-none"
             aria-label={t("kds.station")}
           >
             <option value="">{t("kds.allStations")}</option>
@@ -114,7 +114,7 @@ export function KdsPage() {
         </p>
       ) : null}
 
-      <section className="grid min-h-0 flex-1 grid-cols-1 gap-4 p-5 lg:grid-cols-2">
+      <section className="flex flex-col gap-6 p-4 sm:p-5 lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-2 lg:gap-4 lg:overflow-hidden">
         {columns.map((column) => {
           const list = tickets.filter((ticket) =>
             column.key === "PENDING"
@@ -122,11 +122,11 @@ export function KdsPage() {
               : ticket.status === "PREPARING" || ticket.status === "EXPEDITED"
           );
           return (
-            <div key={column.key} className="flex min-h-0 flex-col gap-3">
+            <div key={column.key} className="flex flex-col gap-3 lg:min-h-0">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
                 {column.title} · {list.length}
               </h2>
-              <div className="grid min-h-0 grid-cols-1 gap-3 overflow-y-auto xl:grid-cols-2">
+              <div className="flex flex-col gap-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto xl:grid xl:grid-cols-2 xl:content-start">
                 {list.length === 0 ? (
                   <p className="text-sm text-slate-600">{t("kds.empty")}</p>
                 ) : (
@@ -136,7 +136,7 @@ export function KdsPage() {
                     return (
                       <article
                         key={ticket.id}
-                        className={`rounded-lg border p-4 ${
+                        className={`min-w-0 rounded-lg border p-4 ${
                           age >= 15
                             ? "border-red-500 bg-red-950/30"
                             : age >= 8
@@ -144,17 +144,17 @@ export function KdsPage() {
                               : "border-slate-700 bg-slate-900"
                         }`}
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <p className="text-lg font-bold">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="break-words text-lg font-bold">
                               {room ? t("kds.room", { room }) : ticket.ticketNumber}
                             </p>
-                            <p className="text-xs text-slate-400">
+                            <p className="break-words text-xs text-slate-400">
                               {ticket.ticketNumber}
                               {ticket.courseType ? ` · ${ticket.courseType}` : ""}
                             </p>
                           </div>
-                          <span className="text-sm font-semibold">
+                          <span className="shrink-0 text-sm font-semibold">
                             {t("kds.minutes", { count: age })}
                           </span>
                         </div>
@@ -171,25 +171,27 @@ export function KdsPage() {
                                 quantity: line.quantity,
                               }))
                           ).map((line) => (
-                            <li key={line.key} className="flex justify-between text-base">
-                              <span>{line.name}</span>
-                              <span className="font-bold">× {Number(line.quantity)}</span>
+                            <li key={line.key} className="flex items-start justify-between gap-3 text-base">
+                              <span className="min-w-0 break-words">{line.name}</span>
+                              <span className="shrink-0 font-bold">× {Number(line.quantity)}</span>
                             </li>
                           ))}
                         </ul>
-                        <div className="mt-4 grid grid-cols-2 gap-2">
+                        <div className="mt-4 grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
                           {ticket.status === "PENDING" ? (
                             <Button
                               variant="secondary"
+                              fullWidth
                               isLoading={busyId === ticket.id}
                               onClick={() => void act(ticket, "start")}
                             >
                               {t("kds.start")}
                             </Button>
                           ) : (
-                            <span />
+                            <span className="hidden min-[420px]:block" />
                           )}
                           <Button
+                            fullWidth
                             isLoading={busyId === ticket.id}
                             onClick={() => void act(ticket, "ready")}
                           >

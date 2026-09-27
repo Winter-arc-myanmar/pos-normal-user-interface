@@ -1,11 +1,14 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
+  ChargeKtvItemsDTO,
   CloseKtvSessionDTO,
   CreateKtvRoomDTO,
+  ExtendKtvSessionDTO,
   KtvRoomFilterDTO,
   OpenKtvSessionDTO,
   UpdateKtvRoomDTO,
 } from "../../application/dtos/KtvDTO";
+import { GiveFreeItemsDTO } from "../../application/dtos/SpaDTO";
 import {
   KtvRoom,
   KtvSessionQuote,
@@ -159,6 +162,48 @@ export function useKtvManagement() {
     [fetchBoard, run, service]
   );
 
+  const extendSession = useCallback(
+    (id: string, payload: ExtendKtvSessionDTO) =>
+      run(async () => {
+        const result = await service.extendSession(id, payload);
+        setQuote(result.quote);
+        return result;
+      }),
+    [run, service]
+  );
+
+  const chargeItems = useCallback(
+    (id: string, payload: ChargeKtvItemsDTO) =>
+      run(async () => {
+        const result = await service.chargeItems(id, payload);
+        setQuote(result.quote);
+        return result;
+      }),
+    [run, service]
+  );
+
+  const giveFree = useCallback(
+    (id: string, payload: GiveFreeItemsDTO) =>
+      run(async () => {
+        const result = await service.giveFree(id, payload);
+        setQuote(result.quote);
+        return result;
+      }),
+    [run, service]
+  );
+
+  const refundLine = useCallback(
+    (id: string, lineId: string, reason?: string) =>
+      run(async () => {
+        const result = await service.refundLine(id, lineId, reason);
+        setQuote(result.quote);
+        return result;
+      }),
+    [run, service]
+  );
+
+  const clearQuote = useCallback(() => setQuote(null), []);
+
   const fetchRoomTabletMenu = useCallback(
     () =>
       run(async () => {
@@ -206,8 +251,13 @@ export function useKtvManagement() {
     pauseSession,
     resumeSession,
     closeSession,
+    extendSession,
+    chargeItems,
+    giveFree,
+    refundLine,
     fetchRoomTabletMenu,
     fetchRoomTabletSession,
+    clearQuote,
     clearError: () => setError(null),
   };
 }

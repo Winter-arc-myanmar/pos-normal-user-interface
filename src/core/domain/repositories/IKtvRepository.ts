@@ -1,11 +1,15 @@
 import {
+  ChargeKtvItemsDTO,
   CloseKtvSessionDTO,
   CreateKtvRoomDTO,
+  ExtendKtvSessionDTO,
+  KtvChargeResultDTO,
   KtvRoomFilterDTO,
   KtvRoomListDTO,
   OpenKtvSessionDTO,
   UpdateKtvRoomDTO,
 } from "../../application/dtos/KtvDTO";
+import { GiveFreeItemsDTO } from "../../application/dtos/SpaDTO";
 import {
   KtvRoom,
   KtvSession,
@@ -30,6 +34,10 @@ export interface IKtvRepository {
     id: string,
     payload: CloseKtvSessionDTO
   ): Promise<KtvSessionQuote>;
+  extendSession(id: string, payload: ExtendKtvSessionDTO): Promise<KtvChargeResultDTO>;
+  chargeItems(id: string, payload: ChargeKtvItemsDTO): Promise<KtvChargeResultDTO>;
+  giveFree(id: string, payload: GiveFreeItemsDTO): Promise<KtvChargeResultDTO>;
+  refundLine(id: string, lineId: string, reason?: string): Promise<KtvChargeResultDTO>;
   getRoomTabletMenu(): Promise<RoomTabletMenu>;
   getRoomTabletSession(): Promise<RoomTabletSession>;
 }

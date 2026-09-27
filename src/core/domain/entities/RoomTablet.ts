@@ -19,8 +19,10 @@ export interface TabletVisitOrder {
   items: { name: string; quantity: number; refunded: boolean }[];
 }
 
+export type TabletRoomKind = "SPA" | "KTV";
+
 export interface TabletVisitRoom {
-  kind: "SPA";
+  kind: TabletRoomKind;
   sessionId: string;
   roomId: string;
   roomNumber: string;
@@ -86,6 +88,7 @@ export interface RoomOrderView {
 }
 
 export interface TabletRoom {
+  kind: TabletRoomKind;
   roomId: string;
   roomNumber: string;
   name: string | null;

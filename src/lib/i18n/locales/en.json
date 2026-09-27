@@ -1458,7 +1458,14 @@
     "started": "Enjoy! {{count}} sessions started · Charged {{amount}} · Balance {{balance}}",
     "tryAgain": "Try again",
     "loadingRooms": "Loading rooms…",
-    "noRoomsSetUp": "No spa rooms are set up yet. Add rooms on the SPA board first."
+    "noRoomsSetUp": "No spa rooms are set up yet. Add rooms on the SPA board first.",
+    "ktv": {
+      "started": "Enjoy! {{count}} hours started · Charged {{amount}} · Balance {{balance}}",
+      "timeAdded": "{{count}} hours added · Charged {{amount}} · Balance {{balance}}",
+      "sessionsOf": "{{count}} more hours · {{minutes}} min",
+      "pricePerSession": "{{amount}} per hour",
+      "startTreatment": "Start the room"
+    }
   },
   "kds": {
     "title": "Kitchen display",
@@ -1484,5 +1491,39 @@
     "printHere": "Print tablet orders here",
     "printFailed": "Could not print the ticket.",
     "started": "Started from tablet"
+  },
+  "ktvPos": {
+    "boardTitle": "KTV Room Board",
+    "sessions": "Hours",
+    "newSession": "New party in {{room}}",
+    "sessionsSummary": "{{minutes}} min in total",
+    "startSession": "Start room",
+    "startAndPay": "Start · pay {{amount}}",
+    "startSummary": "{{room}} · {{sessions}} h ({{minutes}} min) · {{count}} guests",
+    "confirmStartTitle": "Start {{room}}",
+    "treatmentCharge": "Room time",
+    "treatmentSoFar": "Room time",
+    "servicesCharge": "Food & drinks",
+    "endTreatment": "Close room",
+    "endTitle": "Close {{room}}?",
+    "treatmentStarted": "Room started",
+    "treatmentEnded": "{{room}} closed · paid {{amount}}",
+    "extendTitle": "More time · {{room}}",
+    "moreSessionsLabel": "More hours",
+    "moreSessions": "One more hour",
+    "fewerSessions": "One hour less",
+    "confirmExtendTitle": "Add {{count}} h",
+    "perSession": "/ hour",
+    "sessionPriceLabel": "Room price per hour",
+    "priceSummary": "Guests pay {{price}} for each hour. Peak-hour prices set on the room still apply.",
+    "priceHint": "Enter what one hour in this room costs.",
+    "minutesOfBooked": "{{count}}/{{booked}} min ({{sessions}} h)",
+    "treatmentMinutes": "{{count}} min",
+    "sessionOption": "Since {{time}} · {{count}} guests",
+    "noRooms": "No KTV rooms yet. Add a room to start.",
+    "errors": {
+      "openSession": "Could not start the room",
+      "sessionRequired": "Start the room first"
+    }
   }
 }

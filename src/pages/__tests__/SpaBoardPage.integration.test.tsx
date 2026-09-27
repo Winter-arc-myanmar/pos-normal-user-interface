@@ -135,6 +135,10 @@ vi.mock("@/core/presentation/hooks/useSpaManagement", () => ({
   }),
 }));
 
+vi.mock("@/core/presentation/hooks/useKtvManagement", () => ({
+  useKtvManagement: () => ({ rooms: [], quote: null }),
+}));
+
 vi.mock("@/core/presentation/hooks/useCashier", () => ({
   useCashier: () => ({
     products: [scrub, beer, roomRate],
