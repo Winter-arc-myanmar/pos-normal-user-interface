@@ -30,10 +30,10 @@ const fieldClass =
   "min-h-11 w-full rounded border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-500";
 
 const modalOverlayClass =
-  "fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-3";
+  "fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-slate-950/50 p-0 sm:items-center sm:p-3";
 
 const modalPanelClass =
-  "flex max-h-[78dvh] w-full flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-xl sm:max-h-[68vh] sm:rounded-xl";
+  "flex max-h-[calc(100dvh-1rem)] w-full min-h-0 flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-xl sm:rounded-xl";
 
 const modalFieldClass =
   "min-h-9 w-full rounded border border-slate-300 bg-white px-2.5 text-sm text-slate-900 outline-none focus:border-blue-500";
