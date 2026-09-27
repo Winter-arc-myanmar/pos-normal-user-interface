@@ -54,4 +54,61 @@ describe("category and KDS station repositories", () => {
     });
     expect(created.routingRules.categoryIds).toEqual(["drink", "alcohol"]);
   });
+
+  it("creates a category and reads nested tree children", async () => {
+    const post = vi.fn().mockResolvedValue({
+      success: true,
+      data: {
+        id: "phones",
+        tenantId: "tenant-1",
+        parentId: "electronics",
+        name: "Phones",
+        description: "Mobile phones",
+        sortOrder: 1,
+      },
+    });
+    const get = vi.fn().mockResolvedValue({
+      success: true,
+      data: {
+        id: "electronics",
+        tenantId: "tenant-1",
+        name: "Electronics",
+        sortOrder: 0,
+        children: [
+          {
+            id: "phones",
+            tenantId: "tenant-1",
+            parentId: "electronics",
+            name: "Phones",
+            sortOrder: 1,
+          },
+        ],
+      },
+    });
+    const repository = new ApiCategoryRepository({
+      get,
+      post,
+    } as unknown as HttpClient);
+
+    const created = await repository.create({
+      name: "Phones",
+      tenantId: "tenant-1",
+      parentId: "electronics",
+      description: "Mobile phones",
+      sortOrder: 1,
+    });
+    const tree = await repository.tree();
+
+    expect(post).toHaveBeenCalledWith("/api/v1/categories", {
+      name: "Phones",
+      tenantId: "tenant-1",
+      parentId: "electronics",
+      description: "Mobile phones",
+      sortOrder: 1,
+    });
+    expect(created.parentId).toBe("electronics");
+    expect(get).toHaveBeenCalledWith("/api/v1/categories/tree");
+    expect(tree[0].name).toBe("Electronics");
+    expect(tree[0].children?.[0].name).toBe("Phones");
+  });
 });

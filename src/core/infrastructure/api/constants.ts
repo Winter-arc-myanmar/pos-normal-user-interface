@@ -310,8 +310,11 @@ export const API_ENDPOINTS = {
 
   CATEGORIES: {
     LIST: "/api/v1/categories",
+    CREATE: "/api/v1/categories",
     TREE: "/api/v1/categories/tree",
     BY_ID: (id: string) => `/api/v1/categories/${id}`,
+    UPDATE: (id: string) => `/api/v1/categories/${id}`,
+    DELETE: (id: string) => `/api/v1/categories/${id}`,
   },
 
   KITCHEN_PRINTERS: {

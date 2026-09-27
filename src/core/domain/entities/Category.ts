@@ -8,6 +8,7 @@ export class Category {
   deletedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
+  children?: Category[];
 
   constructor(data: Partial<Category>) {
     Object.assign(this, data);
