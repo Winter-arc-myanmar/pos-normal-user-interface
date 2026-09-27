@@ -227,6 +227,20 @@ export class DiningZone {
   }
 }
 
+export class DiningTableActiveSession {
+  id!: string;
+  salesOrderId!: string;
+  guestCount!: number;
+  sessionState!: string;
+  openedAt!: string;
+  seatedSeconds!: number;
+  itemCount!: number;
+
+  constructor(data: Partial<DiningTableActiveSession>) {
+    Object.assign(this, data);
+  }
+}
+
 export class DiningTable {
   id!: string;
   tenantId!: string;
@@ -237,6 +251,10 @@ export class DiningTable {
   posY?: string;
   shape?: string;
   status!: "AVAILABLE" | "OCCUPIED" | "DIRTY" | "RESERVED";
+  deletedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  activeSession?: DiningTableActiveSession | null;
 
   constructor(data: Partial<DiningTable>) {
     Object.assign(this, data);

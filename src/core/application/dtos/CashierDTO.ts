@@ -1,3 +1,5 @@
+import { DiningTable } from "../../domain/entities/Cashier";
+
 export type ServiceType = "TABLE" | "DINE_IN" | "TAKE_AWAY" | "DELIVERY" | "PICK_UP";
 export type ApiServiceType = "DINE_IN" | "TAKEAWAY" | "DELIVERY" | "COUNTER";
 
@@ -85,6 +87,37 @@ export interface SalesOrderFilterDTO extends PaginatedQueryDTO {
 export interface DiningTableFilterDTO extends PaginatedQueryDTO {
   zoneId?: string;
   status?: DiningTableStatus;
+}
+
+export type DiningTableShape = "RECTANGLE" | "CIRCLE";
+
+export interface CreateDiningTableDTO {
+  tenantId: string;
+  zoneId: string;
+  tableNumber: string;
+  maxSeats: number;
+  posX?: number;
+  posY?: number;
+  shape?: DiningTableShape;
+  status?: DiningTableStatus;
+}
+
+export interface UpdateDiningTableDTO {
+  zoneId?: string;
+  tableNumber?: string;
+  maxSeats?: number;
+  posX?: number;
+  posY?: number;
+  shape?: DiningTableShape;
+  status?: DiningTableStatus;
+}
+
+export interface DiningTableListDTO {
+  tables: DiningTable[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 export interface TableSessionFilterDTO extends PaginatedQueryDTO {

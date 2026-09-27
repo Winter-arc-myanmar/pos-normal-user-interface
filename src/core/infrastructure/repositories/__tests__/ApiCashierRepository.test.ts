@@ -608,6 +608,58 @@ describe("ApiCashierRepository", () => {
     expect(sessions[0]?.sessionState).toBe("CLOSED");
   });
 
+  it("maps an active dining session and posts a new table", async () => {
+    const post = vi.fn().mockResolvedValue({
+      data: {
+        id: "table-1",
+        tenantId: "tenant-1",
+        zoneId: "zone-1",
+        tableNumber: "T-12",
+        maxSeats: 4,
+        posX: "120.50",
+        posY: "85.00",
+        shape: "RECTANGLE",
+        status: "AVAILABLE",
+        activeSession: {
+          id: "session-1",
+          salesOrderId: "order-1",
+          guestCount: 4,
+          sessionState: "SEATED",
+          openedAt: "2026-09-19T06:32:00.000Z",
+          seatedSeconds: 120,
+          itemCount: 3,
+        },
+      },
+    });
+    const repository = new ApiCashierRepository({
+      post,
+    } as unknown as HttpClient);
+
+    const table = await repository.createDiningTable({
+      tenantId: "tenant-1",
+      zoneId: "zone-1",
+      tableNumber: "T-12",
+      maxSeats: 4,
+      posX: 120.5,
+      posY: 85,
+      shape: "RECTANGLE",
+      status: "AVAILABLE",
+    });
+
+    expect(post).toHaveBeenCalledWith("/api/v1/dining-tables", {
+      tenantId: "tenant-1",
+      zoneId: "zone-1",
+      tableNumber: "T-12",
+      maxSeats: 4,
+      posX: 120.5,
+      posY: 85,
+      shape: "RECTANGLE",
+      status: "AVAILABLE",
+    });
+    expect(table.activeSession?.itemCount).toBe(3);
+    expect(table.activeSession?.guestCount).toBe(4);
+  });
+
   it("lists and reads KDS tickets from the ticket endpoints", async () => {
     const get = vi.fn().mockImplementation((url: string) => {
       if (String(url).endsWith("/kds/tickets/ticket-1")) {

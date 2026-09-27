@@ -204,6 +204,10 @@ export const API_ENDPOINTS = {
 
   DINING_TABLES: {
     LIST: "/api/v1/dining-tables",
+    CREATE: "/api/v1/dining-tables",
+    BY_ID: (id: string) => `/api/v1/dining-tables/${id}`,
+    UPDATE: (id: string) => `/api/v1/dining-tables/${id}`,
+    DELETE: (id: string) => `/api/v1/dining-tables/${id}`,
     UPDATE_STATUS: (id: string) => `/api/v1/dining-tables/${id}/status`,
   },
 

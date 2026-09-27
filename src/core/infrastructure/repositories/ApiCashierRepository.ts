@@ -4,7 +4,9 @@ import {
   CreateSalesOrderDTO,
   CreateTipPoolDTO,
   CreateWaitlistEntryDTO,
+  CreateDiningTableDTO,
   DiningTableFilterDTO,
+  DiningTableListDTO,
   FireKdsDTO,
   KdsTicketFilterDTO,
   KdsTicketListDTO,
@@ -22,6 +24,7 @@ import {
   TipPoolFilterDTO,
   fromApiServiceType,
   toApiServiceType,
+  UpdateDiningTableDTO,
   UpdateTableSessionStateDTO,
   UpdateSalesOrderLineDTO,
   UpdateTipPoolDTO,
@@ -35,6 +38,7 @@ import {
   AdjustmentReason,
   CounterOrderDetail,
   DiningTable,
+  DiningTableActiveSession,
   DiningZone,
   InventoryLocation,
   KdsTicket,
@@ -754,6 +758,40 @@ const toTableSession = (
       : undefined,
   });
 
+const toDiningTableSession = (value: unknown): DiningTableActiveSession | null => {
+  if (!value || typeof value !== "object") return null;
+  const item = value as Record<string, unknown>;
+  if (!item.id) return null;
+  return new DiningTableActiveSession({
+    id: String(item.id),
+    salesOrderId: String(item.salesOrderId || ""),
+    guestCount: Number(item.guestCount || 0),
+    sessionState: String(item.sessionState || ""),
+    openedAt: String(item.openedAt || ""),
+    seatedSeconds: Number(item.seatedSeconds || 0),
+    itemCount: Number(item.itemCount || 0),
+  });
+};
+
+const toDiningTable = (item: Record<string, unknown>) =>
+  new DiningTable({
+    id: String(item.id || ""),
+    tenantId: String(item.tenantId || ""),
+    zoneId: String(item.zoneId || ""),
+    tableNumber: String(item.tableNumber || ""),
+    maxSeats: Number(item.maxSeats || 0),
+    posX: item.posX === null || item.posX === undefined ? undefined : String(item.posX),
+    posY: item.posY === null || item.posY === undefined ? undefined : String(item.posY),
+    shape: item.shape ? String(item.shape) : undefined,
+    status: String(item.status || "AVAILABLE")
+      .trim()
+      .toUpperCase() as DiningTable["status"],
+    deletedAt: item.deletedAt ? String(item.deletedAt) : null,
+    createdAt: item.createdAt ? String(item.createdAt) : undefined,
+    updatedAt: item.updatedAt ? String(item.updatedAt) : undefined,
+    activeSession: toDiningTableSession(item.activeSession),
+  });
+
 export class ApiCashierRepository implements ICashierRepository {
   constructor(private readonly httpClient: HttpClient) {}
 
@@ -1129,27 +1167,60 @@ export class ApiCashierRepository implements ICashierRepository {
   }
 
   async getDiningTables(params?: DiningTableFilterDTO): Promise<DiningTable[]> {
-    const response = await this.httpClient.get<ApiEnvelope<Record<string, unknown>[]>>(
-      API_ENDPOINTS.DINING_TABLES.LIST,
-      { params }
+    const listed = await this.listDiningTables(params);
+    return listed.tables;
+  }
+
+  async listDiningTables(params?: DiningTableFilterDTO): Promise<DiningTableListDTO> {
+    const response = await this.httpClient.get<
+      ApiEnvelope<Record<string, unknown>[]> & { meta?: Record<string, unknown> }
+    >(API_ENDPOINTS.DINING_TABLES.LIST, { params });
+    const tables = asList<Record<string, unknown>>(response).map(toDiningTable);
+    const meta = response.meta || {};
+    const limit = Number(meta.limit || params?.limit || 10);
+    const total = Number(meta.total ?? tables.length);
+    return {
+      tables,
+      total,
+      page: Number(meta.page || params?.page || 1),
+      limit,
+      totalPages: Number(
+        meta.totalPages || Math.max(1, Math.ceil(total / Math.max(limit, 1)))
+      ),
+    };
+  }
+
+  async getDiningTable(tableId: string): Promise<DiningTable> {
+    const response = await this.httpClient.get<ApiEnvelope<Record<string, unknown>>>(
+      API_ENDPOINTS.DINING_TABLES.BY_ID(tableId)
     );
-    const data = asList<Record<string, unknown>>(response);
-    return data.map(
-      (item) =>
-        new DiningTable({
-          id: String(item.id || ""),
-          tenantId: String(item.tenantId || ""),
-          zoneId: String(item.zoneId || ""),
-          tableNumber: String(item.tableNumber || ""),
-          maxSeats: Number(item.maxSeats || 0),
-          posX: item.posX ? String(item.posX) : undefined,
-          posY: item.posY ? String(item.posY) : undefined,
-          shape: item.shape ? String(item.shape) : undefined,
-          status: String(item.status || "AVAILABLE")
-            .trim()
-            .toUpperCase() as DiningTable["status"],
-        })
+    return toDiningTable(unwrap(response));
+  }
+
+  async createDiningTable(payload: CreateDiningTableDTO): Promise<DiningTable> {
+    const response = await this.httpClient.post<ApiEnvelope<Record<string, unknown>>>(
+      API_ENDPOINTS.DINING_TABLES.CREATE,
+      payload
     );
+    return toDiningTable(unwrap(response));
+  }
+
+  async updateDiningTable(
+    tableId: string,
+    payload: UpdateDiningTableDTO
+  ): Promise<DiningTable> {
+    const response = await this.httpClient.patch<ApiEnvelope<Record<string, unknown>>>(
+      API_ENDPOINTS.DINING_TABLES.UPDATE(tableId),
+      payload
+    );
+    return toDiningTable(unwrap(response));
+  }
+
+  async deleteDiningTable(tableId: string): Promise<DiningTable> {
+    const response = await this.httpClient.delete<ApiEnvelope<Record<string, unknown>>>(
+      API_ENDPOINTS.DINING_TABLES.DELETE(tableId)
+    );
+    return toDiningTable(unwrap(response));
   }
 
   async updateDiningTableStatus(
@@ -1160,20 +1231,7 @@ export class ApiCashierRepository implements ICashierRepository {
       API_ENDPOINTS.DINING_TABLES.UPDATE_STATUS(tableId),
       { status }
     );
-    const item = unwrap(response);
-    return new DiningTable({
-      id: String(item.id || ""),
-      tenantId: String(item.tenantId || ""),
-      zoneId: String(item.zoneId || ""),
-      tableNumber: String(item.tableNumber || ""),
-      maxSeats: Number(item.maxSeats || 0),
-      posX: item.posX ? String(item.posX) : undefined,
-      posY: item.posY ? String(item.posY) : undefined,
-      shape: item.shape ? String(item.shape) : undefined,
-      status: String(item.status || "AVAILABLE")
-        .trim()
-        .toUpperCase() as DiningTable["status"],
-    });
+    return toDiningTable(unwrap(response));
   }
 
   async getTableSessions(params?: TableSessionFilterDTO): Promise<TableSession[]> {

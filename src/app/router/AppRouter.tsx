@@ -61,6 +61,11 @@ const WaitlistPage = lazy(() =>
     default: module.WaitlistPage,
   }))
 );
+const DiningTablesPage = lazy(() =>
+  import("../../pages/DiningTablesPage").then((module) => ({
+    default: module.DiningTablesPage,
+  }))
+);
 const TipPoolsPage = lazy(() =>
   import("../../pages/TipPoolsPage").then((module) => ({
     default: module.TipPoolsPage,
@@ -276,6 +281,16 @@ export function AppRouter() {
                     requiredPermissions={PAGE_PERMISSIONS.waitlist}
                   >
                     <WaitlistPage />
+                  </RequirePermission>
+                }
+              />
+              <Route
+                path="/dining-tables"
+                element={
+                  <RequirePermission
+                    requiredPermissions={PAGE_PERMISSIONS.diningTables}
+                  >
+                    <DiningTablesPage />
                   </RequirePermission>
                 }
               />
