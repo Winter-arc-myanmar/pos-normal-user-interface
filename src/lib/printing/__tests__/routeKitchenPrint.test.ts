@@ -11,7 +11,11 @@ import {
   defaultPrintTemplateSettings,
 } from "@/core/domain/entities/PrintTemplate";
 import { groupKitchenJobs } from "../routeKitchenPrint";
-import { selectPrintTemplate } from "../selectPrintTemplate";
+import { modifierPrintText } from "../modifierText";
+import {
+  PrintTemplateSelectionError,
+  selectPrintTemplate,
+} from "../selectPrintTemplate";
 
 const binding = (id: string, backendPrinterId: string): PrinterBinding => ({
   id,
@@ -135,7 +139,7 @@ describe("station print routing", () => {
     expect(kitchen).not.toContain("5.00");
     expect(finance).not.toContain("LOGO");
     expect(finance).toContain("5.00");
-    expect(checkout).toContain("LOGO");
+    expect(checkout).not.toContain("LOGO");
     expect(checkout).toContain("5.00");
   });
 
@@ -187,6 +191,91 @@ describe("station print routing", () => {
     expect(slip).toContain("See you");
   });
 
+  it("prints every enabled template section for checkout, finance, and kitchen", () => {
+    const settings = defaultPrintTemplateSettings();
+    settings.header.logo = true;
+    settings.item.bilingual = true;
+    settings.item.categorySubtotal = true;
+    settings.bill.payTime = true;
+    settings.bill.rounding = true;
+    settings.other.footerText = "Thank you!";
+    const party = {
+      outletName: "Main outlet",
+      address: "12 River Road",
+      contact: "09-123",
+      cashier: "Aung",
+      serviceType: "Dine in",
+      tableOrRoom: "Table 4",
+      pickupCode: "12",
+      paidAt: "09:50",
+      rounding: "0.00",
+    };
+    const lines = [
+      {
+        name: "Coffee",
+        altName: "ကော်ဖီ",
+        quantity: "1",
+        unitPrice: "10.00",
+        categoryName: "Drinks",
+        modifiers: "Large",
+        remarks: "Less sugar",
+      },
+    ];
+
+    const checkout = formatSaleReceipt({
+      title: "RECEIPT",
+      place: "CHECKOUT",
+      template: settings,
+      receiptId: "No.001",
+      lines,
+      subtotal: "10.00",
+      total: "10.00",
+      ...party,
+    });
+    const financeSettings = defaultPrintTemplateSettings();
+    financeSettings.header.logo = false;
+    financeSettings.header.address = false;
+    financeSettings.other.footerText = "Finance copy";
+    const finance = formatSaleReceipt({
+      title: "FINANCE",
+      place: "FINANCE",
+      template: financeSettings,
+      lines,
+      total: "10.00",
+      outletName: "Main outlet",
+    });
+    const kitchenSettings = defaultPrintTemplateSettings();
+    kitchenSettings.item.price = false;
+    kitchenSettings.other.footerText = "Kitchen";
+    const kitchen = formatKitchenSlip({
+      title: "KITCHEN",
+      template: kitchenSettings,
+      lines,
+      outletName: "Main outlet",
+      tableOrRoom: "Table 4",
+    });
+
+    expect(checkout).toContain("Main outlet");
+    expect(checkout).toContain("No.001");
+    expect(checkout).toContain("Dine in");
+    expect(checkout).toContain("Table 4");
+    expect(checkout).toContain("Aung");
+    expect(checkout).toContain("Large");
+    expect(checkout).toContain("Drinks");
+    expect(checkout).toContain("09:50");
+    expect(checkout).toContain("Thank you!");
+
+    expect(finance).not.toContain("LOGO");
+    expect(finance).not.toContain("12 River Road");
+    expect(finance).toContain("Main outlet");
+    expect(finance).toContain("Finance copy");
+
+    expect(kitchen).toContain("Main outlet");
+    expect(kitchen).toContain("Coffee");
+    expect(kitchen).not.toContain("10.00");
+    expect(kitchen).toContain("Kitchen");
+  });
+
   it("uses the kitchen template for KDS and the non-default receipt for finance", () => {
     const kitchen = new PrintTemplate({
       id: "kitchen",
@@ -221,5 +310,61 @@ describe("station print routing", () => {
       selectPrintTemplate("FINANCE", [kitchen, checkout, finance], "location-1")?.header
         .logo
     ).toBe(false);
+  });
+
+  it("refuses to pick a template when a print section has duplicates", () => {
+    const first = new PrintTemplate({
+      id: "kitchen-a",
+      type: "KITCHEN",
+      isDefault: true,
+      settings: defaultPrintTemplateSettings(),
+    });
+    const second = new PrintTemplate({
+      id: "kitchen-b",
+      type: "KITCHEN",
+      isDefault: true,
+      settings: defaultPrintTemplateSettings(),
+    });
+
+    expect(() => selectPrintTemplate("KDS", [first, second])).toThrow(
+      PrintTemplateSelectionError
+    );
+  });
+
+  it("prints item prices and modifier prices when the price option is on", () => {
+    const settings = defaultPrintTemplateSettings();
+    settings.item.price = true;
+    settings.item.hidePriceOnOrderBill = true;
+    settings.item.modifiers = true;
+    const slip = formatSaleReceipt({
+      title: "RECEIPT",
+      place: "CHECKOUT",
+      template: settings,
+      lines: [
+        {
+          name: "Coffee",
+          quantity: "1",
+          unitPrice: "10.00",
+          modifiers: "Large",
+          modifierPrices: "2.00",
+        },
+      ],
+      total: "12.00",
+    });
+
+    expect(slip).toContain("10.00");
+    expect(slip).toContain("Large +2.00");
+  });
+
+  it("reads modifier names and prices from order lines", () => {
+    expect(
+      modifierPrintText([
+        { modifierId: "mod-1", name: "Large", priceDelta: "2.0000" },
+        { modifier: { name: "Oat milk" }, priceDelta: "0" },
+      ])
+    ).toEqual({
+      names: "Large, Oat milk",
+      prices: "2.0000, -",
+    });
   });
 });

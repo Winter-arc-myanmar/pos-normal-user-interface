@@ -11,6 +11,7 @@ export interface StationRoute {
 export interface PrinterJob {
   binding: PrinterBinding;
   lines: PrintLine[];
+  station?: StationRoute;
 }
 
 export interface KitchenPrintPlan {
@@ -47,9 +48,10 @@ const planFromStations = (
       unrouted.push(line);
       continue;
     }
-    const current = jobs.get(binding.id) || { binding, lines: [] };
+    const key = `${binding.id}:${station?.id || "default"}`;
+    const current = jobs.get(key) || { binding, lines: [], station };
     current.lines.push(line);
-    jobs.set(binding.id, current);
+    jobs.set(key, current);
   }
 
   return { jobs: Array.from(jobs.values()), unrouted };
@@ -94,7 +96,7 @@ export function groupKitchenJobs(
       const binding = bindingForStation(station, bindings) || defaultBinding;
       if (!binding) throw new Error(`Connect a printer for ${station.name}`);
       return {
-        jobs: [{ binding, lines }],
+        jobs: [{ binding, lines, station }],
         unrouted: [],
       };
     }

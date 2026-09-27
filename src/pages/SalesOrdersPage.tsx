@@ -16,6 +16,7 @@ import {
   salesOrderServiceTypeKey,
   salesOrderStatusKey,
 } from "@/lib/pos/orderListDisplay";
+import { modifierPrintText } from "@/lib/printing/modifierText";
 
 type StatusTab = "open" | "completed" | "voided";
 type ServiceFilter = "ALL" | "DINE_IN" | "TAKE_AWAY" | "DELIVERY" | "PICK_UP";
@@ -109,7 +110,7 @@ export function SalesOrdersPage() {
 
   const tenantId = String(user?.tenantId || "");
   const locationId = activeLocationId;
-  const printer = usePrinterConnection(tenantId, activePosRegisterId);
+  const printer = usePrinterConnection(tenantId, activePosRegisterId, locationId);
 
   const statusFilter = statusTabFilters[statusTab];
 
@@ -196,15 +197,29 @@ export function SalesOrdersPage() {
         showLogo: true,
         showPrices: true,
         receiptId: selectedOrder.orderNumber,
-        lines: orderLines.map((line) => ({
-          name: lineDisplayName(line) || t("salesOrders.item"),
-          quantity: String(line.quantity || "1"),
-          unitPrice: String(line.unitPrice || ""),
-        })),
+        cashier: user?.name,
+        serviceType: t(salesOrderServiceTypeKey(selectedOrder.serviceType)),
+        pickupCode: selectedOrder.pickupNumber,
+        lines: orderLines.map((line) => {
+          const modifiers = modifierPrintText(line.selectedModifiers);
+          const unitPrice = line.unitPrice?.trim();
+          return {
+            name: lineDisplayName(line) || t("salesOrders.item"),
+            quantity: String(line.quantity || "1"),
+            unitPrice: unitPrice || undefined,
+            modifiers: modifiers.names,
+            modifierPrices: modifiers.prices,
+          };
+        }),
         subtotal: selectedOrder.subtotal,
         discount: selectedOrder.totalDiscount,
-        tax: selectedOrder.totalTax,
-        tip: selectedOrder.tipAmount,
+        tax: Number(selectedOrder.totalTax) > 0 ? selectedOrder.totalTax : undefined,
+        // Print template does not support extra fee or tip.
+        // extraFee:
+        //   Number(selectedOrder.serviceCharge) > 0
+        //     ? selectedOrder.serviceCharge
+        //     : undefined,
+        // tip: Number(selectedOrder.tipAmount) > 0 ? selectedOrder.tipAmount : undefined,
         total: selectedOrder.grandTotal,
       });
     } catch (caught) {

@@ -122,10 +122,11 @@ function SalesOrdersIcon() {
 export function AppShell() {
   const { t } = useTranslation();
   const { user, setActiveBranch } = useAuth();
-  const { activePosRegisterId } = usePosWorkspace();
+  const { activePosRegisterId, activeLocationId } = usePosWorkspace();
   const printerConnection = usePrinterConnection(
     String(user?.tenantId || ""),
-    activePosRegisterId
+    activePosRegisterId,
+    activeLocationId
   );
   const { canAccess, isTabletAccount } = usePermissions();
   const navigate = useNavigate();
