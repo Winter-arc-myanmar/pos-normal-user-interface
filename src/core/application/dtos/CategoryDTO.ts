@@ -15,3 +15,18 @@ export interface CategoryListDTO {
   limit: number;
   totalPages: number;
 }
+
+export interface CreateCategoryDTO {
+  name: string;
+  tenantId: string;
+  parentId?: string;
+  description?: string;
+  sortOrder?: number;
+}
+
+export interface UpdateCategoryDTO {
+  name?: string;
+  parentId?: string | null;
+  description?: string | null;
+  sortOrder?: number;
+}

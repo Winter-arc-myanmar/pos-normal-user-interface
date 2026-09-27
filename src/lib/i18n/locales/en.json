@@ -40,6 +40,7 @@
     "waitlistTitle": "Waitlist",
     "diningTablesTitle": "Tables",
     "productsTitle": "Products",
+    "categoriesTitle": "Categories",
     "tipPoolsTitle": "Tip pools",
     "syncTitle": "Sync",
     "usersTitle": "Users",
@@ -1636,5 +1637,26 @@
       "STANDARD": "Standard",
       "SERIALIZED": "Serialized"
     }
+  },
+  "categories": {
+    "title": "Categories",
+    "subtitle": "{{count}} categories",
+    "search": "Search categories",
+    "add": "Add category",
+    "addChild": "Add subcategory",
+    "create": "New category",
+    "edit": "Category details",
+    "name": "Name",
+    "parent": "Parent",
+    "noParent": "No parent",
+    "description": "Description",
+    "sortOrder": "Sort order",
+    "loading": "Loading categories...",
+    "empty": "No categories yet.",
+    "saved": "Category saved.",
+    "deleted": "Category removed.",
+    "confirmDelete": "Confirm delete",
+    "prevPage": "Previous page",
+    "nextPage": "Next page"
   }
 }
