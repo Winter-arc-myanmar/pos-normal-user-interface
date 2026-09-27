@@ -86,7 +86,7 @@ export function CashierBoard({
   const { t } = useTranslation();
 
   return (
-    <section className="flex h-full min-h-0 flex-col p-2 min-[1100px]:p-3">
+    <section className="flex h-full min-h-0 flex-col overflow-hidden p-2 min-[1100px]:p-3">
       <div className="relative flex flex-wrap items-center gap-2 pr-11">
         {serviceTabs.map((tab) => {
           const tabCount = serviceTabCounts?.[tab.key];
@@ -145,7 +145,7 @@ export function CashierBoard({
         </div>
       ) : null}
 
-      <div className="mt-2 min-h-0 flex-1 overflow-y-auto">
+      <div className="pos-pane-scroll mt-2">
         {isLoading && tables.length === 0 && orders.length === 0 ? (
           <ApiLoadingState label={t("cashier.loading")} />
         ) : (

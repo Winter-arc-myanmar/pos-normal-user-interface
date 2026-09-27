@@ -54,6 +54,19 @@
   overscroll-behavior: contain;
 }
 
+/* A fixed-pane list must not size itself from its content. A zero flex basis
+   makes the remaining height explicit, which Android WebView needs before it
+   will dispatch touch drags to the list instead of its grid parent. */
+.pos-pane-scroll {
+  min-height: 0;
+  flex: 1 1 0%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+}
+
 /* POS screens keep a fixed application frame at every width. Individual
    lists and detail panes own their scrolling; document scrolling would move
    controls and rails away from the operator. */
