@@ -41,6 +41,39 @@ export function readPrinterBindings(
   }
 }
 
+const bindingsFromStore = (store: PrinterBindingStore) => {
+  const bindings = Object.values(store.bindings || {});
+  const savedDefault = store.defaultBindingId
+    ? store.bindings[store.defaultBindingId] || null
+    : null;
+  return {
+    bindings,
+    defaultBinding: savedDefault || bindings[0] || null,
+  };
+};
+
+export function listStoredPrinterBindings(
+  tenantId: string,
+  registerId: string
+): { bindings: PrinterBinding[]; defaultBinding: PrinterBinding | null } {
+  const current = bindingsFromStore(readPrinterBindings(tenantId, registerId));
+  if (current.bindings.length || typeof localStorage === "undefined") return current;
+
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (!key?.startsWith("pos:printerBindings:")) continue;
+    try {
+      const parsed = JSON.parse(localStorage.getItem(key) || "") as PrinterBindingStore;
+      const found = bindingsFromStore(parsed);
+      if (found.bindings.length) return found;
+    } catch {
+      // Ignore unreadable printer settings from another register.
+    }
+  }
+
+  return current;
+}
+
 const write = (
   tenantId: string,
   registerId: string,
@@ -66,6 +99,26 @@ export function savePrinterBinding(
     defaultBindingId:
       makeDefault || !store.defaultBindingId ? binding.id : store.defaultBindingId,
     bindings: { ...store.bindings, [binding.id]: binding },
+  });
+}
+
+export function removeLocalOnlyPrinterBindings(
+  tenantId: string,
+  registerId: string
+): void {
+  const store = readPrinterBindings(tenantId, registerId);
+  const bindings = Object.fromEntries(
+    Object.entries(store.bindings).filter(([, binding]) => binding.backendPrinterId)
+  );
+  if (Object.keys(bindings).length === Object.keys(store.bindings).length) return;
+  const nextDefault =
+    store.defaultBindingId && bindings[store.defaultBindingId]
+      ? store.defaultBindingId
+      : Object.keys(bindings)[0];
+  write(tenantId, registerId, {
+    ...store,
+    bindings,
+    defaultBindingId: nextDefault,
   });
 }
 

@@ -137,6 +137,36 @@ const resolveLineCatalog = (item: Record<string, unknown>) => {
   };
 };
 
+const nestedLineCount = (item: Record<string, unknown>): number | undefined => {
+  const countBlock = asRecord(item._count);
+  const fromCount = toNumber(
+    countBlock?.lines ??
+      countBlock?.orderLines ??
+      countBlock?.salesOrderLines
+  );
+  if (fromCount !== undefined) return fromCount;
+  return toNumber(
+    item.linesCount ??
+      item.lineItemsCount ??
+      item.totalLineItems ??
+      item.totalLines
+  );
+};
+
+const quantityFromLines = (lines: Record<string, unknown>[]): number | undefined => {
+  if (!lines.length) return undefined;
+  let total = 0;
+  let hasQuantity = false;
+  for (const line of lines) {
+    const quantity = toNumber(line.quantity);
+    if (quantity === undefined) continue;
+    hasQuantity = true;
+    total += quantity;
+  }
+  if (hasQuantity && total > 0) return Math.round(total * 10000) / 10000;
+  return lines.length;
+};
+
 const resolveItemSummary = (item: Record<string, unknown>) => {
   const lines = nestedList(item);
   const names = lines
@@ -145,8 +175,20 @@ const resolveItemSummary = (item: Record<string, unknown>) => {
       return catalog.productName || catalog.variantName || catalog.sku;
     })
     .filter((name): name is string => Boolean(name));
-  const counted = toNumber(item.itemCount ?? item.lineCount ?? item.itemsCount);
-  const itemCount = counted ?? (lines.length || names.length || undefined);
+  const fromLines = quantityFromLines(lines);
+  let itemCount: number | undefined;
+  if (fromLines !== undefined) {
+    itemCount = fromLines;
+  } else {
+    const explicit = toNumber(
+      item.itemCount ?? item.lineCount ?? item.itemsCount
+    );
+    const nested = nestedLineCount(item);
+    if (explicit !== undefined && explicit > 0) itemCount = explicit;
+    else if (nested !== undefined && nested > 0) itemCount = nested;
+    else if (explicit !== undefined) itemCount = explicit;
+    else itemCount = nested;
+  }
   let itemSummary = asHumanName(item.itemSummary);
   if (!itemSummary && names.length) {
     itemSummary =

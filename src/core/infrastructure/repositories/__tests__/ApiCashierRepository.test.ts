@@ -275,7 +275,6 @@ describe("ApiCashierRepository", () => {
     });
 
     expect(post).toHaveBeenCalledWith("/api/v1/checkout", {
-      tenantId: "tenant-1",
       locationId: "location-1",
       salesChannel: "POS",
       serviceType: "DINE_IN",
@@ -324,7 +323,6 @@ describe("ApiCashierRepository", () => {
     });
 
     expect(post).toHaveBeenCalledWith("/api/v1/checkout", {
-      tenantId: "tenant-1",
       locationId: "location-1",
       salesChannel: "POS",
       serviceType: "DINE_IN",
@@ -384,7 +382,6 @@ describe("ApiCashierRepository", () => {
     });
 
     expect(post).toHaveBeenCalledWith("/api/v1/checkout", {
-      tenantId: "tenant-1",
       locationId: "location-1",
       salesChannel: "POS",
       serviceType: "DINE_IN",
@@ -623,6 +620,22 @@ describe("ApiCashierRepository", () => {
             courseType: "MAIN",
             stationId: "station-1",
             firedAt: "2026-09-22T16:53:22.241Z",
+            station: {
+              id: "station-1",
+              name: "Hot line",
+              printerId: "printer-hot",
+            },
+            kdsTicketLines: [
+              {
+                id: "line-1",
+                productName: "Dish Soap",
+                quantity: "2.0000",
+                kitchenModifiers: "No ice",
+                salesOrderLine: {
+                  product: { name: "Dish Soap", categoryId: "grocery" },
+                },
+              },
+            ],
           },
         });
       }
@@ -661,5 +674,17 @@ describe("ApiCashierRepository", () => {
     });
     expect(list.totalPages).toBe(1);
     expect(ticket.ticketNumber).toBe("KDS-20260506-0001");
+    expect(ticket.station).toMatchObject({
+      name: "Hot line",
+      printerId: "printer-hot",
+    });
+    expect(ticket.lines).toEqual([
+      {
+        name: "Dish Soap",
+        quantity: "2.0000",
+        categoryId: "grocery",
+        modifiers: "No ice",
+      },
+    ]);
   });
 });

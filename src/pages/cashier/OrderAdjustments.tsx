@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { AdjustmentReason } from "@/core/domain/entities/Cashier";
@@ -43,12 +44,29 @@ export function OrderAdjustments({
 }: OrderAdjustmentsProps) {
   const { t } = useTranslation();
   const hasDiscount = Number(discountAmount) > 0;
+  const hasValues =
+    hasDiscount ||
+    Number(serviceCharge) > 0 ||
+    Number(tipAmount) > 0 ||
+    memberCardUid.trim().length > 0 ||
+    Boolean(memberPointsLabel);
+  const [expanded, setExpanded] = useState(hasValues);
 
   return (
     <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-        {t("cashier.orderPanel.adjustments")}
-      </p>
+      <button
+        type="button"
+        className="flex w-full items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-slate-500"
+        aria-expanded={expanded}
+        onClick={() => setExpanded((current) => !current)}
+      >
+        <span>{t("cashier.orderPanel.adjustments")}</span>
+        <span aria-hidden="true" className="text-xs">
+          {expanded ? "▾" : "▸"}
+        </span>
+      </button>
+      {expanded ? (
+        <>
       <label className="block space-y-1">
         <span className="text-xs text-slate-600">
           {t("cashier.orderPanel.discount")}
@@ -144,6 +162,8 @@ export function OrderAdjustments({
           <p className="text-xs text-red-700">{memberCardError}</p>
         ) : null}
       </div>
+        </>
+      ) : null}
     </div>
   );
 }

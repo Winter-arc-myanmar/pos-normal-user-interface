@@ -53,6 +53,9 @@ const statusTabFilters: Record<StatusTab, OrderStatus | undefined> = {
   voided: "VOIDED",
 };
 
+const isVoidedSalesOrder = (order: Pick<SalesOrder, "status">) =>
+  String(order.status || "").toUpperCase() === "VOIDED";
+
 function EmptyIllustration() {
   return (
     <svg
@@ -333,7 +336,11 @@ export function SalesOrdersPage() {
                         <p className="truncate font-semibold">
                           {order.orderNumber || order.id.slice(0, 8)}
                         </p>
-                        <p className="shrink-0 font-semibold">{money(order.grandTotal)}</p>
+                        {!isVoidedSalesOrder(order) ? (
+                          <p className="shrink-0 font-semibold">
+                            {money(order.grandTotal)}
+                          </p>
+                        ) : null}
                       </div>
                       <p className="mt-1 text-[11px] text-slate-400">
                         {formatDateTime(order.createdAt)}
@@ -347,13 +354,15 @@ export function SalesOrdersPage() {
                         >
                           {t(salesOrderStatusKey(order.status))}
                         </span>
-                        <span className="text-[11px] text-slate-400">
-                          {order.itemCount === 1
-                            ? t("salesOrders.itemCountOne")
-                            : t("salesOrders.itemCount", {
-                                count: order.itemCount || 0,
-                              })}
-                        </span>
+                        {order.itemCount != null ? (
+                          <span className="text-[11px] text-slate-400">
+                            {order.itemCount === 1
+                              ? t("salesOrders.itemCountOne")
+                              : t("salesOrders.itemCount", {
+                                  count: order.itemCount,
+                                })}
+                          </span>
+                        ) : null}
                       </div>
                       <p className="mt-1 truncate text-xs text-slate-500">
                         {orderSummary(order)}
@@ -479,7 +488,11 @@ export function SalesOrdersPage() {
                             {formatPosQuantity(line.quantity)}{" "}
                             {lineDisplayName(line) || t("salesOrders.item")}
                           </p>
-                          <span>{money(Number(line.unitPrice) * Number(line.quantity))}</span>
+                          {!isVoidedSalesOrder(selectedOrder) ? (
+                            <span>
+                              {money(Number(line.unitPrice) * Number(line.quantity))}
+                            </span>
+                          ) : null}
                         </div>
                         <div className="mt-1 flex flex-wrap gap-1">
                           {(["fire", "ready", "serve"] as const).map((action) => (
@@ -498,28 +511,30 @@ export function SalesOrdersPage() {
                   </ul>
                 )}
 
-                <div className="mt-4 space-y-1 border-t border-slate-200 pt-3 text-sm">
-                  {(
-                    [
-                      ["subtotal", selectedOrder.subtotal],
-                      ["discount", selectedOrder.totalDiscount],
-                      ["tax", selectedOrder.totalTax],
-                      ["serviceCharge", selectedOrder.serviceCharge],
-                      ["tip", selectedOrder.tipAmount],
-                    ] as const
-                  ).map(([label, value]) =>
-                    Number(value) ? (
-                      <div key={label} className="flex justify-between text-slate-600">
-                        <span>{t(`salesOrders.${label}`)}</span>
-                        <span>{money(value)}</span>
-                      </div>
-                    ) : null
-                  )}
-                  <div className="flex justify-between pt-1 text-base font-bold">
-                    <span>{t("salesOrders.total")}</span>
-                    <span>{money(selectedOrder.grandTotal)}</span>
+                {!isVoidedSalesOrder(selectedOrder) ? (
+                  <div className="mt-4 space-y-1 border-t border-slate-200 pt-3 text-sm">
+                    {(
+                      [
+                        ["subtotal", selectedOrder.subtotal],
+                        ["discount", selectedOrder.totalDiscount],
+                        ["tax", selectedOrder.totalTax],
+                        ["serviceCharge", selectedOrder.serviceCharge],
+                        ["tip", selectedOrder.tipAmount],
+                      ] as const
+                    ).map(([label, value]) =>
+                      Number(value) ? (
+                        <div key={label} className="flex justify-between text-slate-600">
+                          <span>{t(`salesOrders.${label}`)}</span>
+                          <span>{money(value)}</span>
+                        </div>
+                      ) : null
+                    )}
+                    <div className="flex justify-between pt-1 text-base font-bold">
+                      <span>{t("salesOrders.total")}</span>
+                      <span>{money(selectedOrder.grandTotal)}</span>
+                    </div>
                   </div>
-                </div>
+                ) : null}
 
                 <div className="mt-4 border-t border-slate-200 pt-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
@@ -527,7 +542,11 @@ export function SalesOrdersPage() {
                   </p>
                   <div className="mt-2 flex justify-between text-sm">
                     <span>{t(salesOrderStatusKey(selectedOrder.status))}</span>
-                    <span className="font-semibold">{money(selectedOrder.grandTotal)}</span>
+                    {!isVoidedSalesOrder(selectedOrder) ? (
+                      <span className="font-semibold">
+                        {money(selectedOrder.grandTotal)}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
               </div>

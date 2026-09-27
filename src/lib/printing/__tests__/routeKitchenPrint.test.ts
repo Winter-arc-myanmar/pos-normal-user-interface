@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { PrinterBinding } from "@/lib/pos/printerBindingStorage";
-import { formatKitchenSlip, formatSaleReceipt } from "../formatKdsTicket";
+import {
+  formatKdsTicket,
+  formatKitchenSlip,
+  formatSaleReceipt,
+} from "../formatKdsTicket";
+import { KdsTicket } from "@/core/domain/entities/Cashier";
+import {
+  PrintTemplate,
+  defaultPrintTemplateSettings,
+} from "@/core/domain/entities/PrintTemplate";
 import { groupKitchenJobs } from "../routeKitchenPrint";
+import { selectPrintTemplate } from "../selectPrintTemplate";
 
 const binding = (id: string, backendPrinterId: string): PrinterBinding => ({
   id,
@@ -54,6 +64,31 @@ describe("station print routing", () => {
     expect(plan.jobs[1].binding.id).toBe("food-printer");
   });
 
+  it("prints items with no station match on the default printer", () => {
+    const fallback = binding("main", "printer-main");
+    const plan = groupKitchenJobs(
+      [{ name: "Soup", quantity: "1", categoryId: "other" }],
+      [fallback],
+      fallback,
+      undefined,
+      [
+        {
+          id: "bar",
+          name: "Bar",
+          printerId: "printer-bar",
+          categoryIds: ["drink"],
+        },
+      ]
+    );
+
+    expect(plan.unrouted).toEqual([]);
+    expect(plan.jobs).toHaveLength(1);
+    expect(plan.jobs[0].binding.id).toBe("main");
+    expect(plan.jobs[0].lines).toEqual([
+      expect.objectContaining({ name: "Soup" }),
+    ]);
+  });
+
   it("reprints a counter ticket on that station printer", () => {
     const plan = groupKitchenJobs(
       [{ name: "Fried chicken", quantity: "1" }],
@@ -102,5 +137,89 @@ describe("station print routing", () => {
     expect(finance).toContain("5.00");
     expect(checkout).toContain("LOGO");
     expect(checkout).toContain("5.00");
+  });
+
+  it("prints ticket items and the station name from kdsTicketLines", () => {
+    const slip = formatKdsTicket(
+      new KdsTicket({
+        ticketNumber: "KDS-1",
+        stationId: "station-1",
+        station: { id: "station-1", name: "Hot line", printerId: "printer-hot" },
+        kdsTicketLines: [
+          {
+            id: "line-1",
+            ticketId: "ticket-1",
+            salesOrderLineId: "order-line-1",
+            productName: "Dish Soap",
+            quantity: "2.0000",
+            kitchenModifiers: "No ice",
+            status: "PENDING",
+            createdAt: "",
+            updatedAt: "",
+          },
+        ],
+      })
+    );
+
+    expect(slip).toContain("Dish Soap");
+    expect(slip).toContain("2  Dish Soap");
+    expect(slip).toContain("No ice");
+    expect(slip).toContain("Station: Hot line");
+  });
+
+  it("prints from the saved template for that section", () => {
+    const checkoutSettings = defaultPrintTemplateSettings();
+    checkoutSettings.header.logo = false;
+    checkoutSettings.item.price = false;
+    checkoutSettings.bill.totalPayment = false;
+    checkoutSettings.other.footerText = "See you";
+    const slip = formatSaleReceipt({
+      title: "RECEIPT",
+      place: "CHECKOUT",
+      template: checkoutSettings,
+      lines: [{ name: "Beer", quantity: "1", unitPrice: "5.00" }],
+      total: "5.00",
+    });
+
+    expect(slip).not.toContain("LOGO");
+    expect(slip).not.toContain("5.00");
+    expect(slip).toContain("Beer");
+    expect(slip).toContain("See you");
+  });
+
+  it("uses the kitchen template for KDS and the non-default receipt for finance", () => {
+    const kitchen = new PrintTemplate({
+      id: "kitchen",
+      type: "KITCHEN",
+      isDefault: true,
+      settings: defaultPrintTemplateSettings(),
+    });
+    const checkout = new PrintTemplate({
+      id: "checkout",
+      type: "RECEIPT",
+      isDefault: true,
+      locationId: "location-1",
+      settings: defaultPrintTemplateSettings(),
+    });
+    const financeSettings = defaultPrintTemplateSettings();
+    financeSettings.header.logo = false;
+    const finance = new PrintTemplate({
+      id: "finance",
+      type: "RECEIPT",
+      isDefault: false,
+      locationId: "location-1",
+      settings: financeSettings,
+    });
+
+    expect(selectPrintTemplate("KDS", [kitchen, checkout, finance])?.header.logo).toBe(
+      true
+    );
+    expect(
+      selectPrintTemplate("CHECKOUT", [kitchen, checkout, finance], "location-1")
+    ).toBe(checkout.settings);
+    expect(
+      selectPrintTemplate("FINANCE", [kitchen, checkout, finance], "location-1")?.header
+        .logo
+    ).toBe(false);
   });
 });

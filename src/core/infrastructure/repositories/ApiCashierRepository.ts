@@ -244,7 +244,6 @@ const normalizeTableSessionCheckoutPayload = (
 const normalizeCheckoutPayload = (
   payload: CheckoutRequestDTO
 ): Record<string, unknown> => ({
-  tenantId: payload.tenantId,
   locationId: payload.locationId,
   salesChannel: payload.salesChannel,
   serviceType: payload.serviceType,
@@ -355,20 +354,63 @@ const asList = <T>(response: unknown): T[] => {
   return [];
 };
 
+const ticketLineName = (row: Record<string, unknown>) => {
+  const salesOrderLine = asRecord(row.salesOrderLine);
+  const product =
+    asRecord(row.product) || asRecord(salesOrderLine?.product);
+  const variant =
+    asRecord(row.variant) || asRecord(salesOrderLine?.variant);
+  return String(
+    row.productName ||
+      row.name ||
+      product?.name ||
+      salesOrderLine?.productName ||
+      variant?.name ||
+      row.variantName ||
+      "Item"
+  );
+};
+
+const ticketLineCategoryId = (row: Record<string, unknown>) => {
+  const salesOrderLine = asRecord(row.salesOrderLine);
+  const product =
+    asRecord(row.product) || asRecord(salesOrderLine?.product);
+  const category = asRecord(product?.category) || asRecord(row.category);
+  const value =
+    row.categoryId ||
+    salesOrderLine?.categoryId ||
+    product?.categoryId ||
+    category?.id;
+  return value ? String(value) : undefined;
+};
+
+const mapTicketLine = (entry: unknown) => {
+  const row = asRecord(entry);
+  if (!row) return null;
+  const modifiers = row.kitchenModifiers
+    ? String(row.kitchenModifiers)
+    : undefined;
+  return {
+    name: ticketLineName(row),
+    quantity: String(row.quantity || "1"),
+    categoryId: ticketLineCategoryId(row),
+    modifiers,
+  };
+};
+
 const toTicketLines = (item: Record<string, unknown>) => {
-  const candidates = [item.lines, item.items, item.orderLines];
+  const candidates = [
+    item.kdsTicketLines,
+    item.lines,
+    item.items,
+    item.orderLines,
+  ];
   for (const candidate of candidates) {
-    if (!Array.isArray(candidate)) continue;
-    return candidate
-      .filter((entry) => entry && typeof entry === "object")
-      .map((entry) => {
-        const row = entry as Record<string, unknown>;
-        return {
-          name: String(row.name || row.productName || row.variantName || "Item"),
-          quantity: String(row.quantity || "1"),
-          categoryId: row.categoryId ? String(row.categoryId) : undefined,
-        };
-      });
+    if (!Array.isArray(candidate) || !candidate.length) continue;
+    const lines = candidate
+      .map(mapTicketLine)
+      .filter((line): line is NonNullable<typeof line> => Boolean(line));
+    if (lines.length) return lines;
   }
   return undefined;
 };
@@ -487,13 +529,17 @@ const toKdsTicket = (item: Record<string, unknown>) =>
         })
       : [],
     station: item.station
-      ? new KdsStation({
-          ...(asRecord(item.station) || {}),
-          id: String(asRecord(item.station)?.id || ""),
-          tenantId: String(asRecord(item.station)?.tenantId || ""),
-          locationId: String(asRecord(item.station)?.locationId || ""),
-          name: String(asRecord(item.station)?.name || ""),
-        })
+      ? (() => {
+          const station = asRecord(item.station) || {};
+          return new KdsStation({
+            ...station,
+            id: String(station.id || item.stationId || ""),
+            tenantId: String(station.tenantId || ""),
+            locationId: String(station.locationId || ""),
+            name: String(station.name || ""),
+            printerId: station.printerId ? String(station.printerId) : undefined,
+          });
+        })()
       : undefined,
     createdAt: String(item.createdAt || ""),
     updatedAt: String(item.updatedAt || ""),

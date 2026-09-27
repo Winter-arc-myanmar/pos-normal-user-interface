@@ -82,14 +82,14 @@ function WaitlistIcon() {
   );
 }
 
-function TipsIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass} aria-hidden="true">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M15 8.5c-.6-.7-1.5-1-2.6-1-1.4 0-2.4.7-2.4 1.8 0 2.8 5.5 1.3 5.5 4.2 0 1.2-1.1 2-2.7 2-1.2 0-2.3-.4-3-1.2M12.5 5.5v2M12.5 15.5v2" />
-    </svg>
-  );
-}
+// function TipsIcon() {
+//   return (
+//     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass} aria-hidden="true">
+//       <circle cx="12" cy="12" r="9" />
+//       <path d="M15 8.5c-.6-.7-1.5-1-2.6-1-1.4 0-2.4.7-2.4 1.8 0 2.8 5.5 1.3 5.5 4.2 0 1.2-1.1 2-2.7 2-1.2 0-2.3-.4-3-1.2M12.5 5.5v2M12.5 15.5v2" />
+//     </svg>
+//   );
+// }
 
 function OrdersIcon() {
   return (
@@ -109,15 +109,15 @@ function SalesOrdersIcon() {
   );
 }
 
-function SyncIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass} aria-hidden="true">
-      <path d="M4 7h11a4 4 0 0 1 0 8H9" />
-      <path d="m7 11-3-3 3-3M20 17H9a4 4 0 0 1 0-8h6" />
-      <path d="m17 13 3 3-3 3" />
-    </svg>
-  );
-}
+// function SyncIcon() {
+//   return (
+//     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass} aria-hidden="true">
+//       <path d="M4 7h11a4 4 0 0 1 0 8H9" />
+//       <path d="m7 11-3-3 3-3M20 17H9a4 4 0 0 1 0-8h6" />
+//       <path d="m17 13 3 3-3 3" />
+//     </svg>
+//   );
+// }
 
 export function AppShell() {
   const { t } = useTranslation();
@@ -212,18 +212,18 @@ export function AppShell() {
       icon: <WaitlistIcon />,
       visible: canAccess(PAGE_PERMISSIONS.waitlist),
     },
-    {
-      to: "/tip-pools",
-      label: t("shell.tipPoolsTitle"),
-      icon: <TipsIcon />,
-      visible: canAccess(PAGE_PERMISSIONS.tipPools),
-    },
-    {
-      to: "/sync",
-      label: t("shell.syncTitle"),
-      icon: <SyncIcon />,
-      visible: canAccess(PAGE_PERMISSIONS.sync),
-    },
+    // {
+    //   to: "/tip-pools",
+    //   label: t("shell.tipPoolsTitle"),
+    //   icon: <TipsIcon />,
+    //   visible: canAccess(PAGE_PERMISSIONS.tipPools),
+    // },
+    // {
+    //   to: "/sync",
+    //   label: t("shell.syncTitle"),
+    //   icon: <SyncIcon />,
+    //   visible: canAccess(PAGE_PERMISSIONS.sync),
+    // },
     {
       to: "/dashboard",
       label: t("shell.dashboardTitle"),
@@ -290,7 +290,7 @@ export function AppShell() {
         notificationLabel={t("shell.notifications")}
         onNotificationsClick={() => navigate("/cashier?view=orders")}
         onPrinterClick={() => navigate("/settings/printer")}
-        onProfileClick={() => navigate("/settings/cashier")}
+        onProfileClick={() => navigate("/settings/devices")}
       />
 
       <main

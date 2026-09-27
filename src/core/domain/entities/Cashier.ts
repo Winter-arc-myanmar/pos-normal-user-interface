@@ -273,7 +273,12 @@ export class KdsTicket {
   startedAt?: string | null;
   bumpedAt?: string | null;
   status!: "PENDING" | "PREPARING" | "READY" | "EXPEDITED";
-  lines?: Array<{ name: string; quantity: string; categoryId?: string }>;
+  lines?: Array<{
+    name: string;
+    quantity: string;
+    categoryId?: string;
+    modifiers?: string;
+  }>;
   kdsTicketLines?: KdsTicketLine[];
   station?: KdsStation;
   createdAt!: string;
