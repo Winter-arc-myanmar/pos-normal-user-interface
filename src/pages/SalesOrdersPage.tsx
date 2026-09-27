@@ -324,7 +324,7 @@ export function SalesOrdersPage() {
       ) : null}
 
       <div className="pos-split grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)_6.5rem] gap-3 overflow-hidden px-4 pb-4">
-        <div className="min-h-0 overflow-y-auto rounded-md bg-[#101010]">
+        <div className="pos-pane-scroll rounded-md bg-[#101010]">
           {isLoading && visibleOrders.length === 0 ? (
             <ApiLoadingState label={t("salesOrders.loading")} />
           ) : visibleOrders.length === 0 ? (
@@ -488,7 +488,7 @@ export function SalesOrdersPage() {
                 </div>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+              <div className="pos-pane-scroll px-4 py-3">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
                   {t("salesOrders.lines")}
                 </p>

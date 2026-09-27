@@ -160,7 +160,7 @@ export function CounterOrdersPage() {
       )}
 
       <div className="pos-split grid min-h-0 flex-1 grid-cols-1 min-[900px]:grid-cols-[14rem_minmax(0,1fr)]">
-        <aside className="border-r border-slate-200 bg-slate-50">
+        <aside className="pos-pane-scroll border-r border-slate-200 bg-slate-50">
           <button
             type="button"
             onClick={() => {
@@ -195,7 +195,7 @@ export function CounterOrdersPage() {
         </aside>
 
         <div className="flex min-h-0 flex-col">
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="pos-pane-scroll">
             {tickets.length ? (
               tickets.map((ticket) => (
                 <article
