@@ -67,6 +67,15 @@
   overscroll-behavior: contain;
 }
 
+.pos-member-list {
+  min-height: 9rem;
+  flex: 1 1 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+
 /* POS screens keep a fixed application frame at every width. Individual
    lists and detail panes own their scrolling; document scrolling would move
    controls and rails away from the operator. */
@@ -148,7 +157,7 @@
   }
 
   .pos-app-shell > main .pos-split.pos-member-split:has(> :nth-child(2):last-child) {
-    grid-template-columns: minmax(0, 0.55fr) minmax(0, 1.45fr);
+    grid-template-columns: minmax(0, 0.35fr) minmax(0, 1.65fr);
   }
 
   .pos-app-shell > main .pos-split:has(> :nth-child(3):last-child:not(.hidden)) {
