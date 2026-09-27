@@ -38,6 +38,7 @@
     "printer": "Printer",
     "notifications": "Notifications",
     "waitlistTitle": "Waitlist",
+    "diningTablesTitle": "Tables",
     "tipPoolsTitle": "Tip pools",
     "syncTitle": "Sync",
     "usersTitle": "Users",
@@ -1536,6 +1537,46 @@
     "errors": {
       "openSession": "Could not start the room",
       "sessionRequired": "Start the room first"
+    }
+  },
+  "diningTables": {
+    "title": "Dining tables",
+    "subtitle": "{{count}} tables on this floor",
+    "search": "Search table number",
+    "add": "Add table",
+    "create": "New table",
+    "edit": "Table details",
+    "zone": "Zone",
+    "chooseZone": "Choose a zone",
+    "allZones": "All zones",
+    "number": "Table number",
+    "maxSeats": "Seats",
+    "shape": "Shape",
+    "dragHint": "Drag a table on the floor to place it.",
+    "statusLabel": "Status",
+    "allStatuses": "All",
+    "seats": "{{count}} seats",
+    "guests": "{{count}} guests",
+    "seated": "{{duration}} · {{items}} items",
+    "zoneHint": "Zone: {{zone}}",
+    "loading": "Loading tables...",
+    "empty": "No tables in this view.",
+    "saved": "Table saved.",
+    "moved": "Table moved.",
+    "statusSaved": "Status updated.",
+    "deleted": "Table removed.",
+    "confirmDelete": "Confirm delete",
+    "prevPage": "Previous page",
+    "nextPage": "Next page",
+    "status": {
+      "AVAILABLE": "Available",
+      "OCCUPIED": "Occupied",
+      "DIRTY": "Dirty",
+      "RESERVED": "Reserved"
+    },
+    "shapeOption": {
+      "RECTANGLE": "Rectangle",
+      "CIRCLE": "Circle"
     }
   }
 }

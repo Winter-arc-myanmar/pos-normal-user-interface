@@ -73,6 +73,17 @@ function CardsIcon() {
   );
 }
 
+function TablesIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass} aria-hidden="true">
+      <rect x="3" y="4" width="7" height="6" rx="1" />
+      <rect x="14" y="4" width="7" height="6" rx="1" />
+      <rect x="3" y="14" width="7" height="6" rx="1" />
+      <rect x="14" y="14" width="7" height="6" rx="1" />
+    </svg>
+  );
+}
+
 function WaitlistIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass} aria-hidden="true">
@@ -137,6 +148,7 @@ export function AppShell() {
     "/spa",
     "/sales-orders",
     "/waitlist",
+    "/dining-tables",
     "/tip-pools",
     "/counter-orders",
     "/customers",
@@ -212,6 +224,12 @@ export function AppShell() {
       label: t("shell.waitlistTitle"),
       icon: <WaitlistIcon />,
       visible: canAccess(PAGE_PERMISSIONS.waitlist),
+    },
+    {
+      to: "/dining-tables",
+      label: t("shell.diningTablesTitle"),
+      icon: <TablesIcon />,
+      visible: canAccess(PAGE_PERMISSIONS.diningTables),
     },
     // {
     //   to: "/tip-pools",

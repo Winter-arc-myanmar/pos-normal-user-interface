@@ -38,6 +38,7 @@
     "printer": "ပရင်တာ",
     "notifications": "အကြောင်းကြားချက်များ",
     "waitlistTitle": "စောင့်ဆိုင်းစာရင်း",
+    "diningTablesTitle": "စားပွဲများ",
     "tipPoolsTitle": "တိပ်ပေါင်းငွေ",
     "syncTitle": "ချိန်ကိုက်မှု",
     "usersTitle": "အသုံးပြုသူများ",
@@ -1536,6 +1537,46 @@
     "errors": {
       "openSession": "အခန်း စတင်၍ မရပါ",
       "sessionRequired": "အခန်းကို အရင်စတင်ပါ"
+    }
+  },
+  "diningTables": {
+    "title": "စားပွဲ စီမံမှု",
+    "subtitle": "ဤထပ်တွင် စားပွဲ {{count}} လုံး",
+    "search": "စားပွဲနံပါတ် ရှာမည်",
+    "add": "စားပွဲ ထည့်မည်",
+    "create": "စားပွဲ အသစ်",
+    "edit": "စားပွဲ အသေးစိတ်",
+    "zone": "ဇုန်",
+    "chooseZone": "ဇုန် ရွေးပါ",
+    "allZones": "ဇုန် အားလုံး",
+    "number": "စားပွဲနံပါတ်",
+    "maxSeats": "ထိုင်ခုံ",
+    "shape": "ပုံစံ",
+    "dragHint": "နေရာချရန် စားပွဲကို ဆွဲရွှေ့ပါ။",
+    "statusLabel": "အခြေအနေ",
+    "allStatuses": "အားလုံး",
+    "seats": "ထိုင်ခုံ {{count}}",
+    "guests": "ဧည့်သည် {{count}}",
+    "seated": "{{duration}} · ပစ္စည်း {{items}}",
+    "zoneHint": "ဇုန်: {{zone}}",
+    "loading": "စားပွဲများ ဖွင့်နေသည်...",
+    "empty": "ဤမြင်ကွင်းတွင် စားပွဲ မရှိပါ။",
+    "saved": "စားပွဲ သိမ်းပြီးပါပြီ။",
+    "moved": "စားပွဲ နေရာပြောင်းပြီးပါပြီ။",
+    "statusSaved": "အခြေအနေ ပြင်ပြီးပါပြီ။",
+    "deleted": "စားပွဲ ဖယ်ပြီးပါပြီ။",
+    "confirmDelete": "ဖျက်ရန် အတည်ပြုပါ",
+    "prevPage": "ယခင်စာမျက်နှာ",
+    "nextPage": "နောက်စာမျက်နှာ",
+    "status": {
+      "AVAILABLE": "လွတ်နေသည်",
+      "OCCUPIED": "အသုံးပြုနေသည်",
+      "DIRTY": "သန့်ရှင်းရန်",
+      "RESERVED": "ကြိုတင်ထားသည်"
+    },
+    "shapeOption": {
+      "RECTANGLE": "စတုဂံ",
+      "CIRCLE": "စက်ဝိုင်း"
     }
   }
 }

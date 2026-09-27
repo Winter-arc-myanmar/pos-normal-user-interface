@@ -4,7 +4,9 @@ import {
   CreateSalesOrderDTO,
   CreateTipPoolDTO,
   CreateWaitlistEntryDTO,
+  CreateDiningTableDTO,
   DiningTableFilterDTO,
+  DiningTableListDTO,
   FireKdsDTO,
   KdsTicketFilterDTO,
   KdsTicketListDTO,
@@ -20,6 +22,7 @@ import {
   CreatePosSessionDTO,
   TipPoolAllocationDTO,
   TipPoolFilterDTO,
+  UpdateDiningTableDTO,
   UpdateTableSessionStateDTO,
   UpdateTipPoolDTO,
   UpdateWaitlistEntryDTO,
@@ -80,6 +83,11 @@ export interface ICashierRepository {
   closePosSession(sessionId: string): Promise<PosSession>;
   getDiningZones(): Promise<DiningZone[]>;
   getDiningTables(params?: DiningTableFilterDTO): Promise<DiningTable[]>;
+  listDiningTables(params?: DiningTableFilterDTO): Promise<DiningTableListDTO>;
+  getDiningTable(tableId: string): Promise<DiningTable>;
+  createDiningTable(payload: CreateDiningTableDTO): Promise<DiningTable>;
+  updateDiningTable(tableId: string, payload: UpdateDiningTableDTO): Promise<DiningTable>;
+  deleteDiningTable(tableId: string): Promise<DiningTable>;
   updateDiningTableStatus(
     tableId: string,
     status: DiningTable["status"]

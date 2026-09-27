@@ -6,7 +6,9 @@ import {
   CreateSalesOrderDTO,
   CreateTipPoolDTO,
   CreateWaitlistEntryDTO,
+  CreateDiningTableDTO,
   DiningTableFilterDTO,
+  DiningTableListDTO,
   FireKdsDTO,
   KdsTicketFilterDTO,
   KdsTicketListDTO,
@@ -23,6 +25,7 @@ import {
   TipPoolAllocationDTO,
   TipPoolFilterDTO,
   toApiServiceType,
+  UpdateDiningTableDTO,
   UpdateTableSessionStateDTO,
   UpdateTipPoolDTO,
   UpdateSalesOrderLineDTO,
@@ -222,6 +225,44 @@ export class CashierService implements ICashierService {
 
   async getDiningTables(params?: DiningTableFilterDTO): Promise<DiningTable[]> {
     return this.cashierRepository.getDiningTables(params);
+  }
+
+  async listDiningTables(params?: DiningTableFilterDTO): Promise<DiningTableListDTO> {
+    return this.cashierRepository.listDiningTables(params);
+  }
+
+  async getDiningTable(tableId: string): Promise<DiningTable> {
+    if (!tableId?.trim()) throw new Error("Table ID is required");
+    return this.cashierRepository.getDiningTable(tableId);
+  }
+
+  async createDiningTable(payload: CreateDiningTableDTO): Promise<DiningTable> {
+    if (!payload.tenantId?.trim()) throw new Error("Tenant ID is required");
+    if (!payload.zoneId?.trim()) throw new Error("Zone ID is required");
+    if (!payload.tableNumber?.trim()) throw new Error("Table number is required");
+    if (!payload.maxSeats || payload.maxSeats < 1) {
+      throw new Error("Seat count must be greater than zero");
+    }
+    return this.cashierRepository.createDiningTable(payload);
+  }
+
+  async updateDiningTable(
+    tableId: string,
+    payload: UpdateDiningTableDTO
+  ): Promise<DiningTable> {
+    if (!tableId?.trim()) throw new Error("Table ID is required");
+    if (payload.tableNumber !== undefined && !payload.tableNumber.trim()) {
+      throw new Error("Table number is required");
+    }
+    if (payload.maxSeats !== undefined && payload.maxSeats < 1) {
+      throw new Error("Seat count must be greater than zero");
+    }
+    return this.cashierRepository.updateDiningTable(tableId, payload);
+  }
+
+  async deleteDiningTable(tableId: string): Promise<DiningTable> {
+    if (!tableId?.trim()) throw new Error("Table ID is required");
+    return this.cashierRepository.deleteDiningTable(tableId);
   }
 
   async updateDiningTableStatus(
