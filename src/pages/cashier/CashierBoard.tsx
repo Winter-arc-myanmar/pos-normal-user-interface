@@ -87,7 +87,7 @@ export function CashierBoard({
 
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden p-2 min-[1100px]:p-3">
-      <div className="relative flex flex-wrap items-center gap-2 pr-11">
+      <div className="relative flex min-w-0 items-center gap-2 overflow-x-auto pr-11">
         {serviceTabs.map((tab) => {
           const tabCount = serviceTabCounts?.[tab.key];
           return (
@@ -96,7 +96,7 @@ export function CashierBoard({
               type="button"
               onClick={() => onServiceTypeChange(tab.key)}
               className={[
-                "min-h-10 rounded px-3 py-1.5 text-sm font-medium",
+                "shrink-0 min-h-10 rounded px-3 py-1.5 text-sm font-medium",
                 serviceType === tab.key
                   ? "bg-blue-600 text-white"
                   : "text-slate-200 hover:bg-slate-800",
@@ -117,7 +117,7 @@ export function CashierBoard({
         </div>
       </div>
 
-      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+      <div className="mt-1 flex min-w-0 items-center gap-1.5 overflow-x-auto">
         {statusTabs.map((tab) => {
           const tabCount = statusTabCounts?.[tab.key];
           return (
@@ -126,7 +126,7 @@ export function CashierBoard({
               type="button"
               onClick={() => onStatusFilterChange(tab.key)}
               className={[
-                "min-h-8 rounded px-2 py-1 text-xs",
+                "shrink-0 min-h-8 rounded px-2 py-1 text-xs",
                 statusFilter === tab.key
                   ? "bg-blue-600 text-white"
                   : "bg-slate-800 text-slate-300",
