@@ -13,7 +13,12 @@ import {
   OpenTableSessionDTO,
   PosRegisterFilterDTO,
   PosSessionFilterDTO,
+  CreateProductDTO,
+  CreateProductVariantDTO,
+  PaginatedQueryDTO,
   ProductFilterDTO,
+  ProductListDTO,
+  ProductVariantListDTO,
   SalesOrderFilterDTO,
   SeatWaitlistEntryDTO,
   TableSessionCheckoutDTO,
@@ -24,7 +29,10 @@ import {
   TipPoolFilterDTO,
   fromApiServiceType,
   toApiServiceType,
+  UomFilterDTO,
   UpdateDiningTableDTO,
+  UpdateProductDTO,
+  UpdateProductVariantDTO,
   UpdateTableSessionStateDTO,
   UpdateSalesOrderLineDTO,
   UpdateTipPoolDTO,
@@ -50,6 +58,8 @@ import {
   PosSession,
   Product,
   ProductVariant,
+  TaxRate,
+  Uom,
   SalesOrder,
   SalesOrderLine,
   TableSession,
@@ -344,6 +354,8 @@ const asList = <T>(response: unknown): T[] => {
     "tipPools",
     "allocations",
     "locations",
+    "uoms",
+    "taxRates",
   ];
 
   for (const key of listKeys) {
@@ -792,6 +804,160 @@ const toDiningTable = (item: Record<string, unknown>) =>
     activeSession: toDiningTableSession(item.activeSession),
   });
 
+const readPage = (
+  response: unknown,
+  count: number,
+  params?: { page?: number; limit?: number }
+) => {
+  const envelope = asRecord(response) || {};
+  const meta = asRecord(envelope.meta) || {};
+  const inner = asRecord(unwrap(response));
+  const limit = Number(meta.limit || inner?.limit || params?.limit || 10);
+  const total = Number(meta.total ?? inner?.total ?? count);
+  return {
+    total,
+    page: Number(meta.page || inner?.page || params?.page || 1),
+    limit,
+    totalPages: Number(
+      meta.totalPages || Math.max(1, Math.ceil(total / Math.max(limit, 1)))
+    ),
+  };
+};
+
+const assignText = (body: Record<string, unknown>, key: string, value?: string) => {
+  if (value === undefined) return;
+  const trimmed = value.trim();
+  if (!trimmed) return;
+  body[key] = trimmed;
+};
+
+const toProductPayload = (
+  payload: CreateProductDTO | UpdateProductDTO,
+  withTenant: boolean
+) => {
+  const body: Record<string, unknown> = {};
+  if (withTenant && "tenantId" in payload) {
+    assignText(body, "tenantId", payload.tenantId);
+  }
+  assignText(body, "name", payload.name);
+  assignText(body, "baseSku", payload.baseSku);
+  if (payload.basePrice !== undefined && payload.basePrice.trim()) {
+    body.basePrice = toDecimalString(payload.basePrice);
+  }
+  assignText(body, "baseUomId", payload.baseUomId);
+  assignText(body, "categoryId", payload.categoryId);
+  if (payload.globalAttributes) body.globalAttributes = payload.globalAttributes;
+  assignText(body, "imageUrl", payload.imageUrl);
+  assignText(body, "trackingType", payload.trackingType);
+  if (payload.isTaxable !== undefined) body.isTaxable = payload.isTaxable;
+  assignText(body, "taxRateId", payload.taxRateId);
+  return body;
+};
+
+const toVariantPayload = (payload: CreateProductVariantDTO | UpdateProductVariantDTO) => {
+  const body: Record<string, unknown> = {};
+  assignText(body, "variantSku", payload.variantSku);
+  if (payload.matrixOptions) body.matrixOptions = payload.matrixOptions;
+  assignText(body, "barcode", payload.barcode);
+  if (payload.priceModifier !== undefined && payload.priceModifier.trim()) {
+    body.priceModifier = toDecimalString(payload.priceModifier);
+  }
+  assignText(body, "imageUrl", payload.imageUrl);
+  return body;
+};
+
+const toProduct = (item: Record<string, unknown>) => {
+  const taxRate = asRecord(item.taxRate);
+  const category = readProductCategory(item);
+  const rawImage = item.imageUrl ? String(item.imageUrl) : undefined;
+  return new Product({
+    id: String(item.id || ""),
+    tenantId: String(item.tenantId || ""),
+    categoryId: category.categoryId,
+    categoryName: category.categoryName,
+    name: String(item.name || ""),
+    basePrice: String(item.basePrice || "0"),
+    baseSku: item.baseSku ? String(item.baseSku) : undefined,
+    baseUomId: item.baseUomId ? String(item.baseUomId) : undefined,
+    trackingType: item.trackingType ? String(item.trackingType).toUpperCase() : undefined,
+    imageUrl: resolveMediaUrl(item.imageUrl),
+    sourceImageUrl: rawImage,
+    globalAttributes: asRecord(item.globalAttributes),
+    totalOnHand:
+      item.totalOnHand === null || item.totalOnHand === undefined
+        ? undefined
+        : String(item.totalOnHand),
+    isTaxable: toBoolean(item.isTaxable),
+    taxRateId: item.taxRateId
+      ? String(item.taxRateId)
+      : taxRate?.id
+        ? String(taxRate.id)
+        : undefined,
+    taxRate:
+      toNumber(item.taxRateRatePercentage) ??
+      toNumber(item.taxRatePercentage) ??
+      toNumber(item.ratePercentage) ??
+      toNumber(taxRate?.ratePercentage) ??
+      toNumber(item.taxRate),
+    isPriceInclusive:
+      toBoolean(item.taxRateIsPriceInclusive) ??
+      toBoolean(item.isPriceInclusive) ??
+      toBoolean(item.priceInclusive) ??
+      toBoolean(taxRate?.isPriceInclusive),
+    deletedAt: item.deletedAt ? String(item.deletedAt) : item.deletedAt === null ? null : undefined,
+    createdAt: item.createdAt ? String(item.createdAt) : undefined,
+    updatedAt: item.updatedAt ? String(item.updatedAt) : undefined,
+  });
+};
+
+const toVariant = (item: Record<string, unknown>, productId: string) => {
+  const taxRate = asRecord(item.taxRate);
+  const rawImage = item.imageUrl ? String(item.imageUrl) : undefined;
+  return new ProductVariant({
+    id: String(item.id || ""),
+    productId: String(item.productId || productId),
+    variantSku: item.variantSku ? String(item.variantSku) : undefined,
+    barcode: item.barcode ? String(item.barcode) : undefined,
+    priceModifier: item.priceModifier ? String(item.priceModifier) : undefined,
+    imageUrl: resolveMediaUrl(item.imageUrl),
+    sourceImageUrl: rawImage,
+    matrixOptions: asRecord(item.matrixOptions),
+    isTaxable: toBoolean(item.isTaxable),
+    taxRate:
+      toNumber(item.taxRateRatePercentage) ??
+      toNumber(item.taxRatePercentage) ??
+      toNumber(item.ratePercentage) ??
+      toNumber(taxRate?.ratePercentage) ??
+      toNumber(item.taxRate),
+    isPriceInclusive:
+      toBoolean(item.taxRateIsPriceInclusive) ??
+      toBoolean(item.isPriceInclusive) ??
+      toBoolean(item.priceInclusive) ??
+      toBoolean(taxRate?.isPriceInclusive),
+    deletedAt: item.deletedAt ? String(item.deletedAt) : item.deletedAt === null ? null : undefined,
+    createdAt: item.createdAt ? String(item.createdAt) : undefined,
+    updatedAt: item.updatedAt ? String(item.updatedAt) : undefined,
+  });
+};
+
+const toUom = (item: Record<string, unknown>) =>
+  new Uom({
+    id: String(item.id || ""),
+    classId: String(item.classId || ""),
+    name: String(item.name || ""),
+    abbreviation: String(item.abbreviation || ""),
+    conversionRateToBase: String(item.conversionRateToBase || "1"),
+  });
+
+const toTaxRate = (item: Record<string, unknown>) =>
+  new TaxRate({
+    id: String(item.id || ""),
+    tenantId: String(item.tenantId || ""),
+    name: String(item.name || ""),
+    ratePercentage: String(item.ratePercentage || "0"),
+    isPriceInclusive: toBoolean(item.isPriceInclusive),
+  });
+
 export class ApiCashierRepository implements ICashierRepository {
   constructor(private readonly httpClient: HttpClient) {}
 
@@ -816,73 +982,119 @@ export class ApiCashierRepository implements ICashierRepository {
   }
 
   async getProducts(params?: ProductFilterDTO): Promise<Product[]> {
+    const listed = await this.listProducts(params);
+    return listed.products;
+  }
+
+  async listProducts(params?: ProductFilterDTO): Promise<ProductListDTO> {
     const response = await this.httpClient.get<ApiEnvelope<Record<string, unknown>[]>>(
       API_ENDPOINTS.PRODUCTS.LIST,
       { params }
     );
-    const data = asList<Record<string, unknown>>(response);
-    return data.map((item) => {
-      const taxRate = asRecord(item.taxRate);
-      const category = readProductCategory(item);
-      return new Product({
-        id: String(item.id || ""),
-        tenantId: String(item.tenantId || ""),
-        categoryId: category.categoryId,
-        categoryName: category.categoryName,
-        name: String(item.name || ""),
-        basePrice: String(item.basePrice || "0"),
-        baseSku: item.baseSku ? String(item.baseSku) : undefined,
-        trackingType: item.trackingType ? String(item.trackingType).toUpperCase() : undefined,
-        imageUrl: resolveMediaUrl(item.imageUrl),
-        totalOnHand: item.totalOnHand ? String(item.totalOnHand) : undefined,
-        isTaxable: toBoolean(item.isTaxable),
-        taxRate:
-          toNumber(item.taxRateRatePercentage) ??
-          toNumber(item.taxRatePercentage) ??
-          toNumber(item.ratePercentage) ??
-          toNumber(taxRate?.ratePercentage) ??
-          toNumber(item.taxRate),
-        isPriceInclusive:
-          toBoolean(item.taxRateIsPriceInclusive) ??
-          toBoolean(item.isPriceInclusive) ??
-          toBoolean(item.priceInclusive) ??
-          toBoolean(taxRate?.isPriceInclusive),
-      });
-    });
+    const products = asList<Record<string, unknown>>(response).map(toProduct);
+    return { products, ...readPage(response, products.length, params) };
+  }
+
+  async getProduct(id: string): Promise<Product> {
+    const response = await this.httpClient.get<ApiEnvelope<Record<string, unknown>>>(
+      API_ENDPOINTS.PRODUCTS.BY_ID(id)
+    );
+    return toProduct(unwrap(response));
+  }
+
+  async createProduct(payload: CreateProductDTO): Promise<Product> {
+    const response = await this.httpClient.post<ApiEnvelope<Record<string, unknown>>>(
+      API_ENDPOINTS.PRODUCTS.CREATE,
+      toProductPayload(payload, true)
+    );
+    return toProduct(unwrap(response));
+  }
+
+  async updateProduct(id: string, payload: UpdateProductDTO): Promise<Product> {
+    const response = await this.httpClient.patch<ApiEnvelope<Record<string, unknown>>>(
+      API_ENDPOINTS.PRODUCTS.UPDATE(id),
+      toProductPayload(payload, false)
+    );
+    return toProduct(unwrap(response));
+  }
+
+  async deleteProduct(id: string): Promise<Product> {
+    const response = await this.httpClient.delete<ApiEnvelope<Record<string, unknown>>>(
+      API_ENDPOINTS.PRODUCTS.DELETE(id)
+    );
+    return toProduct(unwrap(response));
   }
 
   async getVariants(productId: string): Promise<ProductVariant[]> {
+    const listed = await this.listVariants(productId);
+    return listed.variants;
+  }
+
+  async listVariants(
+    productId: string,
+    params?: PaginatedQueryDTO
+  ): Promise<ProductVariantListDTO> {
     const response = await this.httpClient.get<ApiEnvelope<Record<string, unknown>[]>>(
-      API_ENDPOINTS.PRODUCTS.VARIANTS(productId).LIST
+      API_ENDPOINTS.PRODUCTS.VARIANTS(productId).LIST,
+      { params }
     );
-    const data = asList<Record<string, unknown>>(response);
-    return data.map((item) => {
-      const taxRate = asRecord(item.taxRate);
-      return new ProductVariant({
-        id: String(item.id || ""),
-        productId: String(item.productId || productId),
-        variantSku: item.variantSku ? String(item.variantSku) : undefined,
-        barcode: item.barcode ? String(item.barcode) : undefined,
-        priceModifier: item.priceModifier ? String(item.priceModifier) : undefined,
-        imageUrl: resolveMediaUrl(item.imageUrl),
-        matrixOptions:
-          item.matrixOptions && typeof item.matrixOptions === "object"
-            ? (item.matrixOptions as Record<string, unknown>)
-            : undefined,
-        isTaxable: toBoolean(item.isTaxable),
-        taxRate:
-          toNumber(item.taxRateRatePercentage) ??
-          toNumber(item.taxRatePercentage) ??
-          toNumber(item.ratePercentage) ??
-          toNumber(taxRate?.ratePercentage) ??
-          toNumber(item.taxRate),
-        isPriceInclusive:
-          toBoolean(item.taxRateIsPriceInclusive) ??
-          toBoolean(item.isPriceInclusive) ??
-          toBoolean(item.priceInclusive) ??
-          toBoolean(taxRate?.isPriceInclusive),
-      });
-    });
+    const variants = asList<Record<string, unknown>>(response).map((item) =>
+      toVariant(item, productId)
+    );
+    return { variants, ...readPage(response, variants.length, params) };
+  }
+
+  async getVariant(productId: string, id: string): Promise<ProductVariant> {
+    const response = await this.httpClient.get<ApiEnvelope<Record<string, unknown>>>(
+      API_ENDPOINTS.PRODUCTS.VARIANTS(productId).BY_ID(id)
+    );
+    return toVariant(unwrap(response), productId);
+  }
+
+  async createVariant(
+    productId: string,
+    payload: CreateProductVariantDTO
+  ): Promise<ProductVariant> {
+    const response = await this.httpClient.post<ApiEnvelope<Record<string, unknown>>>(
+      API_ENDPOINTS.PRODUCTS.VARIANTS(productId).CREATE,
+      toVariantPayload(payload)
+    );
+    return toVariant(unwrap(response), productId);
+  }
+
+  async updateVariant(
+    productId: string,
+    id: string,
+    payload: UpdateProductVariantDTO
+  ): Promise<ProductVariant> {
+    const response = await this.httpClient.patch<ApiEnvelope<Record<string, unknown>>>(
+      API_ENDPOINTS.PRODUCTS.VARIANTS(productId).UPDATE(id),
+      toVariantPayload(payload)
+    );
+    return toVariant(unwrap(response), productId);
+  }
+
+  async deleteVariant(productId: string, id: string): Promise<ProductVariant> {
+    const response = await this.httpClient.delete<ApiEnvelope<Record<string, unknown>>>(
+      API_ENDPOINTS.PRODUCTS.VARIANTS(productId).DELETE(id)
+    );
+    return toVariant(unwrap(response), productId);
+  }
+
+  async listUoms(params?: UomFilterDTO): Promise<Uom[]> {
+    const response = await this.httpClient.get<ApiEnvelope<Record<string, unknown>[]>>(
+      API_ENDPOINTS.UOMS.LIST,
+      { params }
+    );
+    return asList<Record<string, unknown>>(response).map(toUom);
+  }
+
+  async listTaxRates(params?: PaginatedQueryDTO): Promise<TaxRate[]> {
+    const response = await this.httpClient.get<ApiEnvelope<Record<string, unknown>[]>>(
+      API_ENDPOINTS.TAX_RATES.LIST,
+      { params }
+    );
+    return asList<Record<string, unknown>>(response).map(toTaxRate);
   }
 
   async getSalesOrders(params?: SalesOrderFilterDTO): Promise<SalesOrder[]> {

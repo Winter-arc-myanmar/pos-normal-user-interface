@@ -11,9 +11,14 @@ import {
   KdsTicketFilterDTO,
   KdsTicketListDTO,
   OpenTableSessionDTO,
+  PaginatedQueryDTO,
   PosRegisterFilterDTO,
   PosSessionFilterDTO,
+  CreateProductDTO,
+  CreateProductVariantDTO,
   ProductFilterDTO,
+  ProductListDTO,
+  ProductVariantListDTO,
   SalesOrderFilterDTO,
   SeatWaitlistEntryDTO,
   TableSessionCheckoutDTO,
@@ -22,7 +27,10 @@ import {
   CreatePosSessionDTO,
   TipPoolAllocationDTO,
   TipPoolFilterDTO,
+  UomFilterDTO,
   UpdateDiningTableDTO,
+  UpdateProductDTO,
+  UpdateProductVariantDTO,
   UpdateTableSessionStateDTO,
   UpdateTipPoolDTO,
   UpdateWaitlistEntryDTO,
@@ -42,6 +50,8 @@ import {
   PosSession,
   Product,
   ProductVariant,
+  TaxRate,
+  Uom,
   SalesOrder,
   SalesOrderLine,
   KdsTicket,
@@ -55,7 +65,29 @@ import {
 export interface ICashierRepository {
   getInventoryLocations(): Promise<InventoryLocation[]>;
   getProducts(params?: ProductFilterDTO): Promise<Product[]>;
+  listProducts(params?: ProductFilterDTO): Promise<ProductListDTO>;
+  getProduct(id: string): Promise<Product>;
+  createProduct(payload: CreateProductDTO): Promise<Product>;
+  updateProduct(id: string, payload: UpdateProductDTO): Promise<Product>;
+  deleteProduct(id: string): Promise<Product>;
   getVariants(productId: string): Promise<ProductVariant[]>;
+  listVariants(
+    productId: string,
+    params?: PaginatedQueryDTO
+  ): Promise<ProductVariantListDTO>;
+  getVariant(productId: string, id: string): Promise<ProductVariant>;
+  createVariant(
+    productId: string,
+    payload: CreateProductVariantDTO
+  ): Promise<ProductVariant>;
+  updateVariant(
+    productId: string,
+    id: string,
+    payload: UpdateProductVariantDTO
+  ): Promise<ProductVariant>;
+  deleteVariant(productId: string, id: string): Promise<ProductVariant>;
+  listUoms(params?: UomFilterDTO): Promise<Uom[]>;
+  listTaxRates(params?: PaginatedQueryDTO): Promise<TaxRate[]>;
   getSalesOrders(params?: SalesOrderFilterDTO): Promise<SalesOrder[]>;
   getSalesOrderById(id: string): Promise<SalesOrder>;
   createSalesOrder(payload: CreateSalesOrderDTO): Promise<SalesOrder>;
