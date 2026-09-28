@@ -112,17 +112,7 @@ export async function requestWebBluetoothPrinter(): Promise<string[]> {
   return [device.name || device.id];
 }
 
-export async function printWebUsb(deviceName: string, data: string): Promise<void> {
-  if (!isWebUsbSupported()) {
-    throw new Error("WebUSB is not available in this browser");
-  }
-  const devices = await usbNavigator().usb!.getDevices();
-  const device =
-    devices.find((item: UsbDeviceLike) => deviceLabel(item) === deviceName) ||
-    devices.find((item: UsbDeviceLike) => item.serialNumber === deviceName);
-  if (!device) {
-    throw new Error("USB printer not paired. Tap Discover and allow the printer again.");
-  }
+const writeUsbDevice = async (device: UsbDeviceLike, data: string) => {
   await device.open();
   if (!device.configuration) {
     await device.selectConfiguration(1);
@@ -140,6 +130,36 @@ export async function printWebUsb(deviceName: string, data: string): Promise<voi
   }
   await device.releaseInterface(iface.interfaceNumber);
   await device.close();
+};
+
+/** Saved name first, then any other paired printer that is actually plugged in. */
+const connectedUsbPrinters = (devices: UsbDeviceLike[], deviceName: string) => {
+  const saved = devices.filter(
+    (item) => deviceLabel(item) === deviceName || item.serialNumber === deviceName
+  );
+  const others = devices.filter((item) => !saved.includes(item));
+  return [...saved, ...others];
+};
+
+export async function printWebUsb(deviceName: string, data: string): Promise<void> {
+  if (!isWebUsbSupported()) {
+    throw new Error("WebUSB is not available in this browser");
+  }
+  const devices = connectedUsbPrinters(await usbNavigator().usb!.getDevices(), deviceName);
+  if (!devices.length) {
+    throw new Error("USB printer not paired. Tap Discover and allow the printer again.");
+  }
+  let lastError: Error | null = null;
+  for (const device of devices) {
+    try {
+      await writeUsbDevice(device, data);
+      return;
+    } catch (caught) {
+      lastError = caught instanceof Error ? caught : new Error("USB printer is not connected");
+      await device.close().catch(() => undefined);
+    }
+  }
+  throw lastError ?? new Error("USB printer is not connected. Plug it in and try again.");
 }
 
 async function writeBleCharacteristic(

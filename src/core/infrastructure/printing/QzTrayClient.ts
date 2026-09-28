@@ -10,6 +10,51 @@ import {
   SaleReceipt,
 } from "@/lib/printing/formatKdsTicket";
 
+type UsbPrinterDevice = {
+  vendorId: string;
+  productId: string;
+  product?: string;
+  manufacturer?: string;
+};
+
+type QueueDetail = { name?: string; connection?: string };
+
+const asList = <T>(value: T | T[] | null | undefined): T[] => {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
+};
+
+const isReceiptUsbDevice = (device: UsbPrinterDevice) =>
+  /print|pos|xprinter|thermal|receipt|escpos/i.test(
+    `${device.product || ""} ${device.manufacturer || ""}`
+  );
+
+const escPosHex = (data: string) =>
+  Array.from(data, (char) => (char.charCodeAt(0) & 0xff).toString(16).padStart(2, "0")).join(
+    ""
+  );
+
+const outEndpoint = (endpoint: string) => {
+  const value = Number.parseInt(endpoint, 16);
+  if (!Number.isFinite(value) || (value & 0x80) !== 0) return null;
+  return endpoint;
+};
+
+const offlinePrinterNames = (status: unknown) => {
+  const names = new Set<string>();
+  const visit = (entry: unknown) => {
+    if (!entry || typeof entry !== "object") return;
+    const record = entry as { printerName?: string; name?: string; status?: string };
+    const name = record.printerName || record.name;
+    if (name && /offline|not_available|unavailable/i.test(String(record.status || ""))) {
+      names.add(name);
+    }
+  };
+  if (Array.isArray(status)) status.forEach(visit);
+  else visit(status);
+  return names;
+};
+
 const qzError = (caught: unknown): Error => {
   const message = caught instanceof Error ? caught.message : String(caught || "");
   if (/block|denied|reject|not allowed/i.test(message)) {
@@ -82,10 +127,101 @@ export class QzTrayClient {
     return qz.configs.create(binding.deviceName);
   }
 
+  /** Sends ESC/POS to a receipt printer that is plugged in now, ignoring stale Windows queues. */
+  private async printConnectedUsb(data: string): Promise<boolean> {
+    let devices: UsbPrinterDevice[] = [];
+    try {
+      devices = asList(await qz.usb.listDevices(false)).filter(isReceiptUsbDevice);
+    } catch {
+      return false;
+    }
+    for (const device of devices) {
+      let interfaces: string[] = [];
+      try {
+        interfaces = asList(
+          await qz.usb.listInterfaces({
+            vendorId: device.vendorId,
+            productId: device.productId,
+          })
+        );
+      } catch {
+        continue;
+      }
+      for (const iface of interfaces) {
+        try {
+          await qz.usb.claimDevice({
+            vendorId: device.vendorId,
+            productId: device.productId,
+            interface: iface,
+          });
+          const endpoints = asList(
+            await qz.usb.listEndpoints({
+              vendorId: device.vendorId,
+              productId: device.productId,
+              interface: iface,
+            })
+          );
+          const endpoint = endpoints.map(outEndpoint).find(Boolean);
+          if (!endpoint) continue;
+          await qz.usb.sendData({
+            vendorId: device.vendorId,
+            productId: device.productId,
+            endpoint,
+            data: { data: escPosHex(data), type: "HEX" },
+          });
+          return true;
+        } catch {
+          // This interface is not the live receipt printer. Try the next one.
+        } finally {
+          await qz.usb
+            .releaseDevice({ vendorId: device.vendorId, productId: device.productId })
+            .catch(() => undefined);
+        }
+      }
+    }
+    return false;
+  }
+
+  /** Uses an online USB queue when direct USB is blocked by the Windows driver. */
+  private async withLiveUsbQueue(binding: PrinterBinding): Promise<PrinterBinding> {
+    let queues: QueueDetail[] = [];
+    try {
+      queues = asList(await qz.printers.details()).filter(
+        (item) => item.name && /^USB/i.test(item.connection || "")
+      );
+    } catch {
+      return binding;
+    }
+    if (!queues.length) return binding;
+    const names = queues.map((item) => item.name as string);
+    try {
+      await qz.printers.startListening(names);
+      const offline = offlinePrinterNames(await qz.printers.getStatus());
+      const preferred = binding.deviceName;
+      if (preferred && names.includes(preferred) && !offline.has(preferred)) return binding;
+      const live = names.find((name) => !offline.has(name));
+      if (live) return { ...binding, deviceName: live };
+      if (offline.size) {
+        throw new Error(
+          "The USB receipt printer is offline. Plug in the printer and try again."
+        );
+      }
+      return binding;
+    } catch (caught) {
+      if (caught instanceof Error && /offline/i.test(caught.message)) throw caught;
+      return binding;
+    } finally {
+      await qz.printers.stopListening().catch(() => undefined);
+    }
+  }
+
   private async printRaw(binding: PrinterBinding, data: string): Promise<void> {
     await this.connect();
     try {
-      await qz.print(this.config(binding), [
+      if (binding.transport === "USB" && (await this.printConnectedUsb(data))) return;
+      const target =
+        binding.transport === "USB" ? await this.withLiveUsbQueue(binding) : binding;
+      await qz.print(this.config(target), [
         { type: "raw", format: "command", data },
       ]);
     } catch (caught) {
