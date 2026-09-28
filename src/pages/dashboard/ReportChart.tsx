@@ -4,7 +4,7 @@ export interface ChartPoint {
   display: string;
 }
 
-const COLORS = ["#1e3a8a", "#2563eb", "#0f766e", "#b45309", "#be123c", "#6d28d9", "#0369a1", "#3f6212"];
+const COLORS = ["#0886f0", "#ff8a1a", "#3ec4ff", "#ffc83d", "#066dcc", "#ff5a00", "#5ec8ff", "#0b4a84"];
 
 function Empty({ empty }: { empty: string }) {
   return <p className="text-sm text-slate-500">{empty}</p>;

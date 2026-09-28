@@ -45,7 +45,7 @@ interface PaymentViewProps {
 function CashIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none" aria-hidden="true">
-      <rect x="3" y="6" width="18" height="12" rx="2" fill="#087cf0" />
+      <rect x="3" y="6" width="18" height="12" rx="2" fill="#1a9bff" />
       <circle cx="12" cy="12" r="2.5" fill="#fff" />
       <path d="M7 10h1.5M15.5 14H17" stroke="#fff" strokeWidth="1.5" />
     </svg>

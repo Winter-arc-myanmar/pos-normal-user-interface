@@ -13,7 +13,7 @@ type ButtonProps = {
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    "bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white border-blue-500 hover:border-blue-600 shadow-sm",
+    "bg-gradient-to-r from-[#ffc83d] via-[#ff8a1a] to-[#ff5a00] text-black border-transparent shadow-sm hover:brightness-110 active:brightness-95",
   secondary:
     "bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white border-slate-600 shadow-sm",
   outline:
