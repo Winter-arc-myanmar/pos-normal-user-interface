@@ -56,10 +56,10 @@ export function PosIconRail({
   return (
     <aside className="pos-icon-rail pos-safe-y flex min-h-0 flex-col items-center border-r border-white/10 bg-black px-1.5 py-2 text-white">
       <div
-        className="mb-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white text-sm font-black text-black"
+        className="mb-2 flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden"
         aria-hidden="true"
       >
-        V
+        <img src="/logo.png" alt="" className="h-8 w-8 scale-150 object-contain" />
       </div>
 
       <nav className="flex min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto py-1">
@@ -75,7 +75,7 @@ export function PosIconRail({
                 [
                   "flex h-11 w-11 shrink-0 items-center justify-center rounded-md transition-colors",
                   isActive
-                    ? "bg-[#087cf0] text-white shadow-[0_0_0_1px_rgba(255,255,255,0.15)]"
+                    ? "bg-gradient-to-br from-[#ffc83d] to-[#ff5a00] text-black shadow-[0_0_0_1px_rgba(255,255,255,0.15)]"
                     : "text-white/85 hover:bg-white/10 hover:text-white",
                 ].join(" ")
               }
@@ -117,7 +117,7 @@ export function PosIconRail({
         title={profileLabel}
         aria-label={profileLabel}
         onClick={onProfileClick}
-        className="mt-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-white/30 bg-slate-500 text-sm font-bold text-white transition hover:border-white/60 hover:bg-slate-400"
+        className="mt-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-[#ff8a1a] bg-[#0886f0] text-sm font-bold text-white transition hover:border-[#ffc83d]"
       >
         {userName.slice(0, 1).toUpperCase()}
       </button>

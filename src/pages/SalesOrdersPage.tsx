@@ -45,7 +45,7 @@ const statusBadgeClass = (status?: string) => {
   if (key.endsWith("refunded") || key.endsWith("partiallyRefunded")) {
     return "bg-amber-500 text-slate-950";
   }
-  return "bg-[#087cf0] text-white";
+  return "bg-[#1a9bff] text-white";
 };
 
 const statusTabFilters: Record<StatusTab, OrderStatus | undefined> = {
@@ -280,7 +280,7 @@ export function SalesOrdersPage() {
               className={[
                 "min-h-10 rounded-md px-4 text-sm font-medium transition",
                 statusTab === tab
-                  ? "bg-[#087cf0] text-white"
+                  ? "bg-[#1a9bff] text-white"
                   : "bg-white text-slate-900 hover:bg-slate-100",
               ].join(" ")}
             >
@@ -344,7 +344,7 @@ export function SalesOrdersPage() {
                       onClick={() => void handleSelectOrder(order)}
                       className={[
                         "w-full px-4 py-3 text-left transition",
-                        isSelected ? "bg-[#087cf0]/20" : "hover:bg-white/5",
+                        isSelected ? "bg-[#1a9bff]/20" : "hover:bg-white/5",
                       ].join(" ")}
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -584,7 +584,7 @@ export function SalesOrdersPage() {
               onClick={() => setServiceFilter(filter.id)}
               className={[
                 "mb-1 min-h-10 rounded px-2 py-2 text-left text-xs",
-                serviceFilter === filter.id ? "bg-[#087cf0]" : "bg-slate-600",
+                serviceFilter === filter.id ? "bg-[#1a9bff]" : "bg-slate-600",
               ].join(" ")}
             >
               {t(filter.labelKey)}
