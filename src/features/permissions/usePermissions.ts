@@ -25,6 +25,7 @@ export const PAGE_PERMISSIONS = {
   tipPools: [] as string[],
   counterOrders: [] as string[],
   salesOrders: [] as string[],
+  refunds: [] as string[],
   sync: [] as string[],
   settings: [] as string[],
 } as const;
@@ -35,6 +36,7 @@ export const PERMISSION_ROUTE_ORDER = [
   { path: "/spa", permissions: PAGE_PERMISSIONS.spa },
   { path: "/counter-orders", permissions: PAGE_PERMISSIONS.counterOrders },
   { path: "/sales-orders", permissions: PAGE_PERMISSIONS.salesOrders },
+  { path: "/refunds", permissions: PAGE_PERMISSIONS.refunds },
   { path: "/customers", permissions: PAGE_PERMISSIONS.customers },
   { path: "/cards", permissions: PAGE_PERMISSIONS.cards },
   { path: "/waitlist", permissions: PAGE_PERMISSIONS.waitlist },
