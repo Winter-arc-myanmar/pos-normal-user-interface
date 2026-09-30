@@ -104,7 +104,20 @@ let rooms = [room("wallet-1")];
 let lines: Record<string, unknown>[] = [];
 
 vi.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string) => key,
+    i18n: { language: "en" },
+  }),
+}));
+
+vi.mock("@/core/presentation/hooks/useAuth", () => ({
+  useAuth: () => ({ user: { id: "user-1", tenantId: "tenant-1", name: "Cashier" } }),
+}));
+
+vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
+  usePrinterConnection: () => ({
+    printReceipt: vi.fn().mockResolvedValue(undefined),
+  }),
 }));
 
 vi.mock("@/components/LanguageSwitcher", () => ({

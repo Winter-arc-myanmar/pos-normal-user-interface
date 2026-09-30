@@ -6,6 +6,7 @@ import { GuestCard, GuestWallet } from "@/core/domain/entities/GuestWallet";
 import { KtvSession } from "@/core/domain/entities/Ktv";
 import { Product, ProductVariant } from "@/core/domain/entities/Cashier";
 import { useAuth } from "@/core/presentation/hooks/useAuth";
+import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
 import { useCardCapture } from "@/core/presentation/hooks/useCardCapture";
 import { useCashier } from "@/core/presentation/hooks/useCashier";
 import { useGuestWalletManagement } from "@/core/presentation/hooks/useGuestWalletManagement";
@@ -21,6 +22,9 @@ import {
   isOpenKtvSession,
 } from "@/lib/ktv/session";
 import { isUnspendableWalletStatus } from "@/lib/pos/guestWalletAmounts";
+import { useDateFormatter } from "@/lib/i18n/formatters";
+import { lineDisplayName } from "@/lib/pos/orderListDisplay";
+import { toast } from "@/lib/toast";
 
 export function KtvRoomPage() {
   const { t } = useTranslation();
@@ -58,8 +62,10 @@ export function KtvRoomPage() {
     deleteOrderLine,
   } = useSalesOrderManagement();
   const { lookupCard, getWallet } = useGuestWalletManagement();
-  const { requireCashierContext } = usePosWorkspace();
   const { user } = useAuth();
+  const { activePosRegisterId, requireCashierContext } = usePosWorkspace();
+  const { formatDateTime } = useDateFormatter();
+  const printer = usePrinterConnection(String(user?.tenantId || ""), activePosRegisterId);
   const { users, loadUsers } = useUserManagement();
   const [selectedSessionId, setSelectedSessionId] = useState("");
   const [guestCount, setGuestCount] = useState("1");
@@ -329,6 +335,36 @@ export function KtvRoomPage() {
           },
         ],
       });
+      const endAt = finalQuote.asOf || new Date().toISOString();
+      try {
+        await printer.printReceipt({
+          title: "RECEIPT",
+          place: "CHECKOUT",
+          showLogo: true,
+          showPrices: true,
+          cashier: user?.name,
+          serviceType: "KTV",
+          tableOrRoom: room?.roomNumber,
+          startTime: formatDateTime(session.openedAt),
+          endTime: formatDateTime(endAt),
+          startTimeLabel: t("receipt.startTime"),
+          endTimeLabel: t("receipt.endTime"),
+          lines: result.lines.map((line) => ({
+            name: lineDisplayName(line) || line.variantId,
+            quantity: String(line.quantity || "1"),
+            unitPrice: line.unitPrice,
+          })),
+          subtotal: finalQuote.runningTotal,
+          total: finalTotal.toFixed(4),
+          payments: [
+            { name: paymentMethod.name || "Card", amount: finalTotal.toFixed(4) },
+          ],
+        });
+      } catch (printError) {
+        toast.error(
+          printError instanceof Error ? printError.message : t("receipt.printFailed")
+        );
+      }
       await getWallet(wallet.id);
       navigate("/ktv");
     } catch (caught) {

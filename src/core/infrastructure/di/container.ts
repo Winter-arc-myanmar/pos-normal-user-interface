@@ -63,6 +63,10 @@ import { IRoomTabletRepository } from "../../domain/repositories/IRoomTabletRepo
 import { ApiRoomTabletRepository } from "../repositories/ApiRoomTabletRepository";
 import { IRoomTabletService } from "../../domain/services/IRoomTabletService";
 import { RoomTabletService } from "../../application/services/RoomTabletService";
+import { IRefundRepository } from "../../domain/repositories/IRefundRepository";
+import { ApiRefundRepository } from "../repositories/ApiRefundRepository";
+import { IRefundService } from "../../domain/services/IRefundService";
+import { RefundService } from "../../application/services/RefundService";
 
 /**
  * Dependency Injection Container
@@ -111,6 +115,10 @@ class Container {
     this.register<ISalesOrderRepository>(
       "salesOrderRepository",
       new ApiSalesOrderRepository(this.resolve("httpClient"))
+    );
+    this.register<IRefundRepository>(
+      "refundRepository",
+      new ApiRefundRepository(this.resolve("httpClient"))
     );
     this.register<IKitchenPrinterRepository>(
       "kitchenPrinterRepository",
@@ -178,6 +186,10 @@ class Container {
     this.register<ISalesOrderService>(
       "salesOrderService",
       new SalesOrderService(this.resolve("salesOrderRepository"))
+    );
+    this.register<IRefundService>(
+      "refundService",
+      new RefundService(this.resolve("refundRepository"))
     );
     this.register<IKitchenPrinterService>(
       "kitchenPrinterService",

@@ -151,6 +151,12 @@ export const API_ENDPOINTS = {
     LIST: "/api/v1/tax-rates",
   },
 
+  REFUNDS: {
+    CREATE: "/api/v1/refunds",
+    BY_ID: (id: string) => `/api/v1/refunds/${id}`,
+    BY_ORDER: (salesOrderId: string) => `/api/v1/refunds/order/${salesOrderId}`,
+  },
+
   SALES_ORDERS: {
     LIST: "/api/v1/sales-orders",
     BY_ID: (id: string) => `/api/v1/sales-orders/${id}`,

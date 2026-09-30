@@ -91,6 +91,11 @@ const SalesOrdersPage = lazy(() =>
     default: module.SalesOrdersPage,
   }))
 );
+const RefundsPage = lazy(() =>
+  import("../../pages/RefundsPage").then((module) => ({
+    default: module.RefundsPage,
+  }))
+);
 const UsersPage = lazy(() =>
   import("../../pages/UsersPage").then((module) => ({
     default: module.UsersPage,
@@ -351,6 +356,16 @@ export function AppRouter() {
                     requiredPermissions={PAGE_PERMISSIONS.salesOrders}
                   >
                     <SalesOrdersPage />
+                  </RequirePermission>
+                }
+              />
+              <Route
+                path="/refunds"
+                element={
+                  <RequirePermission
+                    requiredPermissions={PAGE_PERMISSIONS.refunds}
+                  >
+                    <RefundsPage />
                   </RequirePermission>
                 }
               />
