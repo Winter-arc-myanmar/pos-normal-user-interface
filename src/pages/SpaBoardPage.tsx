@@ -1,5 +1,9 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useAuth } from "@/core/presentation/hooks/useAuth";
+import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
+import { useDateFormatter } from "@/lib/i18n/formatters";
+import { lineDisplayName } from "@/lib/pos/orderListDisplay";
 import { useLocation, useNavigate } from "react-router-dom";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Button } from "@/components/ui/Button";
@@ -126,8 +130,11 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     settleOrder,
   } = useSalesOrderManagement();
   const { lookupCard, getWallet } = useGuestWalletManagement();
-  const { activeLocationId, requireCashierContext, isWorkspaceReady } =
+  const { user } = useAuth();
+  const { formatDateTime } = useDateFormatter();
+  const { activeLocationId, activePosRegisterId, requireCashierContext, isWorkspaceReady } =
     usePosWorkspace();
+  const printer = usePrinterConnection(String(user?.tenantId || ""), activePosRegisterId);
 
   const [step, setStep] = useState<SpaStep>("rooms");
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -733,6 +740,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     setIsPaying(true);
     try {
       const context = await requireCashierContext();
+      let endAt = session.closedAt || session.endsAt || "";
       if (!billClosed) {
         const latest = await getQuote(session.id);
         const estimate = estimateCardCharge({
@@ -745,7 +753,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           setActionError(tr("errors.balanceShort"));
           return;
         }
-        await closeSession(session.id, {});
+        const closed = await closeSession(session.id, {});
+        endAt = closed.asOf || new Date().toISOString();
         setSession({ ...session, sessionState: "CLOSED" });
       }
       const result = await settleOrder(session.salesOrderId, {
@@ -759,6 +768,38 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         ...(tipValue > 0 ? { tipAmount: tipValue.toFixed(4) } : {}),
         idempotencyKey: spaSettleKey(session.id),
       });
+      try {
+        await printer.printReceipt({
+          title: "RECEIPT",
+          place: "CHECKOUT",
+          showLogo: true,
+          showPrices: true,
+          receiptId: result.orderNumber,
+          cashier: user?.name,
+          serviceType: kind === "ktv" ? "KTV" : "SPA",
+          tableOrRoom: room?.roomNumber,
+          startTime: formatDateTime(session.openedAt),
+          endTime: formatDateTime(endAt),
+          startTimeLabel: t("receipt.startTime"),
+          endTimeLabel: t("receipt.endTime"),
+          lines: orderLines.map((line) => ({
+            name: lineDisplayName(line) || line.variantId,
+            quantity: String(line.quantity || "1"),
+            unitPrice: line.unitPrice,
+          })),
+          total: result.grandTotal,
+          payments: [
+            {
+              name: cardMethod.name || "Card",
+              amount: result.grandTotal,
+            },
+          ],
+        });
+      } catch (printError) {
+        toast.error(
+          printError instanceof Error ? printError.message : t("receipt.printFailed")
+        );
+      }
       setPaid(result);
       writeResume(kind, null);
       setWallet(await getWallet(wallet.id));

@@ -87,10 +87,21 @@ let rooms: Record<string, unknown>[] = [freeRoom];
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string) => key,
-    i18n: { exists: (key: string) => key.startsWith("ktvPos.") },
+    i18n: {
+      language: "en",
+      exists: (key: string) => key.startsWith("ktvPos."),
+    },
   }),
 }));
 vi.mock("@/components/LanguageSwitcher", () => ({ LanguageSwitcher: () => null }));
+vi.mock("@/core/presentation/hooks/useAuth", () => ({
+  useAuth: () => ({ user: { id: "user-1", tenantId: "tenant-1", name: "Cashier" } }),
+}));
+vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
+  usePrinterConnection: () => ({
+    printReceipt: vi.fn().mockResolvedValue(undefined),
+  }),
+}));
 vi.mock("@/core/presentation/hooks/useSpaManagement", () => ({
   useSpaManagement: () => ({ rooms: [], quote: null }),
 }));

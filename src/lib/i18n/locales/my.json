@@ -1,4 +1,9 @@
 {
+  "receipt": {
+    "startTime": "စတင်ချိန်",
+    "endTime": "ပြီးဆုံးချိန်",
+    "printFailed": "ပြေစာ ပုံနှိပ်၍ မရပါ"
+  },
   "common": {
     "refresh": "ပြန်လည်စစ်မည်",
     "refreshing": "ပြန်လည်စစ်နေသည်...",

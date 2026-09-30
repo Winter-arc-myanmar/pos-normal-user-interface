@@ -72,6 +72,10 @@ export interface SaleReceipt extends PrintParty {
   // tip?: string;
   total: string;
   payments?: Array<{ name: string; amount: string }>;
+  startTime?: string;
+  endTime?: string;
+  startTimeLabel?: string;
+  endTimeLabel?: string;
   place?: PrintPlace;
   showLogo?: boolean;
   showPrices?: boolean;
@@ -142,6 +146,17 @@ const categorySubtotalRows = (lines: PrintLine[] = [], enabled: boolean) => {
     totals.set(name, (totals.get(name) || 0) + qty * price);
   }
   return [...totals.entries()].map(([name, total]) => `${name}  ${total.toFixed(2)}`);
+};
+
+const sessionTimeRows = (receipt: SaleReceipt) => {
+  const rows: string[] = [];
+  if (receipt.startTime) {
+    rows.push(`${receipt.startTimeLabel || "Start time"}: ${receipt.startTime}`);
+  }
+  if (receipt.endTime) {
+    rows.push(`${receipt.endTimeLabel || "End time"}: ${receipt.endTime}`);
+  }
+  return rows;
 };
 
 const partyRows = (
@@ -228,7 +243,10 @@ export function formatSaleReceipt(receipt: SaleReceipt): string {
   const heading = headerRows(settings, receipt)
     .map((row) => `${row}\n`)
     .join("");
-  const meta = partyRows(settings, receipt, showOrderNumber, receipt.receiptId)
+  const meta = [
+    ...partyRows(settings, receipt, showOrderNumber, receipt.receiptId),
+    ...sessionTimeRows(receipt),
+  ]
     .map((row) => `${row}\n`)
     .join("");
   const categories = categorySubtotalRows(
@@ -363,7 +381,10 @@ export function buildSaleReceiptLines(receipt: SaleReceipt): string[] {
   const showTotal = settings ? settings.bill.totalPayment : true;
   const showPayments = settings ? settings.bill.totalPayment : !finance;
   const showOrderNumber = settings ? settings.other.orderNumber : !finance;
-  const meta = partyRows(settings, receipt, showOrderNumber, receipt.receiptId);
+  const meta = [
+    ...partyRows(settings, receipt, showOrderNumber, receipt.receiptId),
+    ...sessionTimeRows(receipt),
+  ];
   const rows: string[] = [];
   rows.push(receipt.title);
   rows.push(...headerRows(settings, receipt));
