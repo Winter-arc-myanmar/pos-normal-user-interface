@@ -64,6 +64,8 @@
     "settingsTitle": "ဆက်တင်များ",
     "collapseSidebar": "ဘေးဘား ခေါက်မည်",
     "expandSidebar": "ဘေးဘား ဖြန့်မည်",
+    "openMenu": "မီနူး ဖွင့်မည်",
+    "closeMenu": "မီနူး ပိတ်မည်",
     "drawerNotConfigured": "ငွေသားအံ API မပြင်ဆင်ရသေးပါ"
   },
   "login": {

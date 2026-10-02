@@ -64,6 +64,8 @@
     "settingsTitle": "Settings",
     "collapseSidebar": "Collapse sidebar",
     "expandSidebar": "Expand sidebar",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
     "drawerNotConfigured": "Cash drawer API is not configured"
   },
   "login": {

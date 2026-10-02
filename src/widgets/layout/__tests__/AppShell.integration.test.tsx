@@ -69,6 +69,16 @@ describe("AppShell POS actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.setActiveBranch.mockResolvedValue(undefined);
+    window.innerWidth = 1280;
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
   });
 
   it("switches branches and routes Menu to the product catalog", async () => {
@@ -92,5 +102,61 @@ describe("AppShell POS actions", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "shell.menu" }));
     expect(screen.getByText("/cashier?view=menu")).toBeInTheDocument();
+  });
+
+  it("expands the side menu and shows page labels", () => {
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=menu"]}>
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route path="*" element={<LocationDisplay />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+
+    const toggle = screen.getByRole("button", { name: "shell.expandSidebar" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(toggle);
+    expect(
+      screen.getByRole("button", { name: "shell.collapseSidebar" })
+    ).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("shell.cashierTitle")).toBeInTheDocument();
+    expect(screen.getByText("shell.mainMenu")).toBeInTheDocument();
+    expect(document.getElementById("pos-side-menu")).toHaveClass(
+      "transition-[width,padding]"
+    );
+  });
+
+  it("opens an overlay menu on small screens", () => {
+    window.innerWidth = 390;
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: String(query).includes("767"),
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=menu"]}>
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route path="*" element={<LocationDisplay />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "shell.openMenu" }));
+    expect(screen.getByRole("navigation", { name: "shell.mainMenu" })).toBeVisible();
+    expect(document.querySelector(".pos-side-drawer")).toHaveClass("translate-x-0");
+    expect(document.querySelector(".pos-nav-backdrop")).toHaveClass("opacity-100");
+    fireEvent.click(screen.getByRole("button", { name: "shell.closeMenu" }));
+    expect(document.querySelector(".pos-side-drawer")).toHaveClass("-translate-x-full");
+    expect(document.querySelector(".pos-nav-backdrop")).toHaveClass("opacity-0");
+    expect(screen.getByRole("button", { name: "shell.openMenu" })).toBeInTheDocument();
   });
 });
