@@ -6,6 +6,7 @@ import { GuestCard, GuestWallet } from "@/core/domain/entities/GuestWallet";
 import { KtvSession } from "@/core/domain/entities/Ktv";
 import { Product, ProductVariant } from "@/core/domain/entities/Cashier";
 import { useAuth } from "@/core/presentation/hooks/useAuth";
+import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
 import { useCardCapture } from "@/core/presentation/hooks/useCardCapture";
 import { useCashier } from "@/core/presentation/hooks/useCashier";
 import { useGuestWalletManagement } from "@/core/presentation/hooks/useGuestWalletManagement";
@@ -15,15 +16,16 @@ import { useUserManagement } from "@/core/presentation/hooks/useUserManagement";
 import { useSalesOrderManagement } from "@/core/presentation/hooks/useSalesOrderManagement";
 import { findMemberCardPaymentMethod } from "@/core/application/services/PosPaymentCatalog";
 import { ProductMenu } from "./cashier/ProductMenu";
-import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
 import { modifierPrintText } from "@/lib/printing/modifierText";
-import { sessionPrintTimes } from "@/lib/printing/formatKdsTicket";
 import {
   getKtvWarning,
   hasSufficientWalletBalance,
   isOpenKtvSession,
 } from "@/lib/ktv/session";
 import { isUnspendableWalletStatus } from "@/lib/pos/guestWalletAmounts";
+import { useDateFormatter } from "@/lib/i18n/formatters";
+import { lineDisplayName } from "@/lib/pos/orderListDisplay";
+import { toast } from "@/lib/toast";
 
 export function KtvRoomPage() {
   const { t } = useTranslation();
@@ -61,9 +63,10 @@ export function KtvRoomPage() {
     deleteOrderLine,
   } = useSalesOrderManagement();
   const { lookupCard, getWallet } = useGuestWalletManagement();
+  const { user } = useAuth();
   const { requireCashierContext, activePosRegisterId, activeLocationId } =
     usePosWorkspace();
-  const { user } = useAuth();
+  const { formatDateTime } = useDateFormatter();
   const printer = usePrinterConnection(
     String(user?.tenantId || ""),
     activePosRegisterId,
@@ -339,6 +342,7 @@ export function KtvRoomPage() {
           },
         ],
       });
+      const endAt = finalQuote.asOf || closedAt;
       try {
         await printer.printReceipt({
           title: "RECEIPT",
@@ -350,19 +354,23 @@ export function KtvRoomPage() {
           serviceType: "KTV",
           tableOrRoom: room?.roomNumber,
           paidAt: new Date().toLocaleString(),
-          ...sessionPrintTimes(session, closedAt),
+          startTime: formatDateTime(session.openedAt),
+          endTime: formatDateTime(endAt),
+          startTimeLabel: t("receipt.startTime"),
+          endTimeLabel: t("receipt.endTime"),
           lines: result.lines
             .filter((line) => !line.voidedAt)
             .map((line) => {
               const modifiers = modifierPrintText(line.selectedModifiers);
               return {
-                name: line.productName || line.variantName || "Item",
+                name: lineDisplayName(line) || line.productName || line.variantName || "Item",
                 quantity: String(line.quantity || "1"),
                 unitPrice: line.unitPrice?.trim() || undefined,
                 modifiers: modifiers.names,
                 modifierPrices: modifiers.prices,
               };
             }),
+          subtotal: finalQuote.runningTotal,
           total: finalTotal.toFixed(4),
           payments: [
             {
@@ -371,8 +379,10 @@ export function KtvRoomPage() {
             },
           ],
         });
-      } catch {
-        // Checkout already succeeded; a printer fault must not undo it.
+      } catch (printError) {
+        toast.error(
+          printError instanceof Error ? printError.message : t("receipt.printFailed")
+        );
       }
       await getWallet(wallet.id);
       navigate("/ktv");

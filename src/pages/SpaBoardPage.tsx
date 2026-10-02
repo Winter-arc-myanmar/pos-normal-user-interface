@@ -1,5 +1,9 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useAuth } from "@/core/presentation/hooks/useAuth";
+import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
+import { useDateFormatter } from "@/lib/i18n/formatters";
+import { lineDisplayName } from "@/lib/pos/orderListDisplay";
 import { useLocation, useNavigate } from "react-router-dom";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Button } from "@/components/ui/Button";
@@ -44,9 +48,7 @@ import { ProductMenu } from "./cashier/ProductMenu";
 import { CardTapDialog } from "./spa/CardTapDialog";
 import { SpaBillPanel } from "./spa/SpaBillPanel";
 import { SpaRoomTile } from "./spa/SpaRoomTile";
-import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
 import { modifierPrintText } from "@/lib/printing/modifierText";
-import { sessionPrintTimes } from "@/lib/printing/formatKdsTicket";
 
 type SpaStep = "rooms" | "sessions" | "menu" | "pay";
 type CardAction = "add" | "open" | "extend" | "pay";
@@ -129,8 +131,15 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     settleOrder,
   } = useSalesOrderManagement();
   const { lookupCard, getWallet } = useGuestWalletManagement();
+  const { user } = useAuth();
+  const { formatDateTime } = useDateFormatter();
   const { activeLocationId, activePosRegisterId, requireCashierContext, isWorkspaceReady } =
     usePosWorkspace();
+  const printer = usePrinterConnection(
+    String(user?.tenantId || ""),
+    activePosRegisterId,
+    activeLocationId
+  );
 
   const [step, setStep] = useState<SpaStep>("rooms");
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -164,11 +173,6 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const [showFoc, setShowFoc] = useState(false);
   const [focReason, setFocReason] = useState("");
   const [isGivingFoc, setIsGivingFoc] = useState(false);
-  const printer = usePrinterConnection(
-    String(wallet?.tenantId || session?.tenantId || ""),
-    activePosRegisterId,
-    activeLocationId
-  );
 
   const room = rooms.find((item) => item.id === selectedRoomId) || null;
   const openSessions = useMemo(
@@ -614,16 +618,20 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           showLogo: true,
           showPrices: true,
           receiptId: session.salesOrderId,
+          cashier: user?.name,
           serviceType: kind === "ktv" ? "KTV" : "SPA",
           tableOrRoom: final.roomNumber || room?.roomNumber,
           paidAt: new Date().toLocaleString(),
-          ...sessionPrintTimes(session, new Date()),
+          startTime: formatDateTime(session.openedAt),
+          endTime: formatDateTime(final.asOf || new Date().toISOString()),
+          startTimeLabel: t("receipt.startTime"),
+          endTimeLabel: t("receipt.endTime"),
           lines: orderLines
             .filter((line) => !line.voidedAt)
             .map((line) => {
               const modifiers = modifierPrintText(line.selectedModifiers);
               return {
-                name: line.productName || itemNames[line.variantId] || tr("item"),
+                name: lineDisplayName(line) || line.productName || itemNames[line.variantId] || tr("item"),
                 quantity: String(line.quantity || "1"),
                 unitPrice: line.unitPrice?.trim() || undefined,
                 modifiers: modifiers.names,
@@ -632,8 +640,10 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             }),
           total: String(final.paidTotal || final.runningTotal || "0"),
         });
-      } catch {
-        // Session already closed; a printer fault must not undo it.
+      } catch (printError) {
+        toast.error(
+          printError instanceof Error ? printError.message : t("receipt.printFailed")
+        );
       }
       backToBoard();
       setNotice(
@@ -769,6 +779,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     setIsPaying(true);
     try {
       const context = await requireCashierContext();
+      let endAt = session.closedAt || session.endsAt || "";
       if (!billClosed) {
         const latest = await getQuote(session.id);
         const estimate = estimateCardCharge({
@@ -781,7 +792,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           setActionError(tr("errors.balanceShort"));
           return;
         }
-        await closeSession(session.id, {});
+        const closed = await closeSession(session.id, {});
+        endAt = closed.asOf || new Date().toISOString();
         setSession({ ...session, sessionState: "CLOSED" });
       }
       const result = await settleOrder(session.salesOrderId, {
@@ -795,10 +807,6 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         ...(tipValue > 0 ? { tipAmount: tipValue.toFixed(4) } : {}),
         idempotencyKey: spaSettleKey(session.id),
       });
-      setPaid(result);
-      writeResume(kind, null);
-      setWallet(await getWallet(wallet.id));
-      await fetchBoard();
       try {
         await printer.printReceipt({
           title: "RECEIPT",
@@ -806,16 +814,20 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           showLogo: true,
           showPrices: true,
           receiptId: result.orderNumber || session.salesOrderId,
+          cashier: user?.name,
           serviceType: kind === "ktv" ? "KTV" : "SPA",
           tableOrRoom: room?.roomNumber || quote?.roomNumber,
           paidAt: new Date().toLocaleString(),
-          ...sessionPrintTimes(session, new Date()),
+          startTime: formatDateTime(session.openedAt),
+          endTime: formatDateTime(endAt),
+          startTimeLabel: t("receipt.startTime"),
+          endTimeLabel: t("receipt.endTime"),
           lines: orderLines
             .filter((line) => !line.voidedAt)
             .map((line) => {
               const modifiers = modifierPrintText(line.selectedModifiers);
               return {
-                name: line.productName || itemNames[line.variantId] || tr("item"),
+                name: lineDisplayName(line) || line.productName || itemNames[line.variantId] || tr("item"),
                 quantity: String(line.quantity || "1"),
                 unitPrice: line.unitPrice?.trim() || undefined,
                 modifiers: modifiers.names,
@@ -824,12 +836,21 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             }),
           total: result.grandTotal,
           payments: [
-            { name: cardMethod.name || "Payment", amount: result.totalPaid || result.grandTotal },
+            {
+              name: cardMethod.name || "Payment",
+              amount: result.totalPaid || result.grandTotal,
+            },
           ],
         });
-      } catch {
-        // Settlement already succeeded; a printer fault must not undo it.
+      } catch (printError) {
+        toast.error(
+          printError instanceof Error ? printError.message : t("receipt.printFailed")
+        );
       }
+      setPaid(result);
+      writeResume(kind, null);
+      setWallet(await getWallet(wallet.id));
+      await fetchBoard();
     } catch (caught) {
       setActionError(caught instanceof Error ? caught.message : tr("errors.pay"));
     } finally {

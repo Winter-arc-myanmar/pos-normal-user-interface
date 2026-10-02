@@ -175,6 +175,15 @@ function SalesOrdersIcon() {
   );
 }
 
+function RefundsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass} aria-hidden="true">
+      <path d="M4 7h11a4 4 0 1 1 0 8H8" />
+      <path d="M8 11 4 15l4 4" />
+    </svg>
+  );
+}
+
 // function SyncIcon() {
 //   return (
 //     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass} aria-hidden="true">
@@ -272,6 +281,12 @@ export function AppShell() {
       label: t("shell.salesOrdersTitle"),
       icon: <SalesOrdersIcon />,
       visible: canAccess(PAGE_PERMISSIONS.salesOrders),
+    },
+    {
+      to: "/refunds",
+      label: t("shell.refundsTitle"),
+      icon: <RefundsIcon />,
+      visible: canAccess(PAGE_PERMISSIONS.refunds),
     },
     {
       to: "/customers",

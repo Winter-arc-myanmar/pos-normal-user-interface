@@ -1,4 +1,9 @@
 {
+  "receipt": {
+    "startTime": "စတင်ချိန်",
+    "endTime": "ပြီးဆုံးချိန်",
+    "printFailed": "ပြေစာ ပုံနှိပ်၍ မရပါ"
+  },
   "common": {
     "refresh": "ပြန်လည်စစ်မည်",
     "refreshing": "ပြန်လည်စစ်နေသည်...",
@@ -35,6 +40,7 @@
     "spaTitle": "SPA အခန်းများ",
     "counterOrdersTitle": "ကောင်တာ အော်ဒါများ",
     "salesOrdersTitle": "အရောင်းအော်ဒါများ",
+    "refundsTitle": "ပြန်အမ်းငွေ",
     "printer": "ပရင်တာ",
     "notifications": "အကြောင်းကြားချက်များ",
     "waitlistTitle": "စောင့်ဆိုင်းစာရင်း",

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { PrinterBinding } from "@/lib/pos/printerBindingStorage";
 import {
+  buildSaleReceiptLines,
   formatKdsTicket,
   formatKitchenSlip,
   formatSaleReceipt,
@@ -281,6 +282,31 @@ describe("station print routing", () => {
     expect(slip).not.toContain("5.00");
     expect(slip).toContain("Beer");
     expect(slip).toContain("See you");
+  });
+
+  it("prints session start and end times on a receipt", () => {
+    const slip = formatSaleReceipt({
+      title: "RECEIPT",
+      place: "CHECKOUT",
+      lines: [{ name: "Room", quantity: "1", unitPrice: "10.00" }],
+      total: "10.00",
+      startTime: "30 Sep 2026, 7:00 PM",
+      endTime: "30 Sep 2026, 9:00 PM",
+      startTimeLabel: "Start time",
+      endTimeLabel: "End time",
+    });
+    const plain = buildSaleReceiptLines({
+      title: "RECEIPT",
+      lines: [{ name: "Room", quantity: "1" }],
+      total: "10.00",
+      startTime: "30 Sep 2026, 7:00 PM",
+      endTime: "30 Sep 2026, 9:00 PM",
+    });
+
+    expect(slip).toContain("Start time: 30 Sep 2026, 7:00 PM");
+    expect(slip).toContain("End time: 30 Sep 2026, 9:00 PM");
+    expect(plain.join("\n")).toContain("Start time: 30 Sep 2026, 7:00 PM");
+    expect(plain.join("\n")).toContain("End time: 30 Sep 2026, 9:00 PM");
   });
 
   it("prints every enabled template section for checkout, finance, and kitchen", () => {
