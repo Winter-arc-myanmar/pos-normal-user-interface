@@ -74,8 +74,6 @@ export interface SaleReceipt extends PrintParty {
   // tip?: string;
   total: string;
   payments?: Array<{ name: string; amount: string }>;
-  startTime?: string;
-  endTime?: string;
   startTimeLabel?: string;
   endTimeLabel?: string;
   place?: PrintPlace;
@@ -173,8 +171,6 @@ const partyRows = (
   if (settings?.other.tableOrRoom && party.tableOrRoom) rows.push(party.tableOrRoom);
   if (settings?.other.cashier && party.cashier) rows.push(party.cashier);
   if (settings?.other.pickupCode && party.pickupCode) rows.push(party.pickupCode);
-  if (party.startTime) rows.push(`Start: ${party.startTime}`);
-  if (party.endTime) rows.push(`End: ${party.endTime}`);
   return rows;
 };
 

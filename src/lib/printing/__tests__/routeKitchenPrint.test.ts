@@ -307,6 +307,8 @@ describe("station print routing", () => {
     expect(slip).toContain("End time: 30 Sep 2026, 9:00 PM");
     expect(plain.join("\n")).toContain("Start time: 30 Sep 2026, 7:00 PM");
     expect(plain.join("\n")).toContain("End time: 30 Sep 2026, 9:00 PM");
+    expect(slip).not.toContain("Start: 30 Sep 2026, 7:00 PM");
+    expect(plain.join("\n")).not.toContain("Start: 30 Sep 2026, 7:00 PM");
   });
 
   it("prints every enabled template section for checkout, finance, and kitchen", () => {
@@ -472,20 +474,6 @@ describe("station print routing", () => {
 
     expect(slip).toContain("10.00");
     expect(slip).toContain("Large +2.00");
-  });
-
-  it("prints session start and end times on a sale receipt", () => {
-    const slip = formatSaleReceipt({
-      title: "RECEIPT",
-      place: "CHECKOUT",
-      startTime: "9/26/2026, 7:00:00 AM",
-      endTime: "9/26/2026, 8:30:00 AM",
-      lines: [{ name: "Room charge", quantity: "1", unitPrice: "30000" }],
-      total: "30000",
-    });
-
-    expect(slip).toContain("Start: 9/26/2026, 7:00:00 AM");
-    expect(slip).toContain("End: 9/26/2026, 8:30:00 AM");
   });
 
   it("reads modifier names and prices from order lines", () => {
