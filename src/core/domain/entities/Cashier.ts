@@ -187,14 +187,14 @@ export class KdsStation {
   locationId!: string;
   name!: string;
   displayColor?: string;
-  printerId?: string;
+  printerIds!: string[];
   routingRules?: Record<string, unknown>;
   deletedAt?: string | null;
   createdAt!: string;
   updatedAt!: string;
 
   constructor(data: Partial<KdsStation>) {
-    Object.assign(this, data);
+    Object.assign(this, { printerIds: [], ...data });
   }
 }
 

@@ -1,7 +1,9 @@
 import { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { GuestCard, GuestWallet } from "../../domain/entities/GuestWallet";
 import { IGuestWalletService } from "../../domain/services/IGuestWalletService";
 import container from "../../infrastructure/di/container";
+import { CardRefundPolicy } from "../../application/services/CardRefundPolicy";
 import {
   GUEST_WALLET_AMOUNT_OPTIONS,
   GuestWalletAmountOption,
@@ -46,6 +48,7 @@ interface UseCardRefundFlowReturn {
   customerName: string | null;
   customerPhone: string | null;
   amountOptions: GuestWalletAmountOption[];
+  maxRefundAmount: number;
   selectedAmount: string;
   customAmount: string;
   receipt: CardRefundReceipt | null;
@@ -65,12 +68,8 @@ interface UseCardRefundFlowReturn {
   clearError: () => void;
 }
 
-const parseAmount = (value: string): number => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-};
-
 export function useCardRefundFlow(): UseCardRefundFlowReturn {
+  const { t } = useTranslation();
   const guestWalletService = container.resolve<IGuestWalletService>(
     "guestWalletService"
   );
@@ -181,22 +180,30 @@ export function useCardRefundFlow(): UseCardRefundFlowReturn {
     return customAmount.trim();
   }, [customAmount, selectedAmount]);
 
+  const maxRefundAmount = CardRefundPolicy.refundableAmount(detectedWallet || {});
+
+  const refundAmountError = useCallback(
+    (err: unknown) => {
+      if (err instanceof Error && err.message.toLowerCase().includes("exceed")) {
+        return t("cardRefund.exceedsBalance");
+      }
+      if (err instanceof Error) return err.message;
+      return t("cardRefund.exceedsBalance");
+    },
+    [t]
+  );
+
   const confirmAmount = useCallback(() => {
     const amount = resolveAmount();
-    if (parseAmount(amount) <= 0) {
-      setError("Refund amount must be greater than zero");
-      return;
-    }
-    const refundable = parseAmount(
-      detectedWallet?.purchasedBalance || detectedWallet?.balance || "0"
-    );
-    if (parseAmount(amount) > refundable) {
-      setError("Refund amount cannot exceed purchased balance");
+    try {
+      CardRefundPolicy.assertRefundAmount(amount, detectedWallet || {});
+    } catch (err) {
+      setError(refundAmountError(err));
       return;
     }
     clearError();
     setStep("print");
-  }, [clearError, detectedWallet, resolveAmount]);
+  }, [clearError, detectedWallet, refundAmountError, resolveAmount]);
 
   const confirmAndPrint = useCallback(
     async (input: CardRefundConfirmInput) => {
@@ -213,8 +220,10 @@ export function useCardRefundFlow(): UseCardRefundFlowReturn {
         setError("Payment method is required");
         return;
       }
-      if (parseAmount(amount) <= 0) {
-        setError("Refund amount must be greater than zero");
+      try {
+        CardRefundPolicy.assertRefundAmount(amount, detectedWallet);
+      } catch (err) {
+        setError(refundAmountError(err));
         return;
       }
 
@@ -242,9 +251,7 @@ export function useCardRefundFlow(): UseCardRefundFlowReturn {
         setReceipt(printed);
         return printed;
       } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Unable to complete card refund";
-        setError(message);
+        setError(refundAmountError(err));
       } finally {
         setIsLoading(false);
       }
@@ -255,6 +262,7 @@ export function useCardRefundFlow(): UseCardRefundFlowReturn {
       detectedCard,
       detectedWallet,
       guestWalletService,
+      refundAmountError,
       resolveAmount,
     ]
   );
@@ -267,6 +275,7 @@ export function useCardRefundFlow(): UseCardRefundFlowReturn {
     customerName,
     customerPhone,
     amountOptions: GUEST_WALLET_AMOUNT_OPTIONS,
+    maxRefundAmount,
     selectedAmount,
     customAmount,
     receipt,

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/core/presentation/hooks/useAuth";
@@ -13,6 +14,42 @@ import { Toaster } from "@/components/ui/Toaster";
 import { PosIconRail, type PosRailItem } from "./PosIconRail";
 
 const iconClass = "h-5 w-5";
+const NAV_EXPANDED_KEY = "pos:navExpanded";
+
+function useNarrowViewport(maxWidth = 767) {
+  const [narrow, setNarrow] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth <= maxWidth : false
+  );
+
+  useEffect(() => {
+    const media = window.matchMedia(`(max-width: ${maxWidth}px)`);
+    const update = () => setNarrow(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, [maxWidth]);
+
+  return narrow;
+}
+
+function MenuIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-5 w-5"
+      aria-hidden="true"
+    >
+      <path d="M4 6h16" />
+      <path d="M4 12h16" />
+      <path d="M4 18h16" />
+    </svg>
+  );
+}
 
 function DashboardIcon() {
   return (
@@ -169,6 +206,15 @@ export function AppShell() {
   const { canAccess, isTabletAccount } = usePermissions();
   const navigate = useNavigate();
   const location = useLocation();
+  const isNarrow = useNarrowViewport();
+  const [sidebarExpanded, setSidebarExpanded] = useState(() => {
+    try {
+      return localStorage.getItem(NAV_EXPANDED_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
+  const [mobileOpen, setMobileOpen] = useState(false);
   const isPosWorkspace = [
     "/cashier",
     "/ktv",
@@ -333,31 +379,83 @@ export function AppShell() {
     }
   };
 
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!mobileOpen) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [mobileOpen]);
+
+  const toggleSidebar = () => {
+    setSidebarExpanded((current) => {
+      const next = !current;
+      try {
+        localStorage.setItem(NAV_EXPANDED_KEY, String(next));
+      } catch {
+        // Embedded WebViews may deny local storage.
+      }
+      return next;
+    });
+  };
+
+  const closeMobileMenu = () => setMobileOpen(false);
+
   if (isTabletAccount) return <Navigate to="/tablet" replace />;
+
+  const navMode = isNarrow
+    ? "overlay"
+    : sidebarExpanded
+      ? "docked-expanded"
+      : "docked-collapsed";
+  const gridCols = isNarrow
+    ? showCheckoutActionRail
+      ? "grid-cols-[minmax(0,1fr)_minmax(5.25rem,6.5rem)]"
+      : "grid-cols-[minmax(0,1fr)]"
+    : showCheckoutActionRail
+      ? sidebarExpanded
+        ? "grid-cols-[14rem_minmax(0,1fr)_6.5rem]"
+        : "grid-cols-[3.5rem_minmax(0,1fr)_6.5rem]"
+      : sidebarExpanded
+        ? "grid-cols-[14rem_minmax(0,1fr)]"
+        : "grid-cols-[3.5rem_minmax(0,1fr)]";
+
+  const rail = (
+    <PosIconRail
+      items={railItems}
+      userName={currentUserName}
+      profileLabel={t("settings.profileLabel")}
+      printerLabel={t("shell.printer")}
+      printerBadgeCount={
+        !printerConnection.defaultBinding || printerConnection.error ? 1 : 0
+      }
+      notificationLabel={t("shell.notifications")}
+      expanded={isNarrow ? true : sidebarExpanded}
+      overlay={isNarrow}
+      onToggle={isNarrow ? undefined : toggleSidebar}
+      onClose={isNarrow ? closeMobileMenu : undefined}
+      onNavigate={isNarrow ? closeMobileMenu : undefined}
+      onNotificationsClick={() => navigate("/cashier?view=orders")}
+      onPrinterClick={() => navigate("/settings/printer")}
+      onProfileClick={() => navigate("/settings/devices")}
+    />
+  );
 
   return (
     <>
     <div
       className={[
-        "pos-app-shell pos-touch-scroll grid h-[100dvh] min-h-0 min-w-0 overflow-x-hidden overflow-y-hidden bg-black",
-        showCheckoutActionRail
-          ? "grid-cols-[3.5rem_minmax(0,1fr)_6.5rem]"
-          : "grid-cols-[3.5rem_minmax(0,1fr)]",
+        "pos-app-shell pos-touch-scroll grid h-[100dvh] min-h-0 min-w-0 overflow-x-hidden overflow-y-hidden bg-black transition-[grid-template-columns] duration-200 ease-out",
+        gridCols,
       ].join(" ")}
+      data-nav={navMode}
     >
-      <PosIconRail
-        items={railItems}
-        userName={currentUserName}
-        profileLabel={t("settings.profileLabel")}
-        printerLabel={t("shell.printer")}
-        printerBadgeCount={
-          !printerConnection.defaultBinding || printerConnection.error ? 1 : 0
-        }
-        notificationLabel={t("shell.notifications")}
-        onNotificationsClick={() => navigate("/cashier?view=orders")}
-        onPrinterClick={() => navigate("/settings/printer")}
-        onProfileClick={() => navigate("/settings/devices")}
-      />
+      {isNarrow ? null : rail}
 
       <main
         className={[
@@ -397,6 +495,50 @@ export function AppShell() {
         />
       ) : null}
     </div>
+
+    {isNarrow ? (
+      <button
+        type="button"
+        className={[
+          "pos-nav-hamburger fixed z-30 inline-flex h-11 w-11 items-center justify-center rounded-lg border border-white/20 bg-black/80 text-white shadow-lg backdrop-blur-sm transition-opacity duration-200 ease-out",
+          mobileOpen ? "pointer-events-none opacity-0" : "opacity-100",
+        ].join(" ")}
+        style={{
+          top: "max(0.5rem, env(safe-area-inset-top))",
+          left: "max(0.5rem, env(safe-area-inset-left))",
+        }}
+        aria-label={t("shell.openMenu")}
+        aria-controls="pos-side-menu"
+        aria-expanded={mobileOpen}
+        aria-hidden={mobileOpen}
+        tabIndex={mobileOpen ? -1 : undefined}
+        onClick={() => setMobileOpen(true)}
+      >
+        <MenuIcon />
+      </button>
+    ) : null}
+    {isNarrow ? (
+      <div
+        className={[
+          "pos-nav-backdrop fixed inset-0 z-40 bg-black/55 transition-opacity duration-200 ease-out",
+          mobileOpen ? "opacity-100" : "pointer-events-none opacity-0",
+        ].join(" ")}
+        onClick={closeMobileMenu}
+        aria-hidden={!mobileOpen}
+      />
+    ) : null}
+    {isNarrow ? (
+      <div
+        className={[
+          "pos-side-drawer fixed inset-y-0 left-0 z-50 overflow-hidden transition-transform duration-200 ease-out",
+          mobileOpen ? "translate-x-0" : "pointer-events-none -translate-x-full",
+        ].join(" ")}
+        aria-hidden={!mobileOpen}
+        inert={!mobileOpen}
+      >
+        {rail}
+      </div>
+    ) : null}
 
     <Toaster />
 

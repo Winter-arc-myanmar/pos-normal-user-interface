@@ -70,7 +70,7 @@ If you are tempted to import `HttpClient` inside a page or inside `domain`, stop
 4. **`AuthService`** calls **`ApiAuthRepository`** (infrastructure) through the constructor wiring in the container.
 5. **`ApiAuthRepository`** uses **`HttpClient`** to POST to the auth endpoint and stores tokens via **`src/lib/cookies.ts`**.
 
-The page never sees the URL or Axios details—only `login(email, password)`.
+The page never sees the URL or Axios details—only `login({ userId, password })`.
 
 ## Dependency injection container
 

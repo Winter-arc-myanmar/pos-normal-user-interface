@@ -160,6 +160,7 @@ export function CardRefundPage() {
     customerName,
     customerPhone,
     amountOptions,
+    maxRefundAmount,
     selectedAmount,
     customAmount,
     receipt,
@@ -376,6 +377,12 @@ export function CardRefundPage() {
                   </span>
                 </p>
                 <p className="mt-1 text-sm text-slate-400">
+                  {t("cardRefund.refundable")}{" "}
+                  <span className="font-semibold text-white">
+                    {formatCurrency(maxRefundAmount)}
+                  </span>
+                </p>
+                <p className="mt-1 text-sm text-slate-400">
                   {t("crm.purchasedBalance")}{" "}
                   <span className="font-semibold text-white">
                     {formatCurrency(Number(detectedWallet?.purchasedBalance || 0))}
@@ -388,23 +395,30 @@ export function CardRefundPage() {
                   {t("cardRefund.predefinedAmounts")}
                 </p>
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                  {amountOptions.map((option) => (
+                  {amountOptions.map((option) => {
+                    const overBalance = Number(option.amount) > maxRefundAmount;
+                    return (
                     <button
                       key={option.id}
                       type="button"
+                      disabled={overBalance}
                       className={`min-h-16 rounded-lg border px-4 py-3 text-left text-lg font-semibold ${
-                        selectedAmount === option.amount
+                        overBalance
+                          ? "cursor-not-allowed border-slate-800 bg-slate-900/40 text-slate-500"
+                          : selectedAmount === option.amount
                           ? "border-amber-500 bg-amber-500/20 text-white"
                           : "border-slate-700 bg-slate-900 text-slate-200 hover:border-slate-500"
                       }`}
                       onClick={() => {
+                        if (overBalance) return;
                         setSelectedAmount(option.amount);
                         setCustomAmount("");
                       }}
                     >
                       {option.label}
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -430,7 +444,11 @@ export function CardRefundPage() {
                 <Button
                   type="button"
                   onClick={confirmAmount}
-                  disabled={!activeAmount || Number(activeAmount) <= 0}
+                  disabled={
+                    !activeAmount ||
+                    Number(activeAmount) <= 0 ||
+                    Number(activeAmount) > maxRefundAmount
+                  }
                 >
                   {t("cardRefund.continueToPrint")}
                 </Button>

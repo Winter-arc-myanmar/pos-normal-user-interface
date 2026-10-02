@@ -27,19 +27,36 @@ export class KitchenPrinterService implements IKitchenPrinterService {
     if (!payload.name.trim()) {
       throw new Error("Printer name is required");
     }
+    if (!payload.sectors.length) {
+      throw new Error("At least one printer sector is required");
+    }
     if (!Number.isInteger(payload.port) || payload.port < 1 || payload.port > 65535) {
       throw new Error("Printer port must be between 1 and 65535");
     }
     const ipAddress = payload.ipAddress?.trim();
     return this.repository.create({
-      ...payload,
-      ...(ipAddress ? { ipAddress } : { ipAddress: undefined }),
+      tenantId: payload.tenantId,
+      locationId: payload.locationId,
+      name: payload.name.trim(),
+      port: payload.port,
+      sectors: Array.from(new Set(payload.sectors)),
+      isActive: payload.isActive,
+      ...(ipAddress ? { ipAddress } : {}),
     });
   }
 
   update(id: string, payload: UpdateKitchenPrinterDTO): Promise<KitchenPrinter> {
     if (!id.trim()) throw new Error("Printer ID is required");
-    return this.repository.update(id, payload);
+    if (payload.sectors && !payload.sectors.length) {
+      throw new Error("At least one printer sector is required");
+    }
+    return this.repository.update(id, {
+      ...payload,
+      sectors: payload.sectors
+        ? Array.from(new Set(payload.sectors))
+        : undefined,
+      ipAddress: payload.ipAddress?.trim() || undefined,
+    });
   }
 
   delete(id: string): Promise<KitchenPrinter> {

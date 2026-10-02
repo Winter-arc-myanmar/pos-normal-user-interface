@@ -18,7 +18,9 @@ import {
  */
 interface ApiAuthUser {
   id: string;
-  email: string;
+  email?: string;
+  username?: string;
+  loginId?: string;
   fullName?: string;
   type?: string;
   tenantId?: string;
@@ -46,7 +48,7 @@ export class ApiAuthRepository implements IAuthRepository {
   }
 
   /**
-   * Login user with email and password
+   * Login user with User ID (username) and password
    */
   async login(payload: SignInRequestDTO): Promise<AuthResultDTO> {
     try {
@@ -151,12 +153,14 @@ export class ApiAuthRepository implements IAuthRepository {
 
     try {
       const parsed = JSON.parse(userJson) as Partial<User> & Partial<ApiAuthUser>;
-      if (!parsed.id || !parsed.email) return null;
+      if (!parsed.id || !parsed.name) return null;
 
       return this.mapApiResponseToUser(
         {
           id: String(parsed.id),
-          email: String(parsed.email),
+          email: parsed.email ? String(parsed.email) : undefined,
+          username: parsed.username || parsed.loginId,
+          loginId: parsed.loginId || parsed.username,
           fullName: parsed.fullName || parsed.name,
           name: parsed.name,
           tenantId: parsed.tenantId,
@@ -185,11 +189,17 @@ export class ApiAuthRepository implements IAuthRepository {
     const normalizedRole = this.normalizeRole(activeBranchAccess.roles, apiUser.role);
     const rolePermissions = this.resolvePermissions(activeBranchAccess.permissions, access);
 
+    const loginId =
+      apiUser.loginId || apiUser.username
+        ? String(apiUser.loginId || apiUser.username)
+        : undefined;
+
     return new User({
       id: String(apiUser.id),
       name: apiUser.fullName || apiUser.name || "",
       nickname: apiUser.fullName || apiUser.name || "",
       email: apiUser.email || "",
+      loginId,
       tenantId: apiUser.tenantId,
       phone: "",
       role: normalizedRole,

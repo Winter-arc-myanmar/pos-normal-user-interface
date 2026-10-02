@@ -5,11 +5,14 @@ import {
   ResolvePrintTemplateDTO,
   UpdatePrintTemplateDTO,
 } from "../dtos/PrintTemplateDTO";
-import { PrintTemplate } from "../../domain/entities/PrintTemplate";
+import {
+  PRINT_TEMPLATE_TYPES,
+  PrintTemplate,
+} from "../../domain/entities/PrintTemplate";
 import { IPrintTemplateRepository } from "../../domain/repositories/IPrintTemplateRepository";
 import { IPrintTemplateService } from "../../domain/services/IPrintTemplateService";
 
-const TYPES = new Set(["RECEIPT", "KITCHEN"]);
+const TYPES = new Set<string>(PRINT_TEMPLATE_TYPES);
 
 export class PrintTemplateService implements IPrintTemplateService {
   constructor(private readonly repository: IPrintTemplateRepository) {}

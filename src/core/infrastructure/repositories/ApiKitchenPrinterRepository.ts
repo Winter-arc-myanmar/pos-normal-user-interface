@@ -29,9 +29,35 @@ const toPrinter = (item: RecordValue) =>
     tenantId: String(item.tenantId || ""),
     locationId: String(item.locationId || ""),
     name: String(item.name || ""),
-    ipAddress: String(item.ipAddress || ""),
+    ipAddress: item.ipAddress ? String(item.ipAddress) : undefined,
     port: Number(item.port || 9100),
+    sectors: Array.isArray(item.sectors)
+      ? item.sectors
+          .map((sector) => String(sector))
+          .filter((sector) =>
+            ["KDS", "CHECKOUT", "FINANCE"].includes(sector)
+          ) as KitchenPrinter["sectors"]
+      : [],
     isActive: item.isActive !== false,
+    categories: Array.isArray(item.categories)
+      ? item.categories.map((value) => {
+          const route = value as RecordValue;
+          const category =
+            route.category && typeof route.category === "object"
+              ? (route.category as RecordValue)
+              : undefined;
+          return {
+            printerId: String(route.printerId || item.id || ""),
+            categoryId: String(route.categoryId || category?.id || ""),
+            category: category
+              ? {
+                  id: String(category.id || ""),
+                  name: String(category.name || ""),
+                }
+              : undefined,
+          };
+        })
+      : [],
     deletedAt: item.deletedAt ? String(item.deletedAt) : null,
     createdAt: item.createdAt ? String(item.createdAt) : undefined,
     updatedAt: item.updatedAt ? String(item.updatedAt) : undefined,
@@ -42,7 +68,7 @@ export class ApiKitchenPrinterRepository implements IKitchenPrinterRepository {
 
   async list(params?: KitchenPrinterFilterDTO): Promise<KitchenPrinterListDTO> {
     const response = await this.httpClient.get<ApiEnvelope<RecordValue[]>>(
-      API_ENDPOINTS.KITCHEN_PRINTERS.LIST,
+      API_ENDPOINTS.PRINTERS.LIST,
       { params }
     );
     const value = unwrap(response);
@@ -67,14 +93,14 @@ export class ApiKitchenPrinterRepository implements IKitchenPrinterRepository {
 
   async getById(id: string): Promise<KitchenPrinter> {
     const response = await this.httpClient.get<ApiEnvelope<RecordValue>>(
-      API_ENDPOINTS.KITCHEN_PRINTERS.BY_ID(id)
+      API_ENDPOINTS.PRINTERS.BY_ID(id)
     );
     return toPrinter(unwrap(response));
   }
 
   async create(payload: CreateKitchenPrinterDTO): Promise<KitchenPrinter> {
     const response = await this.httpClient.post<ApiEnvelope<RecordValue>>(
-      API_ENDPOINTS.KITCHEN_PRINTERS.CREATE,
+      API_ENDPOINTS.PRINTERS.CREATE,
       payload
     );
     return toPrinter(unwrap(response));
@@ -85,7 +111,7 @@ export class ApiKitchenPrinterRepository implements IKitchenPrinterRepository {
     payload: UpdateKitchenPrinterDTO
   ): Promise<KitchenPrinter> {
     const response = await this.httpClient.patch<ApiEnvelope<RecordValue>>(
-      API_ENDPOINTS.KITCHEN_PRINTERS.UPDATE(id),
+      API_ENDPOINTS.PRINTERS.UPDATE(id),
       payload
     );
     return toPrinter(unwrap(response));
@@ -93,21 +119,21 @@ export class ApiKitchenPrinterRepository implements IKitchenPrinterRepository {
 
   async delete(id: string): Promise<KitchenPrinter> {
     const response = await this.httpClient.delete<ApiEnvelope<RecordValue>>(
-      API_ENDPOINTS.KITCHEN_PRINTERS.DELETE(id)
+      API_ENDPOINTS.PRINTERS.DELETE(id)
     );
     return toPrinter(unwrap(response));
   }
 
   async attachCategory(id: string, categoryId: string): Promise<void> {
     await this.httpClient.post(
-      API_ENDPOINTS.KITCHEN_PRINTERS.ATTACH_CATEGORY(id),
+      API_ENDPOINTS.PRINTERS.ATTACH_CATEGORY(id),
       { categoryId }
     );
   }
 
   async detachCategory(id: string, categoryId: string): Promise<void> {
     await this.httpClient.delete(
-      API_ENDPOINTS.KITCHEN_PRINTERS.DETACH_CATEGORY(id, categoryId)
+      API_ENDPOINTS.PRINTERS.DETACH_CATEGORY(id, categoryId)
     );
   }
 }

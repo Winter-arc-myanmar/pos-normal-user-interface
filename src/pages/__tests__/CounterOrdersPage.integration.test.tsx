@@ -72,7 +72,7 @@ vi.mock("@/core/presentation/hooks/useKdsStationManagement", () => ({
         {
           id: "station-kitchen",
           name: "Kitchen",
-          printerId: "printer-1",
+          printerIds: ["printer-1"],
           routingRules: { categoryIds: ["snack"] },
         },
       ],
@@ -120,7 +120,7 @@ describe("CounterOrdersPage integration", () => {
         [
           expect.objectContaining({
             id: "station-kitchen",
-            printerId: "printer-1",
+            printerIds: ["printer-1"],
           }),
         ]
       );

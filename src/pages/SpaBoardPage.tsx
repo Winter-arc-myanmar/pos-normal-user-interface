@@ -48,6 +48,7 @@ import { ProductMenu } from "./cashier/ProductMenu";
 import { CardTapDialog } from "./spa/CardTapDialog";
 import { SpaBillPanel } from "./spa/SpaBillPanel";
 import { SpaRoomTile } from "./spa/SpaRoomTile";
+import { modifierPrintText } from "@/lib/printing/modifierText";
 
 type SpaStep = "rooms" | "sessions" | "menu" | "pay";
 type CardAction = "add" | "open" | "extend" | "pay";
@@ -134,7 +135,11 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const { formatDateTime } = useDateFormatter();
   const { activeLocationId, activePosRegisterId, requireCashierContext, isWorkspaceReady } =
     usePosWorkspace();
-  const printer = usePrinterConnection(String(user?.tenantId || ""), activePosRegisterId);
+  const printer = usePrinterConnection(
+    String(user?.tenantId || ""),
+    activePosRegisterId,
+    activeLocationId
+  );
 
   const [step, setStep] = useState<SpaStep>("rooms");
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -606,6 +611,40 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       const final = await closeSession(session.id, {});
       writeResume(kind, null);
       await fetchBoard();
+      try {
+        await printer.printReceipt({
+          title: "RECEIPT",
+          place: "CHECKOUT",
+          showLogo: true,
+          showPrices: true,
+          receiptId: session.salesOrderId,
+          cashier: user?.name,
+          serviceType: kind === "ktv" ? "KTV" : "SPA",
+          tableOrRoom: final.roomNumber || room?.roomNumber,
+          paidAt: new Date().toLocaleString(),
+          startTime: formatDateTime(session.openedAt),
+          endTime: formatDateTime(final.asOf || new Date().toISOString()),
+          startTimeLabel: t("receipt.startTime"),
+          endTimeLabel: t("receipt.endTime"),
+          lines: orderLines
+            .filter((line) => !line.voidedAt)
+            .map((line) => {
+              const modifiers = modifierPrintText(line.selectedModifiers);
+              return {
+                name: lineDisplayName(line) || line.productName || itemNames[line.variantId] || tr("item"),
+                quantity: String(line.quantity || "1"),
+                unitPrice: line.unitPrice?.trim() || undefined,
+                modifiers: modifiers.names,
+                modifierPrices: modifiers.prices,
+              };
+            }),
+          total: String(final.paidTotal || final.runningTotal || "0"),
+        });
+      } catch (printError) {
+        toast.error(
+          printError instanceof Error ? printError.message : t("receipt.printFailed")
+        );
+      }
       backToBoard();
       setNotice(
         tr("treatmentEnded", {
@@ -774,24 +813,32 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           place: "CHECKOUT",
           showLogo: true,
           showPrices: true,
-          receiptId: result.orderNumber,
+          receiptId: result.orderNumber || session.salesOrderId,
           cashier: user?.name,
           serviceType: kind === "ktv" ? "KTV" : "SPA",
-          tableOrRoom: room?.roomNumber,
+          tableOrRoom: room?.roomNumber || quote?.roomNumber,
+          paidAt: new Date().toLocaleString(),
           startTime: formatDateTime(session.openedAt),
           endTime: formatDateTime(endAt),
           startTimeLabel: t("receipt.startTime"),
           endTimeLabel: t("receipt.endTime"),
-          lines: orderLines.map((line) => ({
-            name: lineDisplayName(line) || line.variantId,
-            quantity: String(line.quantity || "1"),
-            unitPrice: line.unitPrice,
-          })),
+          lines: orderLines
+            .filter((line) => !line.voidedAt)
+            .map((line) => {
+              const modifiers = modifierPrintText(line.selectedModifiers);
+              return {
+                name: lineDisplayName(line) || line.productName || itemNames[line.variantId] || tr("item"),
+                quantity: String(line.quantity || "1"),
+                unitPrice: line.unitPrice?.trim() || undefined,
+                modifiers: modifiers.names,
+                modifierPrices: modifiers.prices,
+              };
+            }),
           total: result.grandTotal,
           payments: [
             {
-              name: cardMethod.name || "Card",
-              amount: result.grandTotal,
+              name: cardMethod.name || "Payment",
+              amount: result.totalPaid || result.grandTotal,
             },
           ],
         });

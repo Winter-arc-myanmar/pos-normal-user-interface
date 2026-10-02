@@ -14,16 +14,16 @@ import {
 } from "@/lib/printing/formatKdsTicket";
 import {
   groupKitchenJobs,
+  KitchenPrintPlan,
+  KitchenRoutingOptions,
   StationRoute,
 } from "@/lib/printing/routeKitchenPrint";
-import {
-  pickPrintTemplate,
-  PrintTemplateSelectionError,
-} from "@/lib/printing/selectPrintTemplate";
+import { printPlaceToTemplateType } from "@/lib/printing/selectPrintTemplate";
 import {
   PRINTER_BINDINGS_CHANGED,
   PrinterBinding,
   PrinterTransport,
+  bindingsForSector,
   listStoredPrinterBindings,
   readPrinterBindings,
   removePrinterBinding,
@@ -163,10 +163,12 @@ export function usePrinterConnection(
     async (place: PrintPlace) => {
       try {
         const service = container.resolve<IPrintTemplateService>("printTemplateService");
-        const result = await service.list({ page: 1, limit: 50 });
-        return pickPrintTemplate(place, result.templates, locationId)?.settings;
-      } catch (caught) {
-        if (caught instanceof PrintTemplateSelectionError) throw caught;
+        const resolved = await service.resolve({
+          type: printPlaceToTemplateType(place),
+          ...(locationId ? { locationId } : {}),
+        });
+        return resolved.settings;
+      } catch {
         return undefined;
       }
     },
@@ -174,7 +176,11 @@ export function usePrinterConnection(
   );
 
   const printKitchen = useCallback(
-    async (slip: KitchenSlip, stations: StationRoute[] = []) => {
+    async (
+      slip: KitchenSlip,
+      stations: StationRoute[] = [],
+      options: KitchenRoutingOptions = {}
+    ): Promise<KitchenPrintPlan> => {
       const client = await configureClient(tenantId, registerId);
       const current = currentBindings();
       const template = slip.template || (await templateFor("KDS"));
@@ -183,18 +189,29 @@ export function usePrinterConnection(
         current.bindings,
         current.defaultBinding,
         slip.stationId,
-        stations
+        stations,
+        options
       );
+      const failures: string[] = [];
       for (const job of plan.jobs) {
-        await client.printKitchen(job.binding, {
-          ...slip,
-          template,
-          lines: job.lines,
-          stationId: job.station?.id || slip.stationId,
-          stationName: job.station?.name || slip.stationName,
-        });
+        try {
+          await client.printKitchen(job.binding, {
+            ...slip,
+            template,
+            lines: job.lines,
+            stationId: job.station?.id || slip.stationId,
+            stationName: job.station?.name || slip.stationName,
+          });
+        } catch (caught) {
+          const message =
+            caught instanceof Error ? caught.message : "Printer communication failed";
+          failures.push(`${job.binding.displayName}: ${message}`);
+        }
       }
-      return plan.unrouted;
+      if (failures.length) {
+        throw new Error(failures.join(" "));
+      }
+      return plan;
     },
     [currentBindings, registerId, templateFor, tenantId]
   );
@@ -203,16 +220,36 @@ export function usePrinterConnection(
     async (receipt: SaleReceipt) => {
       const client = await configureClient(tenantId, registerId);
       const current = currentBindings();
-      const target = current.defaultBinding || current.bindings[0] || null;
-      if (!target) throw new Error("No default printer is connected");
       const place = receipt.place || "CHECKOUT";
+      const targets = bindingsForSector(current.bindings, place);
+      if (!targets.length) {
+        throw new Error(
+          place === "FINANCE"
+            ? "No finance printer is connected"
+            : place === "KDS"
+              ? "No KDS printer is connected"
+              : "No checkout printer is connected"
+        );
+      }
       const template = receipt.template || (await templateFor(place));
-      await client.printReceipt(target, {
-        ...receipt,
-        place,
-        template,
-        showLogo: place === "FINANCE" ? false : receipt.showLogo,
-      });
+      const failures: string[] = [];
+      for (const target of targets) {
+        try {
+          await client.printReceipt(target, {
+            ...receipt,
+            place,
+            template,
+            showLogo: receipt.showLogo,
+          });
+        } catch (caught) {
+          const message =
+            caught instanceof Error
+              ? caught.message
+              : "Printer communication failed";
+          failures.push(`${target.displayName}: ${message}`);
+        }
+      }
+      if (failures.length) throw new Error(failures.join(" "));
     },
     [currentBindings, registerId, templateFor, tenantId]
   );
@@ -226,14 +263,16 @@ export function usePrinterConnection(
       const station: StationRoute | undefined = listed
         ? {
             ...listed,
-            printerId: listed.printerId || ticket.station?.printerId,
+            printerIds: listed.printerIds.length
+              ? listed.printerIds
+              : ticket.station?.printerIds || [],
             name: ticket.station?.name || listed.name,
           }
         : ticket.station
           ? {
               id: ticket.station.id,
               name: ticket.station.name,
-              printerId: ticket.station.printerId,
+              printerIds: ticket.station.printerIds,
               categoryIds: [],
             }
           : undefined;

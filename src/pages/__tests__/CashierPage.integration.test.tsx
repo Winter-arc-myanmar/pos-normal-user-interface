@@ -302,7 +302,11 @@ describe("CashierPage integration", () => {
     mocks.getCounterOrderById.mockResolvedValue({ id: "order-1" });
     mocks.pickupCounterOrder.mockResolvedValue({ id: "order-1" });
     mocks.fireToKds.mockResolvedValue({});
-    mocks.printKitchen.mockResolvedValue([]);
+    mocks.printKitchen.mockResolvedValue({
+      jobs: [],
+      unrouted: [],
+      missingPrinterRoutes: [],
+    });
     mocks.printReceipt.mockResolvedValue(undefined);
     mocks.checkoutTableSession.mockResolvedValue({
       ...session,

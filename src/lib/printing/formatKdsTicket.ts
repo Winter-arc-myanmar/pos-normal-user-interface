@@ -46,6 +46,8 @@ export interface PrintParty {
   pickupCode?: string;
   paidAt?: string;
   rounding?: string;
+  startTime?: string;
+  endTime?: string;
 }
 
 export interface KitchenSlip extends PrintParty {
@@ -72,8 +74,6 @@ export interface SaleReceipt extends PrintParty {
   // tip?: string;
   total: string;
   payments?: Array<{ name: string; amount: string }>;
-  startTime?: string;
-  endTime?: string;
   startTimeLabel?: string;
   endTimeLabel?: string;
   place?: PrintPlace;
@@ -189,6 +189,27 @@ const bottomMargin = "\n".repeat(6);
 
 const wrap = (body: string) =>
   [`${ESC}@`, lineSpacing, body, bottomMargin, `${GS}V\x00`].join("");
+
+export function formatReceiptDateTime(value?: string | null): string | undefined {
+  if (!value?.trim()) return undefined;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date.toLocaleString();
+}
+
+export function sessionPrintTimes(
+  session?: { openedAt?: string | null; closedAt?: string | null } | null,
+  endFallback?: string | Date | null
+): Pick<PrintParty, "startTime" | "endTime"> {
+  if (!session?.openedAt) return {};
+  const endValue =
+    session.closedAt ||
+    (endFallback instanceof Date ? endFallback.toISOString() : endFallback);
+  return {
+    startTime: formatReceiptDateTime(session.openedAt),
+    endTime: formatReceiptDateTime(endValue),
+  };
+}
 
 export function formatKitchenSlip(slip: KitchenSlip): string {
   const settings = slip.template;

@@ -1,4 +1,9 @@
-export type PrintTemplateType = "RECEIPT" | "KITCHEN";
+export const PRINT_TEMPLATE_TYPES = ["RECEIPT", "KITCHEN", "FINANCE"] as const;
+export type PrintTemplateType = (typeof PRINT_TEMPLATE_TYPES)[number];
+
+export const isPrintTemplateType = (value: string): value is PrintTemplateType =>
+  (PRINT_TEMPLATE_TYPES as readonly string[]).includes(value);
+
 export type PrintPaperWidth = "MM58" | "MM80";
 export type PrintTemplateSource = "LOCATION" | "TENANT" | "BUILTIN";
 

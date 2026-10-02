@@ -20,7 +20,7 @@ describe("category and KDS station repositories", () => {
           locationId: "location-1",
           name: "Bar",
           displayColor: "#2563eb",
-          printerId: "printer-1",
+          printerIds: ["printer-1", "printer-2"],
           routingRules: { categoryIds: ["drink", "alcohol"] },
         },
       }),
@@ -41,7 +41,7 @@ describe("category and KDS station repositories", () => {
       locationId: "location-1",
       name: "Bar",
       displayColor: "#2563eb",
-      printerId: "printer-1",
+      printerIds: ["printer-1", "printer-2"],
       routingRules: { categoryIds: ["drink", "alcohol"] },
     });
     expect(httpClient.post).toHaveBeenCalledWith("/api/v1/kds/stations", {
@@ -49,9 +49,10 @@ describe("category and KDS station repositories", () => {
       locationId: "location-1",
       name: "Bar",
       displayColor: "#2563eb",
-      printerId: "printer-1",
+      printerIds: ["printer-1", "printer-2"],
       routingRules: { categoryIds: ["drink", "alcohol"] },
     });
+    expect(created.printerIds).toEqual(["printer-1", "printer-2"]);
     expect(created.routingRules.categoryIds).toEqual(["drink", "alcohol"]);
   });
 

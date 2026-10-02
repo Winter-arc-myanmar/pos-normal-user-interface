@@ -14,7 +14,7 @@ type Draft = {
   id: string;
   name: string;
   displayColor: string;
-  printerId: string;
+  printerIds: string[];
   categoryIds: string[];
 };
 
@@ -22,7 +22,7 @@ const emptyDraft = (): Draft => ({
   id: "",
   name: "",
   displayColor: "#2563eb",
-  printerId: "",
+  printerIds: [],
   categoryIds: [],
 });
 
@@ -43,13 +43,21 @@ export function KdsStationSettingsPanel() {
   } = useKdsStationManagement();
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [notice, setNotice] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
 
   useEffect(() => {
     void listCategories({ page: 1, limit: 100, sortBy: "name", sortOrder: "asc" }).catch(
       () => undefined
     );
-    void listPrinters({ page: 1, limit: 100 }).catch(() => undefined);
-  }, [listCategories, listPrinters]);
+  }, [listCategories]);
+
+  useEffect(() => {
+    void listPrinters({
+      page: 1,
+      limit: 100,
+      locationId: activeLocationId || undefined,
+    }).catch(() => undefined);
+  }, [activeLocationId, listPrinters]);
 
   useEffect(() => {
     if (!activeLocationId) return;
@@ -67,12 +75,42 @@ export function KdsStationSettingsPanel() {
     [categories]
   );
 
+  const categoryOwner = useMemo(() => {
+    const owners = new Map<string, string>();
+    for (const station of stations) {
+      if (station.id === draft.id) continue;
+      for (const categoryId of station.routingRules.categoryIds) {
+        owners.set(categoryId, station.name);
+      }
+    }
+    return owners;
+  }, [draft.id, stations]);
+
+  const kdsPrinters = useMemo(
+    () =>
+      printers.filter(
+        (printer) =>
+          printer.sectors?.includes("KDS") || draft.printerIds.includes(printer.id)
+      ),
+    [draft.printerIds, printers]
+  );
+
   const toggleCategory = (categoryId: string) => {
+    if (categoryOwner.has(categoryId)) return;
     setDraft((current) => ({
       ...current,
       categoryIds: current.categoryIds.includes(categoryId)
         ? current.categoryIds.filter((id) => id !== categoryId)
         : [...current.categoryIds, categoryId],
+    }));
+  };
+
+  const togglePrinter = (printerId: string) => {
+    setDraft((current) => ({
+      ...current,
+      printerIds: current.printerIds.includes(printerId)
+        ? current.printerIds.filter((id) => id !== printerId)
+        : [...current.printerIds, printerId],
     }));
   };
 
@@ -86,15 +124,31 @@ export function KdsStationSettingsPanel() {
       id: station.id,
       name: station.name,
       displayColor: station.displayColor || "#2563eb",
-      printerId: station.printerId || "",
+      printerIds: station.printerIds,
       categoryIds: station.routingRules.categoryIds,
     });
     setNotice(null);
+    setLocalError(null);
   };
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
     if (!activeLocationId || !user?.tenantId) return;
+    setLocalError(null);
+    setNotice(null);
+    const conflictingCategories = draft.categoryIds.filter((categoryId) =>
+      categoryOwner.has(categoryId)
+    );
+    if (conflictingCategories.length) {
+      setLocalError(
+        t("settings.kdsStation.categoryAlreadyAssigned", {
+          categories: conflictingCategories
+            .map((id) => categoryName.get(id) || id)
+            .join(", "),
+        })
+      );
+      return;
+    }
     const routingRules = { categoryIds: draft.categoryIds };
     try {
       if (draft.id) {
@@ -102,7 +156,7 @@ export function KdsStationSettingsPanel() {
           locationId: activeLocationId,
           name: draft.name,
           displayColor: draft.displayColor,
-          printerId: draft.printerId || undefined,
+          printerIds: draft.printerIds,
           routingRules,
         });
       } else {
@@ -111,14 +165,19 @@ export function KdsStationSettingsPanel() {
           locationId: activeLocationId,
           name: draft.name,
           displayColor: draft.displayColor,
-          printerId: draft.printerId || undefined,
+          printerIds: draft.printerIds,
           routingRules,
         });
         setDraft((current) => ({ ...current, id: created.id }));
       }
       setNotice(t("settings.kdsStation.saved"));
-    } catch {
+    } catch (caught) {
       setNotice(null);
+      setLocalError(
+        caught instanceof Error
+          ? caught.message
+          : t("settings.kdsStation.saveFailed")
+      );
     }
   };
 
@@ -180,24 +239,31 @@ export function KdsStationSettingsPanel() {
               }
             />
           </label>
-          <label className="block text-sm text-slate-600">
-            {t("settings.kdsStation.printer")}
-            <select
-              className={fieldClass}
-              value={draft.printerId}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, printerId: event.target.value }))
-              }
-            >
-              <option value="">{t("settings.kdsStation.noPrinter")}</option>
-              {printers.map((printer) => (
-                <option key={printer.id} value={printer.id}>
-                  {printer.name}
-                </option>
-              ))}
-            </select>
-          </label>
         </div>
+
+        <h3 className="mt-4 text-sm font-semibold text-slate-800">
+          {t("settings.kdsStation.printers")}
+        </h3>
+        <p className="mt-1 text-xs text-slate-500">
+          {t("settings.kdsStation.printersHint")}
+        </p>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          {kdsPrinters.map((printer) => (
+            <label key={printer.id} className="flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={draft.printerIds.includes(printer.id)}
+                onChange={() => togglePrinter(printer.id)}
+              />
+              {printer.name}
+            </label>
+          ))}
+        </div>
+        {!kdsPrinters.length ? (
+          <p className="mt-2 text-xs text-amber-700">
+            {t("settings.kdsStation.noKdsPrinters")}
+          </p>
+        ) : null}
 
         <h3 className="mt-4 text-sm font-semibold text-slate-800">
           {t("settings.kdsStation.categories")}
@@ -205,13 +271,22 @@ export function KdsStationSettingsPanel() {
         <p className="mt-1 text-xs text-slate-500">{t("settings.kdsStation.categoriesHint")}</p>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           {categories.map((category) => (
-            <label key={category.id} className="flex items-center gap-2 text-sm text-slate-700">
+            <label
+              key={category.id}
+              className="flex items-center gap-2 text-sm text-slate-700 disabled:text-slate-400"
+            >
               <input
                 type="checkbox"
                 checked={draft.categoryIds.includes(category.id)}
                 onChange={() => toggleCategory(category.id)}
+                disabled={categoryOwner.has(category.id)}
               />
               {category.name}
+              {categoryOwner.has(category.id)
+                ? ` (${t("settings.kdsStation.assignedTo", {
+                    station: categoryOwner.get(category.id),
+                  })})`
+                : ""}
             </label>
           ))}
         </div>
@@ -223,10 +298,16 @@ export function KdsStationSettingsPanel() {
           </p>
         ) : null}
 
-        {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
+        {(localError || error) ? (
+          <p className="mt-3 text-sm text-red-600">{localError || error}</p>
+        ) : null}
         {notice ? <p className="mt-3 text-sm text-emerald-700">{notice}</p> : null}
         <div className="mt-4 flex gap-2">
-          <Button type="submit" isLoading={isLoading} disabled={!draft.name.trim()}>
+          <Button
+            type="submit"
+            isLoading={isLoading}
+            disabled={!draft.name.trim() || !draft.printerIds.length}
+          >
             {t("settings.kdsStation.save")}
           </Button>
           {draft.id ? (

@@ -41,13 +41,13 @@ describe("station print routing", () => {
         {
           id: "bar",
           name: "Bar",
-          printerId: "printer-bar",
+          printerIds: ["printer-bar"],
           categoryIds: ["drink", "alcohol"],
         },
         {
           id: "fast-food",
           name: "Fast food",
-          printerId: "printer-food",
+          printerIds: ["printer-food"],
           categoryIds: ["snack"],
         },
       ]
@@ -69,7 +69,7 @@ describe("station print routing", () => {
     expect(plan.jobs[1].binding.id).toBe("food-printer");
   });
 
-  it("prints items with no station match on the default printer", () => {
+  it("leaves items with no station match unrouted", () => {
     const fallback = binding("main", "printer-main");
     const plan = groupKitchenJobs(
       [{ name: "Soup", quantity: "1", categoryId: "other" }],
@@ -80,16 +80,14 @@ describe("station print routing", () => {
         {
           id: "bar",
           name: "Bar",
-          printerId: "printer-bar",
+          printerIds: ["printer-bar"],
           categoryIds: ["drink"],
         },
       ]
     );
 
-    expect(plan.unrouted).toEqual([]);
-    expect(plan.jobs).toHaveLength(1);
-    expect(plan.jobs[0].binding.id).toBe("main");
-    expect(plan.jobs[0].lines).toEqual([
+    expect(plan.jobs).toEqual([]);
+    expect(plan.unrouted).toEqual([
       expect.objectContaining({ name: "Soup" }),
     ]);
   });
@@ -104,7 +102,7 @@ describe("station print routing", () => {
         {
           id: "fast-food",
           name: "Fast food",
-          printerId: "printer-food",
+          printerIds: ["printer-food"],
           categoryIds: ["snack"],
         },
       ]
@@ -115,6 +113,100 @@ describe("station print routing", () => {
     expect(plan.jobs[0].binding.id).toBe("food-printer");
     expect(plan.jobs[0].lines).toEqual([
       expect.objectContaining({ name: "Fried chicken" }),
+    ]);
+  });
+
+  it("prints the same station ticket on every assigned printer", () => {
+    const plan = groupKitchenJobs(
+      [{ name: "Fried chicken", quantity: "1", categoryId: "snack" }],
+      [
+        binding("food-printer-1", "printer-food-1"),
+        {
+          id: "food-printer-2",
+          backendPrinterId: "printer-food-2",
+          transport: "USB",
+          displayName: "Connected kitchen printer",
+          deviceName: "XPrinter POS-80",
+          lastVerifiedAt: "",
+        },
+      ],
+      null,
+      undefined,
+      [
+        {
+          id: "fast-food",
+          name: "Fast food",
+          printerIds: ["printer-food-1", "printer-food-2"],
+          categoryIds: ["snack"],
+        },
+      ]
+    );
+
+    expect(plan.jobs).toHaveLength(2);
+    expect(plan.jobs.map((job) => job.binding.id)).toEqual([
+      "food-printer-1",
+      "food-printer-2",
+    ]);
+    expect(plan.jobs.every((job) => job.lines[0].name === "Fried chicken")).toBe(
+      true
+    );
+  });
+
+  it("reports a station printer that is not configured on this POS", () => {
+    const plan = groupKitchenJobs(
+      [{ name: "Fried chicken", quantity: "1", categoryId: "snack" }],
+      [binding("food-printer", "printer-food")],
+      null,
+      undefined,
+      [
+        {
+          id: "fast-food",
+          name: "Fast food",
+          printerIds: ["printer-food", "printer-food-copy"],
+          categoryIds: ["snack"],
+        },
+      ]
+    );
+
+    expect(plan.jobs).toHaveLength(1);
+    expect(plan.unrouted).toEqual([]);
+    expect(plan.missingPrinterRoutes).toEqual([
+      {
+        stationId: "fast-food",
+        stationName: "Fast food",
+        printerIds: ["printer-food-copy"],
+      },
+    ]);
+  });
+
+  it("does not duplicate a category assigned to more than one station", () => {
+    const plan = groupKitchenJobs(
+      [{ name: "Beer", quantity: "1", categoryId: "drink" }],
+      [
+        binding("bar-printer", "printer-bar"),
+        binding("food-printer", "printer-food"),
+      ],
+      null,
+      undefined,
+      [
+        {
+          id: "bar",
+          name: "Bar",
+          printerIds: ["printer-bar"],
+          categoryIds: ["drink"],
+        },
+        {
+          id: "food",
+          name: "Food",
+          printerIds: ["printer-food"],
+          categoryIds: ["drink"],
+        },
+      ]
+    );
+
+    expect(plan.jobs).toEqual([]);
+    expect(plan.unrouted).toEqual([
+      expect.objectContaining({ name: "Beer" }),
     ]);
   });
 
@@ -215,6 +307,8 @@ describe("station print routing", () => {
     expect(slip).toContain("End time: 30 Sep 2026, 9:00 PM");
     expect(plain.join("\n")).toContain("Start time: 30 Sep 2026, 7:00 PM");
     expect(plain.join("\n")).toContain("End time: 30 Sep 2026, 9:00 PM");
+    expect(slip).not.toContain("Start: 30 Sep 2026, 7:00 PM");
+    expect(plain.join("\n")).not.toContain("Start: 30 Sep 2026, 7:00 PM");
   });
 
   it("prints every enabled template section for checkout, finance, and kitchen", () => {
@@ -302,7 +396,7 @@ describe("station print routing", () => {
     expect(kitchen).toContain("Kitchen");
   });
 
-  it("uses the kitchen template for KDS and the non-default receipt for finance", () => {
+  it("uses the kitchen, checkout, and finance templates by type", () => {
     const kitchen = new PrintTemplate({
       id: "kitchen",
       type: "KITCHEN",
@@ -320,8 +414,8 @@ describe("station print routing", () => {
     financeSettings.header.logo = false;
     const finance = new PrintTemplate({
       id: "finance",
-      type: "RECEIPT",
-      isDefault: false,
+      type: "FINANCE",
+      isDefault: true,
       locationId: "location-1",
       settings: financeSettings,
     });

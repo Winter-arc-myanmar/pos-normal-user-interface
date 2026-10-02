@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   lookupCard: vi.fn(),
   getWallet: vi.fn(),
   requireCashierContext: vi.fn(),
+  printReceipt: vi.fn(),
   noop: vi.fn(),
 }));
 
@@ -163,8 +164,16 @@ vi.mock("@/core/presentation/hooks/useGuestWalletManagement", () => ({
 vi.mock("@/core/presentation/hooks/usePosWorkspace", () => ({
   usePosWorkspace: () => ({
     activeLocationId: "location-1",
+    activePosRegisterId: "register-1",
     isWorkspaceReady: true,
     requireCashierContext: mocks.requireCashierContext,
+  }),
+}));
+vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
+  usePrinterConnection: () => ({
+    printReceipt: mocks.printReceipt,
+    printKitchen: vi.fn(),
+    error: null,
   }),
 }));
 vi.mock("@/core/presentation/hooks/useCardCapture", () => ({
@@ -207,6 +216,7 @@ describe("KtvBoardPage", () => {
       posRegisterId: "register-1",
       posSessionId: "pos-session-1",
     });
+    mocks.printReceipt.mockResolvedValue(undefined);
   });
 
   it("shows each room with the hourly price that applies now", () => {

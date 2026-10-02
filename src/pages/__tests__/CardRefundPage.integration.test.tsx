@@ -140,4 +140,37 @@ describe("CardRefundPage", () => {
       );
     });
   });
+
+  it("blocks a refund larger than remaining card balance", async () => {
+    mocks.getWallet.mockResolvedValue(
+      new GuestWallet({
+        ...wallet,
+        balance: "8000.0000",
+        purchasedBalance: "50000.0000",
+      })
+    );
+
+    render(
+      <MemoryRouter>
+        <CardRefundPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("cardRefund.cardNumberPlaceholder"), {
+      target: { value: "MC-001" },
+    });
+    fireEvent.click(screen.getByText("cardRefund.detect"));
+
+    await waitFor(() => {
+      expect(screen.getByText("cardRefund.refundable")).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByPlaceholderText("0.00"), {
+      target: { value: "20000" },
+    });
+
+    expect(screen.getByText("10,000")).toBeDisabled();
+    expect(screen.getByText("cardRefund.continueToPrint")).toBeDisabled();
+    expect(mocks.refundWallet).not.toHaveBeenCalled();
+  });
 });

@@ -32,12 +32,25 @@ describe("ApiPrintTemplateRepository", () => {
       httpClient as unknown as HttpClient
     );
 
-    const listed = await repository.list({ page: 1, limit: 10, type: "RECEIPT" });
+    const listed = await repository.list({
+      page: 1,
+      limit: 10,
+      type: "RECEIPT",
+      locationId: "location-1",
+    });
     expect(listed.templates[0]).toMatchObject({
       id: "template-1",
       name: "Default receipt",
       paperWidth: "MM80",
       settings: { language: "FOLLOW_POS", copies: ["CUSTOMER"] },
+    });
+    expect(httpClient.get).toHaveBeenCalledWith("/api/v1/print-templates", {
+      params: {
+        page: 1,
+        limit: 10,
+        type: "RECEIPT",
+        locationId: "location-1",
+      },
     });
 
     await repository.create({ type: "RECEIPT", name: "Default receipt" });

@@ -1,4 +1,5 @@
 export type PrinterTransport = "NETWORK" | "USB" | "BLUETOOTH";
+export type PrinterSector = "KDS" | "CHECKOUT" | "FINANCE";
 
 export interface PrinterBinding {
   id: string;
@@ -8,7 +9,7 @@ export interface PrinterBinding {
   deviceName?: string;
   host?: string;
   port?: number;
-  stationId?: string;
+  sectors?: PrinterSector[];
   categoryIds?: string[];
   lastVerifiedAt: string;
   lastError?: string | null;
@@ -27,6 +28,30 @@ const keyFor = (tenantId: string, registerId: string) =>
 
 const emptyStore = (): PrinterBindingStore => ({ version: 1, bindings: {} });
 
+type LegacyPrinterBinding = PrinterBinding & {
+  stationId?: string;
+  stationIds?: string[];
+};
+
+const normalizeBinding = (
+  binding: LegacyPrinterBinding
+): PrinterBinding => {
+  const normalized = { ...binding };
+  delete normalized.stationId;
+  delete normalized.stationIds;
+  return normalized;
+};
+
+const normalizeStore = (store: PrinterBindingStore): PrinterBindingStore => ({
+  ...store,
+  bindings: Object.fromEntries(
+    Object.entries(store.bindings || {}).map(([id, binding]) => [
+      id,
+      normalizeBinding(binding as LegacyPrinterBinding),
+    ])
+  ),
+});
+
 export function readPrinterBindings(
   tenantId: string,
   registerId: string
@@ -35,7 +60,9 @@ export function readPrinterBindings(
     const raw = localStorage.getItem(keyFor(tenantId, registerId));
     if (!raw) return emptyStore();
     const parsed = JSON.parse(raw) as PrinterBindingStore;
-    return parsed?.version === 1 && parsed.bindings ? parsed : emptyStore();
+    return parsed?.version === 1 && parsed.bindings
+      ? normalizeStore(parsed)
+      : emptyStore();
   } catch {
     return emptyStore();
   }
@@ -64,7 +91,7 @@ export function listStoredPrinterBindings(
     if (!key?.startsWith("pos:printerBindings:")) continue;
     try {
       const parsed = JSON.parse(localStorage.getItem(key) || "") as PrinterBindingStore;
-      const found = bindingsFromStore(parsed);
+      const found = bindingsFromStore(normalizeStore(parsed));
       if (found.bindings.length) return found;
     } catch {
       // Ignore unreadable printer settings from another register.
@@ -98,7 +125,7 @@ export function savePrinterBinding(
     ...store,
     defaultBindingId:
       makeDefault || !store.defaultBindingId ? binding.id : store.defaultBindingId,
-    bindings: { ...store.bindings, [binding.id]: binding },
+    bindings: { ...store.bindings, [binding.id]: normalizeBinding(binding) },
   });
 }
 
@@ -159,4 +186,11 @@ export function getDefaultPrinterBinding(
   return store.defaultBindingId
     ? store.bindings[store.defaultBindingId] || null
     : null;
+}
+
+export function bindingsForSector(
+  bindings: PrinterBinding[],
+  sector: PrinterSector
+): PrinterBinding[] {
+  return bindings.filter((binding) => binding.sectors?.includes(sector));
 }

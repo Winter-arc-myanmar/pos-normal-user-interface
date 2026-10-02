@@ -16,6 +16,7 @@ import { useUserManagement } from "@/core/presentation/hooks/useUserManagement";
 import { useSalesOrderManagement } from "@/core/presentation/hooks/useSalesOrderManagement";
 import { findMemberCardPaymentMethod } from "@/core/application/services/PosPaymentCatalog";
 import { ProductMenu } from "./cashier/ProductMenu";
+import { modifierPrintText } from "@/lib/printing/modifierText";
 import {
   getKtvWarning,
   hasSufficientWalletBalance,
@@ -63,9 +64,14 @@ export function KtvRoomPage() {
   } = useSalesOrderManagement();
   const { lookupCard, getWallet } = useGuestWalletManagement();
   const { user } = useAuth();
-  const { activePosRegisterId, requireCashierContext } = usePosWorkspace();
+  const { requireCashierContext, activePosRegisterId, activeLocationId } =
+    usePosWorkspace();
   const { formatDateTime } = useDateFormatter();
-  const printer = usePrinterConnection(String(user?.tenantId || ""), activePosRegisterId);
+  const printer = usePrinterConnection(
+    String(user?.tenantId || ""),
+    activePosRegisterId,
+    activeLocationId
+  );
   const { users, loadUsers } = useUserManagement();
   const [selectedSessionId, setSelectedSessionId] = useState("");
   const [guestCount, setGuestCount] = useState("1");
@@ -302,8 +308,9 @@ export function KtvRoomPage() {
         return;
       }
       setShowCloseConfirm(false);
+      const closedAt = new Date().toISOString();
       const finalQuote = await closeSession(session.id, {
-        closedAt: new Date().toISOString(),
+        closedAt,
       });
       const result = await fetchOrderLines(session.salesOrderId, {
         page: 1,
@@ -335,29 +342,41 @@ export function KtvRoomPage() {
           },
         ],
       });
-      const endAt = finalQuote.asOf || new Date().toISOString();
+      const endAt = finalQuote.asOf || closedAt;
       try {
         await printer.printReceipt({
           title: "RECEIPT",
           place: "CHECKOUT",
           showLogo: true,
           showPrices: true,
+          receiptId: session.salesOrderId,
           cashier: user?.name,
           serviceType: "KTV",
           tableOrRoom: room?.roomNumber,
+          paidAt: new Date().toLocaleString(),
           startTime: formatDateTime(session.openedAt),
           endTime: formatDateTime(endAt),
           startTimeLabel: t("receipt.startTime"),
           endTimeLabel: t("receipt.endTime"),
-          lines: result.lines.map((line) => ({
-            name: lineDisplayName(line) || line.variantId,
-            quantity: String(line.quantity || "1"),
-            unitPrice: line.unitPrice,
-          })),
+          lines: result.lines
+            .filter((line) => !line.voidedAt)
+            .map((line) => {
+              const modifiers = modifierPrintText(line.selectedModifiers);
+              return {
+                name: lineDisplayName(line) || line.productName || line.variantName || "Item",
+                quantity: String(line.quantity || "1"),
+                unitPrice: line.unitPrice?.trim() || undefined,
+                modifiers: modifiers.names,
+                modifierPrices: modifiers.prices,
+              };
+            }),
           subtotal: finalQuote.runningTotal,
           total: finalTotal.toFixed(4),
           payments: [
-            { name: paymentMethod.name || "Card", amount: finalTotal.toFixed(4) },
+            {
+              name: paymentMethod.name || "Payment",
+              amount: finalTotal.toFixed(4),
+            },
           ],
         });
       } catch (printError) {
