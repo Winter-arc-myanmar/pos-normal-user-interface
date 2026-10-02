@@ -4,7 +4,7 @@ import { PrintLine } from "./formatKdsTicket";
 export interface StationRoute {
   id: string;
   name: string;
-  printerId?: string;
+  printerIds: string[];
   categoryIds: string[];
 }
 
@@ -17,50 +17,92 @@ export interface PrinterJob {
 export interface KitchenPrintPlan {
   jobs: PrinterJob[];
   unrouted: PrintLine[];
+  missingPrinterRoutes: Array<{
+    stationId: string;
+    stationName: string;
+    printerIds: string[];
+  }>;
 }
 
-const bindingForStation = (
+export interface KitchenRoutingOptions {
+  requireStationRouting?: boolean;
+}
+
+const bindingsForStation = (
   station: StationRoute,
   bindings: PrinterBinding[]
-) =>
-  bindings.find(
+) => {
+  const printerIds = new Set(station.printerIds);
+  return bindings.filter(
     (binding) =>
-      (station.printerId && binding.backendPrinterId === station.printerId) ||
-      binding.stationId === station.id
-  ) || null;
+      Boolean(binding.backendPrinterId) &&
+      printerIds.has(binding.backendPrinterId!)
+  );
+};
 
 const planFromStations = (
   lines: PrintLine[],
   bindings: PrinterBinding[],
-  stations: StationRoute[],
-  defaultBinding: PrinterBinding | null
+  stations: StationRoute[]
 ): KitchenPrintPlan => {
   const jobs = new Map<string, PrinterJob>();
   const unrouted: PrintLine[] = [];
+  const missing = new Map<
+    string,
+    { stationId: string; stationName: string; printerIds: string[] }
+  >();
 
   for (const line of lines) {
-    const station = stations.find((item) =>
+    const matchingStations = stations.filter((item) =>
       item.categoryIds.includes(line.categoryId || "")
     );
-    const binding =
-      (station && bindingForStation(station, bindings)) || defaultBinding;
-    if (!binding) {
+
+    if (matchingStations.length !== 1) {
       unrouted.push(line);
       continue;
     }
-    const key = `${binding.id}:${station?.id || "default"}`;
-    const current = jobs.get(key) || { binding, lines: [], station };
-    current.lines.push(line);
-    jobs.set(key, current);
+
+    const station = matchingStations[0];
+    const stationBindings = bindingsForStation(station, bindings);
+    const configuredIds = Array.from(new Set(station.printerIds));
+    const locallyBoundIds = new Set(
+      stationBindings
+        .map((binding) => binding.backendPrinterId)
+        .filter((id): id is string => Boolean(id))
+    );
+    const missingIds = configuredIds.filter((id) => !locallyBoundIds.has(id));
+
+    if (missingIds.length) {
+      missing.set(station.id, {
+        stationId: station.id,
+        stationName: station.name,
+        printerIds: missingIds,
+      });
+    }
+
+    if (!stationBindings.length) {
+      unrouted.push(line);
+      continue;
+    }
+
+    for (const binding of stationBindings) {
+      const key = `${binding.id}:${station.id}`;
+      const current = jobs.get(key) || { binding, lines: [], station };
+      current.lines.push(line);
+      jobs.set(key, current);
+    }
   }
 
-  return { jobs: Array.from(jobs.values()), unrouted };
+  return {
+    jobs: Array.from(jobs.values()),
+    unrouted,
+    missingPrinterRoutes: Array.from(missing.values()),
+  };
 };
 
 const bindingForLine = (
   line: PrintLine,
   bindings: PrinterBinding[],
-  stationBinding: PrinterBinding | null,
   defaultBinding: PrinterBinding | null
 ) => {
   if (line.categoryId) {
@@ -69,7 +111,7 @@ const bindingForLine = (
     );
     if (routed) return routed;
   }
-  return stationBinding || defaultBinding;
+  return defaultBinding;
 };
 
 export function groupKitchenJobs(
@@ -77,11 +119,9 @@ export function groupKitchenJobs(
   bindings: PrinterBinding[],
   defaultBinding: PrinterBinding | null,
   stationId?: string,
-  stations: StationRoute[] = []
+  stations: StationRoute[] = [],
+  options: KitchenRoutingOptions = {}
 ): KitchenPrintPlan {
-  const stationBinding =
-    bindings.find((binding) => stationId && binding.stationId === stationId) ||
-    null;
   const jobs = new Map<string, PrinterJob>();
 
   const add = (binding: PrinterBinding, line?: PrintLine) => {
@@ -93,31 +133,67 @@ export function groupKitchenJobs(
   if (stationId && stations.length) {
     const station = stations.find((item) => item.id === stationId);
     if (station) {
-      const binding = bindingForStation(station, bindings) || defaultBinding;
-      if (!binding) throw new Error(`Connect a printer for ${station.name}`);
+      const stationBindings = bindingsForStation(station, bindings);
+      const configuredIds = Array.from(new Set(station.printerIds));
+      const locallyBoundIds = new Set(
+        stationBindings
+          .map((binding) => binding.backendPrinterId)
+          .filter((id): id is string => Boolean(id))
+      );
+      const missingPrinterIds = configuredIds.filter(
+        (id) => !locallyBoundIds.has(id)
+      );
+      if (!stationBindings.length) {
+        return {
+          jobs: [],
+          unrouted: lines,
+          missingPrinterRoutes: [
+            {
+              stationId: station.id,
+              stationName: station.name,
+              printerIds: missingPrinterIds.length
+                ? missingPrinterIds
+                : configuredIds,
+            },
+          ],
+        };
+      }
       return {
-        jobs: [{ binding, lines, station }],
+        jobs: stationBindings.map((binding) => ({ binding, lines, station })),
         unrouted: [],
+        missingPrinterRoutes: missingPrinterIds.length
+          ? [
+              {
+                stationId: station.id,
+                stationName: station.name,
+                printerIds: missingPrinterIds,
+              },
+            ]
+          : [],
       };
     }
   }
 
   if (stations.length) {
-    return planFromStations(lines, bindings, stations, defaultBinding);
+    return planFromStations(lines, bindings, stations);
+  }
+
+  if (options.requireStationRouting) {
+    return { jobs: [], unrouted: lines, missingPrinterRoutes: [] };
   }
 
   if (!lines.length) {
-    const target = stationBinding || defaultBinding;
+    const target = defaultBinding;
     if (!target) throw new Error("No default printer is connected");
     add(target);
-    return { jobs: Array.from(jobs.values()), unrouted: [] };
+    return { jobs: Array.from(jobs.values()), unrouted: [], missingPrinterRoutes: [] };
   }
 
   for (const line of lines) {
-    const target = bindingForLine(line, bindings, stationBinding, defaultBinding);
+    const target = bindingForLine(line, bindings, defaultBinding);
     if (!target) throw new Error("No default printer is connected");
     add(target, line);
   }
 
-  return { jobs: Array.from(jobs.values()), unrouted: [] };
+  return { jobs: Array.from(jobs.values()), unrouted: [], missingPrinterRoutes: [] };
 }

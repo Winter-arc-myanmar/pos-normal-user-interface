@@ -553,7 +553,11 @@ const toKdsTicket = (item: Record<string, unknown>) =>
             tenantId: String(station.tenantId || ""),
             locationId: String(station.locationId || ""),
             name: String(station.name || ""),
-            printerId: station.printerId ? String(station.printerId) : undefined,
+            printerIds: Array.isArray(station.printerIds)
+              ? station.printerIds.map((id) => String(id))
+              : station.printerId
+                ? [String(station.printerId)]
+                : [],
           });
         })()
       : undefined,

@@ -9,12 +9,12 @@ export interface BranchAccessDTO {
 }
 
 export interface LoginInputDTO {
-  email: string;
+  userId: string;
   password: string;
 }
 
 export interface SignInRequestDTO {
-  email: string;
+  userId: string;
   password: string;
   type: AuthSignInTypeDTO;
 }
@@ -25,7 +25,9 @@ export interface SetActiveBranchRequestDTO {
 
 export interface AuthSessionUserDTO {
   id: string;
-  email: string;
+  email?: string;
+  username?: string;
+  loginId?: string;
   fullName: string;
   type: string;
   tenantId: string;

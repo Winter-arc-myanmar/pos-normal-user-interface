@@ -14,6 +14,8 @@ import {
 } from "@/lib/printing/formatKdsTicket";
 import {
   groupKitchenJobs,
+  KitchenPrintPlan,
+  KitchenRoutingOptions,
   StationRoute,
 } from "@/lib/printing/routeKitchenPrint";
 import {
@@ -174,7 +176,11 @@ export function usePrinterConnection(
   );
 
   const printKitchen = useCallback(
-    async (slip: KitchenSlip, stations: StationRoute[] = []) => {
+    async (
+      slip: KitchenSlip,
+      stations: StationRoute[] = [],
+      options: KitchenRoutingOptions = {}
+    ): Promise<KitchenPrintPlan> => {
       const client = await configureClient(tenantId, registerId);
       const current = currentBindings();
       const template = slip.template || (await templateFor("KDS"));
@@ -183,18 +189,29 @@ export function usePrinterConnection(
         current.bindings,
         current.defaultBinding,
         slip.stationId,
-        stations
+        stations,
+        options
       );
+      const failures: string[] = [];
       for (const job of plan.jobs) {
-        await client.printKitchen(job.binding, {
-          ...slip,
-          template,
-          lines: job.lines,
-          stationId: job.station?.id || slip.stationId,
-          stationName: job.station?.name || slip.stationName,
-        });
+        try {
+          await client.printKitchen(job.binding, {
+            ...slip,
+            template,
+            lines: job.lines,
+            stationId: job.station?.id || slip.stationId,
+            stationName: job.station?.name || slip.stationName,
+          });
+        } catch (caught) {
+          const message =
+            caught instanceof Error ? caught.message : "Printer communication failed";
+          failures.push(`${job.binding.displayName}: ${message}`);
+        }
       }
-      return plan.unrouted;
+      if (failures.length) {
+        throw new Error(failures.join(" "));
+      }
+      return plan;
     },
     [currentBindings, registerId, templateFor, tenantId]
   );
@@ -226,14 +243,16 @@ export function usePrinterConnection(
       const station: StationRoute | undefined = listed
         ? {
             ...listed,
-            printerId: listed.printerId || ticket.station?.printerId,
+            printerIds: listed.printerIds.length
+              ? listed.printerIds
+              : ticket.station?.printerIds || [],
             name: ticket.station?.name || listed.name,
           }
         : ticket.station
           ? {
               id: ticket.station.id,
               name: ticket.station.name,
-              printerId: ticket.station.printerId,
+              printerIds: ticket.station.printerIds,
               categoryIds: [],
             }
           : undefined;

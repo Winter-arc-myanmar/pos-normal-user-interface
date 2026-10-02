@@ -5,6 +5,7 @@ declare module "qz-tray" {
     websocket: {
       isActive(): boolean;
       connect(options?: {
+        host?: string;
         retries?: number;
         delay?: number;
         usingSecure?: boolean;

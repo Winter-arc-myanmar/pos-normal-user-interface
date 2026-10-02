@@ -31,13 +31,18 @@ const toStation = (item: RecordValue) => {
   const categoryIds = Array.isArray(rules.categoryIds)
     ? rules.categoryIds.map((id) => String(id))
     : [];
+  const printerIds = Array.isArray(item.printerIds)
+    ? item.printerIds.map((id) => String(id))
+    : item.printerId
+      ? [String(item.printerId)]
+      : [];
   return new KdsStation({
     id: String(item.id || ""),
     tenantId: String(item.tenantId || ""),
     locationId: String(item.locationId || ""),
     name: String(item.name || ""),
     displayColor: item.displayColor ? String(item.displayColor) : undefined,
-    printerId: item.printerId ? String(item.printerId) : undefined,
+    printerIds,
     routingRules: { categoryIds },
     deletedAt: item.deletedAt ? String(item.deletedAt) : null,
     createdAt: item.createdAt ? String(item.createdAt) : undefined,

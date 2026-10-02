@@ -18,19 +18,19 @@ export class AuthService implements IAuthService {
   }
 
   /**
-   * Login a user with email and password
+   * Login a user with User ID and password
    */
   async login(input: LoginInputDTO): Promise<User> {
-    const email = input.email?.trim();
+    const userId = input.userId?.trim();
     const password = input.password;
 
-    if (!email || !password) {
-      throw new Error("Email and password are required");
+    if (!userId || !password) {
+      throw new Error("User ID and password are required");
     }
 
     try {
       const result = await this.authRepository.login({
-        email,
+        userId,
         password,
         type: "user",
       });

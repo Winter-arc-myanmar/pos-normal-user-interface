@@ -225,7 +225,15 @@ export class QzTrayClient {
         { type: "raw", format: "command", data },
       ]);
     } catch (caught) {
-      throw qzError(caught);
+      const error = qzError(caught);
+      if (/Cannot find printer with name|printer .* not found/i.test(error.message)) {
+        const name = binding.deviceName || binding.displayName;
+        throw new Error(
+          `Printer "${name}" is not installed on this POS computer. ` +
+            "In Settings > KDS stations, assign the connected local printer to this station."
+        );
+      }
+      throw error;
     }
   }
 

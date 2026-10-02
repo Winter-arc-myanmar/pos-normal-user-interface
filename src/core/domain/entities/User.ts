@@ -5,7 +5,8 @@
 export class User {
   id!: string;
   name!: string;
-  email!: string;
+  email?: string;
+  loginId?: string;
   tenantId?: string;
   phone?: string;
   role!: "ADMIN" | "STAFF";
@@ -29,7 +30,8 @@ export class User {
   constructor(data: {
     id: string;
     name: string;
-    email: string;
+    email?: string;
+    loginId?: string;
     tenantId?: string;
     phone?: string;
     role: "ADMIN" | "STAFF";
@@ -57,11 +59,13 @@ export class User {
     // Basic email regex pattern for domain entity validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+    const emailOk =
+      !this.email || this.email.trim() === "" || emailRegex.test(this.email);
+
     return (
       !!this.id &&
       !!this.name &&
-      !!this.email &&
-      emailRegex.test(this.email) &&
+      emailOk &&
       !!this.role &&
       ["ADMIN", "STAFF"].includes(this.role)
     );

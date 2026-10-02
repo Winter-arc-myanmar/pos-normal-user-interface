@@ -34,7 +34,7 @@ export function LoginPage() {
   const [searchParams] = useSearchParams();
   const { login, user, isAuthenticated, isLoading, error } = useAuth();
 
-  const [email, setEmail] = useState("");
+  const [userId, setUserId] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -53,7 +53,7 @@ export function LoginPage() {
 
     try {
       await login({
-        email: email.trim(),
+        userId: userId.trim(),
         password,
       });
       navigate(from || "/cashier", { replace: true });
@@ -85,18 +85,18 @@ export function LoginPage() {
           <div>
             <label
               className="mb-1.5 block text-sm font-medium text-white/80"
-              htmlFor="email"
+              htmlFor="userId"
             >
-              {t("login.emailLabel")}
+              {t("login.userIdLabel")}
             </label>
             <input
-              id="email"
+              id="userId"
               className={inputClassName}
-              type="email"
+              type="text"
               autoComplete="username"
-              placeholder={t("login.emailPlaceholder")}
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              placeholder={t("login.userIdPlaceholder")}
+              value={userId}
+              onChange={(event) => setUserId(event.target.value)}
               required
             />
           </div>

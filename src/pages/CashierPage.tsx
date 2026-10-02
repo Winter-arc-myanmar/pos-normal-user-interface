@@ -1908,7 +1908,7 @@ export function CashierPage() {
         const listed = locationId
           ? await listStations({ page: 1, limit: 100, locationId })
           : { stations: [] };
-        const unrouted = await printer.printKitchen(
+        const printPlan = await printer.printKitchen(
           {
             title: selectedOrder?.orderNumber || "KITCHEN",
             courseType: displayOrderLines.find((line) => line.courseType)?.courseType,
@@ -1920,14 +1920,30 @@ export function CashierPage() {
           listed.stations.map((station) => ({
             id: station.id,
             name: station.name,
-            printerId: station.printerId,
+            printerIds: station.printerIds,
             categoryIds: station.routingRules.categoryIds,
-          }))
+          })),
+          { requireStationRouting: true }
         );
-        if (unrouted.length) {
-          kitchenPrintError = t("cashier.errors.kdsUnrouted", {
-            items: unrouted.map((line) => line.name).join(", "),
-          });
+        const printProblems: string[] = [];
+        if (printPlan.unrouted.length) {
+          printProblems.push(
+            t("cashier.errors.kdsUnrouted", {
+              items: printPlan.unrouted.map((line) => line.name).join(", "),
+            })
+          );
+        }
+        if (printPlan.missingPrinterRoutes.length) {
+          printProblems.push(
+            t("cashier.errors.kdsPrinterUnavailable", {
+              stations: printPlan.missingPrinterRoutes
+                .map((route) => route.stationName)
+                .join(", "),
+            })
+          );
+        }
+        if (printProblems.length) {
+          kitchenPrintError = printProblems.join(" ");
         }
       } catch (printError) {
         kitchenPrintError =

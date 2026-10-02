@@ -112,7 +112,7 @@ export function CounterOrdersPage() {
         listed.stations.map((station) => ({
           id: station.id,
           name: station.name,
-          printerId: station.printerId,
+          printerIds: station.printerIds,
           categoryIds: station.routingRules.categoryIds,
         }))
       );

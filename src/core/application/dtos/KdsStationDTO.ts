@@ -14,7 +14,7 @@ export interface CreateKdsStationDTO {
   locationId: string;
   name: string;
   displayColor?: string;
-  printerId?: string;
+  printerIds: string[];
   routingRules: KdsRoutingRules;
 }
 
@@ -22,7 +22,7 @@ export interface UpdateKdsStationDTO {
   locationId?: string;
   name?: string;
   displayColor?: string;
-  printerId?: string;
+  printerIds?: string[];
   routingRules?: KdsRoutingRules;
 }
 

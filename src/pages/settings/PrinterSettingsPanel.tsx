@@ -37,13 +37,12 @@ export function PrinterSettingsPanel() {
     createPrinter,
     updatePrinter,
     deletePrinter,
-    // attachCategory,
-    // detachCategory,
   } = useKitchenPrinterManagement();
   const {
     stations,
     isLoading: stationsLoading,
     listStations,
+    updateStation,
   } = useKdsStationManagement();
   const connection = usePrinterConnection(tenantId, activePosRegisterId);
   // const {
@@ -61,8 +60,7 @@ export function PrinterSettingsPanel() {
   const [deviceName, setDeviceName] = useState("");
   const [isActive, setIsActive] = useState(false);
   const [isDefault, setIsDefault] = useState(false);
-  // const [categoryId, setCategoryId] = useState("");
-  const [stationId, setStationId] = useState("");
+  const [stationIds, setStationIds] = useState<string[]>([]);
   const [verifiedBinding, setVerifiedBinding] = useState<PrinterBinding | null>(
     null
   );
@@ -111,8 +109,7 @@ export function PrinterSettingsPanel() {
     setDeviceName("");
     setIsActive(false);
     setIsDefault(false);
-    // setCategoryId("");
-    setStationId("");
+    setStationIds([]);
     setVerifiedBinding(null);
     setNotice(null);
     setLocalError(null);
@@ -133,7 +130,11 @@ export function PrinterSettingsPanel() {
     setDeviceName(binding?.deviceName || "");
     setIsActive(printer.isActive);
     setIsDefault(connection.defaultBinding?.id === binding?.id);
-    setStationId(binding?.stationId || "");
+    setStationIds(
+      stations
+        .filter((station) => station.printerIds.includes(printer.id))
+        .map((station) => station.id)
+    );
     setVerifiedBinding(binding || null);
     setNotice(null);
     setLocalError(null);
@@ -147,11 +148,11 @@ export function PrinterSettingsPanel() {
     deviceName: transport === "NETWORK" ? undefined : deviceName,
     host: transport === "NETWORK" ? ipAddress.trim() : undefined,
     port: transport === "NETWORK" ? Number(port) : undefined,
-    stationId: stationId.trim() || undefined,
-    // categoryIds: verifiedBinding?.categoryIds,
     lastVerifiedAt: "",
     lastError: null,
   });
+
+  const canAssignStations = Boolean(selectedBackendId || transport === "NETWORK");
 
   const testConnection = async () => {
     setNotice(null);
@@ -171,6 +172,28 @@ export function PrinterSettingsPanel() {
           : t("settings.printer.testFailed")
       );
     }
+  };
+
+  const syncStationAssignments = async (
+    printerId: string,
+    selectedStationIds: string[]
+  ) => {
+    await Promise.all(
+      stations.flatMap((station) => {
+        const isAssigned = station.printerIds.includes(printerId);
+        const shouldAssign = selectedStationIds.includes(station.id);
+        if (isAssigned === shouldAssign) return [];
+
+        const printerIds = shouldAssign
+          ? [...station.printerIds, printerId]
+          : station.printerIds.filter((id) => id !== printerId);
+        return [
+          updateStation(station.id, {
+            printerIds: Array.from(new Set(printerIds)),
+          }),
+        ];
+      })
+    );
   };
 
   const save = async () => {
@@ -225,7 +248,6 @@ export function PrinterSettingsPanel() {
           backendPrinterId: printer.id,
           host: printer.ipAddress,
           port: printer.port,
-          stationId: stationId.trim() || undefined,
         };
         connection.saveBinding(binding, isDefault);
         setSelectedBindingId(binding.id);
@@ -233,6 +255,7 @@ export function PrinterSettingsPanel() {
       } else if (selectedBindingId) {
         connection.removeBinding(selectedBindingId);
       }
+      await syncStationAssignments(printer.id, stationIds);
       setNotice(
         connected ? t("settings.printer.saved") : t("settings.printer.savedInactive")
       );
@@ -259,41 +282,6 @@ export function PrinterSettingsPanel() {
       );
     }
   };
-
-  // const routeCategory = async (attach: boolean) => {
-  //   if (!selectedBackendId || !categoryId.trim()) return;
-  //   setLocalError(null);
-  //   try {
-  //     const nextCategoryId = categoryId.trim();
-  //     if (attach) await attachCategory(selectedBackendId, nextCategoryId);
-  //     else await detachCategory(selectedBackendId, nextCategoryId);
-  //     if (verifiedBinding) {
-  //       const categoryIds = new Set(verifiedBinding.categoryIds || []);
-  //       if (attach) categoryIds.add(nextCategoryId);
-  //       else categoryIds.delete(nextCategoryId);
-  //       const nextBinding = {
-  //         ...verifiedBinding,
-  //         categoryIds: Array.from(categoryIds),
-  //       };
-  //       connection.saveBinding(nextBinding, isDefault);
-  //       setVerifiedBinding(nextBinding);
-  //     }
-  //     setNotice(
-  //       t(
-  //         attach
-  //           ? "settings.printer.categoryAttached"
-  //           : "settings.printer.categoryDetached"
-  //       )
-  //     );
-  //     setCategoryId("");
-  //   } catch (caught) {
-  //     setLocalError(
-  //       caught instanceof Error
-  //         ? caught.message
-  //         : t("settings.printer.categoryFailed")
-  //     );
-  //   }
-  // };
 
   return (
     <div className="pos-split grid min-h-[34rem] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:grid-cols-[16rem_minmax(0,1fr)]">
@@ -512,78 +500,41 @@ export function PrinterSettingsPanel() {
             {t("settings.printer.default")}
           </label>
         </div>
-        <label className="mt-4 block text-sm text-slate-600">
-          {t("settings.printer.stationId")}
-          <select
-            className={fieldClass}
-            value={stationId}
-            disabled={stationsLoading}
-            onChange={(event) => setStationId(event.target.value)}
-          >
-            <option value="">{t("settings.printer.noStation")}</option>
-            {stationId &&
-            !stations.some((station) => station.id === stationId) ? (
-              <option value={stationId}>{stationId}</option>
-            ) : null}
+        <fieldset className="mt-4">
+          <legend className="text-sm text-slate-600">
+            {t("settings.printer.kdsStations")}
+          </legend>
+          <p className="mt-1 text-xs text-slate-500">
+            {t("settings.printer.kdsStationsHint")}
+          </p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
             {stations.map((station) => (
-              <option key={station.id} value={station.id}>
+              <label
+                key={station.id}
+                className="flex items-center gap-2 text-sm text-slate-700 disabled:text-slate-400"
+              >
+                <input
+                  type="checkbox"
+                  checked={stationIds.includes(station.id)}
+                  disabled={stationsLoading || !canAssignStations}
+                  onChange={() =>
+                    setStationIds((current) =>
+                      current.includes(station.id)
+                        ? current.filter((id) => id !== station.id)
+                        : [...current, station.id]
+                    )
+                  }
+                />
                 {station.name}
-              </option>
+              </label>
             ))}
-          </select>
-        </label>
-
-        {/* Category routing is not used when saving a printer.
-        {selectedBackendId ? (
-          <div className="mt-5 rounded-lg border border-slate-200 p-3">
-            <p className="text-sm font-semibold">
-              {t("settings.printer.categoryRouting")}
-            </p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <select
-                className="min-h-10 min-w-56 flex-1 rounded border border-slate-200 bg-white px-3 text-sm"
-                value={categoryId}
-                disabled={categoriesLoading}
-                aria-label={t("settings.printer.categoryRouting")}
-                onChange={(event) => setCategoryId(event.target.value)}
-              >
-                <option value="">{t("settings.printer.selectCategory")}</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={!categoryId}
-                onClick={() => void routeCategory(true)}
-              >
-                {t("settings.printer.attach")}
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={!categoryId}
-                onClick={() => void routeCategory(false)}
-              >
-                {t("settings.printer.detach")}
-              </Button>
-            </div>
-            {verifiedBinding?.categoryIds?.length ? (
-              <p className="mt-2 text-xs text-slate-500">
-                {verifiedBinding.categoryIds
-                  .map(
-                    (id) =>
-                      categories.find((category) => category.id === id)?.name || id
-                  )
-                  .join(", ")}
-              </p>
-            ) : null}
           </div>
-        ) : null}
-        */}
+          {!canAssignStations ? (
+            <p className="mt-2 text-xs text-amber-700">
+              {t("settings.printer.kdsBackendRequired")}
+            </p>
+          ) : null}
+        </fieldset>
 
         <div className="mt-6 flex flex-wrap gap-2">
           <Button

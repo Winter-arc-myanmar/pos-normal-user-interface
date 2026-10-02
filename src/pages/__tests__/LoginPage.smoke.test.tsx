@@ -29,7 +29,7 @@ describe("LoginPage", () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByLabelText("login.emailLabel")).toBeInTheDocument();
+    expect(screen.getByLabelText("login.userIdLabel")).toBeInTheDocument();
     expect(screen.getByLabelText("login.passwordLabel")).toBeInTheDocument();
     expect(screen.queryByLabelText("login.tenantIdLabel")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("login.branchIdLabel")).not.toBeInTheDocument();

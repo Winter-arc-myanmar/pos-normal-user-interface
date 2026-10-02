@@ -87,4 +87,34 @@ describe("printer binding storage", () => {
       Object.keys(readPrinterBindings("tenant-1", "register-1").bindings)
     ).toEqual(["net-1"]);
   });
+
+  it("drops legacy local station assignments in favor of backend routing", () => {
+    const values = new Map<string, string>();
+    values.set(
+      "pos:printerBindings:tenant-1:register-1",
+      JSON.stringify({
+        version: 1,
+        bindings: {
+          "old-printer": {
+            id: "old-printer",
+            transport: "USB",
+            displayName: "Old kitchen printer",
+            deviceName: "Old kitchen printer",
+            stationId: "kitchen",
+            lastVerifiedAt: "",
+          },
+        },
+      })
+    );
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key),
+      clear: () => values.clear(),
+    });
+
+    expect(
+      readPrinterBindings("tenant-1", "register-1").bindings["old-printer"]
+    ).not.toHaveProperty("stationId");
+  });
 });

@@ -28,6 +28,9 @@ export class KdsStationService implements IKdsStationService {
     return this.repository.create({
       ...payload,
       name: payload.name.trim(),
+      printerIds: Array.from(
+        new Set(payload.printerIds.map((id) => id.trim()).filter(Boolean))
+      ),
       routingRules: {
         categoryIds: payload.routingRules.categoryIds.filter((id) => id.trim()),
       },
@@ -39,6 +42,11 @@ export class KdsStationService implements IKdsStationService {
     return this.repository.update(id, {
       ...payload,
       name: payload.name?.trim(),
+      printerIds: payload.printerIds
+        ? Array.from(
+            new Set(payload.printerIds.map((id) => id.trim()).filter(Boolean))
+          )
+        : undefined,
       routingRules: payload.routingRules
         ? {
             categoryIds: payload.routingRules.categoryIds.filter((item) =>

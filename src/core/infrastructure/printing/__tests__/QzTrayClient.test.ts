@@ -68,4 +68,21 @@ describe("QzTrayClient", () => {
       [expect.objectContaining({ type: "raw", format: "command" })]
     );
   });
+
+  it("identifies a KDS printer queue that is no longer installed", async () => {
+    mocks.print.mockRejectedValue(
+      new Error('Cannot find printer with name "Old kitchen printer"')
+    );
+    const client = new QzTrayClient();
+
+    await expect(
+      client.testPrint({
+        id: "usb-1",
+        transport: "USB",
+        displayName: "Kitchen",
+        deviceName: "Old kitchen printer",
+        lastVerifiedAt: "",
+      })
+    ).rejects.toThrow(/assign the connected local printer/i);
+  });
 });
