@@ -41,8 +41,9 @@ vi.mock("@/core/presentation/hooks/useCategoryManagement", () => ({
 vi.mock("@/core/presentation/hooks/useKitchenPrinterManagement", () => ({
   useKitchenPrinterManagement: () => ({
     printers: [
-      { id: "printer-drink", name: "Drink printer" },
-      { id: "printer-food", name: "Food printer" },
+      { id: "printer-drink", name: "Drink printer", sectors: ["KDS"] },
+      { id: "printer-food", name: "Food printer", sectors: ["KDS"] },
+      { id: "printer-checkout", name: "Checkout printer", sectors: ["CHECKOUT"] },
     ],
     listPrinters: vi.fn().mockResolvedValue({ printers: [] }),
   }),
@@ -79,6 +80,9 @@ describe("KdsStationSettingsPanel", () => {
     fireEvent.click(
       screen.getByRole("checkbox", { name: "Food printer" })
     );
+    expect(
+      screen.queryByRole("checkbox", { name: "Checkout printer" })
+    ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("checkbox", { name: "Drink" }));
     fireEvent.click(
       screen.getByRole("button", { name: "settings.kdsStation.save" })

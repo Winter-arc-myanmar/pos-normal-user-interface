@@ -1,4 +1,7 @@
-import { KitchenPrinter } from "../../domain/entities/KitchenPrinter";
+import {
+  KitchenPrinter,
+  PrinterSector,
+} from "../../domain/entities/KitchenPrinter";
 
 export interface CreateKitchenPrinterDTO {
   tenantId: string;
@@ -6,6 +9,7 @@ export interface CreateKitchenPrinterDTO {
   name: string;
   ipAddress?: string;
   port: number;
+  sectors: PrinterSector[];
   isActive: boolean;
 }
 
@@ -14,6 +18,7 @@ export interface UpdateKitchenPrinterDTO {
   name?: string;
   ipAddress?: string;
   port?: number;
+  sectors?: PrinterSector[];
   isActive?: boolean;
 }
 
@@ -23,6 +28,8 @@ export interface KitchenPrinterFilterDTO {
   search?: string;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
+  locationId?: string;
+  sector?: PrinterSector;
 }
 
 export interface KitchenPrinterListDTO {

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PrintTemplateSettingsPanel } from "../PrintTemplateSettingsPanel";
 
 const createTemplate = vi.fn();
@@ -25,6 +25,10 @@ vi.mock("@/core/presentation/hooks/usePrintTemplateManagement", () => ({
 }));
 
 describe("PrintTemplateSettingsPanel", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("creates a receipt template for the current branch", async () => {
     createTemplate.mockResolvedValue({ id: "template-1" });
     render(<PrintTemplateSettingsPanel />);
@@ -39,6 +43,27 @@ describe("PrintTemplateSettingsPanel", () => {
         name: "Default receipt",
         locationId: "location-1",
         paperWidth: "MM80",
+        isDefault: true,
+      })
+    );
+  });
+
+  it("creates a finance template as its own type", async () => {
+    createTemplate.mockResolvedValue({ id: "template-finance" });
+    render(<PrintTemplateSettingsPanel />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /settings.printTemplate.placeFinanceHint/ })
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "settings.printTemplate.save" })
+    );
+
+    expect(createTemplate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "FINANCE",
+        name: "Default finance",
+        locationId: "location-1",
         isDefault: true,
       })
     );

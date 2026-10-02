@@ -10,7 +10,11 @@ import {
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
 import { usePrintTemplateManagement } from "@/core/presentation/hooks/usePrintTemplateManagement";
 import { PrintPlace } from "@/lib/printing/formatKdsTicket";
-import { templatesForPrintPlace } from "@/lib/printing/selectPrintTemplate";
+import {
+  printPlaceToTemplateType,
+  templateTypeToPrintPlace,
+  templatesForPrintPlace,
+} from "@/lib/printing/selectPrintTemplate";
 
 const fieldClass =
   "mt-1 min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500";
@@ -25,21 +29,24 @@ type Draft = {
   settings: PrintTemplateSettings;
 };
 
-const placeOf = (template: {
-  type: PrintTemplateType;
-  isDefault?: boolean;
-}): PrintPlace =>
-  template.type === "KITCHEN" ? "KDS" : template.isDefault ? "CHECKOUT" : "FINANCE";
+const DEFAULT_NAMES: Record<PrintTemplateType, string> = {
+  RECEIPT: "Default receipt",
+  KITCHEN: "Default kitchen",
+  FINANCE: "Default finance",
+};
 
 const emptyDraft = (): Draft => ({
   id: "",
-  name: "Default receipt",
+  name: DEFAULT_NAMES.RECEIPT,
   locationScope: "CURRENT",
   type: "RECEIPT",
   paperWidth: "MM80",
   isDefault: true,
   settings: defaultPrintTemplateSettings(),
 });
+
+const isPresetName = (name: string) =>
+  Object.values(DEFAULT_NAMES).includes(name.trim());
 
 function ToggleField({
   label,
@@ -80,6 +87,12 @@ function ReceiptPreview({
   const { t } = useTranslation();
   const showItemPrice = settings.item.price;
   const isKitchen = type === "KITCHEN";
+  const previewLabel =
+    type === "KITCHEN"
+      ? t("settings.printTemplate.kitchen")
+      : type === "FINANCE"
+        ? t("settings.printTemplate.finance")
+        : t("settings.printTemplate.receipt");
   return (
     <div
       className={[
@@ -88,9 +101,7 @@ function ReceiptPreview({
       ].join(" ")}
     >
       <p className="text-center text-[10px] uppercase tracking-wide text-slate-500">
-        {isKitchen
-          ? t("settings.printTemplate.kitchen")
-          : t("settings.printTemplate.receipt")}
+        {previewLabel}
       </p>
       {settings.header.outletName ? (
         <p className="text-center text-sm font-bold">
@@ -169,30 +180,28 @@ export function PrintTemplateSettingsPanel() {
   const patchSettings = (settings: PrintTemplateSettings) =>
     setDraft((current) => ({ ...current, settings }));
 
-  const applyPlace = (place: PrintPlace) => {
-    setDraft((current) => ({
-      ...current,
-      type: place === "KDS" ? "KITCHEN" : "RECEIPT",
-      isDefault: place !== "FINANCE",
-      settings: {
-        ...current.settings,
-        header: {
-          ...current.settings.header,
-          logo: place === "CHECKOUT",
-          address: place !== "FINANCE",
-          contact: place !== "FINANCE",
-        },
-        item: {
-          ...current.settings.item,
-          price: place !== "KDS",
-          modifiers: place !== "FINANCE",
-          productRemarks: place !== "FINANCE",
-        },
-      },
-    }));
+  const applyType = (type: PrintTemplateType) => {
+    setDraft((current) => {
+      if (current.id) return current;
+      const settings = defaultPrintTemplateSettings();
+      if (type === "KITCHEN") {
+        settings.item.price = false;
+        settings.header.logo = false;
+      }
+      if (type === "FINANCE") {
+        settings.header.logo = false;
+      }
+      return {
+        ...current,
+        type,
+        isDefault: true,
+        name: isPresetName(current.name) ? DEFAULT_NAMES[type] : current.name,
+        settings,
+      };
+    });
   };
 
-  const place = placeOf(draft);
+  const place = templateTypeToPrintPlace(draft.type);
   const places: PrintPlace[] = ["KDS", "CHECKOUT", "FINANCE"];
   const placeCopy: Record<PrintPlace, { label: string; hint: string }> = {
     KDS: {
@@ -276,10 +285,7 @@ export function PrintTemplateSettingsPanel() {
           "tableOrRoom",
           "pickupCode",
         ] as const);
-  const billFields =
-    place === "CHECKOUT"
-      ? (["amountAfterDiscount", "totalPayment", "payTime"] as const)
-      : (["amountAfterDiscount", "totalPayment"] as const);
+  const billFields = ["amountAfterDiscount", "totalPayment", "payTime"] as const;
 
   return (
     <form onSubmit={(event) => void save(event)} className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
@@ -308,14 +314,16 @@ export function PrintTemplateSettingsPanel() {
                     {active?.name ||
                       (competing.length > 1
                         ? competing.map((template) => template.name).join(", ")
-                        : t("settings.printTemplate.notSet"))}
+                        : t("settings.printTemplate.builtin"))}
                   </span>
                   <span className="mt-1 block text-xs text-slate-500">
                     {competing.length > 1
                       ? t("settings.printTemplate.conflict", {
                           name: competing.map((template) => template.name).join(", "),
                         })
-                      : t("settings.printTemplate.printingNow")}
+                      : competing.length === 1
+                        ? t("settings.printTemplate.printingNow")
+                        : t("settings.printTemplate.usingBuiltin")}
                   </span>
                 </>
               );
@@ -352,7 +360,7 @@ export function PrintTemplateSettingsPanel() {
                 <option value="">{t("settings.printTemplate.newTemplate")}</option>
                 {templates.map((template) => (
                   <option key={template.id} value={template.id}>
-                    {template.name} — {placeCopy[placeOf(template)].label}
+                    {template.name} — {placeCopy[templateTypeToPrintPlace(template.type)].label}
                   </option>
                 ))}
               </select>
@@ -373,20 +381,17 @@ export function PrintTemplateSettingsPanel() {
               </legend>
               <div className="mt-1 grid gap-2 sm:grid-cols-3">
                 {places.map((item) => {
-                  const locked =
-                    Boolean(draft.id) &&
-                    ((draft.type === "KITCHEN" && item !== "KDS") ||
-                      (draft.type === "RECEIPT" && item === "KDS"));
+                  const selected = place === item;
                   return (
                     <button
                       key={item}
                       type="button"
-                      aria-pressed={place === item}
-                      disabled={locked}
-                      onClick={() => applyPlace(item)}
+                      aria-pressed={selected}
+                      disabled={Boolean(draft.id) && !selected}
+                      onClick={() => applyType(printPlaceToTemplateType(item))}
                       className={[
                         "rounded-lg border px-3 py-3 text-left disabled:cursor-not-allowed disabled:opacity-50",
-                        place === item
+                        selected
                           ? "border-blue-600 bg-blue-600 text-white"
                           : "border-slate-200 bg-white text-slate-800",
                       ].join(" ")}
@@ -397,7 +402,7 @@ export function PrintTemplateSettingsPanel() {
                       <span
                         className={[
                           "mt-1 block text-xs leading-5",
-                          place === item ? "text-blue-100" : "text-slate-500",
+                          selected ? "text-blue-100" : "text-slate-500",
                         ].join(" ")}
                       >
                         {placeCopy[item].hint}
@@ -408,9 +413,7 @@ export function PrintTemplateSettingsPanel() {
               </div>
               {draft.id ? (
                 <p className="mt-2 text-xs leading-5 text-slate-500">
-                  {draft.type === "KITCHEN"
-                    ? t("settings.printTemplate.lockedKitchen")
-                    : t("settings.printTemplate.lockedReceipt")}
+                  {t("settings.printTemplate.lockedType")}
                 </p>
               ) : null}
             </fieldset>
@@ -452,11 +455,31 @@ export function PrintTemplateSettingsPanel() {
                 </span>
               ) : null}
             </label>
+            <label className="flex items-center gap-2 text-sm text-slate-700 sm:col-span-2">
+              <input
+                type="checkbox"
+                checked={draft.isDefault}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    isDefault: event.target.checked,
+                  }))
+                }
+              />
+              {t("settings.printTemplate.defaultStatus")}
+            </label>
           </div>
         </section>
 
         <section className="rounded-xl bg-white p-4 shadow-sm">
           <h3 className="font-semibold">{t("settings.printTemplate.header")}</h3>
+          <ToggleField
+            label={t("settings.printTemplate.logo")}
+            checked={settings.header.logo}
+            onChange={(logo) =>
+              patchSettings({ ...settings, header: { ...settings.header, logo } })
+            }
+          />
           <ToggleField
             label={t("settings.printTemplate.outletName")}
             checked={settings.header.outletName}

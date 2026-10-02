@@ -1,4 +1,5 @@
 export type PrinterTransport = "NETWORK" | "USB" | "BLUETOOTH";
+export type PrinterSector = "KDS" | "CHECKOUT" | "FINANCE";
 
 export interface PrinterBinding {
   id: string;
@@ -8,6 +9,7 @@ export interface PrinterBinding {
   deviceName?: string;
   host?: string;
   port?: number;
+  sectors?: PrinterSector[];
   categoryIds?: string[];
   lastVerifiedAt: string;
   lastError?: string | null;
@@ -184,4 +186,11 @@ export function getDefaultPrinterBinding(
   return store.defaultBindingId
     ? store.bindings[store.defaultBindingId] || null
     : null;
+}
+
+export function bindingsForSector(
+  bindings: PrinterBinding[],
+  sector: PrinterSector
+): PrinterBinding[] {
+  return bindings.filter((binding) => binding.sectors?.includes(sector));
 }

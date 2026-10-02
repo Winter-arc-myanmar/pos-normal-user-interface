@@ -69,6 +69,15 @@ vi.mock("@/core/presentation/hooks/usePosWorkspace", () => ({
   }),
 }));
 
+vi.mock("@/core/presentation/hooks/useKdsStationManagement", () => ({
+  useKdsStationManagement: () => ({
+    stations: [],
+    isLoading: false,
+    listStations: vi.fn().mockResolvedValue({ stations: [] }),
+    updateStation: vi.fn(),
+  }),
+}));
+
 vi.mock("@/core/presentation/hooks/useKitchenPrinterManagement", () => ({
   useKitchenPrinterManagement: () => ({
     printers: [],
@@ -144,6 +153,7 @@ describe("PosSettingsPage integration", () => {
       name: "Kitchen",
       ipAddress: "192.168.1.50",
       port: 9100,
+      sectors: ["CHECKOUT"],
     });
     renderPage("printer");
 
@@ -153,6 +163,9 @@ describe("PosSettingsPage integration", () => {
     fireEvent.change(screen.getByLabelText("settings.printer.ipAddress"), {
       target: { value: "192.168.1.50" },
     });
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "settings.printer.sectorCheckout" })
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "settings.printer.save" }));
 
@@ -161,6 +174,7 @@ describe("PosSettingsPage integration", () => {
       expect.objectContaining({
         name: "Kitchen",
         ipAddress: "192.168.1.50",
+        sectors: ["CHECKOUT"],
         isActive: true,
       })
     );
@@ -171,6 +185,7 @@ describe("PosSettingsPage integration", () => {
       name: "Kitchen",
       ipAddress: "192.168.1.50",
       port: 9100,
+      sectors: ["CHECKOUT"],
       isActive: false,
     });
     fireEvent.click(screen.getByRole("button", { name: "settings.printer.save" }));

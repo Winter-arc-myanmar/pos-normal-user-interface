@@ -368,7 +368,7 @@ describe("station print routing", () => {
     expect(kitchen).toContain("Kitchen");
   });
 
-  it("uses the kitchen template for KDS and the non-default receipt for finance", () => {
+  it("uses the kitchen, checkout, and finance templates by type", () => {
     const kitchen = new PrintTemplate({
       id: "kitchen",
       type: "KITCHEN",
@@ -386,8 +386,8 @@ describe("station print routing", () => {
     financeSettings.header.logo = false;
     const finance = new PrintTemplate({
       id: "finance",
-      type: "RECEIPT",
-      isDefault: false,
+      type: "FINANCE",
+      isDefault: true,
       locationId: "location-1",
       settings: financeSettings,
     });

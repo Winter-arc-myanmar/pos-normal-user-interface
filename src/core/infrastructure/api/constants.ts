@@ -317,16 +317,16 @@ export const API_ENDPOINTS = {
     DELETE: (id: string) => `/api/v1/categories/${id}`,
   },
 
-  KITCHEN_PRINTERS: {
-    LIST: "/api/v1/kitchen-printers",
-    CREATE: "/api/v1/kitchen-printers",
-    BY_ID: (id: string) => `/api/v1/kitchen-printers/${id}`,
-    UPDATE: (id: string) => `/api/v1/kitchen-printers/${id}`,
-    DELETE: (id: string) => `/api/v1/kitchen-printers/${id}`,
+  PRINTERS: {
+    LIST: "/api/v1/printers",
+    CREATE: "/api/v1/printers",
+    BY_ID: (id: string) => `/api/v1/printers/${id}`,
+    UPDATE: (id: string) => `/api/v1/printers/${id}`,
+    DELETE: (id: string) => `/api/v1/printers/${id}`,
     ATTACH_CATEGORY: (id: string) =>
-      `/api/v1/kitchen-printers/${id}/categories`,
+      `/api/v1/printers/${id}/categories`,
     DETACH_CATEGORY: (id: string, categoryId: string) =>
-      `/api/v1/kitchen-printers/${id}/categories/${categoryId}`,
+      `/api/v1/printers/${id}/categories/${categoryId}`,
   },
 
   DISCOUNT_REASONS: {

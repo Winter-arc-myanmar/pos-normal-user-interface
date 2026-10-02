@@ -49,8 +49,15 @@ export function KdsStationSettingsPanel() {
     void listCategories({ page: 1, limit: 100, sortBy: "name", sortOrder: "asc" }).catch(
       () => undefined
     );
-    void listPrinters({ page: 1, limit: 100 }).catch(() => undefined);
-  }, [listCategories, listPrinters]);
+  }, [listCategories]);
+
+  useEffect(() => {
+    void listPrinters({
+      page: 1,
+      limit: 100,
+      locationId: activeLocationId || undefined,
+    }).catch(() => undefined);
+  }, [activeLocationId, listPrinters]);
 
   useEffect(() => {
     if (!activeLocationId) return;
@@ -78,6 +85,15 @@ export function KdsStationSettingsPanel() {
     }
     return owners;
   }, [draft.id, stations]);
+
+  const kdsPrinters = useMemo(
+    () =>
+      printers.filter(
+        (printer) =>
+          printer.sectors?.includes("KDS") || draft.printerIds.includes(printer.id)
+      ),
+    [draft.printerIds, printers]
+  );
 
   const toggleCategory = (categoryId: string) => {
     if (categoryOwner.has(categoryId)) return;
@@ -232,7 +248,7 @@ export function KdsStationSettingsPanel() {
           {t("settings.kdsStation.printersHint")}
         </p>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
-          {printers.map((printer) => (
+          {kdsPrinters.map((printer) => (
             <label key={printer.id} className="flex items-center gap-2 text-sm text-slate-700">
               <input
                 type="checkbox"
@@ -243,6 +259,11 @@ export function KdsStationSettingsPanel() {
             </label>
           ))}
         </div>
+        {!kdsPrinters.length ? (
+          <p className="mt-2 text-xs text-amber-700">
+            {t("settings.kdsStation.noKdsPrinters")}
+          </p>
+        ) : null}
 
         <h3 className="mt-4 text-sm font-semibold text-slate-800">
           {t("settings.kdsStation.categories")}

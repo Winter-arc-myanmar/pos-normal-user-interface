@@ -10,8 +10,8 @@ import {
   PrintTemplate,
   PrintTemplateSettings,
   PrintTemplateSource,
-  PrintTemplateType,
   defaultPrintTemplateSettings,
+  isPrintTemplateType,
 } from "../../domain/entities/PrintTemplate";
 import { IPrintTemplateRepository } from "../../domain/repositories/IPrintTemplateRepository";
 import { HttpClient } from "../api/HttpClient";
@@ -101,12 +101,13 @@ const toSettings = (value: unknown): PrintTemplateSettings => {
   };
 };
 
-const toTemplate = (item: RecordValue) =>
-  new PrintTemplate({
+const toTemplate = (item: RecordValue) => {
+  const rawType = String(item.type || "");
+  return new PrintTemplate({
     id: String(item.id || ""),
     tenantId: item.tenantId ? String(item.tenantId) : undefined,
     locationId: item.locationId ? String(item.locationId) : undefined,
-    type: String(item.type || "RECEIPT") as PrintTemplateType,
+    type: isPrintTemplateType(rawType) ? rawType : "RECEIPT",
     name: String(item.name || ""),
     paperWidth: (item.paperWidth === "MM58" ? "MM58" : "MM80") as PrintPaperWidth,
     isDefault: typeof item.isDefault === "boolean" ? item.isDefault : undefined,
@@ -116,6 +117,7 @@ const toTemplate = (item: RecordValue) =>
     createdAt: item.createdAt ? String(item.createdAt) : undefined,
     updatedAt: item.updatedAt ? String(item.updatedAt) : undefined,
   });
+};
 
 export class ApiPrintTemplateRepository implements IPrintTemplateRepository {
   constructor(private readonly httpClient: HttpClient) {}

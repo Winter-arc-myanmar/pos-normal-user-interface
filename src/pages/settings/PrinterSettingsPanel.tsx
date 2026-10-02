@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
-import { KitchenPrinter } from "@/core/domain/entities/KitchenPrinter";
+import {
+  KitchenPrinter,
+  PRINTER_SECTORS,
+  PrinterSector,
+} from "@/core/domain/entities/KitchenPrinter";
 import { useAuth } from "@/core/presentation/hooks/useAuth";
 import { useKdsStationManagement } from "@/core/presentation/hooks/useKdsStationManagement";
-// Category routing is not part of printer create. Send KDS uses station categories.
-// import { useCategoryManagement } from "@/core/presentation/hooks/useCategoryManagement";
 import { useKitchenPrinterManagement } from "@/core/presentation/hooks/useKitchenPrinterManagement";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
 import { isBrowserPrinting } from "@/core/infrastructure/printing/PrinterClient";
@@ -23,6 +25,12 @@ const localId = () =>
   typeof crypto.randomUUID === "function"
     ? crypto.randomUUID()
     : `printer-${Date.now()}`;
+
+const SECTOR_LABEL_KEYS: Record<PrinterSector, string> = {
+  CHECKOUT: "settings.printer.sectorCheckout",
+  FINANCE: "settings.printer.sectorFinance",
+  KDS: "settings.printer.sectorKds",
+};
 
 export function PrinterSettingsPanel() {
   const { t } = useTranslation();
@@ -45,11 +53,6 @@ export function PrinterSettingsPanel() {
     updateStation,
   } = useKdsStationManagement();
   const connection = usePrinterConnection(tenantId, activePosRegisterId);
-  // const {
-  //   categories,
-  //   isLoading: categoriesLoading,
-  //   listCategories,
-  // } = useCategoryManagement();
 
   const [selectedBackendId, setSelectedBackendId] = useState("");
   const [selectedBindingId, setSelectedBindingId] = useState("");
@@ -60,6 +63,7 @@ export function PrinterSettingsPanel() {
   const [deviceName, setDeviceName] = useState("");
   const [isActive, setIsActive] = useState(false);
   const [isDefault, setIsDefault] = useState(false);
+  const [sectors, setSectors] = useState<PrinterSector[]>([]);
   const [stationIds, setStationIds] = useState<string[]>([]);
   const [verifiedBinding, setVerifiedBinding] = useState<PrinterBinding | null>(
     null
@@ -75,19 +79,11 @@ export function PrinterSettingsPanel() {
     void listPrinters({
       page: 1,
       limit: 100,
+      locationId: activeLocationId || undefined,
       sortBy: "createdAt",
       sortOrder: "desc",
     }).catch(() => undefined);
-  }, [listPrinters]);
-
-  // useEffect(() => {
-  //   void listCategories({
-  //     page: 1,
-  //     limit: 200,
-  //     sortBy: "name",
-  //     sortOrder: "asc",
-  //   }).catch(() => undefined);
-  // }, [listCategories]);
+  }, [activeLocationId, listPrinters]);
 
   useEffect(() => {
     void listStations({
@@ -109,6 +105,7 @@ export function PrinterSettingsPanel() {
     setDeviceName("");
     setIsActive(false);
     setIsDefault(false);
+    setSectors([]);
     setStationIds([]);
     setVerifiedBinding(null);
     setNotice(null);
@@ -125,11 +122,12 @@ export function PrinterSettingsPanel() {
     setTransport(
       binding?.transport || (printer.ipAddress ? "NETWORK" : "USB")
     );
-    setIpAddress(printer.ipAddress);
+    setIpAddress(printer.ipAddress || "");
     setPort(String(printer.port));
     setDeviceName(binding?.deviceName || "");
     setIsActive(printer.isActive);
     setIsDefault(connection.defaultBinding?.id === binding?.id);
+    setSectors(printer.sectors || []);
     setStationIds(
       stations
         .filter((station) => station.printerIds.includes(printer.id))
@@ -148,11 +146,24 @@ export function PrinterSettingsPanel() {
     deviceName: transport === "NETWORK" ? undefined : deviceName,
     host: transport === "NETWORK" ? ipAddress.trim() : undefined,
     port: transport === "NETWORK" ? Number(port) : undefined,
+    sectors,
     lastVerifiedAt: "",
     lastError: null,
   });
 
-  const canAssignStations = Boolean(selectedBackendId || transport === "NETWORK");
+  const servesKds = sectors.includes("KDS");
+  const canAssignStations =
+    servesKds && Boolean(selectedBackendId || transport === "NETWORK");
+
+  const toggleSector = (sector: PrinterSector) => {
+    setSectors((current) => {
+      const next = current.includes(sector)
+        ? current.filter((item) => item !== sector)
+        : [...current, sector];
+      if (!next.includes("KDS")) setStationIds([]);
+      return next;
+    });
+  };
 
   const testConnection = async () => {
     setNotice(null);
@@ -220,11 +231,16 @@ export function PrinterSettingsPanel() {
     if (
       !activeLocationId ||
       !name.trim() ||
+      !sectors.length ||
       !Number.isInteger(portNumber) ||
       portNumber < 1 ||
       portNumber > 65535
     ) {
-      setLocalError(t("settings.printer.saveFailed"));
+      setLocalError(
+        sectors.length
+          ? t("settings.printer.saveFailed")
+          : t("settings.printer.sectorsRequired")
+      );
       return;
     }
     if (transport !== "NETWORK" && (!connected || !verified)) return;
@@ -235,12 +251,14 @@ export function PrinterSettingsPanel() {
         name: name.trim(),
         ...(networkAddress ? { ipAddress: networkAddress } : {}),
         port: portNumber,
+        sectors,
         isActive: connected,
       };
       const printer = selectedBackendId
         ? await updatePrinter(selectedBackendId, payload)
         : await createPrinter({ tenantId, ...payload });
       setSelectedBackendId(printer.id);
+      setSectors(printer.sectors?.length ? printer.sectors : sectors);
       if (connected && verified) {
         const binding = {
           ...verified,
@@ -248,6 +266,7 @@ export function PrinterSettingsPanel() {
           backendPrinterId: printer.id,
           host: printer.ipAddress,
           port: printer.port,
+          sectors: printer.sectors?.length ? printer.sectors : sectors,
         };
         connection.saveBinding(binding, isDefault);
         setSelectedBindingId(binding.id);
@@ -255,7 +274,12 @@ export function PrinterSettingsPanel() {
       } else if (selectedBindingId) {
         connection.removeBinding(selectedBindingId);
       }
-      await syncStationAssignments(printer.id, stationIds);
+      await syncStationAssignments(
+        printer.id,
+        (printer.sectors?.length ? printer.sectors : sectors).includes("KDS")
+          ? stationIds
+          : []
+      );
       setNotice(
         connected ? t("settings.printer.saved") : t("settings.printer.savedInactive")
       );
@@ -310,6 +334,11 @@ export function PrinterSettingsPanel() {
               ].join(" ")}
             >
               <span className="block truncate font-semibold">{printer.name}</span>
+              <span className="mt-1 block text-xs text-slate-500">
+                {printer.sectors?.length
+                  ? printer.sectors.join(" · ")
+                  : t("settings.printer.noSectors")}
+              </span>
               <span className="mt-1 block text-xs text-slate-500">
                 {printer.ipAddress
                   ? `${printer.ipAddress}:${printer.port}`
@@ -427,17 +456,22 @@ export function PrinterSettingsPanel() {
           </label>
           {transport === "NETWORK" ? (
             <>
-              <label className="block text-sm text-slate-600">
-                {t("settings.printer.ipAddress")}
-                <input
-                  className={fieldClass}
-                  value={ipAddress}
-                  onChange={(event) => {
-                    setIpAddress(event.target.value);
-                    setVerifiedBinding(null);
-                  }}
-                />
-              </label>
+              <div>
+                <label className="block text-sm text-slate-600">
+                  {t("settings.printer.ipAddress")}
+                  <input
+                    className={fieldClass}
+                    value={ipAddress}
+                    onChange={(event) => {
+                      setIpAddress(event.target.value);
+                      setVerifiedBinding(null);
+                    }}
+                  />
+                </label>
+                <p className="mt-1 text-xs text-slate-500">
+                  {t("settings.printer.ipOptional")}
+                </p>
+              </div>
               <label className="block text-sm text-slate-600">
                 {t("settings.printer.port")}
                 <input
@@ -490,6 +524,29 @@ export function PrinterSettingsPanel() {
             {isActive ? t("settings.printer.yes") : t("settings.printer.no")}
           </span>
         </p>
+        <fieldset className="mt-4">
+          <legend className="text-sm text-slate-600">
+            {t("settings.printer.sectors")}
+          </legend>
+          <p className="mt-1 text-xs text-slate-500">
+            {t("settings.printer.sectorsHint")}
+          </p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-3">
+            {PRINTER_SECTORS.map((sector) => (
+              <label
+                key={sector}
+                className="flex items-center gap-2 text-sm text-slate-700"
+              >
+                <input
+                  type="checkbox"
+                  checked={sectors.includes(sector)}
+                  onChange={() => toggleSector(sector)}
+                />
+                {t(SECTOR_LABEL_KEYS[sector])}
+              </label>
+            ))}
+          </div>
+        </fieldset>
         <div className="mt-4 flex flex-wrap gap-4 text-sm">
           <label className="flex items-center gap-2">
             <input
@@ -500,6 +557,7 @@ export function PrinterSettingsPanel() {
             {t("settings.printer.default")}
           </label>
         </div>
+        {servesKds ? (
         <fieldset className="mt-4">
           <legend className="text-sm text-slate-600">
             {t("settings.printer.kdsStations")}
@@ -535,6 +593,7 @@ export function PrinterSettingsPanel() {
             </p>
           ) : null}
         </fieldset>
+        ) : null}
 
         <div className="mt-6 flex flex-wrap gap-2">
           <Button
@@ -549,7 +608,7 @@ export function PrinterSettingsPanel() {
           <Button
             type="button"
             isLoading={isLoading || connection.isConnecting}
-            disabled={!name.trim() || !activeLocationId || !tenantId}
+            disabled={!name.trim() || !activeLocationId || !tenantId || !sectors.length}
             onClick={() => void save()}
           >
             {t("settings.printer.save")}

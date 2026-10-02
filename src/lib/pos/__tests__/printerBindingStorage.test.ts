@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  bindingsForSector,
   getDefaultPrinterBinding,
   readPrinterBindings,
   removeLocalOnlyPrinterBindings,
@@ -116,5 +117,34 @@ describe("printer binding storage", () => {
     expect(
       readPrinterBindings("tenant-1", "register-1").bindings["old-printer"]
     ).not.toHaveProperty("stationId");
+  });
+
+  it("selects local bindings by print sector", () => {
+    const checkout = {
+      id: "checkout-1",
+      backendPrinterId: "printer-checkout",
+      transport: "USB" as const,
+      displayName: "Counter",
+      deviceName: "USB Counter",
+      sectors: ["CHECKOUT" as const],
+      lastVerifiedAt: "2026-10-02T00:00:00.000Z",
+    };
+    const finance = {
+      id: "finance-1",
+      backendPrinterId: "printer-finance",
+      transport: "NETWORK" as const,
+      displayName: "Office",
+      host: "192.168.1.80",
+      port: 9100,
+      sectors: ["FINANCE" as const, "CHECKOUT" as const],
+      lastVerifiedAt: "2026-10-02T00:00:00.000Z",
+    };
+
+    expect(bindingsForSector([checkout, finance], "CHECKOUT")).toEqual([
+      checkout,
+      finance,
+    ]);
+    expect(bindingsForSector([checkout, finance], "FINANCE")).toEqual([finance]);
+    expect(bindingsForSector([checkout, finance], "KDS")).toEqual([]);
   });
 });

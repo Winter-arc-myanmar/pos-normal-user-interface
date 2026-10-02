@@ -3,7 +3,7 @@ import { HttpClient } from "../../api/HttpClient";
 import { ApiKitchenPrinterRepository } from "../ApiKitchenPrinterRepository";
 
 describe("ApiKitchenPrinterRepository", () => {
-  it("maps paginated printers and CRUD endpoints", async () => {
+  it("maps paginated printers and CRUD endpoints on /api/v1/printers", async () => {
     const item = {
       id: "printer-1",
       tenantId: "tenant-1",
@@ -11,6 +11,7 @@ describe("ApiKitchenPrinterRepository", () => {
       name: "Hot Line",
       ipAddress: "192.168.1.50",
       port: 9100,
+      sectors: ["KDS", "CHECKOUT"],
       isActive: true,
     };
     const get = vi.fn().mockResolvedValue({
@@ -27,37 +28,50 @@ describe("ApiKitchenPrinterRepository", () => {
       delete: remove,
     } as unknown as HttpClient);
 
-    const list = await repository.list({ page: 1, limit: 10 });
+    const list = await repository.list({
+      page: 1,
+      limit: 10,
+      locationId: "location-1",
+      sector: "KDS",
+    });
     await repository.create({
       tenantId: "tenant-1",
       locationId: "location-1",
       name: "Hot Line",
       ipAddress: "192.168.1.50",
       port: 9100,
+      sectors: ["KDS", "CHECKOUT"],
       isActive: true,
     });
-    await repository.update("printer-1", { isActive: false });
+    await repository.update("printer-1", { isActive: false, sectors: ["FINANCE"] });
     await repository.delete("printer-1");
 
     expect(list.printers[0]).toMatchObject(item);
-    expect(get).toHaveBeenCalledWith("/api/v1/kitchen-printers", {
-      params: { page: 1, limit: 10 },
+    expect(get).toHaveBeenCalledWith("/api/v1/printers", {
+      params: {
+        page: 1,
+        limit: 10,
+        locationId: "location-1",
+        sector: "KDS",
+      },
     });
-    expect(post).toHaveBeenCalledWith("/api/v1/kitchen-printers", {
+    expect(post).toHaveBeenCalledWith("/api/v1/printers", {
       tenantId: "tenant-1",
       locationId: "location-1",
       name: "Hot Line",
       ipAddress: "192.168.1.50",
       port: 9100,
+      sectors: ["KDS", "CHECKOUT"],
       isActive: true,
     });
-    expect(patch).toHaveBeenCalledWith("/api/v1/kitchen-printers/printer-1", {
+    expect(patch).toHaveBeenCalledWith("/api/v1/printers/printer-1", {
       isActive: false,
+      sectors: ["FINANCE"],
     });
-    expect(remove).toHaveBeenCalledWith("/api/v1/kitchen-printers/printer-1");
+    expect(remove).toHaveBeenCalledWith("/api/v1/printers/printer-1");
   });
 
-  it("attaches and detaches categories", async () => {
+  it("attaches and detaches categories on /api/v1/printers", async () => {
     const post = vi.fn().mockResolvedValue(undefined);
     const remove = vi.fn().mockResolvedValue(undefined);
     const repository = new ApiKitchenPrinterRepository({
@@ -68,12 +82,11 @@ describe("ApiKitchenPrinterRepository", () => {
     await repository.attachCategory("printer-1", "category-1");
     await repository.detachCategory("printer-1", "category-1");
 
-    expect(post).toHaveBeenCalledWith(
-      "/api/v1/kitchen-printers/printer-1/categories",
-      { categoryId: "category-1" }
-    );
+    expect(post).toHaveBeenCalledWith("/api/v1/printers/printer-1/categories", {
+      categoryId: "category-1",
+    });
     expect(remove).toHaveBeenCalledWith(
-      "/api/v1/kitchen-printers/printer-1/categories/category-1"
+      "/api/v1/printers/printer-1/categories/category-1"
     );
   });
 });

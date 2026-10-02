@@ -17,6 +17,7 @@ export interface PrintTemplateFilterDTO {
   search?: string;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
+  locationId?: string;
   type?: PrintTemplateType;
 }
 
