@@ -28,7 +28,7 @@ describe("GuestWalletService", () => {
   const repository: IGuestWalletRepository = {
     issueWallet: vi.fn().mockResolvedValue(wallet),
     listWallets: vi.fn(),
-    getWallet: vi.fn(),
+    getWallet: vi.fn().mockResolvedValue(wallet),
     listWalletCards: vi.fn(),
     listWalletLedger: vi.fn(),
     auditWallet: vi.fn(),
@@ -74,6 +74,27 @@ describe("GuestWalletService", () => {
         approverAuthorization: " ",
       })
     ).rejects.toThrow("Approver authorization is required");
+  });
+
+  it("rejects refund over remaining card balance", async () => {
+    vi.mocked(repository.getWallet).mockResolvedValueOnce(
+      new GuestWallet({
+        ...wallet,
+        balance: "10000",
+        purchasedBalance: "50000",
+      })
+    );
+
+    await expect(
+      service.refundWallet("wallet-1", {
+        amount: "20000",
+        paymentMethodId: "pm-1",
+        posSessionId: "session-1",
+        locationId: "loc-1",
+        approverAuthorization: "approver-token",
+      })
+    ).rejects.toThrow("Refund amount cannot exceed card balance");
+    expect(repository.refundWallet).not.toHaveBeenCalled();
   });
 
   it("loads guest cards and fetches a card by id", async () => {

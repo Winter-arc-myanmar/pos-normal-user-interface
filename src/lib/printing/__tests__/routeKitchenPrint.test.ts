@@ -448,6 +448,20 @@ describe("station print routing", () => {
     expect(slip).toContain("Large +2.00");
   });
 
+  it("prints session start and end times on a sale receipt", () => {
+    const slip = formatSaleReceipt({
+      title: "RECEIPT",
+      place: "CHECKOUT",
+      startTime: "9/26/2026, 7:00:00 AM",
+      endTime: "9/26/2026, 8:30:00 AM",
+      lines: [{ name: "Room charge", quantity: "1", unitPrice: "30000" }],
+      total: "30000",
+    });
+
+    expect(slip).toContain("Start: 9/26/2026, 7:00:00 AM");
+    expect(slip).toContain("End: 9/26/2026, 8:30:00 AM");
+  });
+
   it("reads modifier names and prices from order lines", () => {
     expect(
       modifierPrintText([

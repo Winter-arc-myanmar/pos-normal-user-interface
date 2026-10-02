@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   lookupCard: vi.fn(),
   getWallet: vi.fn(),
   requireCashierContext: vi.fn(),
+  printReceipt: vi.fn(),
   noop: vi.fn(),
 }));
 
@@ -179,8 +180,17 @@ vi.mock("@/core/presentation/hooks/useGuestWalletManagement", () => ({
 vi.mock("@/core/presentation/hooks/usePosWorkspace", () => ({
   usePosWorkspace: () => ({
     activeLocationId: "location-1",
+    activePosRegisterId: "register-1",
     isWorkspaceReady: true,
     requireCashierContext: mocks.requireCashierContext,
+  }),
+}));
+
+vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
+  usePrinterConnection: () => ({
+    printReceipt: mocks.printReceipt,
+    printKitchen: vi.fn(),
+    error: null,
   }),
 }));
 
@@ -242,6 +252,7 @@ describe("SpaBoardPage", () => {
       change: "0.0000",
       status: "COMPLETED",
     });
+    mocks.printReceipt.mockResolvedValue(undefined);
   });
 
   it("opens a running room's bill and menu without asking for a card", async () => {
@@ -320,6 +331,15 @@ describe("SpaBoardPage", () => {
       mocks.settleOrder.mock.invocationCallOrder[0]
     );
     expect(await screen.findByText("spa.paidTitle")).toBeInTheDocument();
+    expect(mocks.printReceipt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "RECEIPT",
+        serviceType: "SPA",
+        tableOrRoom: "SUITE1",
+        startTime: expect.any(String),
+        endTime: expect.any(String),
+      })
+    );
   });
 
   it("splits the bill with cash when asked", async () => {

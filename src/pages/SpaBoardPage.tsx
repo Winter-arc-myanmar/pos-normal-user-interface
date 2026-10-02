@@ -44,6 +44,9 @@ import { ProductMenu } from "./cashier/ProductMenu";
 import { CardTapDialog } from "./spa/CardTapDialog";
 import { SpaBillPanel } from "./spa/SpaBillPanel";
 import { SpaRoomTile } from "./spa/SpaRoomTile";
+import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
+import { modifierPrintText } from "@/lib/printing/modifierText";
+import { sessionPrintTimes } from "@/lib/printing/formatKdsTicket";
 
 type SpaStep = "rooms" | "sessions" | "menu" | "pay";
 type CardAction = "add" | "open" | "extend" | "pay";
@@ -126,7 +129,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     settleOrder,
   } = useSalesOrderManagement();
   const { lookupCard, getWallet } = useGuestWalletManagement();
-  const { activeLocationId, requireCashierContext, isWorkspaceReady } =
+  const { activeLocationId, activePosRegisterId, requireCashierContext, isWorkspaceReady } =
     usePosWorkspace();
 
   const [step, setStep] = useState<SpaStep>("rooms");
@@ -161,6 +164,11 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const [showFoc, setShowFoc] = useState(false);
   const [focReason, setFocReason] = useState("");
   const [isGivingFoc, setIsGivingFoc] = useState(false);
+  const printer = usePrinterConnection(
+    String(wallet?.tenantId || session?.tenantId || ""),
+    activePosRegisterId,
+    activeLocationId
+  );
 
   const room = rooms.find((item) => item.id === selectedRoomId) || null;
   const openSessions = useMemo(
@@ -599,6 +607,34 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       const final = await closeSession(session.id, {});
       writeResume(kind, null);
       await fetchBoard();
+      try {
+        await printer.printReceipt({
+          title: "RECEIPT",
+          place: "CHECKOUT",
+          showLogo: true,
+          showPrices: true,
+          receiptId: session.salesOrderId,
+          serviceType: kind === "ktv" ? "KTV" : "SPA",
+          tableOrRoom: final.roomNumber || room?.roomNumber,
+          paidAt: new Date().toLocaleString(),
+          ...sessionPrintTimes(session, new Date()),
+          lines: orderLines
+            .filter((line) => !line.voidedAt)
+            .map((line) => {
+              const modifiers = modifierPrintText(line.selectedModifiers);
+              return {
+                name: line.productName || itemNames[line.variantId] || tr("item"),
+                quantity: String(line.quantity || "1"),
+                unitPrice: line.unitPrice?.trim() || undefined,
+                modifiers: modifiers.names,
+                modifierPrices: modifiers.prices,
+              };
+            }),
+          total: String(final.paidTotal || final.runningTotal || "0"),
+        });
+      } catch {
+        // Session already closed; a printer fault must not undo it.
+      }
       backToBoard();
       setNotice(
         tr("treatmentEnded", {
@@ -763,6 +799,37 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       writeResume(kind, null);
       setWallet(await getWallet(wallet.id));
       await fetchBoard();
+      try {
+        await printer.printReceipt({
+          title: "RECEIPT",
+          place: "CHECKOUT",
+          showLogo: true,
+          showPrices: true,
+          receiptId: result.orderNumber || session.salesOrderId,
+          serviceType: kind === "ktv" ? "KTV" : "SPA",
+          tableOrRoom: room?.roomNumber || quote?.roomNumber,
+          paidAt: new Date().toLocaleString(),
+          ...sessionPrintTimes(session, new Date()),
+          lines: orderLines
+            .filter((line) => !line.voidedAt)
+            .map((line) => {
+              const modifiers = modifierPrintText(line.selectedModifiers);
+              return {
+                name: line.productName || itemNames[line.variantId] || tr("item"),
+                quantity: String(line.quantity || "1"),
+                unitPrice: line.unitPrice?.trim() || undefined,
+                modifiers: modifiers.names,
+                modifierPrices: modifiers.prices,
+              };
+            }),
+          total: result.grandTotal,
+          payments: [
+            { name: cardMethod.name || "Payment", amount: result.totalPaid || result.grandTotal },
+          ],
+        });
+      } catch {
+        // Settlement already succeeded; a printer fault must not undo it.
+      }
     } catch (caught) {
       setActionError(caught instanceof Error ? caught.message : tr("errors.pay"));
     } finally {

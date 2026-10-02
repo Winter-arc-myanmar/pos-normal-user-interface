@@ -3,10 +3,8 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { CardCaptureStatus } from "@/components/ui/CardCaptureStatus";
 import { SearchInput } from "@/components/ui/SearchInput";
-import {
-  CreateCustomerDTO,
-  CreateCustomerInteractionDTO,
-} from "@/core/application/dtos/CustomerDTO";
+import { CreateCustomerDTO, CreateCustomerInteractionDTO } from "@/core/application/dtos/CustomerDTO";
+import { CardRefundPolicy } from "@/core/application/services/CardRefundPolicy";
 import { PaymentMethod } from "@/core/domain/entities/Cashier";
 import { Customer } from "@/core/domain/entities/Customer";
 import { GuestCard, GuestWallet } from "@/core/domain/entities/GuestWallet";
@@ -914,6 +912,14 @@ export function CustomersPage() {
         setNotice(t("crm.topupSuccess"));
       } else if (walletAction === "refund") {
         const context = await requireWorkspace();
+        try {
+          CardRefundPolicy.assertRefundAmount(amount.trim(), selectedWallet);
+        } catch (err) {
+          if (err instanceof Error && err.message.toLowerCase().includes("exceed")) {
+            throw new Error(t("cardRefund.exceedsBalance"));
+          }
+          throw err;
+        }
         await refundWallet(selectedWallet.id, {
           amount: amount.trim(),
           paymentMethodId,

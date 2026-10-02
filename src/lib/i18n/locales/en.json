@@ -393,6 +393,8 @@
     "verifyPin": "Verify PIN",
     "verifyingPin": "Verifying...",
     "currentBalance": "Current balance",
+    "refundable": "Refundable",
+    "exceedsBalance": "Refund cannot exceed the current card balance.",
     "predefinedAmounts": "Predefined amounts",
     "customAmount": "Custom amount",
     "continueToPrint": "Continue to print",

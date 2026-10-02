@@ -393,6 +393,8 @@
     "verifyPin": "PIN စစ်မည်",
     "verifyingPin": "စစ်နေသည်...",
     "currentBalance": "လက်ရှိလက်ကျန်",
+    "refundable": "ပြန်အမ်းနိုင်သောပမာဏ",
+    "exceedsBalance": "ကတ်လက်ကျန်ထက် ပိုပြီး ပြန်အမ်း၍ မရပါ။",
     "predefinedAmounts": "သတ်မှတ်ပမာဏများ",
     "customAmount": "ကိုယ်တိုင်ပမာဏ",
     "continueToPrint": "ပရင့်သို့ ဆက်မည်",

@@ -1,5 +1,6 @@
 import { IGuestWalletRepository } from "../../domain/repositories/IGuestWalletRepository";
 import { IGuestWalletService } from "../../domain/services/IGuestWalletService";
+import { CardRefundPolicy } from "./CardRefundPolicy";
 import {
   BindGuestCardDTO,
   GuestCardListResponseDTO,
@@ -146,14 +147,13 @@ export class GuestWalletService implements IGuestWalletService {
   ): Promise<GuestWallet> {
     this.assertId(id, "Invalid wallet ID");
     this.assertApprover(payload.approverAuthorization);
-    if (parseAmount(payload.amount) <= 0) {
-      throw new Error("Refund amount must be greater than zero");
-    }
     if (!payload.paymentMethodId?.trim()) {
       throw new Error("Payment method is required");
     }
     if (!payload.locationId?.trim()) throw new Error("Location is required");
     if (!payload.posSessionId?.trim()) throw new Error("POS session is required");
+    const wallet = await this.guestWalletRepository.getWallet(id);
+    CardRefundPolicy.assertRefundAmount(payload.amount, wallet);
     return this.guestWalletRepository.refundWallet(id, {
       ...payload,
       idempotencyKey: payload.idempotencyKey || newIdempotencyKey(),

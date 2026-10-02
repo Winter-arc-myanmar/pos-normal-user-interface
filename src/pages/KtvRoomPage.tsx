@@ -15,6 +15,9 @@ import { useUserManagement } from "@/core/presentation/hooks/useUserManagement";
 import { useSalesOrderManagement } from "@/core/presentation/hooks/useSalesOrderManagement";
 import { findMemberCardPaymentMethod } from "@/core/application/services/PosPaymentCatalog";
 import { ProductMenu } from "./cashier/ProductMenu";
+import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
+import { modifierPrintText } from "@/lib/printing/modifierText";
+import { sessionPrintTimes } from "@/lib/printing/formatKdsTicket";
 import {
   getKtvWarning,
   hasSufficientWalletBalance,
@@ -58,8 +61,14 @@ export function KtvRoomPage() {
     deleteOrderLine,
   } = useSalesOrderManagement();
   const { lookupCard, getWallet } = useGuestWalletManagement();
-  const { requireCashierContext } = usePosWorkspace();
+  const { requireCashierContext, activePosRegisterId, activeLocationId } =
+    usePosWorkspace();
   const { user } = useAuth();
+  const printer = usePrinterConnection(
+    String(user?.tenantId || ""),
+    activePosRegisterId,
+    activeLocationId
+  );
   const { users, loadUsers } = useUserManagement();
   const [selectedSessionId, setSelectedSessionId] = useState("");
   const [guestCount, setGuestCount] = useState("1");
@@ -296,8 +305,9 @@ export function KtvRoomPage() {
         return;
       }
       setShowCloseConfirm(false);
+      const closedAt = new Date().toISOString();
       const finalQuote = await closeSession(session.id, {
-        closedAt: new Date().toISOString(),
+        closedAt,
       });
       const result = await fetchOrderLines(session.salesOrderId, {
         page: 1,
@@ -329,6 +339,41 @@ export function KtvRoomPage() {
           },
         ],
       });
+      try {
+        await printer.printReceipt({
+          title: "RECEIPT",
+          place: "CHECKOUT",
+          showLogo: true,
+          showPrices: true,
+          receiptId: session.salesOrderId,
+          cashier: user?.name,
+          serviceType: "KTV",
+          tableOrRoom: room?.roomNumber,
+          paidAt: new Date().toLocaleString(),
+          ...sessionPrintTimes(session, closedAt),
+          lines: result.lines
+            .filter((line) => !line.voidedAt)
+            .map((line) => {
+              const modifiers = modifierPrintText(line.selectedModifiers);
+              return {
+                name: line.productName || line.variantName || "Item",
+                quantity: String(line.quantity || "1"),
+                unitPrice: line.unitPrice?.trim() || undefined,
+                modifiers: modifiers.names,
+                modifierPrices: modifiers.prices,
+              };
+            }),
+          total: finalTotal.toFixed(4),
+          payments: [
+            {
+              name: paymentMethod.name || "Payment",
+              amount: finalTotal.toFixed(4),
+            },
+          ],
+        });
+      } catch {
+        // Checkout already succeeded; a printer fault must not undo it.
+      }
       await getWallet(wallet.id);
       navigate("/ktv");
     } catch (caught) {

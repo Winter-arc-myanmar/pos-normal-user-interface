@@ -20,6 +20,7 @@ import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
 import { useKdsStationManagement } from "@/core/presentation/hooks/useKdsStationManagement";
 import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
 import { modifierPrintText } from "@/lib/printing/modifierText";
+import { sessionPrintTimes } from "@/lib/printing/formatKdsTicket";
 import { useSalesOrderManagement } from "@/core/presentation/hooks/useSalesOrderManagement";
 import { CashierBoard } from "./cashier/CashierBoard";
 import { MultiOrderingView } from "./cashier/MultiOrderingView";
@@ -454,6 +455,7 @@ export function CashierPage() {
     const service = String(activeServiceType || selectedOrder?.serviceType || "");
     const serviceKey = `settings.cashier.serviceTypes.${service}`;
     const serviceLabel = t(serviceKey);
+    const session = selectedOrderSession || activeTableSession;
     return {
       outletName: outlet?.name,
       cashier: user?.name,
@@ -465,6 +467,7 @@ export function CashierPage() {
       tableOrRoom: displayedOrderTable?.tableNumber,
       pickupCode: selectedOrder?.pickupNumber,
       ...(includePaidAt ? { paidAt: new Date().toLocaleString() } : {}),
+      ...sessionPrintTimes(session, includePaidAt ? new Date() : session?.closedAt),
     };
   };
 
