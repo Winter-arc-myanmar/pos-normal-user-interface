@@ -60,4 +60,15 @@ describe("documentPrint", () => {
     );
     expect(printDocument.close).toHaveBeenCalled();
   });
+
+  it("prints from a hidden iframe when the popup is blocked", async () => {
+    vi.stubGlobal("open", vi.fn().mockReturnValue(null));
+    vi.spyOn(window, "print").mockImplementation(() => undefined);
+
+    await printLinesWithBrowserDialog(["Soup"], "Kitchen");
+
+    const frame = document.querySelector("iframe.pos-print-frame");
+    expect(frame).toBeTruthy();
+    expect(frame?.getAttribute("aria-hidden")).toBe("true");
+  });
 });

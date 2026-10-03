@@ -508,6 +508,11 @@ export function PrinterSettingsPanel() {
                   }}
                 />
               </label>
+              {isBrowserPrinting() ? (
+                <p className="sm:col-span-2 text-xs text-slate-500">
+                  {t("settings.printer.networkAndroidHint")}
+                </p>
+              ) : null}
             </>
           ) : (
             <label className="block text-sm text-slate-600 sm:col-span-2">
