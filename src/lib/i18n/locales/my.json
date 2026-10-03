@@ -947,11 +947,11 @@
       "tapMemberCard": "ဧည့်သည်ကတ် UID ကို တို့ပါ၊ ပွတ်ပါ၊ သို့မဟုတ် ထည့်ပါ။",
       "lookupMemberCard": "ကတ်ရှာမည်",
       "lookingUpMemberCard": "ရှာနေသည်...",
+      "closeCardLookup": "ပိတ်မည်",
+      "reopenCardLookup": "ကတ်ရှာရန် ပြန်ဖွင့်မည်",
       "memberWallet": "ဧည့်သည်ပိုက်ဆံအိတ်",
       "memberBalanceHint": "လက်ကျန်ကို ကိုးကားရန် ပြထားသည်။ ပေးချေချိန်တွင် ငွေကောက်စက်က ထပ်စစ်သည်။",
-      "memberCardReady": "ကတ်ချိတ်ပြီး။ အဆင်သင့်ဖြစ်လျှင် ပေးချေ အတည်ပြုပါ။",
-      "closeCardLookup": "ပြီးပါပြီ",
-      "reopenCardLookup": "ကတ်စစ်မည်"
+      "memberCardReady": "ကတ်ချိတ်ပြီး။ အဆင်သင့်ဖြစ်လျှင် ပေးချေ အတည်ပြုပါ။"
     },
     "tableWarning": {
       "ok": "အချိန်မီ",
