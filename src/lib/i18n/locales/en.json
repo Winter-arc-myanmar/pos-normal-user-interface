@@ -947,11 +947,11 @@
       "tapMemberCard": "Tap, swipe, or enter the guest card UID.",
       "lookupMemberCard": "Look up card",
       "lookingUpMemberCard": "Looking up...",
+      "closeCardLookup": "Close",
+      "reopenCardLookup": "Open card lookup",
       "memberWallet": "Guest wallet",
       "memberBalanceHint": "Balance is shown for reference. The till rechecks it at tender.",
-      "memberCardReady": "Card linked. Confirm pay when ready.",
-      "closeCardLookup": "Done",
-      "reopenCardLookup": "Validate card"
+      "memberCardReady": "Card linked. Confirm pay when ready."
     },
     "tableWarning": {
       "ok": "On time",

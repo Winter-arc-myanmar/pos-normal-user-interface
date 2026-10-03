@@ -104,6 +104,9 @@ function formatMoney(value: number): string {
   return (Number.isFinite(value) ? value : 0).toFixed(2);
 }
 
+/** Overlay the card lookup on phones and any portrait POS, not just <768px. */
+const CARD_LOOKUP_SHEET_MQ = "(max-width: 1023px), (orientation: portrait)";
+
 function methodLabel(method: PaymentMethod, memberCardLabel: string): string {
   if (isMemberCardPaymentMethod(method)) return memberCardLabel;
   return method.name.toUpperCase();
@@ -178,7 +181,7 @@ export function PaymentView({
       if (
         showMemberCardLookup &&
         cardLookupOpen &&
-        window.matchMedia("(max-width: 767px)").matches
+        window.matchMedia(CARD_LOOKUP_SHEET_MQ).matches
       ) {
         setCardLookupOpen(false);
         return;
@@ -338,7 +341,7 @@ export function PaymentView({
         </div>
         {showMemberCardLookup && memberCardLookup && cardLookupOpen ? (
           <div
-            className="fixed inset-0 z-40 bg-black/70 md:hidden"
+            className="fixed inset-0 z-40 bg-black/70 lg:landscape:hidden"
             onClick={() => setCardLookupOpen(false)}
             aria-hidden="true"
           />
@@ -348,21 +351,29 @@ export function PaymentView({
             role="dialog"
             aria-label={t("cashier.payment.tapMemberCard")}
             className={[
-              "rounded border border-blue-400/40 bg-[#111111] p-3 text-sm",
+              "rounded border border-blue-400/40 bg-[#111111] text-sm",
               cardLookupOpen
-                ? "fixed inset-x-0 bottom-0 z-50 mt-0 max-h-[min(92dvh,42rem)] overflow-y-auto rounded-t-2xl border-x-0 border-b-0 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:static md:mt-2 md:max-h-none md:overflow-visible md:rounded md:border md:p-3"
-                : "hidden md:mt-2 md:block",
+                ? [
+                    "fixed left-1/2 top-1/2 z-50 w-[min(calc(100vw-1.5rem),32rem)] -translate-x-1/2 -translate-y-1/2",
+                    "max-h-[min(90dvh,44rem)] overflow-y-auto overscroll-contain rounded-2xl p-4",
+                    "pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]",
+                    "lg:landscape:static lg:landscape:left-auto lg:landscape:top-auto lg:landscape:z-auto",
+                    "lg:landscape:mt-2 lg:landscape:w-auto lg:landscape:max-w-none lg:landscape:max-h-none",
+                    "lg:landscape:translate-x-0 lg:landscape:translate-y-0 lg:landscape:overflow-visible",
+                    "lg:landscape:rounded lg:landscape:p-3 lg:landscape:pt-3 lg:landscape:pb-3",
+                  ].join(" ")
+                : "hidden lg:landscape:mt-2 lg:landscape:block",
             ].join(" ")}
           >
             <div className="flex items-start justify-between gap-3">
-              <p className="min-w-0 text-xs text-slate-400">
+              <p className="min-w-0 text-sm text-slate-300 lg:landscape:text-xs lg:landscape:text-slate-400">
                 {t("cashier.payment.tapMemberCard")}
               </p>
               <Button
                 type="button"
                 size="sm"
                 variant="secondary"
-                className="shrink-0 md:hidden"
+                className="min-h-11 shrink-0 px-3 lg:landscape:hidden"
                 onClick={() => setCardLookupOpen(false)}
               >
                 {t("cashier.payment.closeCardLookup")}
@@ -374,9 +385,9 @@ export function PaymentView({
                 memberCardLookup.onCardUidChange(event.target.value)
               }
               placeholder={t("crm.cardUid")}
-              className="mt-2 min-h-11 w-full min-w-0 rounded border border-slate-600 bg-slate-900 px-3 text-white outline-none focus:border-blue-400"
+              className="mt-3 min-h-12 w-full min-w-0 rounded border border-slate-600 bg-slate-900 px-3 text-base text-white outline-none focus:border-blue-400 lg:landscape:mt-2 lg:landscape:min-h-11 lg:landscape:text-sm"
             />
-            <div className="mt-2">
+            <div className="mt-3 lg:landscape:mt-2">
               <CardCaptureStatus
                 nfcSupported={memberCardLookup.nfcSupported}
                 nfcActive={memberCardLookup.nfcActive}
@@ -387,7 +398,7 @@ export function PaymentView({
             </div>
             <Button
               type="button"
-              className="mt-2 w-full md:w-auto"
+              className="mt-3 min-h-12 w-full lg:landscape:mt-2 lg:landscape:min-h-10 lg:landscape:w-auto"
               onClick={memberCardLookup.onDetect}
               disabled={
                 memberCardLookup.isLoading || !memberCardLookup.cardUid.trim()
@@ -398,11 +409,11 @@ export function PaymentView({
                 : t("cashier.payment.lookupMemberCard")}
             </Button>
             {memberCardLookup.guestName || memberCardLookup.walletNumber ? (
-              <div className="mt-3 rounded border border-emerald-500/30 bg-emerald-500/10 p-2 text-emerald-100">
+              <div className="mt-3 rounded border border-emerald-500/30 bg-emerald-500/10 p-3 text-emerald-100">
                 <p className="text-xs uppercase tracking-wide">
                   {t("cashier.payment.memberWallet")}
                 </p>
-                <p className="mt-1 break-words font-semibold">
+                <p className="mt-1 break-words text-base font-semibold">
                   {memberCardLookup.guestName || memberCardLookup.walletNumber}
                 </p>
                 {memberCardLookup.walletNumber ? (
@@ -411,7 +422,7 @@ export function PaymentView({
                   </p>
                 ) : null}
                 {memberCardLookup.balance ? (
-                  <p className="mt-1 text-sm">
+                  <p className="mt-1 text-lg tabular-nums">
                     {formatMoney(Number(memberCardLookup.balance))}
                   </p>
                 ) : null}
@@ -426,14 +437,14 @@ export function PaymentView({
               </div>
             ) : null}
             {memberCardLookup.error ? (
-              <p className="mt-2 text-xs text-red-300">{memberCardLookup.error}</p>
+              <p className="mt-2 text-sm text-red-300">{memberCardLookup.error}</p>
             ) : null}
           </div>
         ) : null}
         {showMemberCardLookup && memberCardLookup && !cardLookupOpen ? (
           <button
             type="button"
-            className="mt-2 min-h-11 w-full rounded border border-blue-400/40 bg-[#111111] px-3 text-left text-sm font-semibold text-blue-100 md:hidden"
+            className="mt-2 min-h-12 w-full rounded border border-blue-400/40 bg-[#111111] px-3 text-left text-sm font-semibold text-blue-100 lg:landscape:hidden"
             onClick={() => setCardLookupOpen(true)}
           >
             {t("cashier.payment.reopenCardLookup")}
