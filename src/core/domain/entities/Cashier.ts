@@ -25,6 +25,7 @@ export class Product {
   imageUrl?: string;
   sourceImageUrl?: string;
   totalOnHand?: string;
+  isAvailable?: boolean;
   isTaxable?: boolean;
   taxRateId?: string;
   taxRate?: number;

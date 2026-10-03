@@ -9,6 +9,11 @@ import {
   KitchenSlip,
   SaleReceipt,
 } from "@/lib/printing/formatKdsTicket";
+import {
+  isRetryableUsbQueueError,
+  rankUsbPrintQueues,
+  usbNameMatches,
+} from "@/lib/printing/usbPrintTarget";
 
 type UsbPrinterDevice = {
   vendorId: string;
@@ -76,6 +81,7 @@ const qzError = (caught: unknown): Error => {
 
 export class QzTrayClient {
   private connecting: Promise<void> | null = null;
+  private readonly usbQueueOverride = new Map<string, string>();
 
   isConnected(): boolean {
     return qz.websocket.isActive();
@@ -127,11 +133,32 @@ export class QzTrayClient {
     return qz.configs.create(binding.deviceName);
   }
 
+  private usbOverrideKey(binding: PrinterBinding) {
+    return binding.id || binding.deviceName || binding.displayName;
+  }
+
+  private preferUsbDevices(binding: PrinterBinding, devices: UsbPrinterDevice[]) {
+    const preferred = binding.deviceName || binding.displayName;
+    return [...devices].sort((left, right) => {
+      const leftMatch = Number(
+        usbNameMatches(preferred, left.product) || usbNameMatches(preferred, left.manufacturer)
+      );
+      const rightMatch = Number(
+        usbNameMatches(preferred, right.product) ||
+          usbNameMatches(preferred, right.manufacturer)
+      );
+      return rightMatch - leftMatch;
+    });
+  }
+
   /** Sends ESC/POS to a receipt printer that is plugged in now, ignoring stale Windows queues. */
-  private async printConnectedUsb(data: string): Promise<boolean> {
+  private async printConnectedUsb(binding: PrinterBinding, data: string): Promise<boolean> {
     let devices: UsbPrinterDevice[] = [];
     try {
-      devices = asList(await qz.usb.listDevices(false)).filter(isReceiptUsbDevice);
+      devices = this.preferUsbDevices(
+        binding,
+        asList(await qz.usb.listDevices(false)).filter(isReceiptUsbDevice)
+      );
     } catch {
       return false;
     }
@@ -182,46 +209,86 @@ export class QzTrayClient {
     return false;
   }
 
-  /** Uses an online USB queue when direct USB is blocked by the Windows driver. */
-  private async withLiveUsbQueue(binding: PrinterBinding): Promise<PrinterBinding> {
+  /** Online USB queues, with a leftover unplugged printer ranked last. */
+  private async usbQueueCandidates(binding: PrinterBinding): Promise<PrinterBinding[]> {
+    const override = this.usbQueueOverride.get(this.usbOverrideKey(binding));
     let queues: QueueDetail[] = [];
+    let devices: UsbPrinterDevice[] = [];
     try {
-      queues = asList(await qz.printers.details()).filter(
-        (item) => item.name && /^USB/i.test(item.connection || "")
-      );
+      queues = asList(await qz.printers.details());
     } catch {
-      return binding;
+      return [binding];
     }
-    if (!queues.length) return binding;
-    const names = queues.map((item) => item.name as string);
     try {
-      await qz.printers.startListening(names);
-      const offline = offlinePrinterNames(await qz.printers.getStatus());
-      const preferred = binding.deviceName;
-      if (preferred && names.includes(preferred) && !offline.has(preferred)) return binding;
-      const live = names.find((name) => !offline.has(name));
-      if (live) return { ...binding, deviceName: live };
+      devices = asList(await qz.usb.listDevices(false));
+    } catch {
+      devices = [];
+    }
+    const usbNames = queues
+      .filter((item) => item.name && /^USB/i.test(item.connection || ""))
+      .map((item) => item.name as string);
+    if (!usbNames.length) return [binding];
+
+    let offline = new Set<string>();
+    try {
+      await qz.printers.startListening(usbNames);
+      offline = offlinePrinterNames(await qz.printers.getStatus());
+    } catch {
+      offline = new Set();
+    } finally {
+      await qz.printers.stopListening().catch(() => undefined);
+    }
+
+    const ranked = rankUsbPrintQueues({
+      savedName: override || binding.deviceName,
+      queues,
+      offlineNames: offline,
+      connectedDevices: devices,
+    });
+    if (!ranked.length) {
       if (offline.size) {
         throw new Error(
           "The USB receipt printer is offline. Plug in the printer and try again."
         );
       }
-      return binding;
-    } catch (caught) {
-      if (caught instanceof Error && /offline/i.test(caught.message)) throw caught;
-      return binding;
-    } finally {
-      await qz.printers.stopListening().catch(() => undefined);
+      return [binding];
     }
+    return ranked.map((deviceName) => ({ ...binding, deviceName }));
+  }
+
+  private rememberUsbQueue(binding: PrinterBinding, usedName?: string) {
+    const key = this.usbOverrideKey(binding);
+    if (!usedName || usedName === binding.deviceName) {
+      this.usbQueueOverride.delete(key);
+      return;
+    }
+    this.usbQueueOverride.set(key, usedName);
   }
 
   private async printRaw(binding: PrinterBinding, data: string): Promise<void> {
     await this.connect();
     try {
-      if (binding.transport === "USB" && (await this.printConnectedUsb(data))) return;
-      const target =
-        binding.transport === "USB" ? await this.withLiveUsbQueue(binding) : binding;
-      await qz.print(this.config(target), [
+      if (binding.transport === "USB" && (await this.printConnectedUsb(binding, data))) {
+        return;
+      }
+      if (binding.transport === "USB") {
+        const candidates = await this.usbQueueCandidates(binding);
+        let lastError: Error | null = null;
+        for (const target of candidates) {
+          try {
+            await qz.print(this.config(target), [
+              { type: "raw", format: "command", data },
+            ]);
+            this.rememberUsbQueue(binding, target.deviceName);
+            return;
+          } catch (caught) {
+            lastError = qzError(caught);
+            if (!isRetryableUsbQueueError(lastError.message)) throw lastError;
+          }
+        }
+        throw lastError ?? new Error("USB printer is not connected. Plug it in and try again.");
+      }
+      await qz.print(this.config(binding), [
         { type: "raw", format: "command", data },
       ]);
     } catch (caught) {

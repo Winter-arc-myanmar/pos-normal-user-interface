@@ -19,6 +19,7 @@ describe("ApiCashierRepository", () => {
               name: "Coffee",
               basePrice: "10.0000",
               baseSku: "COFFEE",
+              isAvailable: true,
               isTaxable: true,
               taxRate: {
                 id: "tax-1",
@@ -44,6 +45,7 @@ describe("ApiCashierRepository", () => {
       categoryName: "Drinks",
       name: "Coffee",
       basePrice: "10.0000",
+      isAvailable: true,
       isTaxable: true,
       taxRate: 5,
       isPriceInclusive: false,
@@ -766,6 +768,7 @@ describe("ApiCashierRepository", () => {
           basePrice: "999.0000",
           baseUomId: "uom-1",
           trackingType: "standard",
+          isAvailable: true,
           isTaxable: true,
           taxRateId: "tax-1",
           totalOnHand: "250.0000",
@@ -783,6 +786,7 @@ describe("ApiCashierRepository", () => {
       baseUomId: "uom-1",
       globalAttributes: { brand: "Apple" },
       trackingType: "STANDARD",
+      isAvailable: true,
       isTaxable: true,
       taxRateId: "tax-1",
     });
@@ -801,12 +805,14 @@ describe("ApiCashierRepository", () => {
       baseUomId: "uom-1",
       globalAttributes: { brand: "Apple" },
       trackingType: "STANDARD",
+      isAvailable: true,
       isTaxable: true,
       taxRateId: "tax-1",
     });
     expect(product).toMatchObject({
       id: "product-1",
       trackingType: "STANDARD",
+      isAvailable: true,
       taxRateId: "tax-1",
       totalOnHand: "250.0000",
       globalAttributes: { brand: "Apple" },
