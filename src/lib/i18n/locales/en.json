@@ -554,6 +554,9 @@
       "systemPrinter": "Installed printer",
       "selectPrinter": "Select a printer",
       "discover": "Discover",
+      "usbDiscoverHint": "Discover lists only a receipt printer that is plugged into USB right now. Save after a successful test print.",
+      "usbDetected": "USB printer connected: {{name}}",
+      "usbNonePlugged": "No USB receipt printer is plugged in.",
       "connected": "QZ connected",
       "disconnected": "QZ disconnected",
       "mobileConnected": "Ready to print",
@@ -946,7 +949,9 @@
       "lookingUpMemberCard": "Looking up...",
       "memberWallet": "Guest wallet",
       "memberBalanceHint": "Balance is shown for reference. The till rechecks it at tender.",
-      "memberCardReady": "Card linked. Confirm pay when ready."
+      "memberCardReady": "Card linked. Confirm pay when ready.",
+      "closeCardLookup": "Done",
+      "reopenCardLookup": "Validate card"
     },
     "tableWarning": {
       "ok": "On time",

@@ -1,6 +1,6 @@
 import qz from "qz-tray";
 import { KdsTicket } from "../../domain/entities/Cashier";
-import { PrinterBinding } from "@/lib/pos/printerBindingStorage";
+import { PrinterBinding, PrinterTransport } from "@/lib/pos/printerBindingStorage";
 import {
   formatKdsTicket,
   formatKitchenSlip,
@@ -10,9 +10,15 @@ import {
   SaleReceipt,
 } from "@/lib/printing/formatKdsTicket";
 import {
+  isReceiptQueueName,
+  isReceiptUsbPrinter,
   isRetryableUsbQueueError,
+  parseUsbDeviceRef,
   rankUsbPrintQueues,
-  usbNameMatches,
+  toQzUsbHex,
+  uniquePrinterNames,
+  usbDeviceLabel,
+  usbDeviceMatchesName,
 } from "@/lib/printing/usbPrintTarget";
 
 type UsbPrinterDevice = {
@@ -29,21 +35,24 @@ const asList = <T>(value: T | T[] | null | undefined): T[] => {
   return Array.isArray(value) ? value : [value];
 };
 
-const isReceiptUsbDevice = (device: UsbPrinterDevice) =>
-  /print|pos|xprinter|thermal|receipt|escpos/i.test(
-    `${device.product || ""} ${device.manufacturer || ""}`
-  );
-
 const escPosHex = (data: string) =>
   Array.from(data, (char) => (char.charCodeAt(0) & 0xff).toString(16).padStart(2, "0")).join(
     ""
   );
 
+const qzUsbDevice = (device: UsbPrinterDevice) => ({
+  vendorId: toQzUsbHex(device.vendorId),
+  productId: toQzUsbHex(device.productId),
+});
+
 const outEndpoint = (endpoint: string) => {
-  const value = Number.parseInt(endpoint, 16);
-  if (!Number.isFinite(value) || (value & 0x80) !== 0) return null;
-  return endpoint;
+  const hex = toQzUsbHex(endpoint);
+  const value = Number.parseInt(hex, 16);
+  if (!hex || !Number.isFinite(value) || (value & 0x80) !== 0) return null;
+  return hex;
 };
+
+const VIRTUAL_QUEUE = /pdf|onenote|fax|xps|onenote|microsoft print to pdf/i;
 
 const offlinePrinterNames = (status: unknown) => {
   const names = new Set<string>();
@@ -110,14 +119,68 @@ export class QzTrayClient {
     if (this.isConnected()) await qz.websocket.disconnect();
   }
 
-  async findPrinters(): Promise<string[]> {
+  async findPrinters(transport?: PrinterTransport): Promise<string[]> {
     await this.connect();
     try {
+      if (transport === "USB") return this.findUsbPrinters();
       const result = await qz.printers.find();
-      return Array.isArray(result) ? result : result ? [result] : [];
+      return uniquePrinterNames(Array.isArray(result) ? result : result ? [result] : []);
     } catch (caught) {
       throw qzError(caught);
     }
+  }
+
+  private async onlinePrinterNames(names: string[]): Promise<string[]> {
+    const unique = uniquePrinterNames(names);
+    if (!unique.length) return [];
+    try {
+      await qz.printers.startListening(unique);
+      const offline = offlinePrinterNames(await qz.printers.getStatus());
+      return unique.filter((name) => !offline.has(name));
+    } catch {
+      return unique;
+    } finally {
+      await qz.printers.stopListening().catch(() => undefined);
+    }
+  }
+
+  /** Only USB receipt printers that are plugged in right now. */
+  private async findUsbPrinters(): Promise<string[]> {
+    const queueNames: string[] = [];
+    try {
+      queueNames.push(
+        ...asList(await qz.printers.details())
+          .filter((item) => item.name && /^USB/i.test(item.connection || ""))
+          .map((item) => item.name as string)
+      );
+    } catch {
+      // details() is optional on some QZ builds.
+    }
+    try {
+      queueNames.push(
+        ...asList(await qz.printers.find()).filter(
+          (name) => name && !VIRTUAL_QUEUE.test(name) && isReceiptQueueName(name)
+        )
+      );
+    } catch {
+      // find() is optional if details already returned USB queues.
+    }
+    const liveQueues = await this.onlinePrinterNames(queueNames);
+
+    let devices: string[] = [];
+    try {
+      devices = asList(await qz.usb.listDevices(false))
+        .filter(isReceiptUsbPrinter)
+        .map(usbDeviceLabel);
+    } catch {
+      // Windows USBPRINT drivers often hide the raw device; live queues still count.
+    }
+
+    const discovered = uniquePrinterNames([...liveQueues, ...devices]);
+    if (discovered.length) return discovered;
+    throw new Error(
+      "No USB printer is plugged in. Connect the receipt printer to a USB port, then tap Discover."
+    );
   }
 
   private config(binding: PrinterBinding): unknown {
@@ -140,13 +203,8 @@ export class QzTrayClient {
   private preferUsbDevices(binding: PrinterBinding, devices: UsbPrinterDevice[]) {
     const preferred = binding.deviceName || binding.displayName;
     return [...devices].sort((left, right) => {
-      const leftMatch = Number(
-        usbNameMatches(preferred, left.product) || usbNameMatches(preferred, left.manufacturer)
-      );
-      const rightMatch = Number(
-        usbNameMatches(preferred, right.product) ||
-          usbNameMatches(preferred, right.manufacturer)
-      );
+      const leftMatch = Number(usbDeviceMatchesName(left, preferred));
+      const rightMatch = Number(usbDeviceMatchesName(right, preferred));
       return rightMatch - leftMatch;
     });
   }
@@ -157,42 +215,42 @@ export class QzTrayClient {
     try {
       devices = this.preferUsbDevices(
         binding,
-        asList(await qz.usb.listDevices(false)).filter(isReceiptUsbDevice)
+        asList(await qz.usb.listDevices(false)).filter(
+          (device) =>
+            isReceiptUsbPrinter(device) ||
+            usbDeviceMatchesName(device, binding.deviceName)
+        )
       );
     } catch {
       return false;
     }
+    const selected = devices.filter((device) =>
+      usbDeviceMatchesName(device, binding.deviceName)
+    );
+    if (selected.length) devices = selected;
     for (const device of devices) {
+      const ids = qzUsbDevice(device);
+      if (!ids.vendorId || !ids.productId) continue;
       let interfaces: string[] = [];
       try {
-        interfaces = asList(
-          await qz.usb.listInterfaces({
-            vendorId: device.vendorId,
-            productId: device.productId,
-          })
-        );
+        interfaces = asList(await qz.usb.listInterfaces(ids));
       } catch {
         continue;
       }
       for (const iface of interfaces) {
+        const claimed = { ...ids, interface: toQzUsbHex(iface) || iface };
         try {
-          await qz.usb.claimDevice({
-            vendorId: device.vendorId,
-            productId: device.productId,
-            interface: iface,
-          });
+          await qz.usb.claimDevice(claimed);
           const endpoints = asList(
             await qz.usb.listEndpoints({
-              vendorId: device.vendorId,
-              productId: device.productId,
-              interface: iface,
+              ...ids,
+              interface: claimed.interface,
             })
           );
           const endpoint = endpoints.map(outEndpoint).find(Boolean);
           if (!endpoint) continue;
           await qz.usb.sendData({
-            vendorId: device.vendorId,
-            productId: device.productId,
+            ...ids,
             endpoint,
             data: { data: escPosHex(data), type: "HEX" },
           });
@@ -200,13 +258,34 @@ export class QzTrayClient {
         } catch {
           // This interface is not the live receipt printer. Try the next one.
         } finally {
-          await qz.usb
-            .releaseDevice({ vendorId: device.vendorId, productId: device.productId })
-            .catch(() => undefined);
+          await qz.usb.releaseDevice(ids).catch(() => undefined);
         }
       }
     }
     return false;
+  }
+
+  private async listedUsbQueueNames(): Promise<string[]> {
+    const names: string[] = [];
+    try {
+      names.push(
+        ...asList(await qz.printers.details())
+          .filter((item) => item.name && /^USB/i.test(item.connection || ""))
+          .map((item) => item.name as string)
+      );
+    } catch {
+      // details() is optional.
+    }
+    try {
+      names.push(
+        ...asList(await qz.printers.find()).filter(
+          (name) => name && !VIRTUAL_QUEUE.test(name) && isReceiptQueueName(name)
+        )
+      );
+    } catch {
+      // find() is optional.
+    }
+    return this.onlinePrinterNames(names);
   }
 
   /** Online USB queues, with a leftover unplugged printer ranked last. */
@@ -214,10 +293,11 @@ export class QzTrayClient {
     const override = this.usbQueueOverride.get(this.usbOverrideKey(binding));
     let queues: QueueDetail[] = [];
     let devices: UsbPrinterDevice[] = [];
+    const listed = await this.listedUsbQueueNames();
     try {
       queues = asList(await qz.printers.details());
     } catch {
-      return [binding];
+      queues = [];
     }
     try {
       devices = asList(await qz.usb.listDevices(false));
@@ -227,7 +307,11 @@ export class QzTrayClient {
     const usbNames = queues
       .filter((item) => item.name && /^USB/i.test(item.connection || ""))
       .map((item) => item.name as string);
-    if (!usbNames.length) return [binding];
+    if (!usbNames.length) {
+      const found = listed.filter((name) => !parseUsbDeviceRef(name));
+      if (found.length) return found.map((deviceName) => ({ ...binding, deviceName }));
+      return parseUsbDeviceRef(binding.deviceName) ? [] : [binding];
+    }
 
     let offline = new Set<string>();
     try {
@@ -239,19 +323,22 @@ export class QzTrayClient {
       await qz.printers.stopListening().catch(() => undefined);
     }
 
-    const ranked = rankUsbPrintQueues({
-      savedName: override || binding.deviceName,
-      queues,
-      offlineNames: offline,
-      connectedDevices: devices,
-    });
+    const ranked = uniquePrinterNames([
+      ...listed.filter((name) => !parseUsbDeviceRef(name)),
+      ...rankUsbPrintQueues({
+        savedName: override || (parseUsbDeviceRef(binding.deviceName) ? undefined : binding.deviceName),
+        queues,
+        offlineNames: offline,
+        connectedDevices: devices,
+      }),
+    ]);
     if (!ranked.length) {
       if (offline.size) {
         throw new Error(
           "The USB receipt printer is offline. Plug in the printer and try again."
         );
       }
-      return [binding];
+      return parseUsbDeviceRef(binding.deviceName) ? [] : [binding];
     }
     return ranked.map((deviceName) => ({ ...binding, deviceName }));
   }
@@ -294,6 +381,12 @@ export class QzTrayClient {
     } catch (caught) {
       const error = qzError(caught);
       if (/Cannot find printer with name|printer .* not found/i.test(error.message)) {
+        if (binding.transport === "USB") {
+          throw new Error(
+            `USB printer "${binding.deviceName || binding.displayName}" could not be opened. ` +
+              "Tap Discover, pick the connected USB device, then Test print again."
+          );
+        }
         const name = binding.deviceName || binding.displayName;
         throw new Error(
           `Printer "${name}" is not installed on this POS computer. ` +

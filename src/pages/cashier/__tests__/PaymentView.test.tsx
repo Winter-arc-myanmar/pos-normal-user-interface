@@ -180,6 +180,20 @@ describe("PaymentView", () => {
     expect(screen.getByText("cashier.payment.lookupMemberCard")).toBeInTheDocument();
     expect(screen.getByText("Ko Aung")).toBeInTheDocument();
     expect(screen.getByText("W-000041")).toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", { name: "cashier.payment.tapMemberCard" })
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "cashier.payment.closeCardLookup" })
+    );
+    expect(screen.getByText("cashier.payment.reopenCardLookup")).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "cashier.payment.reopenCardLookup" })
+    );
+    expect(
+      screen.getByRole("dialog", { name: "cashier.payment.tapMemberCard" })
+    ).toBeInTheDocument();
   });
 
   it("shows the guest card id on a split member-card tender", () => {

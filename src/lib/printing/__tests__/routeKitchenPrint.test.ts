@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { PrinterBinding } from "@/lib/pos/printerBindingStorage";
 import {
+  buildKitchenSlipLines,
   buildSaleReceiptLines,
   formatKdsTicket,
   formatKitchenSlip,
@@ -309,6 +310,47 @@ describe("station print routing", () => {
     expect(plain.join("\n")).toContain("End time: 30 Sep 2026, 9:00 PM");
     expect(slip).not.toContain("Start: 30 Sep 2026, 7:00 PM");
     expect(plain.join("\n")).not.toContain("Start: 30 Sep 2026, 7:00 PM");
+  });
+
+  it("leaves a blank line between items on checkout, finance, and kitchen receipts", () => {
+    const lines = [
+      { name: "Beer", quantity: "1", unitPrice: "5.00" },
+      { name: "Soup", quantity: "1", unitPrice: "8.00" },
+    ];
+    const checkout = formatSaleReceipt({
+      title: "RECEIPT",
+      place: "CHECKOUT",
+      lines,
+      total: "13.00",
+    });
+    const finance = formatSaleReceipt({
+      title: "FINANCE",
+      place: "FINANCE",
+      lines,
+      total: "13.00",
+    });
+    const kitchen = formatKitchenSlip({ title: "KDS", lines });
+    const checkoutPlain = buildSaleReceiptLines({
+      title: "RECEIPT",
+      place: "CHECKOUT",
+      lines,
+      total: "13.00",
+    });
+    const financePlain = buildSaleReceiptLines({
+      title: "FINANCE",
+      place: "FINANCE",
+      lines,
+      total: "13.00",
+    });
+    const kitchenPlain = buildKitchenSlipLines({ title: "KDS", lines });
+
+    for (const slip of [checkout, finance, kitchen]) {
+      expect(slip).toMatch(/Beer[^\n]*\n\x1b!\x00\n/);
+      expect(slip).toContain("Soup");
+    }
+    for (const rows of [checkoutPlain, financePlain, kitchenPlain]) {
+      expect(rows.join("\n")).toMatch(/Beer[^\n]*\n\n1  Soup/);
+    }
   });
 
   it("prints every enabled template section for checkout, finance, and kitchen", () => {

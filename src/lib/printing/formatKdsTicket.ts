@@ -100,7 +100,7 @@ const plainItemLines = (
   }
 ) => {
   const rows: string[] = [];
-  for (const item of lines) {
+  lines.forEach((item, index) => {
     const qty = Number(item.quantity);
     const quantity = Number.isFinite(qty) ? String(qty) : item.quantity;
     const price = linePrice(options.showPrices, item.unitPrice);
@@ -108,7 +108,8 @@ const plainItemLines = (
     rows.push(`${lead}${price}`);
     const modifiers = modifierLine(item, options.showPrices, options.showModifiers);
     if (modifiers) rows.push(`  ${modifiers}`);
-  }
+    if (index < lines.length - 1) rows.push("");
+  });
   return rows;
 };
 
@@ -130,7 +131,7 @@ const itemLines = (
       const extras = [modifierLine(item, options.showPrices, options.showModifiers)]
         .filter(Boolean)
         .join("\n  ");
-      return `${itemFont(options.fontSize)}${lead}${price}\n${ESC}!\x00${extras ? `  ${extras}\n` : ""}`;
+      return `${itemFont(options.fontSize)}${lead}${price}\n${ESC}!\x00${extras ? `  ${extras}\n` : ""}\n`;
     })
     .join("");
 

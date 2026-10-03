@@ -136,18 +136,19 @@ export function OrderAdjustments({
         <span className="text-xs text-slate-600">
           {t("cashier.orderPanel.memberPoints")}
         </span>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 min-[420px]:flex-row">
           <input
             value={memberCardUid}
             disabled={disabled || isMemberCardLoading}
             aria-label={t("cashier.orderPanel.memberPoints")}
             placeholder={t("cashier.orderPanel.memberCardUid")}
             onChange={(event) => onMemberCardUidChange(event.target.value)}
-            className="min-h-9 w-full rounded border border-slate-300 px-2 text-sm focus:border-blue-500 focus:outline-none"
+            className="min-h-9 min-w-0 w-full rounded border border-slate-300 px-2 text-sm focus:border-blue-500 focus:outline-none"
           />
           <Button
             size="sm"
             variant="secondary"
+            className="w-full shrink-0 min-[420px]:w-auto"
             disabled={disabled || isMemberCardLoading || !memberCardUid.trim()}
             isLoading={isMemberCardLoading}
             onClick={onLookupMemberCard}
