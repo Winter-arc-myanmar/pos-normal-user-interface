@@ -949,7 +949,9 @@
       "lookingUpMemberCard": "Looking up...",
       "memberWallet": "Guest wallet",
       "memberBalanceHint": "Balance is shown for reference. The till rechecks it at tender.",
-      "memberCardReady": "Card linked. Confirm pay when ready."
+      "memberCardReady": "Card linked. Confirm pay when ready.",
+      "closeCardLookup": "Done",
+      "reopenCardLookup": "Validate card"
     },
     "tableWarning": {
       "ok": "On time",

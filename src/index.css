@@ -206,6 +206,10 @@
     grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
   }
 
+  .pos-app-shell > main .pos-split.pos-pay-split:has(> :nth-child(2):last-child) {
+    grid-template-columns: minmax(8.25rem, 11rem) minmax(0, 1fr);
+  }
+
   .pos-app-shell > main .pos-split.pos-member-split:has(> :nth-child(2):last-child) {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
   }

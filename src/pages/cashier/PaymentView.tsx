@@ -135,6 +135,7 @@ export function PaymentView({
 }: PaymentViewProps) {
   const { t } = useTranslation();
   const [confirmClose, setConfirmClose] = useState(false);
+  const [cardLookupOpen, setCardLookupOpen] = useState(true);
   const remaining = remainingReceivable(total, isSplitMode ? splitTenders : []);
   const displayRemaining = isSplitMode ? remaining : Number(total || 0);
   const splitCovered =
@@ -163,6 +164,10 @@ export function PaymentView({
   }, [isSplitMode]);
 
   useEffect(() => {
+    if (showMemberCardLookup) setCardLookupOpen(true);
+  }, [showMemberCardLookup]);
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.preventDefault();
@@ -170,15 +175,23 @@ export function PaymentView({
         setConfirmClose(false);
         return;
       }
+      if (
+        showMemberCardLookup &&
+        cardLookupOpen &&
+        window.matchMedia("(max-width: 767px)").matches
+      ) {
+        setCardLookupOpen(false);
+        return;
+      }
       requestClosePay();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [confirmClose, requestClosePay]);
+  }, [cardLookupOpen, confirmClose, requestClosePay, showMemberCardLookup]);
 
   return (
-    <section className="pos-split grid h-full min-h-0 grid-cols-[minmax(11rem,16rem)_4.5rem_minmax(0,1fr)] overflow-hidden bg-[#202020] text-white">
-      <aside className="flex min-h-0 flex-col border-r border-white/10 p-2">
+    <section className="grid h-full min-h-0 grid-cols-1 grid-rows-[minmax(0,1fr)_auto_auto] overflow-hidden bg-[#202020] text-white md:grid-cols-[minmax(11rem,16rem)_4.5rem_minmax(0,1fr)] md:grid-rows-none">
+      <aside className="order-3 flex min-h-0 max-h-[38vh] flex-col overflow-y-auto border-t border-white/10 p-2 md:order-none md:max-h-none md:border-r md:border-t-0">
         <div className="rounded bg-white p-3 text-slate-900">
           <p className="text-sm font-semibold">{t("cashier.payment.bill")}</p>
           <div className="mt-3 flex justify-between text-sm">
@@ -281,7 +294,7 @@ export function PaymentView({
         )}
       </aside>
 
-      <div className="flex min-h-0 flex-col items-center gap-1 overflow-y-auto border-r border-white/10 bg-[#171717] p-1">
+      <div className="order-2 flex min-h-0 flex-row items-stretch gap-1 overflow-x-auto border-t border-white/10 bg-[#171717] p-1 md:order-none md:flex-col md:overflow-y-auto md:border-r md:border-t-0">
         <button
           type="button"
           onClick={() => {
@@ -290,27 +303,27 @@ export function PaymentView({
           aria-pressed={isSplitMode}
           aria-label={t("cashier.payment.split")}
           className={[
-            "flex min-h-20 w-full flex-col items-center justify-center rounded px-1 py-2 text-[11px] font-semibold",
+            "flex min-h-12 min-w-0 flex-1 flex-row items-center justify-center gap-2 rounded px-2 py-2 text-[11px] font-semibold md:min-h-20 md:w-full md:flex-none md:flex-col md:gap-0",
             isSplitMode
               ? "cursor-default bg-blue-700 text-white ring-2 ring-blue-300"
               : "bg-blue-600 text-white hover:bg-blue-500",
           ].join(" ")}
         >
           <SplitIcon />
-          <span className="mt-1">{t("cashier.payment.split")}</span>
+          <span className="md:mt-1">{t("cashier.payment.split")}</span>
         </button>
         <button
           type="button"
           onClick={requestClosePay}
           aria-label={t("cashier.payment.closePayTitle")}
-          className="flex min-h-16 w-full flex-col items-center justify-center rounded bg-slate-800 px-1 py-2 text-[11px] font-semibold text-white hover:bg-slate-600"
+          className="flex min-h-12 min-w-0 flex-1 flex-row items-center justify-center gap-2 rounded bg-slate-800 px-2 py-2 text-[11px] font-semibold text-white hover:bg-slate-600 md:min-h-16 md:w-full md:flex-none md:flex-col md:gap-0"
         >
           <CloseSplitIcon />
-          <span className="mt-1">{t("cashier.payment.closePay")}</span>
+          <span className="md:mt-1">{t("cashier.payment.closePay")}</span>
         </button>
       </div>
 
-      <div className="flex min-h-0 flex-col p-2">
+      <div className="order-1 flex min-h-0 flex-col p-2 md:order-none">
         <div
           className={[
             "flex min-h-12 items-center rounded px-3 text-sm font-semibold",
@@ -323,16 +336,45 @@ export function PaymentView({
                 amount: formatMoney(displayRemaining),
               })}
         </div>
+        {showMemberCardLookup && memberCardLookup && cardLookupOpen ? (
+          <div
+            className="fixed inset-0 z-40 bg-black/70 md:hidden"
+            onClick={() => setCardLookupOpen(false)}
+            aria-hidden="true"
+          />
+        ) : null}
         {showMemberCardLookup && memberCardLookup ? (
-          <div className="mt-2 rounded border border-blue-400/40 bg-[#111111] p-3 text-sm">
-            <p className="text-xs text-slate-400">{t("cashier.payment.tapMemberCard")}</p>
+          <div
+            role="dialog"
+            aria-label={t("cashier.payment.tapMemberCard")}
+            className={[
+              "rounded border border-blue-400/40 bg-[#111111] p-3 text-sm",
+              cardLookupOpen
+                ? "fixed inset-x-0 bottom-0 z-50 mt-0 max-h-[min(92dvh,42rem)] overflow-y-auto rounded-t-2xl border-x-0 border-b-0 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:static md:mt-2 md:max-h-none md:overflow-visible md:rounded md:border md:p-3"
+                : "hidden md:mt-2 md:block",
+            ].join(" ")}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <p className="min-w-0 text-xs text-slate-400">
+                {t("cashier.payment.tapMemberCard")}
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="shrink-0 md:hidden"
+                onClick={() => setCardLookupOpen(false)}
+              >
+                {t("cashier.payment.closeCardLookup")}
+              </Button>
+            </div>
             <input
               value={memberCardLookup.cardUid}
               onChange={(event) =>
                 memberCardLookup.onCardUidChange(event.target.value)
               }
               placeholder={t("crm.cardUid")}
-              className="mt-2 min-h-10 w-full rounded border border-slate-600 bg-slate-900 px-3 text-white outline-none focus:border-blue-400"
+              className="mt-2 min-h-11 w-full min-w-0 rounded border border-slate-600 bg-slate-900 px-3 text-white outline-none focus:border-blue-400"
             />
             <div className="mt-2">
               <CardCaptureStatus
@@ -345,7 +387,7 @@ export function PaymentView({
             </div>
             <Button
               type="button"
-              className="mt-2"
+              className="mt-2 w-full md:w-auto"
               onClick={memberCardLookup.onDetect}
               disabled={
                 memberCardLookup.isLoading || !memberCardLookup.cardUid.trim()
@@ -360,11 +402,11 @@ export function PaymentView({
                 <p className="text-xs uppercase tracking-wide">
                   {t("cashier.payment.memberWallet")}
                 </p>
-                <p className="mt-1 font-semibold">
+                <p className="mt-1 break-words font-semibold">
                   {memberCardLookup.guestName || memberCardLookup.walletNumber}
                 </p>
                 {memberCardLookup.walletNumber ? (
-                  <p className="text-xs text-emerald-200">
+                  <p className="break-all text-xs text-emerald-200">
                     {memberCardLookup.walletNumber}
                   </p>
                 ) : null}
@@ -388,6 +430,15 @@ export function PaymentView({
             ) : null}
           </div>
         ) : null}
+        {showMemberCardLookup && memberCardLookup && !cardLookupOpen ? (
+          <button
+            type="button"
+            className="mt-2 min-h-11 w-full rounded border border-blue-400/40 bg-[#111111] px-3 text-left text-sm font-semibold text-blue-100 md:hidden"
+            onClick={() => setCardLookupOpen(true)}
+          >
+            {t("cashier.payment.reopenCardLookup")}
+          </button>
+        ) : null}
         <div className="mt-2 grid min-h-0 flex-1 grid-cols-2 content-start gap-2 overflow-y-auto">
           {sortedMethods.map((method) => {
             const selected = selectedMethodId === method.id;
@@ -399,9 +450,12 @@ export function PaymentView({
               <button
                 key={method.id}
                 type="button"
-                onClick={() => onSelectMethod(method.id)}
+                onClick={() => {
+                  onSelectMethod(method.id);
+                  if (memberCard) setCardLookupOpen(true);
+                }}
                 className={[
-                  "flex min-h-[6.5rem] flex-col items-center justify-center rounded border bg-white px-2 text-slate-900 transition",
+                  "flex min-h-[4.75rem] flex-col items-center justify-center rounded border bg-white px-2 text-slate-900 transition md:min-h-[6.5rem]",
                   selected
                     ? "border-blue-500 ring-2 ring-blue-400"
                     : "border-slate-200 hover:border-blue-300",

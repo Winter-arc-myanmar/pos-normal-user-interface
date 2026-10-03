@@ -949,7 +949,9 @@
       "lookingUpMemberCard": "ရှာနေသည်...",
       "memberWallet": "ဧည့်သည်ပိုက်ဆံအိတ်",
       "memberBalanceHint": "လက်ကျန်ကို ကိုးကားရန် ပြထားသည်။ ပေးချေချိန်တွင် ငွေကောက်စက်က ထပ်စစ်သည်။",
-      "memberCardReady": "ကတ်ချိတ်ပြီး။ အဆင်သင့်ဖြစ်လျှင် ပေးချေ အတည်ပြုပါ။"
+      "memberCardReady": "ကတ်ချိတ်ပြီး။ အဆင်သင့်ဖြစ်လျှင် ပေးချေ အတည်ပြုပါ။",
+      "closeCardLookup": "ပြီးပါပြီ",
+      "reopenCardLookup": "ကတ်စစ်မည်"
     },
     "tableWarning": {
       "ok": "အချိန်မီ",

@@ -22,7 +22,7 @@ export function CardCaptureStatus({
   return (
     <div
       className={[
-        "flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5",
+        "flex flex-col items-stretch gap-2 rounded-lg border px-2.5 py-1.5 sm:flex-row sm:items-center sm:justify-between",
         dark
           ? "border-slate-800 bg-slate-900 text-slate-300"
           : "border-slate-200 bg-slate-50 text-slate-600",
@@ -33,7 +33,7 @@ export function CardCaptureStatus({
           {nfcActive ? t("crm.nfcListening") : t("crm.readerListening")}
         </p>
         {lastUid ? (
-          <p className="truncate text-[11px] opacity-80">
+          <p className="break-all text-[11px] opacity-80">
             {t("crm.cardCaptured", { uid: lastUid })}
           </p>
         ) : nfcError && nfcSupported ? (
@@ -43,7 +43,13 @@ export function CardCaptureStatus({
         ) : null}
       </div>
       {nfcSupported && !nfcActive ? (
-        <Button size="sm" variant="secondary" type="button" onClick={onEnableNfc}>
+        <Button
+          size="sm"
+          variant="secondary"
+          type="button"
+          className="w-full shrink-0 sm:w-auto"
+          onClick={onEnableNfc}
+        >
           {t("crm.nfcEnable")}
         </Button>
       ) : null}
