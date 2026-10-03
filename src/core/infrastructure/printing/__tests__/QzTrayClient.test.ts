@@ -89,6 +89,37 @@ describe("QzTrayClient", () => {
     expect(mocks.connect).toHaveBeenCalled();
   });
 
+  it("discovers a plugged-in USB printer that has no Windows queue yet", async () => {
+    mocks.listDevices.mockResolvedValue([
+      { vendorId: "0483", productId: "5740", product: "XP-80C", manufacturer: "XPrinter" },
+      { vendorId: "046d", productId: "c534", product: "USB Keyboard" },
+    ]);
+    mocks.details.mockResolvedValue([{ name: "Microsoft Print to PDF", connection: "FILE" }]);
+    mocks.find.mockResolvedValue(["Microsoft Print to PDF"]);
+    const client = new QzTrayClient();
+
+    await expect(client.findPrinters("USB")).resolves.toEqual(["XPrinter XP-80C"]);
+  });
+
+  it("lists only an online Windows USB receipt queue", async () => {
+    mocks.details.mockResolvedValue([{ name: "POS-80", connection: "USB" }]);
+    const client = new QzTrayClient();
+
+    await expect(client.findPrinters("USB")).resolves.toEqual(["POS-80"]);
+  });
+
+  it("does not list webcams or other USB gadgets as printers", async () => {
+    mocks.listDevices.mockResolvedValue([
+      { vendorId: "3277", productId: "0029", product: "USB2.0 HD UVC WebCam" },
+      { vendorId: "13d3", productId: "3571", product: "Realtek Bluetooth Adapter" },
+    ]);
+    mocks.details.mockResolvedValue([]);
+    mocks.find.mockResolvedValue(["Microsoft Print to PDF"]);
+    const client = new QzTrayClient();
+
+    await expect(client.findPrinters("USB")).rejects.toThrow(/plugged in/i);
+  });
+
   it("sends a raw ESC/POS network test print", async () => {
     const client = new QzTrayClient();
 
@@ -123,8 +154,7 @@ describe("QzTrayClient", () => {
 
     await client.testPrint(usbBinding);
 
-    expect(mocks.create).toHaveBeenCalledWith("XP-80C");
-    expect(mocks.create).not.toHaveBeenCalledWith("POS-80");
+    expect(mocks.create).toHaveBeenCalledWith("POS-80");
     expect(mocks.print).toHaveBeenCalledTimes(1);
   });
 
@@ -161,6 +191,53 @@ describe("QzTrayClient", () => {
         deviceName: "Old kitchen printer",
         lastVerifiedAt: "",
       })
-    ).rejects.toThrow(/assign the connected local printer/i);
+    ).rejects.toThrow(/could not be opened/i);
+  });
+
+  it("prints through the Windows POS-80 queue when a raw USB id cannot be claimed", async () => {
+    mocks.find.mockResolvedValue(["POS-80"]);
+    mocks.details.mockResolvedValue([]);
+    const client = new QzTrayClient();
+
+    await client.testPrint({
+      id: "usb-vid",
+      transport: "USB",
+      displayName: "ffff",
+      deviceName: "USB 1f9d:2016",
+      lastVerifiedAt: "",
+    });
+
+    expect(mocks.create).toHaveBeenCalledWith("POS-80");
+    expect(mocks.print).toHaveBeenCalled();
+  });
+
+  it("sends a test print to a USB device selected by vendor and product id", async () => {
+    mocks.listDevices.mockResolvedValue([
+      { vendorId: "1f9d", productId: "2016" },
+      { vendorId: "1d3d", productId: "3571" },
+    ]);
+    mocks.listInterfaces.mockResolvedValue(["00"]);
+    mocks.listEndpoints.mockResolvedValue(["01"]);
+    const client = new QzTrayClient();
+
+    await client.testPrint({
+      id: "usb-vid",
+      transport: "USB",
+      displayName: "ddodd",
+      deviceName: "USB 1f9d:2016",
+      lastVerifiedAt: "",
+    });
+
+    expect(mocks.listInterfaces).toHaveBeenCalledWith({
+      vendorId: "0x1F9D",
+      productId: "0x2016",
+    });
+    expect(mocks.claimDevice).toHaveBeenCalledWith({
+      vendorId: "0x1F9D",
+      productId: "0x2016",
+      interface: "0x00",
+    });
+    expect(mocks.sendData).toHaveBeenCalled();
+    expect(mocks.print).not.toHaveBeenCalled();
   });
 });

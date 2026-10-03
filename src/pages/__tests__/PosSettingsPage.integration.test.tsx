@@ -100,7 +100,7 @@ vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
     isConnected: true,
     isConnecting: false,
     error: null,
-    discover: vi.fn(),
+    discover: vi.fn().mockResolvedValue(["USB Kitchen"]),
     verify: printerMocks.verify,
     saveBinding: printerMocks.saveBinding,
     removeBinding: vi.fn(),

@@ -75,6 +75,30 @@ export function PrinterSettingsPanel() {
     removeLocalOnlyPrinterBindings(tenantId, activePosRegisterId || "");
   }, [activePosRegisterId, tenantId]);
 
+  const applyLiveUsbPrinters = (names: string[]) => {
+    const next = names[0] || "";
+    setDeviceName(next);
+    setVerifiedBinding(null);
+    if (next) {
+      setLocalError(null);
+      setNotice(t("settings.printer.usbDetected", { name: next }));
+      return;
+    }
+    setNotice(null);
+    setLocalError(t("settings.printer.usbNonePlugged"));
+  };
+
+  useEffect(() => {
+    if (transport !== "USB") return;
+    void connection
+      .discover("USB")
+      .then(applyLiveUsbPrinters)
+      .catch(() => {
+        setDeviceName("");
+        setVerifiedBinding(null);
+      });
+  }, [connection.discover, t, transport]);
+
   useEffect(() => {
     void listPrinters({
       page: 1,
@@ -498,6 +522,9 @@ export function PrinterSettingsPanel() {
                   }}
                 >
                   <option value="">{t("settings.printer.selectPrinter")}</option>
+                  {deviceName && !connection.deviceNames.includes(deviceName) ? (
+                    <option value={deviceName}>{deviceName}</option>
+                  ) : null}
                   {connection.deviceNames.map((device) => (
                     <option key={device} value={device}>
                       {device}
@@ -509,11 +536,19 @@ export function PrinterSettingsPanel() {
                   variant="secondary"
                   className="mt-1"
                   isLoading={connection.isConnecting}
-                  onClick={() => void connection.discover(transport)}
+                  onClick={() => {
+                    void connection
+                      .discover(transport)
+                      .then(applyLiveUsbPrinters)
+                      .catch(() => undefined);
+                  }}
                 >
                   {t("settings.printer.discover")}
                 </Button>
               </div>
+              <p className="mt-1 text-xs text-slate-500">
+                {t("settings.printer.usbDiscoverHint")}
+              </p>
             </label>
           )}
         </div>
