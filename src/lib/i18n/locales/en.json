@@ -914,7 +914,8 @@
       "selectTableOptionalTitle": "Assign a table (optional)",
       "selectTableOptionalHint": "Pick a table for seated dine-in, or add items without a table.",
       "selectPrompt": "Tap a product to add it to the order.",
-      "otherCategory": "Other"
+      "otherCategory": "Other",
+      "unavailable": "Unavailable"
     },
     "payment": {
       "remaining": "Remaining receivable {{amount}}",
@@ -1673,6 +1674,12 @@
     "tracking": "Tracking",
     "allTracking": "All tracking",
     "inStock": "In stock",
+    "available": "Available",
+    "unavailable": "Unavailable",
+    "enable": "Enable",
+    "disable": "Disable",
+    "enabled": "Product enabled.",
+    "disabled": "Product disabled.",
     "location": "Location",
     "allLocations": "All locations",
     "taxable": "Taxable",

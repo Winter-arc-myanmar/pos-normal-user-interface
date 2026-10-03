@@ -25,6 +25,7 @@ type ProductDraft = {
   categoryId: string;
   trackingType: ProductTrackingType;
   isTaxable: boolean;
+  isAvailable: boolean;
   taxRateId: string;
   imageUrl: string;
   attributes: Pair[];
@@ -82,6 +83,7 @@ const emptyProduct = (): ProductDraft => ({
   categoryId: "",
   trackingType: "STANDARD",
   isTaxable: true,
+  isAvailable: true,
   taxRateId: "",
   imageUrl: "",
   attributes: emptyPairs(),
@@ -106,6 +108,7 @@ const draftFromProduct = (product: Product): ProductDraft => ({
   trackingType:
     product.trackingType === "SERIALIZED" ? "SERIALIZED" : "STANDARD",
   isTaxable: product.isTaxable !== false,
+  isAvailable: product.isAvailable !== false,
   taxRateId: product.taxRateId || "",
   imageUrl: product.sourceImageUrl || "",
   attributes: pairsFrom(product.globalAttributes),
@@ -244,6 +247,7 @@ export function ProductsPage() {
       globalAttributes: recordFrom(draft.attributes),
       imageUrl: draft.imageUrl.trim() || undefined,
       trackingType: draft.trackingType,
+      isAvailable: draft.isAvailable,
       isTaxable: draft.isTaxable,
       taxRateId: draft.isTaxable && draft.taxRateId ? draft.taxRateId : undefined,
     };
@@ -254,6 +258,20 @@ export function ProductsPage() {
       setDraft(draftFromProduct(saved));
       setNotice(t("products.saved"));
       setConfirmDelete(false);
+    } catch {
+      setNotice(null);
+    }
+  };
+
+  const toggleAvailable = async (product: Product) => {
+    try {
+      const updated = await updateProduct(product.id, {
+        isAvailable: product.isAvailable === false,
+      });
+      if (draft.id === product.id) setDraft(draftFromProduct(updated));
+      setNotice(
+        updated.isAvailable === false ? t("products.disabled") : t("products.enabled")
+      );
     } catch {
       setNotice(null);
     }
@@ -410,16 +428,20 @@ export function ProductsPage() {
             ) : (
               <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {products.map((product) => (
-                  <li key={product.id}>
+                  <li
+                    key={product.id}
+                    className={[
+                      "flex gap-2 rounded-xl border p-2",
+                      draft.id === product.id
+                        ? "border-blue-500 bg-blue-950/40"
+                        : "border-slate-800 bg-slate-950",
+                      product.isAvailable === false ? "opacity-80" : "",
+                    ].join(" ")}
+                  >
                     <button
                       type="button"
                       onClick={() => openProduct(product)}
-                      className={[
-                        "flex w-full gap-3 rounded-xl border p-2 text-left",
-                        draft.id === product.id
-                          ? "border-blue-500 bg-blue-950/40"
-                          : "border-slate-800 bg-slate-950",
-                      ].join(" ")}
+                      className="flex min-w-0 flex-1 gap-3 text-left"
                     >
                       <ProductThumb src={product.imageUrl} name={product.name} />
                       <span className="min-w-0 flex-1">
@@ -435,6 +457,18 @@ export function ProductsPage() {
                           <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[11px] text-slate-300">
                             {t("products.onHand", { count: quantity(product.totalOnHand) })}
                           </span>
+                          <span
+                            className={[
+                              "rounded-full px-2 py-0.5 text-[11px]",
+                              product.isAvailable === false
+                                ? "bg-slate-800 text-slate-400"
+                                : "bg-emerald-950 text-emerald-300",
+                            ].join(" ")}
+                          >
+                            {product.isAvailable === false
+                              ? t("products.unavailable")
+                              : t("products.available")}
+                          </span>
                           {product.trackingType ? (
                             <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[11px] text-slate-300">
                               {t(`products.trackingOption.${product.trackingType}`, {
@@ -444,6 +478,21 @@ export function ProductsPage() {
                           ) : null}
                         </span>
                       </span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isLoading}
+                      onClick={() => void toggleAvailable(product)}
+                      className={[
+                        "self-center shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold",
+                        product.isAvailable === false
+                          ? "bg-emerald-700 text-white"
+                          : "bg-slate-800 text-slate-200",
+                      ].join(" ")}
+                    >
+                      {product.isAvailable === false
+                        ? t("products.enable")
+                        : t("products.disable")}
                     </button>
                   </li>
                 ))}
@@ -566,6 +615,18 @@ export function ProductsPage() {
             ))}
           </div>
           <div className="mt-3 flex flex-wrap items-end gap-2">
+            <FilterChip
+              active={draft.isAvailable}
+              label={
+                draft.isAvailable ? t("products.available") : t("products.unavailable")
+              }
+              onClick={() =>
+                setDraft((current) => ({
+                  ...current,
+                  isAvailable: !current.isAvailable,
+                }))
+              }
+            />
             <FilterChip
               active={draft.isTaxable}
               label={t("products.taxable")}

@@ -141,4 +141,26 @@ describe("ProductMenu", () => {
       "false"
     );
   });
+
+  it("does not add an unavailable product from the menu", async () => {
+    const onAdd = vi.fn();
+    const soldOut = new Product({ ...coffee, isAvailable: false });
+
+    render(
+      <ProductMenu
+        products={[soldOut]}
+        variantsByProductId={{ "product-1": [coffeeVariant] }}
+        onLoadVariants={vi.fn()}
+        onAdd={onAdd}
+        onClose={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Coffee/ }));
+
+    expect(onAdd).not.toHaveBeenCalled();
+    expect(screen.getAllByText("cashier.productMenu.unavailable").length).toBeGreaterThan(
+      0
+    );
+  });
 });

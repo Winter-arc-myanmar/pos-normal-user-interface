@@ -87,6 +87,7 @@ export interface CreateProductDTO {
   globalAttributes?: Record<string, unknown>;
   imageUrl?: string;
   trackingType?: string;
+  isAvailable?: boolean;
   isTaxable?: boolean;
   taxRateId?: string;
 }
@@ -100,6 +101,7 @@ export interface UpdateProductDTO {
   globalAttributes?: Record<string, unknown>;
   imageUrl?: string;
   trackingType?: string;
+  isAvailable?: boolean;
   isTaxable?: boolean;
   taxRateId?: string;
 }

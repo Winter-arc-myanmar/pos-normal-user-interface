@@ -914,7 +914,8 @@
       "selectTableOptionalTitle": "စားပွဲ သတ်မှတ်မည် (ရွေးချယ်နိုင်)",
       "selectTableOptionalHint": "ဆိုင်တွင်စားရန် စားပွဲရွေးပါ၊ သို့မဟုတ် စားပွဲမရှိဘဲ ပစ္စည်းထည့်ပါ။",
       "selectPrompt": "အော်ဒါသို့ ထည့်ရန် ကုန်ပစ္စည်းကို တို့ပါ။",
-      "otherCategory": "အခြား"
+      "otherCategory": "အခြား",
+      "unavailable": "မရနိုင်ပါ"
     },
     "payment": {
       "remaining": "ကျန်ရှိသော လက်ခံရငွေ {{amount}}",
@@ -1631,6 +1632,12 @@
     "tracking": "ခြေရာခံပုံစံ",
     "allTracking": "ခြေရာခံအားလုံး",
     "inStock": "လက်ကျန်ရှိ",
+    "available": "ရနိုင်သည်",
+    "unavailable": "မရနိုင်ပါ",
+    "enable": "ဖွင့်မည်",
+    "disable": "ပိတ်မည်",
+    "enabled": "ကုန်ပစ္စည်း ဖွင့်ပြီးပါပြီ။",
+    "disabled": "ကုန်ပစ္စည်း ပိတ်ပြီးပါပြီ။",
     "location": "တည်နေရာ",
     "allLocations": "တည်နေရာအားလုံး",
     "taxable": "အခွန်ကောက်သည်",

@@ -853,6 +853,7 @@ const toProductPayload = (
   if (payload.globalAttributes) body.globalAttributes = payload.globalAttributes;
   assignText(body, "imageUrl", payload.imageUrl);
   assignText(body, "trackingType", payload.trackingType);
+  if (payload.isAvailable !== undefined) body.isAvailable = payload.isAvailable;
   if (payload.isTaxable !== undefined) body.isTaxable = payload.isTaxable;
   assignText(body, "taxRateId", payload.taxRateId);
   return body;
@@ -891,6 +892,7 @@ const toProduct = (item: Record<string, unknown>) => {
       item.totalOnHand === null || item.totalOnHand === undefined
         ? undefined
         : String(item.totalOnHand),
+    isAvailable: toBoolean(item.isAvailable) ?? true,
     isTaxable: toBoolean(item.isTaxable),
     taxRateId: item.taxRateId
       ? String(item.taxRateId)

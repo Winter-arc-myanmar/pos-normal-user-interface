@@ -150,6 +150,10 @@ export function ProductMenu({
   };
 
   const selectProduct = async (product: Product) => {
+    if (product.isAvailable === false) {
+      setLocalError(t("cashier.productMenu.unavailable"));
+      return;
+    }
     setSelectedProduct(product);
     setQuantity(1);
     setLocalError(null);
@@ -227,14 +231,17 @@ export function ProductMenu({
             const orderedQty = Number(orderedProductQuantities[product.id] || 0);
             const isSelected =
               selectedProduct?.id === product.id || orderedQty > 0;
+            const unavailable = product.isAvailable === false;
             return (
               <button
                 key={product.id}
                 type="button"
                 aria-pressed={isSelected}
+                disabled={unavailable}
                 onClick={() => void selectProduct(product)}
                 className={[
                   "relative overflow-hidden rounded border bg-[#181818] text-left",
+                  unavailable ? "cursor-not-allowed opacity-50" : "",
                   isSelected
                     ? "border-blue-500 ring-2 ring-blue-400 ring-offset-1 ring-offset-[#070707]"
                     : "border-slate-700",
@@ -244,7 +251,11 @@ export function ProductMenu({
                   src={productCardImage(product, variantsByProductId)}
                   name={product.name}
                 />
-                {orderedQty > 0 ? (
+                {unavailable ? (
+                  <span className="absolute right-2 top-2 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-bold text-slate-200">
+                    {t("cashier.productMenu.unavailable")}
+                  </span>
+                ) : orderedQty > 0 ? (
                   <span className="absolute right-2 top-2 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
                     {orderedQty}
                   </span>
