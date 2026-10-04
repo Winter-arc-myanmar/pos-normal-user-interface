@@ -11,10 +11,10 @@ export interface CreateSpaRoomDTO {
   capacity: number;
   rateVariantId?: string;
   sessionPrice?: number;
-  minimumMinutes: number;
-  incrementMinutes: number;
-  graceMinutes: number;
-  roundingMode: SpaRoundingMode;
+  minimumMinutes?: number;
+  incrementMinutes?: number;
+  graceMinutes?: number;
+  roundingMode?: SpaRoundingMode;
 }
 
 export type UpdateSpaRoomDTO = Partial<Omit<CreateSpaRoomDTO, "locationId">> & {
@@ -34,6 +34,8 @@ export interface OpenSpaSessionDTO {
   guestCount?: number;
   plannedMinutes?: number;
   sessions?: number;
+  /** SPA: the service packages booked; their time is the treatment's. */
+  packages?: { packageId: string; quantity: number }[];
   items?: { variantId: string; quantity: number }[];
   prepay?: SpaCardChargeDTO;
   posRegisterId?: string;
@@ -41,11 +43,25 @@ export interface OpenSpaSessionDTO {
   salesChannel?: "POS";
 }
 
-export interface ExtendSpaSessionDTO extends SpaCardChargeDTO {
-  sessions: number;
+/**
+ * The card on an order into a running room: required when the venue takes payment
+ * when ordering, left out when it takes payment at the end.
+ */
+export interface RoomOrderCardDTO {
+  guestCardId?: string;
+  paymentMethodId?: string;
+  posSessionId?: string;
+  idempotencyKey?: string;
 }
 
-export interface ChargeSpaItemsDTO extends SpaCardChargeDTO {
+export interface ExtendSpaSessionDTO extends RoomOrderCardDTO {
+  /** KTV: hours. */
+  sessions?: number;
+  /** SPA: more service packages. */
+  packages?: { packageId: string; quantity: number }[];
+}
+
+export interface ChargeSpaItemsDTO extends RoomOrderCardDTO {
   items: { variantId: string; quantity: number }[];
 }
 

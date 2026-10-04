@@ -62,16 +62,21 @@ export function SpaRoomTile({
           </span>
         </div>
         <div className="mt-5 grid grid-cols-2 gap-2 text-xs text-slate-300">
-          <span>
-            {room.sessionPrice !== undefined ? (
-              <span className="mr-1 text-sm font-semibold text-slate-100">
-                {Number(room.sessionPrice).toLocaleString(undefined, {
-                  maximumFractionDigits: 2,
-                })}
-              </span>
-            ) : null}
-            {tr("perSession", { count: room.minimumMinutes })}
-          </span>
+          {/* A SPA room has no price: the service package sold sets it. KTV sells by the hour. */}
+          {kind === "ktv" ? (
+            <span>
+              {room.sessionPrice !== undefined ? (
+                <span className="mr-1 text-sm font-semibold text-slate-100">
+                  {Number(room.sessionPrice).toLocaleString(undefined, {
+                    maximumFractionDigits: 2,
+                  })}
+                </span>
+              ) : null}
+              {tr("perSession", { count: room.minimumMinutes })}
+            </span>
+          ) : (
+            <span />
+          )}
           <span className="text-right">
             {session
               ? tr("guestCount", { count: session.guestCount })
