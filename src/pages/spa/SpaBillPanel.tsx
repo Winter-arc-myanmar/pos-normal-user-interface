@@ -7,7 +7,14 @@ import { useRoomText } from "@/core/presentation/hooks/useRoomText";
 import { getKtvWarning } from "@/lib/ktv/session";
 import { estimateCardCharge } from "@/lib/spa/payment";
 import { bookedSessions } from "@/lib/spa/session";
-import { focPending, PendingItem, pendingKey, pendingTotal } from "@/lib/spa/pending";
+import {
+  focPending,
+  PendingItem,
+  pendingKey,
+  pendingSaving,
+  pendingTotal,
+} from "@/lib/spa/pending";
+import type { PromotionDiscount, RunningPromotion } from "@/core/domain/entities/Promotion";
 
 const money = (value: string | number | undefined) =>
   Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -37,6 +44,9 @@ export function SpaBillPanel({
   onToggleFoc,
   onChangeCard,
   onExtend,
+  promotions = [],
+  pendingDiscounts = {},
+  promotionName = () => undefined,
 }: {
   kind?: RoomKind;
   room: SpaRoom | null;
@@ -62,10 +72,14 @@ export function SpaBillPanel({
   onToggleFoc: (key: string) => void;
   onChangeCard: () => void;
   onExtend: () => void;
+  promotions?: RunningPromotion[];
+  pendingDiscounts?: Record<string, PromotionDiscount>;
+  promotionName?: (id: string | undefined) => string | undefined;
 }) {
   const tr = useRoomText(kind);
   const warning = getKtvWarning(session.endsAt, nowMs);
   const discountBps = wallet?.discountBpsSnapshot || 0;
+  const pendingDue = pendingTotal(pending) - pendingSaving(pending, pendingDiscounts);
   const runningTotal = Number(quote?.runningTotal || 0);
   const discount = (runningTotal * discountBps) / 10000;
   const minutesIn = Math.max(0, (quote?.elapsedMinutes || 0) - (quote?.pausedMinutes || 0));
@@ -162,6 +176,19 @@ export function SpaBillPanel({
         </p>
       </div>
 
+      {promotions.length ? (
+        <p className="shrink-0 rounded border border-emerald-700/60 bg-emerald-950/40 px-2 py-1 text-xs text-emerald-200">
+          <span className="font-semibold">{tr("promotionsNow")}</span>{" "}
+          {promotions
+            .map((promotion) =>
+              promotion.discountType === "PERCENT_OFF"
+                ? `${promotion.name} (${promotion.discountValue}%)`
+                : `${promotion.name} (−${money(promotion.discountValue)})`
+            )
+            .join(" · ")}
+        </p>
+      ) : null}
+
       <section className="min-h-[5rem] flex-1 divide-y divide-slate-800 overflow-y-auto border-y border-slate-800">
         {visibleLines.length === 0 ? (
           <p className="py-3 text-xs text-slate-500">{tr("noLines")}</p>
@@ -181,12 +208,24 @@ export function SpaBillPanel({
                       <span className="mr-1.5 rounded border border-slate-500 px-1 text-[10px] font-semibold tracking-wide text-slate-300">
                         {tr("foc")}
                       </span>
+                    ) : line.appliedPromotionId ? (
+                      <span
+                        className="mr-1.5 rounded border border-emerald-600 px-1 text-[10px] font-semibold tracking-wide text-emerald-300"
+                        title={promotionName(line.appliedPromotionId)}
+                      >
+                        {tr("promo")}
+                      </span>
                     ) : null}
                     {isTreatment
                       ? tr("treatmentCharge")
                       : line.productName || itemNames[line.variantId] || tr("item")}
                   </p>
-                  <p className="text-xs text-slate-500">{money(unitPrice)}</p>
+                  <p className="text-xs text-slate-500">
+                    {money(unitPrice)}
+                    {line.appliedPromotionId && promotionName(line.appliedPromotionId)
+                      ? ` · ${promotionName(line.appliedPromotionId)}`
+                      : ""}
+                  </p>
                 </div>
                 {editable && isFoc ? (
                   <span className="shrink-0 text-xs text-slate-400">
@@ -263,14 +302,36 @@ export function SpaBillPanel({
             {tr("newItems")} · {pendingCount}
           </p>
           <div className="max-h-56 divide-y divide-slate-800/70 overflow-y-auto pr-1">
-            {pending.map((item) => (
+            {pending.map((item) => {
+              const deal = item.foc ? undefined : pendingDiscounts[item.variantId];
+              const full = item.unitPrice * item.quantity;
+              return (
               <div key={pendingKey(item)} className="space-y-1 py-1 text-sm">
                 <div className="flex items-start justify-between gap-2">
                   <p className="min-w-0 break-words font-medium leading-snug">{item.name}</p>
-                  <span className="shrink-0 font-semibold">
-                    {item.foc ? tr("free") : money(item.unitPrice * item.quantity)}
+                  <span className="shrink-0 text-right font-semibold">
+                    {item.foc ? (
+                      tr("free")
+                    ) : deal?.discount ? (
+                      <>
+                        <span className="mr-1 text-xs font-normal text-slate-500 line-through">
+                          {money(full)}
+                        </span>
+                        {money(full - deal.discount)}
+                      </>
+                    ) : (
+                      money(full)
+                    )}
                   </span>
                 </div>
+                {deal?.discount ? (
+                  <p className="text-xs text-emerald-300">
+                    {tr("promoSaving", {
+                      name: deal.names.join(", "),
+                      amount: money(deal.discount),
+                    })}
+                  </p>
+                ) : null}
                 <div className="flex items-center gap-2">
                   <span className="flex-1 text-xs text-slate-500">{money(item.unitPrice)}</span>
                   <button
@@ -315,7 +376,8 @@ export function SpaBillPanel({
                   </button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
           <div className="grid grid-cols-[auto_1fr] gap-2 pt-1">
             <Button variant="secondary" disabled={isBusy} onClick={onClearPending}>
@@ -327,12 +389,12 @@ export function SpaBillPanel({
                 : freeCount
                   ? tr("addToBillWithFree", {
                       count: pendingCount - freeCount,
-                      amount: money(pendingTotal(pending)),
+                      amount: money(pendingDue),
                       free: freeCount,
                     })
                   : tr("addToBill", {
                       count: pendingCount,
-                      amount: money(pendingTotal(pending)),
+                      amount: money(pendingDue),
                     })}
             </Button>
           </div>

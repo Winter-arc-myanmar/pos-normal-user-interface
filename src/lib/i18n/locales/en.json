@@ -1464,7 +1464,11 @@
     "giveFreeCount": "Give free · {{count}}",
     "addToBillWithFree": "Add to bill · {{count}} · {{amount}} + {{free}} free",
     "owes": "Owes {{amount}}",
-    "focReasonPlaceholder": "Birthday, regular guest, apology…"
+    "focReasonPlaceholder": "Birthday, regular guest, apology…",
+    "promotionsNow": "Promotions now:",
+    "promo": "PROMO",
+    "promoSaving": "{{name}} −{{amount}}",
+    "promotionDiscount": "Promotion discount"
   },
   "statusBadge": {
     "verified": "Verified",

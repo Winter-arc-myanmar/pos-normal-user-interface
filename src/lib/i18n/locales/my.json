@@ -1422,7 +1422,11 @@
     "giveFreeCount": "အခမဲ့ပေးမည် · {{count}}",
     "addToBillWithFree": "ဘေလ်ထဲထည့်မည် · {{count}} · {{amount}} + အခမဲ့ {{free}}",
     "owes": "ပေးရန် {{amount}}",
-    "focReasonPlaceholder": "မွေးနေ့၊ ပုံမှန်ဧည့်သည်၊ တောင်းပန်ခြင်း…"
+    "focReasonPlaceholder": "မွေးနေ့၊ ပုံမှန်ဧည့်သည်၊ တောင်းပန်ခြင်း…",
+    "promotionsNow": "ယခု ပရိုမိုးရှင်း:",
+    "promo": "ပရိုမို",
+    "promoSaving": "{{name}} ဖြင့် {{amount}} လျှော့",
+    "promotionDiscount": "ပရိုမိုးရှင်း လျှော့စျေး"
   },
   "statusBadge": {
     "verified": "အတည်ပြုပြီး",

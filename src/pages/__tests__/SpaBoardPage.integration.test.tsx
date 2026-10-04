@@ -4,6 +4,12 @@ import { MemoryRouter } from "react-router-dom";
 import { Toaster } from "@/components/ui/Toaster";
 import { SpaBoardPage } from "../SpaBoardPage";
 
+let promotionState: {
+  running: { id: string; name: string; discountType: string; discountValue: number }[];
+  discounts: Record<string, { discount: number; names: string[] }>;
+  promotionName: (id: string | undefined) => string | undefined;
+} = { running: [], discounts: {}, promotionName: () => undefined };
+
 const mocks = vi.hoisted(() => ({
   fetchBoard: vi.fn(),
   getQuote: vi.fn(),
@@ -149,6 +155,10 @@ vi.mock("@/core/presentation/hooks/useSpaManagement", () => ({
   }),
 }));
 
+vi.mock("@/core/presentation/hooks/useRoomPromotions", () => ({
+  useRoomPromotions: () => promotionState,
+}));
+
 vi.mock("@/core/presentation/hooks/useKtvManagement", () => ({
   useKtvManagement: () => ({ rooms: [], quote: null }),
 }));
@@ -266,6 +276,7 @@ describe("SpaBoardPage", () => {
       status: "COMPLETED",
     });
     mocks.printReceipt.mockResolvedValue(undefined);
+    promotionState = { running: [], discounts: {}, promotionName: () => undefined };
   });
 
   it("opens a running room's bill and menu without asking for a card", async () => {
@@ -588,6 +599,53 @@ describe("SpaBoardPage", () => {
       );
       expect(mocks.addOrderLine).not.toHaveBeenCalled();
       expect(await screen.findByText("spa.charged")).toBeInTheDocument();
+    });
+
+    it("shows the promotion running now and the discounted total before the tap", async () => {
+      promotionState = {
+        running: [
+          { id: "promo-1", name: "Scrub week", discountType: "PERCENT_OFF", discountValue: 10 },
+        ],
+        discounts: { "variant-scrub": { discount: 1200, names: ["Scrub week"] } },
+        promotionName: (id) => (id === "promo-1" ? "Scrub week" : undefined),
+      };
+      await openRunningRoom();
+      expect(screen.getByText("spa.promotionsNow")).toBeInTheDocument();
+      expect(screen.getByText(/Scrub week \(10%\)/)).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: /Foot Scrub/ }));
+      fireEvent.click(await screen.findByRole("button", { name: "spa.increaseNew" }));
+      expect(screen.getByText("spa.promoSaving")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /spa.addToBill/ }));
+
+      expect(await screen.findByText("spa.promotionDiscount")).toBeInTheDocument();
+      expect(screen.getByText("−1,200")).toBeInTheDocument();
+      // The cart row and the tap dialog both show the price after the promotion.
+      expect(screen.getAllByText("10,800")).toHaveLength(2);
+    });
+
+    it("marks a bill line a promotion discounted", async () => {
+      promotionState = {
+        running: [],
+        discounts: {},
+        promotionName: (id) => (id === "promo-1" ? "Scrub week" : undefined),
+      };
+      lines = [
+        {
+          id: "line-1",
+          salesOrderId: "order-1",
+          variantId: "variant-scrub",
+          quantity: "1.0000",
+          unitPrice: "6000.0000",
+          lineDiscount: "600.0000",
+          appliedPromotionId: "promo-1",
+          productName: "Foot Scrub",
+        },
+      ];
+      await openRunningRoom();
+
+      expect(screen.getByText("spa.promo")).toBeInTheDocument();
+      expect(screen.getByText(/Scrub week/)).toBeInTheDocument();
     });
 
     it("extends by buying more sessions with a tap", async () => {

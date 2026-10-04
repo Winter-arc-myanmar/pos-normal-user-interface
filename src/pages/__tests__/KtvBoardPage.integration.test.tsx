@@ -4,6 +4,12 @@ import { MemoryRouter } from "react-router-dom";
 import { Toaster } from "@/components/ui/Toaster";
 import { KtvBoardPage } from "../KtvBoardPage";
 
+const promotionState: {
+  running: { id: string; name: string; discountType: string; discountValue: number }[];
+  discounts: Record<string, { discount: number; names: string[] }>;
+  promotionName: (id: string | undefined) => string | undefined;
+} = { running: [], discounts: {}, promotionName: () => undefined };
+
 const mocks = vi.hoisted(() => ({
   fetchBoard: vi.fn(),
   getQuote: vi.fn(),
@@ -106,6 +112,10 @@ vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
 vi.mock("@/core/presentation/hooks/useSpaManagement", () => ({
   useSpaManagement: () => ({ rooms: [], quote: null }),
 }));
+vi.mock("@/core/presentation/hooks/useRoomPromotions", () => ({
+  useRoomPromotions: () => promotionState,
+}));
+
 vi.mock("@/core/presentation/hooks/useKtvManagement", () => ({
   useKtvManagement: () => ({
     rooms,

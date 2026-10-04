@@ -22,6 +22,7 @@ import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
 import { useSalesOrderManagement } from "@/core/presentation/hooks/useSalesOrderManagement";
 import { RoomKind, useRoomPos } from "@/core/presentation/hooks/useRoomPos";
 import { useRoomText } from "@/core/presentation/hooks/useRoomText";
+import { useRoomPromotions } from "@/core/presentation/hooks/useRoomPromotions";
 import { getKtvWarning } from "@/lib/ktv/session";
 import { isUnspendableWalletStatus } from "@/lib/pos/guestWalletAmounts";
 import {
@@ -35,6 +36,7 @@ import {
   focPending,
   paidPending,
   PendingItem,
+  pendingSaving,
   pendingTotal,
   toggleOneFoc,
 } from "@/lib/spa/pending";
@@ -211,6 +213,12 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       }, {}),
     [pending]
   );
+  const promotions = useRoomPromotions(
+    kind,
+    activeLocationId || undefined,
+    paidPending(pending).map((item) => ({ variantId: item.variantId, quantity: item.quantity }))
+  );
+  const pendingDue = pendingTotal(pending) - pendingSaving(pending, promotions.discounts);
   const roomSessionPrice = room?.sessionPrice;
   const rateProductIds = useMemo(
     () => new Set(rooms.map((item) => item.rateProductId).filter(Boolean)),
@@ -474,7 +482,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     if (!session?.salesOrderId || billClosed || !toPay.length) return;
     const prepaid = Boolean(quote?.prepaid);
     const estimate = estimateCardCharge({
-      runningTotal: (prepaid ? 0 : Number(quote?.runningTotal || 0)) + pendingTotal(pending),
+      runningTotal: (prepaid ? 0 : Number(quote?.runningTotal || 0)) + pendingDue,
       discountBps: payer.discountBpsSnapshot,
     });
     if (!force && !cardCanCover(payer, estimate)) {
@@ -1129,6 +1137,9 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             onCommitPending={addPendingToBill}
             onToggleFoc={(key) => setPending((current) => toggleOneFoc(current, key))}
             onChangeCard={forgetCard}
+            promotions={promotions.running}
+            pendingDiscounts={promotions.discounts}
+            promotionName={promotions.promotionName}
           />
 
           {step === "menu" ? (
@@ -1236,9 +1247,15 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                   <span>{money(item.unitPrice * item.quantity)}</span>
                 </p>
               ))}
+              {pendingDue < pendingTotal(pending) ? (
+                <p className="flex justify-between text-emerald-300">
+                  <span>{tr("promotionDiscount")}</span>
+                  <span>−{money(pendingTotal(pending) - pendingDue)}</span>
+                </p>
+              ) : null}
               <p className="mt-1 flex justify-between border-t border-slate-800 pt-1 font-semibold">
                 <span>{tr("newItemsTotal")}</span>
-                <span>{money(pendingTotal(pending))}</span>
+                <span>{money(pendingDue)}</span>
               </p>
             </>
           ) : cardPrompt === "extend" ? (
@@ -1426,7 +1443,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                 balance: money(balanceWarning.balance),
                 total: money(
                   estimateCardCharge({
-                    runningTotal: Number(quote?.runningTotal || 0) + pendingTotal(pending),
+                    runningTotal: Number(quote?.runningTotal || 0) + pendingDue,
                     discountBps: balanceWarning.discountBpsSnapshot,
                   })
                 ),
