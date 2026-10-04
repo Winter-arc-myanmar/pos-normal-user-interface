@@ -95,6 +95,9 @@ const emptyRoomForm = {
   graceMinutes: "15",
 };
 
+/** The products behind room time and SPA packages, which are not on the menu. */
+const ROOM_CATEGORIES = ["Spa Packages", "Spa Rooms", "KTV Rooms"];
+
 const money = (value: string | number | undefined) =>
   Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
 
@@ -195,6 +198,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   // A new room follows Venue setup; a running one keeps how it started.
   const startsAtEnd = venue.paymentTiming === "PAY_AT_END";
   const atEnd = quote?.paymentTiming === "PAY_AT_END";
+  // Venue setup can turn food and drinks off for SPA or KTV; the server refuses them then.
+  const menuAllowed = isSpa ? venue.spaMenuOrdering : venue.ktvMenuOrdering;
   const openSessions = useMemo(
     () => (room?.sessions || []).filter(isOpenSpaSession),
     [room?.sessions]
@@ -265,11 +270,13 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     () => new Set(rooms.map((item) => item.rateProductId).filter(Boolean)),
     [rooms]
   );
-  // Packages are booked with the treatment, never ordered from the menu.
+  // Room time and packages are booked with the room, never ordered from the menu.
   const menuProducts = useMemo(
     () =>
       products.filter(
-        (product) => !rateProductIds.has(product.id) && product.categoryName !== "Spa Packages"
+        (product) =>
+          !rateProductIds.has(product.id) &&
+          !ROOM_CATEGORIES.includes(product.categoryName || "")
       ),
     [products, rateProductIds]
   );
@@ -1385,7 +1392,12 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             packageVariantIds={packageVariantIds}
           />
 
-          {step === "menu" ? (
+          {step === "menu" && !menuAllowed ? (
+            <div className="space-y-3 rounded-lg border border-slate-700 bg-slate-900 p-5">
+              <h2 className="text-lg font-semibold text-white">{tr("menuOffTitle")}</h2>
+              <p className="text-sm text-slate-300">{tr("menuOffBody")}</p>
+            </div>
+          ) : step === "menu" ? (
             <ProductMenu
               products={menuProducts}
               groupByCategory

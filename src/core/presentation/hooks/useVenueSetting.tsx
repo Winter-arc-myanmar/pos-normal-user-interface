@@ -5,7 +5,12 @@ import type {
   VenueSetting,
 } from "../../infrastructure/repositories/ApiVenueSettingRepository";
 
-const PAY_WHEN_ORDERING: VenueSetting = { paymentTiming: "PAY_WHEN_ORDERING", roomCardOnly: true };
+const PAY_WHEN_ORDERING: VenueSetting = {
+  paymentTiming: "PAY_WHEN_ORDERING",
+  roomCardOnly: true,
+  spaMenuOrdering: true,
+  ktvMenuOrdering: true,
+};
 
 /**
  * When guests pay for SPA and KTV rooms. Until it loads, the till behaves as it

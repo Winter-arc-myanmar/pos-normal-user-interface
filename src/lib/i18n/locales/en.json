@@ -1410,7 +1410,7 @@
     "removeLine": "Remove from bill",
     "lineRemoved": "Removed from the bill.",
     "startedShort": "Since {{time}}",
-    "minutesOfBooked": "{{count}}/{{booked}} min ({{sessions}} sessions)",
+    "minutesOfBooked": "{{count}}/{{booked}} min",
     "minutesLeft": "{{count}} min left",
     "tapPrompt": "Tap or swipe the guest card, or type its UID.",
     "noCardYet": "No card yet",
@@ -1485,7 +1485,9 @@
     "memberCardOnly": "This business takes member cards only for room bills.",
     "payOtherTitle": "Or pay another way",
     "payOtherHint": "The room is closed first, then {{amount}} is paid in full.",
-    "payWith": "Close and pay with {{method}}"
+    "payWith": "Close and pay with {{method}}",
+    "menuOffTitle": "Food and drinks are off",
+    "menuOffBody": "Venue setup has food and drinks turned off here. Turn them on in the admin under Venue setup to take orders."
   },
   "statusBadge": {
     "verified": "Verified",

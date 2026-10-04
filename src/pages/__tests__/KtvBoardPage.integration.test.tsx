@@ -19,7 +19,12 @@ const spaPackages: {
   items: { name: string; quantity: number }[];
 }[] = [];
 
-let venueState: { paymentTiming: "PAY_WHEN_ORDERING" | "PAY_AT_END"; roomCardOnly: boolean } = {
+let venueState: {
+  paymentTiming: "PAY_WHEN_ORDERING" | "PAY_AT_END";
+  roomCardOnly: boolean;
+  spaMenuOrdering?: boolean;
+  ktvMenuOrdering?: boolean;
+} = {
   paymentTiming: "PAY_WHEN_ORDERING",
   roomCardOnly: true,
 };
@@ -127,7 +132,7 @@ vi.mock("@/core/presentation/hooks/useSpaManagement", () => ({
   useSpaManagement: () => ({ rooms: [], quote: null }),
 }));
 vi.mock("@/core/presentation/hooks/useVenueSetting", () => ({
-  useVenueSetting: () => venueState,
+  useVenueSetting: () => ({ spaMenuOrdering: true, ktvMenuOrdering: true, ...venueState }),
 }));
 
 vi.mock("@/core/presentation/hooks/useSpaPackages", () => ({

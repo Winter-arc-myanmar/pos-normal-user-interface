@@ -4,6 +4,10 @@ import { API_ENDPOINTS } from "../api/constants";
 export interface VenueSetting {
   paymentTiming: "PAY_WHEN_ORDERING" | "PAY_AT_END";
   roomCardOnly: boolean;
+  /** Guests may order food and drinks during a SPA treatment. */
+  spaMenuOrdering: boolean;
+  /** Guests may order food and drinks in a KTV room. */
+  ktvMenuOrdering: boolean;
 }
 
 type RecordValue = Record<string, unknown>;
@@ -21,6 +25,8 @@ export class ApiVenueSettingRepository {
     return {
       paymentTiming: data.paymentTiming === "PAY_AT_END" ? "PAY_AT_END" : "PAY_WHEN_ORDERING",
       roomCardOnly: data.roomCardOnly !== false,
+      spaMenuOrdering: data.spaMenuOrdering !== false,
+      ktvMenuOrdering: data.ktvMenuOrdering !== false,
     };
   }
 }

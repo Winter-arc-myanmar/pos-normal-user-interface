@@ -19,7 +19,12 @@ let spaPackages: {
   items: { name: string; quantity: number }[];
 }[] = [];
 
-let venueState: { paymentTiming: "PAY_WHEN_ORDERING" | "PAY_AT_END"; roomCardOnly: boolean } = {
+let venueState: {
+  paymentTiming: "PAY_WHEN_ORDERING" | "PAY_AT_END";
+  roomCardOnly: boolean;
+  spaMenuOrdering?: boolean;
+  ktvMenuOrdering?: boolean;
+} = {
   paymentTiming: "PAY_WHEN_ORDERING",
   roomCardOnly: true,
 };
@@ -127,6 +132,14 @@ const thaiPackageProduct = {
   trackingType: "SERVICE",
   basePrice: "45000.0000",
 };
+const ktvRoomProduct = {
+  id: "product-ktv-r1",
+  tenantId: "tenant-1",
+  name: "KTV room R-01",
+  categoryName: "KTV Rooms",
+  trackingType: "SERVICE",
+  basePrice: "50000.0000",
+};
 const scrubVariant = { id: "variant-scrub", productId: "product-scrub", priceModifier: "0" };
 
 let rooms = [room("wallet-1")];
@@ -178,7 +191,7 @@ vi.mock("@/core/presentation/hooks/useSpaManagement", () => ({
 }));
 
 vi.mock("@/core/presentation/hooks/useVenueSetting", () => ({
-  useVenueSetting: () => venueState,
+  useVenueSetting: () => ({ spaMenuOrdering: true, ktvMenuOrdering: true, ...venueState }),
 }));
 
 vi.mock("@/core/presentation/hooks/useSpaPackages", () => ({
@@ -195,7 +208,7 @@ vi.mock("@/core/presentation/hooks/useKtvManagement", () => ({
 
 vi.mock("@/core/presentation/hooks/useCashier", () => ({
   useCashier: () => ({
-    products: [scrub, beer, roomRate, thaiPackageProduct],
+    products: [scrub, beer, roomRate, thaiPackageProduct, ktvRoomProduct],
     variantsByProductId: {
       "product-scrub": [scrubVariant],
       "product-beer": [{ id: "variant-beer", productId: "product-beer", priceModifier: "0" }],
@@ -614,9 +627,18 @@ describe("SpaBoardPage", () => {
     expect(payload).not.toHaveProperty("items");
   });
 
-  it("keeps packages off the menu: they are booked with the treatment", async () => {
+  it("shows no menu when Venue setup turns food and drinks off for SPA", async () => {
+    venueState = { ...venueState, spaMenuOrdering: false };
+    await openRunningRoom();
+
+    expect(screen.getByText("spa.menuOffTitle")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Foot Scrub/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps packages and room time off the menu", async () => {
     await openRunningRoom();
     expect(screen.queryByRole("button", { name: /Thai massage 90 min/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /KTV room R-01/ })).not.toBeInTheDocument();
   });
 
   describe("paid at the end", () => {
