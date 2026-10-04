@@ -1644,8 +1644,27 @@
     "noRooms": "No KTV rooms yet. Add a room to start.",
     "errors": {
       "openSession": "Could not start the room",
-      "sessionRequired": "Start the room first"
-    }
+      "sessionRequired": "Start the room first",
+      "wrongSessionCard": "This card does not belong to the party in this room.",
+      "pay": "Unable to close and pay for this room.",
+      "extend": "Unable to add time to this room."
+    },
+    "timeUp": "Booked time is up",
+    "status": {
+      "occupied": "In use",
+      "open": "In use"
+    },
+    "filters": {
+      "active": "In use"
+    },
+    "billClosed": "Room closed. The bill is waiting for payment.",
+    "payTitle": "Close room and pay",
+    "steps": {
+      "sessions": "Choose hours",
+      "menu": "Order food and drinks"
+    },
+    "addServices": "Order food and drinks",
+    "noLines": "Nothing ordered yet."
   },
   "diningTables": {
     "title": "Dining tables",
