@@ -3,7 +3,7 @@ import {
   KtvRoomStatus,
   KtvSessionQuote,
 } from "../../domain/entities/Ktv";
-import { SpaCardChargeDTO } from "./SpaDTO";
+import { RoomOrderCardDTO, SpaCardChargeDTO } from "./SpaDTO";
 
 export interface KtvRoomFilterDTO {
   page?: number;
@@ -55,11 +55,11 @@ export interface CloseKtvSessionDTO {
   closedAt: string;
 }
 
-export interface ExtendKtvSessionDTO extends SpaCardChargeDTO {
+export interface ExtendKtvSessionDTO extends RoomOrderCardDTO {
   hours: number;
 }
 
-export interface ChargeKtvItemsDTO extends SpaCardChargeDTO {
+export interface ChargeKtvItemsDTO extends RoomOrderCardDTO {
   items: { variantId: string; quantity: number }[];
 }
 
