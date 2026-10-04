@@ -88,8 +88,22 @@ export class SpaSessionQuote {
   runningTotal!: string;
   prepaid!: boolean;
   paidTotal!: string;
+  /** PAY_AT_END: added to the bill and paid after close. Null on older sessions. */
+  paymentTiming?: "PAY_WHEN_ORDERING" | "PAY_AT_END" | null;
+  /** Still to pay, before any member-card discount. */
+  amountDue?: string;
 
   constructor(data: Partial<SpaSessionQuote>) {
     Object.assign(this, { segments: [], ...data });
   }
+}
+
+/** A SPA service package: what the guest buys, with its time and price. */
+export interface SpaPackage {
+  id: string;
+  name: string;
+  durationMinutes: number;
+  price: number;
+  variantId: string;
+  items: { name: string; quantity: number }[];
 }

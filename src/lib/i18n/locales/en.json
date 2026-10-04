@@ -563,6 +563,7 @@
       "mobileDisconnected": "Mobile printing idle",
       "qzRequirement": "QZ Tray must be installed and running on this POS computer.",
       "mobileRequirement": "Android and Median use PDF receipts (tap Print in the viewer). Wi‑Fi printers use PDF; USB and Bluetooth use direct ESC/POS when the device allows it.",
+      "networkAndroidHint": "Android Chrome cannot open printer port 9100. Add the Wi-Fi printer in Android Settings → Printing (or the XPrinter app), then Test print and pick that printer on the Android print sheet. Raw IP:9100 works on Windows with QZ Tray.",
       "active": "Active",
       "yes": "Yes",
       "no": "No",
@@ -1396,7 +1397,8 @@
       "balanceShort": "The card cannot cover this bill. Top up or pay part in cash.",
       "pendingItems": "Add or clear the new items before paying.",
       "extend": "Unable to extend this treatment.",
-      "foc": "Could not give the items free"
+      "foc": "Could not give the items free",
+      "packages": "Couldn't load the service packages: {{message}}"
     },
     "item": "Item",
     "treatmentSoFar": "Treatment so far",
@@ -1408,7 +1410,7 @@
     "removeLine": "Remove from bill",
     "lineRemoved": "Removed from the bill.",
     "startedShort": "Since {{time}}",
-    "minutesOfBooked": "{{count}}/{{booked}} min ({{sessions}} sessions)",
+    "minutesOfBooked": "{{count}}/{{booked}} min",
     "minutesLeft": "{{count}} min left",
     "tapPrompt": "Tap or swipe the guest card, or type its UID.",
     "noCardYet": "No card yet",
@@ -1463,7 +1465,31 @@
     "giveFreeCount": "Give free · {{count}}",
     "addToBillWithFree": "Add to bill · {{count}} · {{amount}} + {{free}} free",
     "owes": "Owes {{amount}}",
-    "focReasonPlaceholder": "Birthday, regular guest, apology…"
+    "focReasonPlaceholder": "Birthday, regular guest, apology…",
+    "promotionsNow": "Promotions now:",
+    "promo": "PROMO",
+    "promoSaving": "{{name}} −{{amount}}",
+    "promotionDiscount": "Promotion discount",
+    "noPackages": "No service packages on sale. Add them in the admin under SPA packages.",
+    "packageMeta": "{{minutes}} min · {{price}}",
+    "packageIncludes": "with {{items}}",
+    "fewerOf": "One less {{name}}",
+    "moreOf": "One more {{name}}",
+    "packagesSummary": "Packages: {{count}} · {{minutes}} min",
+    "choosePackage": "Choose a service package",
+    "roomNoPriceHint": "The room has no price. Time and price come from the service package sold.",
+    "startOnBill": "Start · {{amount}} on the bill",
+    "startedOnBill": "Started. Everything goes on the bill and is paid at the end.",
+    "addToBillShort": "Add to bill",
+    "addedToBillNotice": "Added to the bill.",
+    "memberCardOnly": "This business takes member cards only for room bills.",
+    "payOtherTitle": "Or pay another way",
+    "payOtherHint": "The room is closed first, then {{amount}} is paid in full.",
+    "payWith": "Close and pay with {{method}}",
+    "menuOffTitle": "Food and drinks are off",
+    "menuOffBody": "Venue setup has food and drinks turned off here. Turn them on in the admin under Venue setup to take orders.",
+    "addPackageTitle": "Add a service package",
+    "addPackageHint": "Food and drinks are off for SPA. Add another package to give the guest more time."
   },
   "statusBadge": {
     "verified": "Verified",
@@ -1618,8 +1644,27 @@
     "noRooms": "No KTV rooms yet. Add a room to start.",
     "errors": {
       "openSession": "Could not start the room",
-      "sessionRequired": "Start the room first"
-    }
+      "sessionRequired": "Start the room first",
+      "wrongSessionCard": "This card does not belong to the party in this room.",
+      "pay": "Unable to close and pay for this room.",
+      "extend": "Unable to add time to this room."
+    },
+    "timeUp": "Booked time is up",
+    "status": {
+      "occupied": "In use",
+      "open": "In use"
+    },
+    "filters": {
+      "active": "In use"
+    },
+    "billClosed": "Room closed. The bill is waiting for payment.",
+    "payTitle": "Close room and pay",
+    "steps": {
+      "sessions": "Choose hours",
+      "menu": "Order food and drinks"
+    },
+    "addServices": "Order food and drinks",
+    "noLines": "Nothing ordered yet."
   },
   "diningTables": {
     "title": "Dining tables",

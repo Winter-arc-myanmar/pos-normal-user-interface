@@ -56,6 +56,9 @@ import { ApiKtvRepository } from "../repositories/ApiKtvRepository";
 import { IKtvService } from "../../domain/services/IKtvService";
 import { KtvService } from "../../application/services/KtvService";
 import { ISpaRepository } from "../../domain/repositories/ISpaRepository";
+import { ApiPromotionRepository } from "../repositories/ApiPromotionRepository";
+import { ApiSpaPackageRepository } from "../repositories/ApiSpaPackageRepository";
+import { ApiVenueSettingRepository } from "../repositories/ApiVenueSettingRepository";
 import { ApiSpaRepository } from "../repositories/ApiSpaRepository";
 import { ISpaService } from "../../domain/services/ISpaService";
 import { SpaService } from "../../application/services/SpaService";
@@ -147,6 +150,18 @@ class Container {
     this.register<ISpaRepository>(
       "spaRepository",
       new ApiSpaRepository(this.resolve("httpClient"))
+    );
+    this.register<ApiVenueSettingRepository>(
+      "venueSettingRepository",
+      new ApiVenueSettingRepository(this.resolve("httpClient"))
+    );
+    this.register<ApiSpaPackageRepository>(
+      "spaPackageRepository",
+      new ApiSpaPackageRepository(this.resolve("httpClient"))
+    );
+    this.register<ApiPromotionRepository>(
+      "promotionRepository",
+      new ApiPromotionRepository(this.resolve("httpClient"))
     );
     this.register<IRoomTabletRepository>(
       "roomTabletRepository",

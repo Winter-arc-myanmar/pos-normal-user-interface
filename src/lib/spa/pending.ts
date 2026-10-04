@@ -54,3 +54,10 @@ export const focPending = (items: PendingItem[]): PendingItem[] =>
 
 export const pendingTotal = (items: PendingItem[]): number =>
   paidPending(items).reduce((sum, entry) => sum + entry.unitPrice * entry.quantity, 0);
+
+/** What running promotions take off the items still to pay for. Free items get none. */
+export const pendingSaving = (
+  items: PendingItem[],
+  discounts: Record<string, { discount: number }>
+): number =>
+  paidPending(items).reduce((sum, entry) => sum + (discounts[entry.variantId]?.discount || 0), 0);

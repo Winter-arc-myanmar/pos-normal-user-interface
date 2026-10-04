@@ -58,6 +58,44 @@ const isMobileDevice = () =>
   typeof navigator !== "undefined" &&
   /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
+const isStandalonePwa = () =>
+  typeof window !== "undefined" &&
+  (window.matchMedia?.("(display-mode: standalone)").matches === true ||
+    Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone));
+
+/** Same-origin hidden iframe. Android PWAs block window.open; this is how the Thuta POS prints. */
+const createHiddenPrintFrame = () => {
+  const frame = document.createElement("iframe");
+  frame.className = "pos-print-frame";
+  frame.title = "Print document";
+  frame.setAttribute("aria-hidden", "true");
+  Object.assign(frame.style, {
+    position: "fixed",
+    right: "0",
+    bottom: "0",
+    width: "1px",
+    height: "1px",
+    border: "0",
+    opacity: "0",
+    pointerEvents: "none",
+  });
+  document.body.appendChild(frame);
+  window.setTimeout(() => frame.remove(), 120_000);
+  return frame;
+};
+
+const resolvePrintWindow = (): Window => {
+  if (isMobileDevice() || isStandalonePwa()) {
+    const frame = createHiddenPrintFrame();
+    if (frame.contentWindow) return frame.contentWindow;
+  }
+  const opened = window.open("about:blank", "_blank");
+  if (opened) return opened;
+  const frame = createHiddenPrintFrame();
+  if (frame.contentWindow) return frame.contentWindow;
+  throw new Error("Unable to open the print dialog. Allow popups and try again.");
+};
+
 const downloadPdf = (url: string, filename: string) => {
   const link = document.createElement("a");
   link.href = url;
@@ -84,10 +122,7 @@ export async function printLinesWithBrowserDialog(
     throw new Error("Browser printing is only available in the browser");
   }
 
-  const printWindow = window.open("about:blank", "_blank");
-  if (!printWindow) {
-    throw new Error("Unable to open the print dialog. Allow popups and try again.");
-  }
+  const printWindow = resolvePrintWindow();
 
   const safeTitle = escapeHtml(title);
   const receiptLines = lines
@@ -95,7 +130,11 @@ export async function printLinesWithBrowserDialog(
     .join("");
 
   try {
-    printWindow.opener = null;
+    try {
+      printWindow.opener = null;
+    } catch {
+      // Hidden iframes used on Android may not allow opener writes.
+    }
     printWindow.document.open();
     printWindow.document.write(`<!doctype html>
 <html>
@@ -160,7 +199,11 @@ export async function printLinesWithBrowserDialog(
 </html>`);
     printWindow.document.close();
   } catch (caught) {
-    printWindow.close();
+    try {
+      printWindow.close();
+    } catch {
+      // Iframe print targets do not always implement close().
+    }
     throw caught instanceof Error
       ? caught
       : new Error("Unable to create the print document");

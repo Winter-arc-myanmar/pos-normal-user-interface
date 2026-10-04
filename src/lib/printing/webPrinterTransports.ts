@@ -79,6 +79,13 @@ export const isWebBluetoothSupported = () =>
 export const isDirectTcpSupported = () =>
   typeof globalThis !== "undefined" && "TCPSocket" in globalThis;
 
+/** Chrome/Android cannot open printer port 9100. QZ Tray or a native plugin can. */
+export const ANDROID_LAN_PRINTER_ERROR =
+  "This Android browser cannot open a Wi-Fi printer by IP. Raw port 9100 only works on a Windows/Mac POS with QZ Tray. On this tablet use USB or Bluetooth.";
+
+export const canOpenRawLanPrinter = () =>
+  Boolean(medianPosPrinter()) || isDirectTcpSupported();
+
 const usbNavigator = () => navigator as UsbNavigator;
 const bluetoothNavigator = () => navigator as BluetoothNavigator;
 
@@ -220,7 +227,7 @@ export async function printLanTcp(
 ): Promise<void> {
   const TCPSocket = (globalThis as { TCPSocket?: TcpSocketConstructor }).TCPSocket;
   if (!TCPSocket) {
-    throw new Error("Raw network printing is not available on this device.");
+    throw new Error(ANDROID_LAN_PRINTER_ERROR);
   }
   const socket = new TCPSocket(host, { port });
   const opened = await socket.opened;
