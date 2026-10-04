@@ -53,6 +53,7 @@ export function PrinterSettingsPanel() {
     updateStation,
   } = useKdsStationManagement();
   const connection = usePrinterConnection(tenantId, activePosRegisterId);
+  const nativeBridge = connection.nativeBridge;
 
   const [selectedBackendId, setSelectedBackendId] = useState("");
   const [selectedBindingId, setSelectedBindingId] = useState("");
@@ -378,9 +379,11 @@ export function PrinterSettingsPanel() {
           <div>
             <h2 className="text-base font-bold">{t("settings.printer.title")}</h2>
             <p className="mt-1 text-xs text-slate-500">
-              {isBrowserPrinting()
-                ? t("settings.printer.mobileRequirement")
-                : t("settings.printer.qzRequirement")}
+              {nativeBridge
+                ? t("settings.printer.nativeRequirement")
+                : isBrowserPrinting()
+                  ? t("settings.printer.mobileRequirement")
+                  : t("settings.printer.qzRequirement")}
             </p>
           </div>
           <span
@@ -393,14 +396,18 @@ export function PrinterSettingsPanel() {
           >
             {connection.isConnected
               ? t(
-                  isBrowserPrinting()
-                    ? "settings.printer.mobileConnected"
-                    : "settings.printer.connected"
+                  nativeBridge
+                    ? "settings.printer.nativeConnected"
+                    : isBrowserPrinting()
+                      ? "settings.printer.mobileConnected"
+                      : "settings.printer.connected"
                 )
               : t(
-                  isBrowserPrinting()
-                    ? "settings.printer.mobileDisconnected"
-                    : "settings.printer.disconnected"
+                  nativeBridge
+                    ? "settings.printer.nativeDisconnected"
+                    : isBrowserPrinting()
+                      ? "settings.printer.mobileDisconnected"
+                      : "settings.printer.disconnected"
                 )}
           </span>
         </div>
@@ -508,7 +515,11 @@ export function PrinterSettingsPanel() {
                   }}
                 />
               </label>
-              {isBrowserPrinting() ? (
+              {nativeBridge ? (
+                <p className="sm:col-span-2 text-xs text-slate-500">
+                  {t("settings.printer.networkNativeHint")}
+                </p>
+              ) : isBrowserPrinting() ? (
                 <p className="sm:col-span-2 text-xs text-slate-500">
                   {t("settings.printer.networkAndroidHint")}
                 </p>

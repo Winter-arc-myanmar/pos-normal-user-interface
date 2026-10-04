@@ -587,7 +587,10 @@
       "localPrinting": "စက်တွင် ပုံနှိပ်ခြင်း",
       "localPrintingReady": "ဤကွန်ပျူတာတွင် မူလပရင်တာ ချိတ်ထားသည်။",
       "localPrintingMissing": "မူလပရင်တာ မချိတ်ရသေးပါ။ ပရင်တာသို့သွားပြီး စမ်းသပ်ပုံနှိပ် လုပ်ပါ။",
-      "openPrinters": "ပရင်တာများ ဖွင့်မည်"
+      "openPrinters": "ပရင်တာများ ဖွင့်မည်",
+      "directPrinting": "တိုက်ရိုက်ပုံနှိပ်ခြင်း (အန်းဒရွိုက်)",
+      "directPrintingReady": "Native bridge အလုပ်လုပ်နေသည်",
+      "directPrintingMissing": "ဘရောက်ဇာ အစားထိုးနည်း"
     },
     "printer": {
       "title": "ပရင်တာ",
@@ -616,6 +619,10 @@
       "qzRequirement": "ဤ POS ကွန်ပျူတာတွင် QZ Tray တပ်ဆင်ပြီး ဖွင့်ထားရမည်။",
       "mobileRequirement": "Android/Median တွင် PDF ဖြင့်ပရင့်မည် (viewer တွင် Print နှိပ်ပါ)။ Wi‑Fi ပရင်တာသည် PDF၊ USB/Bluetooth သည် WebUSB/BT ဖြင့် ESC/POS ပို့နိုင်သည်။",
       "networkAndroidHint": "Android Settings → Printing တွင် XPrinter ကို ရှာမတွေ့ပါ။ ထိုနေရာသည် ရုံးသုံး IPP ပရင်တာသာ တွေ့သည်။ XPrinter သို့မဟုတ် RawBT app သုံးပါ၊ သို့မဟုတ် Bluetooth / USB OTG ဖြင့် ချိတ်ပါ။ Raw IP:9100 သည် Windows + QZ Tray တွင်သာ အလုပ်လုပ်သည်။",
+      "nativeConnected": "အန်းဒရွိုက် တိုက်ရိုက်ပုံနှိပ်ရန် အဆင်သင့်",
+      "nativeDisconnected": "တိုက်ရိုက်ပုံနှိပ်ခြင်း မရရှိပါ",
+      "nativeRequirement": "ဤစက်ပစ္စည်းသည် POS ပရင်တာ native plugin မှတစ်ဆင့် ESC/POS ကို တိုက်ရိုက်ပုံနှိပ်သည် - Wi-Fi၊ USB နှင့် ဘလူးတုသ် ပရင်တာများကို အန်းဒရွိုက် ပုံနှိပ်ဒိုင်ယာလော့ မပြဘဲ တိတ်ဆိတ်စွာ ပုံနှိပ်သည်။",
+      "networkNativeHint": "တိုက်ရိုက်ပုံနှိပ်ရာတွင် အက်ပ်၏ native bridge ကို အသုံးပြုသည်။ ပရင်တာ IP လိပ်စာနှင့် port (များသောအားဖြင့် 9100) ကို ထည့်ပါ။",
       "active": "အသုံးပြုမည်",
       "yes": "ဟုတ်",
       "no": "မဟုတ်",

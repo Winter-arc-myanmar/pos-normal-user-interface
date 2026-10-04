@@ -1,5 +1,14 @@
 import { KdsTicket } from "../../domain/entities/Cashier";
 import { PrinterBinding, PrinterTransport } from "@/lib/pos/printerBindingStorage";
+import { escPosToBase64 } from "@/lib/printing/escPosBytes";
+import {
+  callPosPrinter,
+  hasNativePrinterBridge,
+  hasPluginMethod,
+  nativePrinterNames,
+  type MedianDiscoverResult,
+  type MedianPosPrinterLike,
+} from "@/lib/printing/webPrinterTransports";
 import type { IPrinterClient } from "./IPrinterClient";
 import {
   formatKdsTicket,
@@ -10,97 +19,58 @@ import {
   SaleReceipt,
 } from "@/lib/printing/formatKdsTicket";
 
-interface MedianPrinterPlugin {
-  connect?: () => Promise<void>;
-  disconnect?: () => Promise<void>;
-  discover: (options: {
-    transport?: PrinterTransport;
-  }) => Promise<
-    | string[]
-    | {
-        devices?: Array<string | { id?: string; name?: string }>;
-      }
-  >;
-  printRaw: (options: {
-    transport: PrinterTransport;
-    host?: string;
-    port?: number;
-    deviceId?: string;
-    dataBase64: string;
-    encoding: "base64";
-  }) => Promise<void>;
-}
-
 declare global {
   interface Window {
     median?: {
-      posPrinter?: MedianPrinterPlugin;
+      posPrinter?: MedianPosPrinterLike;
+    };
+    gonative?: {
+      posPrinter?: MedianPosPrinterLike;
     };
   }
 }
 
 const pluginError = () =>
   new Error(
-    "Android direct printing requires the Median POS Printer native plugin. Enable the plugin and rebuild the Android app."
+    "Android direct printing requires the POS printer native plugin (window.median.posPrinter). Enable the plugin and rebuild the Android app."
   );
 
-const waitForPlugin = async (timeoutMs = 5000): Promise<MedianPrinterPlugin> => {
+/** Polls until the Median JavaScript bridge injects `posPrinter` (or times out). */
+const waitForPlugin = async (timeoutMs = 5000): Promise<void> => {
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
-    const plugin = window.median?.posPrinter;
-    if (plugin) return plugin;
+    if (hasNativePrinterBridge()) return;
     await new Promise((resolve) => window.setTimeout(resolve, 50));
   }
   throw pluginError();
-};
-
-const base64 = (value: string) => {
-  const bytes = new TextEncoder().encode(value);
-  let binary = "";
-  bytes.forEach((byte) => {
-    binary += String.fromCharCode(byte);
-  });
-  return window.btoa(binary);
-};
-
-const deviceNames = (
-  result:
-    | string[]
-    | {
-        devices?: Array<string | { id?: string; name?: string }>;
-      }
-): string[] => {
-  const devices = Array.isArray(result) ? result : result.devices || [];
-  return devices
-    .map((device) =>
-      typeof device === "string" ? device : device.id || device.name || ""
-    )
-    .filter(Boolean);
 };
 
 export class MedianPrinterClient implements IPrinterClient {
   private connected = false;
 
   isConnected(): boolean {
-    return this.connected && Boolean(window.median?.posPrinter);
+    return this.connected && hasNativePrinterBridge();
   }
 
   async connect(): Promise<void> {
-    const plugin = await waitForPlugin();
-    await plugin.connect?.();
+    await waitForPlugin();
+    if (hasPluginMethod("connect")) await callPosPrinter("connect", {});
     this.connected = true;
   }
 
   async disconnect(): Promise<void> {
-    const plugin = window.median?.posPrinter;
-    await plugin?.disconnect?.();
+    if (hasPluginMethod("disconnect")) {
+      await callPosPrinter("disconnect", {}).catch(() => undefined);
+    }
     this.connected = false;
   }
 
   async findPrinters(transport?: PrinterTransport): Promise<string[]> {
     await this.connect();
-    const plugin = await waitForPlugin();
-    return deviceNames(await plugin.discover({ transport }));
+    const result = await callPosPrinter<MedianDiscoverResult>("discover", {
+      transport,
+    });
+    return nativePrinterNames(result);
   }
 
   private async printRaw(binding: PrinterBinding, data: string): Promise<void> {
@@ -111,13 +81,12 @@ export class MedianPrinterClient implements IPrinterClient {
     if (binding.transport !== "NETWORK" && !binding.deviceName) {
       throw new Error("Select a printer");
     }
-    const plugin = await waitForPlugin();
-    await plugin.printRaw({
+    await callPosPrinter("printRaw", {
       transport: binding.transport,
       host: binding.host,
       port: binding.port,
       deviceId: binding.deviceName,
-      dataBase64: base64(data),
+      dataBase64: escPosToBase64(data),
       encoding: "base64",
     });
   }

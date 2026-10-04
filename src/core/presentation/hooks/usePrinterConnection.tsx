@@ -12,6 +12,7 @@ import {
   PrintPlace,
   SaleReceipt,
 } from "@/lib/printing/formatKdsTicket";
+import { hasNativePrinterBridge } from "@/lib/printing/webPrinterTransports";
 import {
   groupKitchenJobs,
   KitchenPrintPlan,
@@ -300,6 +301,7 @@ export function usePrinterConnection(
     isConnected,
     isConnecting,
     error,
+    nativeBridge: hasNativePrinterBridge(),
     connect,
     discover,
     verify,
