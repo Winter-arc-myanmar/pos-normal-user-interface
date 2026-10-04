@@ -249,7 +249,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     () => new Set(spaPackages.map((item) => item.variantId)),
     [spaPackages]
   );
-  const booking = showExtend ? extendChoice : packageChoice;
+  // Before the room starts, the packages it starts with; once it runs, the ones added.
+  const booking = session ? extendChoice : packageChoice;
   const promotions = useRoomPromotions(kind, activeLocationId || undefined, [
     ...paidPending(pending).map((item) => ({ variantId: item.variantId, quantity: item.quantity })),
     ...chosenPackages(booking, spaPackages).map(({ package: item, quantity }) => ({
@@ -1392,7 +1393,34 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             packageVariantIds={packageVariantIds}
           />
 
-          {step === "menu" && !menuAllowed ? (
+          {step === "menu" && !menuAllowed && isSpa ? (
+            <div className="space-y-4 rounded-lg border border-slate-700 bg-slate-900 p-5">
+              <div>
+                <h2 className="text-lg font-semibold text-white">{tr("addPackageTitle")}</h2>
+                <p className="mt-1 text-sm text-slate-400">{tr("addPackageHint")}</p>
+              </div>
+              <PackagePicker
+                kind={kind}
+                packages={spaPackages}
+                choice={extendChoice}
+                discounts={promotions.discounts}
+                onChange={(id, delta) => setExtendChoice((current) => changeChoice(current, id, delta))}
+              />
+              {bookingTotals.count ? (
+                <p className="text-sm text-slate-300">
+                  {tr("packagesSummary", { count: bookingTotals.count, minutes: bookingTotals.minutes })}
+                  {` · ${money(bookingDue)}`}
+                </p>
+              ) : null}
+              <Button
+                isLoading={isAdding}
+                disabled={!bookingTotals.count || billClosed}
+                onClick={() => (atEnd ? void extendOnBill() : requestCard("extend"))}
+              >
+                {atEnd ? tr("addToBillShort") : tr("extendAndPay")}
+              </Button>
+            </div>
+          ) : step === "menu" && !menuAllowed ? (
             <div className="space-y-3 rounded-lg border border-slate-700 bg-slate-900 p-5">
               <h2 className="text-lg font-semibold text-white">{tr("menuOffTitle")}</h2>
               <p className="text-sm text-slate-300">{tr("menuOffBody")}</p>

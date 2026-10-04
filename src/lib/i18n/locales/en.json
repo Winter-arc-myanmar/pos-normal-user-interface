@@ -1487,7 +1487,9 @@
     "payOtherHint": "The room is closed first, then {{amount}} is paid in full.",
     "payWith": "Close and pay with {{method}}",
     "menuOffTitle": "Food and drinks are off",
-    "menuOffBody": "Venue setup has food and drinks turned off here. Turn them on in the admin under Venue setup to take orders."
+    "menuOffBody": "Venue setup has food and drinks turned off here. Turn them on in the admin under Venue setup to take orders.",
+    "addPackageTitle": "Add a service package",
+    "addPackageHint": "Food and drinks are off for SPA. Add another package to give the guest more time."
   },
   "statusBadge": {
     "verified": "Verified",

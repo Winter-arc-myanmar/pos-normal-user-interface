@@ -1445,7 +1445,9 @@
     "payOtherHint": "အခန်းကို အရင်ပိတ်ပြီး {{amount}} အပြည့် ပေးချေမည်။",
     "payWith": "ပိတ်ပြီး {{method}} ဖြင့် ပေးချေရန်",
     "menuOffTitle": "အစားအသောက် ပိတ်ထားသည်",
-    "menuOffBody": "Venue setup တွင် ဤနေရာအတွက် အစားအသောက် ပိတ်ထားသည်။ မှာယူရန် admin ၏ Venue setup တွင် ဖွင့်ပါ။"
+    "menuOffBody": "Venue setup တွင် ဤနေရာအတွက် အစားအသောက် ပိတ်ထားသည်။ မှာယူရန် admin ၏ Venue setup တွင် ဖွင့်ပါ။",
+    "addPackageTitle": "ဝန်ဆောင်မှု ပက်ကေ့ချ် ထပ်ထည့်ရန်",
+    "addPackageHint": "SPA အတွက် အစားအသောက် ပိတ်ထားသည်။ ဧည့်သည်အား အချိန်ပိုပေးရန် ပက်ကေ့ချ် ထပ်ထည့်ပါ။"
   },
   "statusBadge": {
     "verified": "အတည်ပြုပြီး",
