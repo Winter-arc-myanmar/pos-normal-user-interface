@@ -190,7 +190,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
 
   const room = rooms.find((item) => item.id === selectedRoomId) || null;
   const isSpa = kind === "spa";
-  const { packages: spaPackages } = useSpaPackages(isSpa);
+  const { packages: spaPackages, error: packagesError } = useSpaPackages(isSpa);
   const venue = useVenueSetting();
   // A new room follows Venue setup; a running one keeps how it started.
   const startsAtEnd = venue.paymentTiming === "PAY_AT_END";
@@ -326,6 +326,10 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   useEffect(() => {
     if (error) toast.error(error);
   }, [error]);
+
+  useEffect(() => {
+    if (packagesError) toast.error(tr("errors.packages", { message: packagesError }));
+  }, [packagesError, tr]);
 
   useEffect(() => {
     void fetchBoard();

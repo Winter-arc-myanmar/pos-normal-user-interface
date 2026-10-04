@@ -1397,7 +1397,8 @@
       "balanceShort": "The card cannot cover this bill. Top up or pay part in cash.",
       "pendingItems": "Add or clear the new items before paying.",
       "extend": "Unable to extend this treatment.",
-      "foc": "Could not give the items free"
+      "foc": "Could not give the items free",
+      "packages": "Couldn't load the service packages: {{message}}"
     },
     "item": "Item",
     "treatmentSoFar": "Treatment so far",
