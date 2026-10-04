@@ -563,7 +563,7 @@
       "mobileDisconnected": "မိုဘိုင်းပရင့် စောင့်ဆိုင်းနေ",
       "qzRequirement": "ဤ POS ကွန်ပျူတာတွင် QZ Tray တပ်ဆင်ပြီး ဖွင့်ထားရမည်။",
       "mobileRequirement": "Android/Median တွင် PDF ဖြင့်ပရင့်မည် (viewer တွင် Print နှိပ်ပါ)။ Wi‑Fi ပရင်တာသည် PDF၊ USB/Bluetooth သည် WebUSB/BT ဖြင့် ESC/POS ပို့နိုင်သည်။",
-      "networkAndroidHint": "Android Chrome သည် ပရင်တာ port 9100 ကို ဖွင့်၍မရပါ။ Android Settings → Printing (သို့မဟုတ် XPrinter app) တွင် Wi-Fi ပရင်တာ ထည့်ပြီး Test print နှိပ်ကာ Android ပရင့်စာရင်းမှ ရွေးပါ။ Raw IP:9100 သည် Windows + QZ Tray တွင်သာ အလုပ်လုပ်သည်။",
+      "networkAndroidHint": "Android Settings → Printing တွင် XPrinter ကို ရှာမတွေ့ပါ။ ထိုနေရာသည် ရုံးသုံး IPP ပရင်တာသာ တွေ့သည်။ XPrinter သို့မဟုတ် RawBT app သုံးပါ၊ သို့မဟုတ် Bluetooth / USB OTG ဖြင့် ချိတ်ပါ။ Raw IP:9100 သည် Windows + QZ Tray တွင်သာ အလုပ်လုပ်သည်။",
       "active": "အသုံးပြုမည်",
       "yes": "ဟုတ်",
       "no": "မဟုတ်",

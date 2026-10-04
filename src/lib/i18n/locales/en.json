@@ -563,7 +563,7 @@
       "mobileDisconnected": "Mobile printing idle",
       "qzRequirement": "QZ Tray must be installed and running on this POS computer.",
       "mobileRequirement": "Android and Median use PDF receipts (tap Print in the viewer). Wi‑Fi printers use PDF; USB and Bluetooth use direct ESC/POS when the device allows it.",
-      "networkAndroidHint": "Android Chrome cannot open printer port 9100. Add the Wi-Fi printer in Android Settings → Printing (or the XPrinter app), then Test print and pick that printer on the Android print sheet. Raw IP:9100 works on Windows with QZ Tray.",
+      "networkAndroidHint": "Android Settings → Printing will not find an XPrinter. That screen only sees office IPP printers. Use the XPrinter or RawBT app, or connect this tablet with Bluetooth / USB OTG. Raw IP:9100 works on Windows with QZ Tray.",
       "active": "Active",
       "yes": "Yes",
       "no": "No",
