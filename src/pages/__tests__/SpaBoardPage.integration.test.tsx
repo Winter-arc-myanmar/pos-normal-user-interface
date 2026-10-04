@@ -10,6 +10,15 @@ let promotionState: {
   promotionName: (id: string | undefined) => string | undefined;
 } = { running: [], discounts: {}, promotionName: () => undefined };
 
+let spaPackages: {
+  id: string;
+  name: string;
+  durationMinutes: number;
+  price: number;
+  variantId: string;
+  items: { name: string; quantity: number }[];
+}[] = [];
+
 const mocks = vi.hoisted(() => ({
   fetchBoard: vi.fn(),
   getQuote: vi.fn(),
@@ -105,6 +114,14 @@ const roomRate = {
   trackingType: "SERVICE",
   basePrice: "30000.0000",
 };
+const thaiPackageProduct = {
+  id: "product-pkg-thai",
+  tenantId: "tenant-1",
+  name: "Thai massage 90 min",
+  categoryName: "Spa Packages",
+  trackingType: "SERVICE",
+  basePrice: "45000.0000",
+};
 const scrubVariant = { id: "variant-scrub", productId: "product-scrub", priceModifier: "0" };
 
 let rooms = [room("wallet-1")];
@@ -155,6 +172,10 @@ vi.mock("@/core/presentation/hooks/useSpaManagement", () => ({
   }),
 }));
 
+vi.mock("@/core/presentation/hooks/useSpaPackages", () => ({
+  useSpaPackages: () => ({ packages: spaPackages, error: null }),
+}));
+
 vi.mock("@/core/presentation/hooks/useRoomPromotions", () => ({
   useRoomPromotions: () => promotionState,
 }));
@@ -165,7 +186,7 @@ vi.mock("@/core/presentation/hooks/useKtvManagement", () => ({
 
 vi.mock("@/core/presentation/hooks/useCashier", () => ({
   useCashier: () => ({
-    products: [scrub, beer, roomRate],
+    products: [scrub, beer, roomRate, thaiPackageProduct],
     variantsByProductId: {
       "product-scrub": [scrubVariant],
       "product-beer": [{ id: "variant-beer", productId: "product-beer", priceModifier: "0" }],
@@ -277,6 +298,24 @@ describe("SpaBoardPage", () => {
     });
     mocks.printReceipt.mockResolvedValue(undefined);
     promotionState = { running: [], discounts: {}, promotionName: () => undefined };
+    spaPackages = [
+      {
+        id: "pkg-thai",
+        name: "Thai massage 90 min",
+        durationMinutes: 90,
+        price: 45000,
+        variantId: "variant-pkg-thai",
+        items: [],
+      },
+      {
+        id: "pkg-foot",
+        name: "Foot massage + juice",
+        durationMinutes: 60,
+        price: 30000,
+        variantId: "variant-pkg-foot",
+        items: [{ name: "Orange juice", quantity: 1 }],
+      },
+    ];
   });
 
   it("opens a running room's bill and menu without asking for a card", async () => {
@@ -499,23 +538,22 @@ describe("SpaBoardPage", () => {
     expect(screen.getByText("30,000")).toBeInTheDocument();
   });
 
-  it("prices a room with a plain number", async () => {
+  it("saves a SPA room without a price: the package sets time and price", async () => {
     mocks.updateRoom.mockResolvedValue(room("wallet-1"));
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: "spa.manageRoom" }));
 
-    const price = screen.getByLabelText("spa.sessionPriceLabel");
-    expect(price).toHaveValue(30000);
-    fireEvent.change(price, { target: { value: "25000" } });
+    expect(screen.queryByLabelText("spa.sessionPriceLabel")).not.toBeInTheDocument();
+    expect(screen.getByText("spa.roomNoPriceHint")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "common.save" }));
 
     await waitFor(() =>
-      expect(mocks.updateRoom).toHaveBeenCalledWith(
-        "room-1",
-        expect.objectContaining({ sessionPrice: 25000 })
-      )
+      expect(mocks.updateRoom).toHaveBeenCalledWith("room-1", {
+        roomNumber: "SUITE1",
+        name: "Couple suite",
+        capacity: 2,
+      })
     );
-    expect(mocks.updateRoom.mock.calls[0][1]).not.toHaveProperty("rateVariantId");
   });
 
   it("filters the menu by category, without the room's own price", async () => {
@@ -529,8 +567,8 @@ describe("SpaBoardPage", () => {
     expect(screen.queryByRole("button", { name: /Foot Scrub/ })).not.toBeInTheDocument();
   });
 
-  it("starts a treatment for several sessions after a card tap", async () => {
-    rooms = [{ ...room("wallet-1"), status: "AVAILABLE", minimumMinutes: 60, sessions: [] }];
+  it("starts a treatment with the service packages chosen, after a card tap", async () => {
+    rooms = [{ ...room("wallet-1"), status: "AVAILABLE", sessions: [] }];
     mocks.openSession.mockResolvedValue({
       id: "session-2",
       roomId: "room-1",
@@ -542,28 +580,33 @@ describe("SpaBoardPage", () => {
     });
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: /SUITE1/ }));
-    for (let i = 0; i < 4; i += 1) {
-      fireEvent.click(screen.getByRole("button", { name: "spa.moreSessions" }));
-    }
-    fireEvent.click(await screen.findByRole("button", { name: "spa.startAndPay" }));
+    expect(await screen.findByRole("button", { name: "spa.choosePackage" })).toBeDisabled();
+
+    const [moreThai] = screen.getAllByRole("button", { name: "spa.moreOf" });
+    fireEvent.click(moreThai);
+    fireEvent.click(moreThai);
+    fireEvent.click(screen.getByRole("button", { name: "spa.startAndPay" }));
     await tapCard();
 
     await waitFor(() => expect(mocks.openSession).toHaveBeenCalled());
-    expect(mocks.openSession.mock.calls[0][0]).not.toHaveProperty("items");
-    await waitFor(() =>
-      expect(mocks.openSession).toHaveBeenCalledWith(
-        expect.objectContaining({
-          roomId: "room-1",
-          guestWalletId: "wallet-1",
-          sessions: 5,
-          prepay: expect.objectContaining({
-            guestCardId: "card-1",
-            paymentMethodId: "card-method",
-            posSessionId: "pos-session-1",
-          }),
-        })
-      )
-    );
+    const [[payload]] = mocks.openSession.mock.calls as [[Record<string, unknown>]];
+    expect(payload).toMatchObject({
+      roomId: "room-1",
+      guestWalletId: "wallet-1",
+      packages: [{ packageId: "pkg-thai", quantity: 2 }],
+      prepay: expect.objectContaining({
+        guestCardId: "card-1",
+        paymentMethodId: "card-method",
+        posSessionId: "pos-session-1",
+      }),
+    });
+    expect(payload).not.toHaveProperty("sessions");
+    expect(payload).not.toHaveProperty("items");
+  });
+
+  it("keeps packages off the menu: they are booked with the treatment", async () => {
+    await openRunningRoom();
+    expect(screen.queryByRole("button", { name: /Thai massage 90 min/ })).not.toBeInTheDocument();
   });
 
   describe("paid as it goes", () => {
@@ -648,17 +691,22 @@ describe("SpaBoardPage", () => {
       expect(screen.getByText(/Scrub week/)).toBeInTheDocument();
     });
 
-    it("extends by buying more sessions with a tap", async () => {
+    it("extends by adding a service package with a tap", async () => {
       await openRunningRoom();
       fireEvent.click(screen.getByRole("button", { name: "spa.extend" }));
-      fireEvent.click(screen.getByRole("button", { name: "spa.moreSessions" }));
+      expect(screen.getByRole("button", { name: "spa.extendAndPay" })).toBeDisabled();
+      const [, moreFoot] = screen.getAllByRole("button", { name: "spa.moreOf" });
+      fireEvent.click(moreFoot);
       fireEvent.click(screen.getByRole("button", { name: "spa.extendAndPay" }));
       await tapCard();
 
       await waitFor(() =>
         expect(mocks.extendSession).toHaveBeenCalledWith(
           "session-1",
-          expect.objectContaining({ sessions: 2, guestCardId: "card-1" })
+          expect.objectContaining({
+            packages: [{ packageId: "pkg-foot", quantity: 1 }],
+            guestCardId: "card-1",
+          })
         )
       );
     });

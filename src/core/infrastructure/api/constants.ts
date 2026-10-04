@@ -399,6 +399,10 @@ export const API_ENDPOINTS = {
   },
 
   // Placeholder POS sync endpoints — replace when backend contract is confirmed.
+  SPA_PACKAGES: {
+    LIST: "/api/v1/spa-packages",
+  },
+
   PROMOTIONS: {
     RUNNING: "/api/v1/promotion-rules/running",
     PREVIEW: "/api/v1/promotion-rules/preview",

@@ -168,8 +168,16 @@ export function useRoomPos(kind: RoomKind) {
           })
         ),
       extendSession: async (id: string, payload: ExtendSpaSessionDTO) => {
-        const { sessions, ...charge } = payload;
-        return fromKtvCharge(await ktvExtendSession(id, { ...charge, hours: sessions }));
+        const { guestCardId, paymentMethodId, posSessionId, idempotencyKey, sessions } = payload;
+        return fromKtvCharge(
+          await ktvExtendSession(id, {
+            guestCardId,
+            paymentMethodId,
+            posSessionId,
+            idempotencyKey,
+            hours: sessions || 1,
+          })
+        );
       },
       chargeItems: async (id: string, payload: ChargeSpaItemsDTO) =>
         fromKtvCharge(await ktvChargeItems(id, payload)),

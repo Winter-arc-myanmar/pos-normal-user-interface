@@ -23,6 +23,14 @@ import { useSalesOrderManagement } from "@/core/presentation/hooks/useSalesOrder
 import { RoomKind, useRoomPos } from "@/core/presentation/hooks/useRoomPos";
 import { useRoomText } from "@/core/presentation/hooks/useRoomText";
 import { useRoomPromotions } from "@/core/presentation/hooks/useRoomPromotions";
+import { useSpaPackages } from "@/core/presentation/hooks/useSpaPackages";
+import {
+  changeChoice,
+  choiceTotals,
+  chosenPackages,
+  PackageChoice,
+  packageOrders,
+} from "@/lib/spa/packages";
 import { getKtvWarning } from "@/lib/ktv/session";
 import { isUnspendableWalletStatus } from "@/lib/pos/guestWalletAmounts";
 import {
@@ -49,6 +57,7 @@ import {
 import { ProductMenu } from "./cashier/ProductMenu";
 import { CardTapDialog } from "./spa/CardTapDialog";
 import { SpaBillPanel } from "./spa/SpaBillPanel";
+import { PackagePicker } from "./spa/PackagePicker";
 import { SpaRoomTile } from "./spa/SpaRoomTile";
 import { modifierPrintText } from "@/lib/printing/modifierText";
 
@@ -167,6 +176,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const [isAdding, setIsAdding] = useState(false);
   const [showExtend, setShowExtend] = useState(false);
   const [extendCount, setExtendCount] = useState(1);
+  const [packageChoice, setPackageChoice] = useState<PackageChoice>({});
+  const [extendChoice, setExtendChoice] = useState<PackageChoice>({});
   const [confirmEnd, setConfirmEnd] = useState(false);
   const tapKeys = useRef<Partial<Record<CardAction, string>>>({});
   const [showRoomForm, setShowRoomForm] = useState(false);
@@ -177,6 +188,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const [isGivingFoc, setIsGivingFoc] = useState(false);
 
   const room = rooms.find((item) => item.id === selectedRoomId) || null;
+  const isSpa = kind === "spa";
+  const { packages: spaPackages } = useSpaPackages(isSpa);
   const openSessions = useMemo(
     () => (room?.sessions || []).filter(isOpenSpaSession),
     [room?.sessions]
@@ -203,8 +216,9 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       }
     }
     if (room) names[room.rateVariantId] = tr("treatmentCharge");
+    for (const item of spaPackages) names[item.variantId] = item.name;
     return names;
-  }, [products, room, tr, variantsByProductId]);
+  }, [products, room, spaPackages, tr, variantsByProductId]);
   const pendingByProduct = useMemo(
     () =>
       pending.reduce<Record<string, number>>((counts, item) => {
@@ -213,19 +227,37 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       }, {}),
     [pending]
   );
-  const promotions = useRoomPromotions(
-    kind,
-    activeLocationId || undefined,
-    paidPending(pending).map((item) => ({ variantId: item.variantId, quantity: item.quantity }))
+  const packageVariantIds = useMemo(
+    () => new Set(spaPackages.map((item) => item.variantId)),
+    [spaPackages]
   );
+  const booking = showExtend ? extendChoice : packageChoice;
+  const promotions = useRoomPromotions(kind, activeLocationId || undefined, [
+    ...paidPending(pending).map((item) => ({ variantId: item.variantId, quantity: item.quantity })),
+    ...chosenPackages(booking, spaPackages).map(({ package: item, quantity }) => ({
+      variantId: item.variantId,
+      quantity,
+    })),
+  ]);
+  const bookingTotals = choiceTotals(booking, spaPackages);
+  const bookingDue =
+    bookingTotals.price -
+    chosenPackages(booking, spaPackages).reduce(
+      (sum, { package: item }) => sum + (promotions.discounts[item.variantId]?.discount || 0),
+      0
+    );
   const pendingDue = pendingTotal(pending) - pendingSaving(pending, promotions.discounts);
   const roomSessionPrice = room?.sessionPrice;
   const rateProductIds = useMemo(
     () => new Set(rooms.map((item) => item.rateProductId).filter(Boolean)),
     [rooms]
   );
+  // Packages are booked with the treatment, never ordered from the menu.
   const menuProducts = useMemo(
-    () => products.filter((product) => !rateProductIds.has(product.id)),
+    () =>
+      products.filter(
+        (product) => !rateProductIds.has(product.id) && product.categoryName !== "Spa Packages"
+      ),
     [products, rateProductIds]
   );
   const startCharge = (roomSessionPrice || 0) * sessionCount;
@@ -387,6 +419,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     clearQuote();
     setGuestCount("1");
     setSessionCount(1);
+    setPackageChoice({});
     const running = next.sessions.filter(isOpenSpaSession);
     if (running.length === 1) {
       void selectSession(running[0]);
@@ -437,7 +470,9 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         roomId: room.id,
         guestWalletId: payer.id,
         guestCount: Math.max(1, Number(guestCount) || 1),
-        sessions: sessionCount,
+        ...(isSpa
+          ? { packages: packageOrders(packageChoice, spaPackages) }
+          : { sessions: sessionCount }),
         prepay: charge,
         posRegisterId: context.posRegisterId,
         openedByPosSessionId: context.posSessionId,
@@ -459,14 +494,23 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     setIsAdding(true);
     try {
       const { charge } = await chargeFrom("extend", payerCard);
-      const result = await extendSession(session.id, { ...charge, sessions: extendCount });
+      const result = await extendSession(
+        session.id,
+        isSpa
+          ? { ...charge, packages: packageOrders(extendChoice, spaPackages) }
+          : { ...charge, sessions: extendCount }
+      );
       tapKeys.current.extend = undefined;
       setShowExtend(false);
       setSession({
         ...session,
         plannedMinutes:
-          (session.plannedMinutes || 0) + extendCount * sessionMinutes(room),
+          (session.plannedMinutes || 0) +
+          (isSpa
+            ? choiceTotals(extendChoice, spaPackages).minutes
+            : extendCount * sessionMinutes(room)),
       });
+      setExtendChoice({});
       showCharged(payer, result.charged, result.balanceAfter);
       await fetchBoard();
       await refreshBill(session);
@@ -670,7 +714,9 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
 
   const handleOpenSession = (event: FormEvent) => {
     event.preventDefault();
-    if (room) requestCard("open");
+    if (!room) return;
+    if (isSpa && !choiceTotals(packageChoice, spaPackages).count) return;
+    requestCard("open");
   };
 
   const handleAddProduct = async (product: Product, variantId: string, quantity: number) => {
@@ -879,16 +925,24 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     if (!activeLocationId) return;
     setActionError(null);
     const minutes = Number(roomForm.treatmentMinutes);
-    const terms = {
-      roomNumber: roomForm.roomNumber.trim(),
-      name: roomForm.name.trim(),
-      capacity: Number(roomForm.capacity),
-      sessionPrice: Number(roomForm.sessionPrice),
-      minimumMinutes: minutes,
-      incrementMinutes: minutes,
-      graceMinutes: Number(roomForm.graceMinutes),
-      roundingMode: "DOWN" as const,
-    };
+    // A SPA room is only where a treatment happens; its time and price come from
+    // the service package sold.
+    const terms = isSpa
+      ? {
+          roomNumber: roomForm.roomNumber.trim(),
+          name: roomForm.name.trim(),
+          capacity: Number(roomForm.capacity),
+        }
+      : {
+          roomNumber: roomForm.roomNumber.trim(),
+          name: roomForm.name.trim(),
+          capacity: Number(roomForm.capacity),
+          sessionPrice: Number(roomForm.sessionPrice),
+          minimumMinutes: minutes,
+          incrementMinutes: minutes,
+          graceMinutes: Number(roomForm.graceMinutes),
+          roundingMode: "DOWN" as const,
+        };
     try {
       if (editingRoom) await updateRoom(editingRoom.id, terms);
       else await createRoom({ ...terms, locationId: activeLocationId });
@@ -926,7 +980,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       : cardPrompt === "open"
         ? tr("confirmStartTitle", { room: room?.roomNumber || "" })
         : cardPrompt === "extend"
-          ? tr("confirmExtendTitle", { count: extendCount })
+          ? tr("confirmExtendTitle", { count: isSpa ? bookingTotals.count : extendCount })
           : tr("confirmPayTitle");
 
   return (
@@ -1031,6 +1085,26 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               onSubmit={handleOpenSession}
             >
               <p className="font-bold">{tr("newSession", { room: room.roomNumber })}</p>
+              {isSpa ? (
+                <>
+                  <PackagePicker
+                    kind={kind}
+                    packages={spaPackages}
+                    choice={packageChoice}
+                    discounts={promotions.discounts}
+                    onChange={(id, delta) => setPackageChoice((current) => changeChoice(current, id, delta))}
+                  />
+                  {bookingTotals.count ? (
+                    <p className="text-sm text-slate-300">
+                      {tr("packagesSummary", {
+                        count: bookingTotals.count,
+                        minutes: bookingTotals.minutes,
+                      })}
+                    </p>
+                  ) : null}
+                </>
+              ) : (
+              <>
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm text-slate-300">{tr("sessions")}</span>
                 <div className="flex items-center rounded bg-slate-800">
@@ -1063,6 +1137,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                   ? ` · ${money(roomSessionPrice * sessionCount)}`
                   : ""}
               </p>
+              </>
+              )}
               <label className="block text-sm text-slate-300">
                 {tr("guestCountLabel")}
                 <input
@@ -1074,11 +1150,19 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                   className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2"
                 />
               </label>
-              <Button type="submit" isLoading={isLoading}>
-                {roomSessionPrice !== undefined
-                  ? tr("startAndPay", { amount: money(startCharge) })
-                  : tr("startSession")}
-              </Button>
+              {isSpa ? (
+                <Button type="submit" isLoading={isLoading} disabled={!bookingTotals.count}>
+                  {bookingTotals.count
+                    ? tr("startAndPay", { amount: money(bookingDue) })
+                    : tr("choosePackage")}
+                </Button>
+              ) : (
+                <Button type="submit" isLoading={isLoading}>
+                  {roomSessionPrice !== undefined
+                    ? tr("startAndPay", { amount: money(startCharge) })
+                    : tr("startSession")}
+                </Button>
+              )}
             </form>
           ) : null}
           {openSessions.length === 0 && room.status !== "AVAILABLE" ? (
@@ -1123,6 +1207,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             }
             onExtend={() => {
               setExtendCount(1);
+              setExtendChoice({});
               setShowExtend(true);
             }}
             onTogglePause={() => void togglePause()}
@@ -1140,6 +1225,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             promotions={promotions.running}
             pendingDiscounts={promotions.discounts}
             promotionName={promotions.promotionName}
+            packageVariantIds={packageVariantIds}
           />
 
           {step === "menu" ? (
@@ -1258,6 +1344,27 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                 <span>{money(pendingDue)}</span>
               </p>
             </>
+          ) : isSpa && (cardPrompt === "extend" || cardPrompt === "open") ? (
+            <>
+              {chosenPackages(booking, spaPackages).map(({ package: item, quantity }) => (
+                <p key={item.id} className="flex justify-between gap-2">
+                  <span>
+                    {item.name} × {quantity}
+                  </span>
+                  <span>{money(item.price * quantity)}</span>
+                </p>
+              ))}
+              {bookingDue < bookingTotals.price ? (
+                <p className="flex justify-between text-emerald-300">
+                  <span>{tr("promotionDiscount")}</span>
+                  <span>−{money(bookingTotals.price - bookingDue)}</span>
+                </p>
+              ) : null}
+              <p className="mt-1 flex justify-between border-t border-slate-800 pt-1 font-semibold">
+                <span>{tr("packagesSummary", { count: bookingTotals.count, minutes: bookingTotals.minutes })}</span>
+                <span>{money(bookingDue)}</span>
+              </p>
+            </>
           ) : cardPrompt === "extend" ? (
             <p className="flex justify-between font-semibold">
               <span>
@@ -1373,6 +1480,24 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         <div className="fixed inset-0 z-40 grid place-items-center bg-black/75 p-4">
           <div className="w-full max-w-sm space-y-4 rounded-lg border border-slate-700 bg-slate-950 p-5">
             <h2 className="text-lg font-bold">{tr("extendTitle", { room: room?.roomNumber || "" })}</h2>
+            {isSpa ? (
+              <>
+                <PackagePicker
+                  kind={kind}
+                  packages={spaPackages}
+                  choice={extendChoice}
+                  discounts={promotions.discounts}
+                  onChange={(id, delta) => setExtendChoice((current) => changeChoice(current, id, delta))}
+                />
+                {bookingTotals.count ? (
+                  <p className="text-sm text-slate-300">
+                    {tr("packagesSummary", { count: bookingTotals.count, minutes: bookingTotals.minutes })}
+                    {` · ${money(bookingDue)}`}
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <>
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-300">{tr("moreSessionsLabel")}</span>
               <div className="flex items-center rounded bg-slate-800">
@@ -1403,11 +1528,17 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               })}
               {roomSessionPrice ? ` · ${money(roomSessionPrice * extendCount)}` : ""}
             </p>
+              </>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <Button variant="secondary" onClick={() => setShowExtend(false)}>
                 {t("common.cancel")}
               </Button>
-              <Button isLoading={isAdding} onClick={() => requestCard("extend")}>
+              <Button
+                isLoading={isAdding}
+                disabled={isSpa && !bookingTotals.count}
+                onClick={() => requestCard("extend")}
+              >
                 {tr("extendAndPay")}
               </Button>
             </div>
@@ -1495,6 +1626,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                 />
               </label>
             ))}
+            {!isSpa ? (
             <label className="text-sm">
               {tr("sessionPriceLabel")}
               <input
@@ -1510,30 +1642,11 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                 required
               />
             </label>
-            {kind === "spa"
-              ? (
-                [
-                  ["treatmentMinutes", "spa.treatmentLengthLabel"],
-                  ["graceMinutes", "spa.graceMinutes"],
-                ] as const
-              ).map(([key, label]) => (
-                <label key={key} className="text-sm">
-                  {t(label)}
-                  <input
-                    type="number"
-                    min={key === "graceMinutes" ? 0 : 1}
-                    value={roomForm[key]}
-                    onChange={(event) =>
-                      setRoomForm((current) => ({ ...current, [key]: event.target.value }))
-                    }
-                    className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2"
-                    required
-                  />
-                </label>
-              ))
-              : null}
+            ) : null}
             <p className="col-span-2 text-xs text-slate-400">
-              {roomForm.sessionPrice !== ""
+              {isSpa
+                ? tr("roomNoPriceHint")
+                : roomForm.sessionPrice !== ""
                 ? tr("priceSummary", {
                     price: money(roomForm.sessionPrice),
                     minutes: roomForm.treatmentMinutes,

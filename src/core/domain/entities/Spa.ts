@@ -93,3 +93,13 @@ export class SpaSessionQuote {
     Object.assign(this, { segments: [], ...data });
   }
 }
+
+/** A SPA service package: what the guest buys, with its time and price. */
+export interface SpaPackage {
+  id: string;
+  name: string;
+  durationMinutes: number;
+  price: number;
+  variantId: string;
+  items: { name: string; quantity: number }[];
+}

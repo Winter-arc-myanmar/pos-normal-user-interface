@@ -1426,7 +1426,15 @@
     "promotionsNow": "ယခု ပရိုမိုးရှင်း:",
     "promo": "ပရိုမို",
     "promoSaving": "{{name}} ဖြင့် {{amount}} လျှော့",
-    "promotionDiscount": "ပရိုမိုးရှင်း လျှော့စျေး"
+    "promotionDiscount": "ပရိုမိုးရှင်း လျှော့စျေး",
+    "noPackages": "ရောင်းရန် ဝန်ဆောင်မှု ပက်ကေ့ချ် မရှိပါ။ Admin ရှိ SPA packages တွင် ထည့်ပါ။",
+    "packageMeta": "{{minutes}} မိနစ် · {{price}}",
+    "packageIncludes": "{{items}} ပါဝင်",
+    "fewerOf": "{{name}} တစ်ခု လျှော့ရန်",
+    "moreOf": "{{name}} တစ်ခု ထပ်ထည့်ရန်",
+    "packagesSummary": "ပက်ကေ့ချ် {{count}} ခု · {{minutes}} မိနစ်",
+    "choosePackage": "ဝန်ဆောင်မှု ပက်ကေ့ချ် ရွေးပါ",
+    "roomNoPriceHint": "အခန်းတွင် ဈေးနှုန်း မရှိပါ။ အချိန်နှင့် ဈေးနှုန်းကို ရောင်းသော ပက်ကေ့ချ်မှ ယူသည်။"
   },
   "statusBadge": {
     "verified": "အတည်ပြုပြီး",

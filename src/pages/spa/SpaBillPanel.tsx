@@ -47,6 +47,7 @@ export function SpaBillPanel({
   promotions = [],
   pendingDiscounts = {},
   promotionName = () => undefined,
+  packageVariantIds,
 }: {
   kind?: RoomKind;
   room: SpaRoom | null;
@@ -75,6 +76,8 @@ export function SpaBillPanel({
   promotions?: RunningPromotion[];
   pendingDiscounts?: Record<string, PromotionDiscount>;
   promotionName?: (id: string | undefined) => string | undefined;
+  /** SPA package lines: booked treatments, shown by name and never edited. */
+  packageVariantIds?: Set<string>;
 }) {
   const tr = useRoomText(kind);
   const warning = getKtvWarning(session.endsAt, nowMs);
@@ -197,7 +200,8 @@ export function SpaBillPanel({
             const quantity = Number(line.quantity || 0);
             const unitPrice = Number(line.unitPrice || 0);
             const total = quantity * unitPrice - Number(line.lineDiscount || 0);
-            const isTreatment = line.variantId === room?.rateVariantId;
+            const isPackage = Boolean(packageVariantIds?.has(line.variantId));
+            const isTreatment = line.variantId === room?.rateVariantId || isPackage;
             const isFoc = Boolean(line.compReasonId);
             const editable = !billClosed && !isTreatment;
             return (
@@ -216,7 +220,7 @@ export function SpaBillPanel({
                         {tr("promo")}
                       </span>
                     ) : null}
-                    {isTreatment
+                    {isTreatment && !isPackage
                       ? tr("treatmentCharge")
                       : line.productName || itemNames[line.variantId] || tr("item")}
                   </p>

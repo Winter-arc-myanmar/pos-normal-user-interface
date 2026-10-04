@@ -10,6 +10,15 @@ const promotionState: {
   promotionName: (id: string | undefined) => string | undefined;
 } = { running: [], discounts: {}, promotionName: () => undefined };
 
+const spaPackages: {
+  id: string;
+  name: string;
+  durationMinutes: number;
+  price: number;
+  variantId: string;
+  items: { name: string; quantity: number }[];
+}[] = [];
+
 const mocks = vi.hoisted(() => ({
   fetchBoard: vi.fn(),
   getQuote: vi.fn(),
@@ -112,6 +121,10 @@ vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
 vi.mock("@/core/presentation/hooks/useSpaManagement", () => ({
   useSpaManagement: () => ({ rooms: [], quote: null }),
 }));
+vi.mock("@/core/presentation/hooks/useSpaPackages", () => ({
+  useSpaPackages: () => ({ packages: spaPackages, error: null }),
+}));
+
 vi.mock("@/core/presentation/hooks/useRoomPromotions", () => ({
   useRoomPromotions: () => promotionState,
 }));
