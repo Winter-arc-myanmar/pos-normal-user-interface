@@ -10,6 +10,7 @@ const FULL_ACCESS_ROLE = "ROOT_ADMIN";
 
 export const PAGE_PERMISSIONS = {
   dashboard: [] as string[],
+  salesSummary: [] as string[],
   users: ["MANAGE_USERS"],
   customers: [] as string[],
   cards: [] as string[],
@@ -46,6 +47,7 @@ export const PERMISSION_ROUTE_ORDER = [
   { path: "/tip-pools", permissions: PAGE_PERMISSIONS.tipPools },
   { path: "/sync", permissions: PAGE_PERMISSIONS.sync },
   { path: "/dashboard", permissions: PAGE_PERMISSIONS.dashboard },
+  { path: "/sales-summary", permissions: PAGE_PERMISSIONS.salesSummary },
   { path: "/users", permissions: PAGE_PERMISSIONS.users },
 ] as const;
 

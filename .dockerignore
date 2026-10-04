@@ -1,0 +1,32 @@
+# Dependencies and build output are reinstalled/rebuilt inside the image.
+node_modules
+dist
+dist-ssr
+coverage
+
+# Version control / editors.
+.git
+.gitignore
+.vscode
+.idea
+*.swp
+
+# Local environment and secrets (never bake these into the image).
+.env
+.env.*
+!.env.docker.example
+
+# Logs and caches.
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.eslintcache
+*.local
+
+# Docs and other non-build files.
+docs
+*.md
+_ref-wmfe
+vercel.json

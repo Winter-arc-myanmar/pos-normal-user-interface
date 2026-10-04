@@ -26,6 +26,11 @@ const DashboardPage = lazy(() =>
     default: module.DashboardPage,
   }))
 );
+const SalesSummaryPage = lazy(() =>
+  import("../../pages/SalesSummaryPage").then((module) => ({
+    default: module.SalesSummaryPage,
+  }))
+);
 const CashierPage = lazy(() =>
   import("../../pages/CashierPage").then((module) => ({
     default: module.CashierPage,
@@ -252,6 +257,16 @@ export function AppRouter() {
                     requiredPermissions={PAGE_PERMISSIONS.dashboard}
                   >
                     <DashboardPage />
+                  </RequirePermission>
+                }
+              />
+              <Route
+                path="/sales-summary"
+                element={
+                  <RequirePermission
+                    requiredPermissions={PAGE_PERMISSIONS.salesSummary}
+                  >
+                    <SalesSummaryPage />
                   </RequirePermission>
                 }
               />

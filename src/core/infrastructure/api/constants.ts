@@ -356,6 +356,11 @@ export const API_ENDPOINTS = {
 
   REPORTS: {
     SALES_SUMMARY: "/api/v1/reports/sales-summary",
+    POS_SUMMARY: "/api/v1/reports/pos-summary",
+    POS_BILLS: "/api/v1/reports/pos-bills",
+    BAR_CATEGORIES: "/api/v1/reports/bar-categories",
+    SPA_MENU: "/api/v1/reports/spa-menu",
+    KTV_SESSIONS: "/api/v1/reports/ktv-sessions",
     ITEM_SALES: "/api/v1/reports/item-sales",
     SALES_BY_CATEGORY: "/api/v1/reports/sales-by-category",
     SALES_BY_ITEM: "/api/v1/reports/sales-by-item",

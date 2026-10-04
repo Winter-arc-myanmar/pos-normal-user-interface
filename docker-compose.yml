@@ -1,0 +1,75 @@
+# ---------------------------------------------------------------------------
+# Vision POS - production stack.
+#
+# The service is completely stateless (no volumes): the SPA is baked into the
+# image and all state lives in the browser or the backend. That is what makes
+# it trivial to migrate - "docker compose up -d" on a new server and you are
+# back online, with nothing to restore.
+#
+# Usage:
+#   cp .env.docker.example .env      # then edit for the server
+#   docker compose up -d --build
+#   docker compose ps
+# ---------------------------------------------------------------------------
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Build-time API origin (Vite inlines it). See .env.docker.example.
+        VITE_API_URL: ${VITE_API_URL:-https://apivision.winterarc.asia}
+    image: vision-pos-web:latest
+    container_name: vision-pos-web
+
+    # Survive host reboots / crashers and re-deploys without manual help.
+    restart: unless-stopped
+
+    # Proper PID 1 handling (reaps zombies) for long-running stability.
+    init: true
+
+    ports:
+      # host:container  (container always listens on 80)
+      - "${APP_PORT:-8080}:80"
+
+    environment:
+      # Runtime backend origin for the optional same-origin proxy. Re-pointing
+      # to a new backend needs no image rebuild.
+      API_UPSTREAM: ${API_UPSTREAM:-https://apivision.winterarc.asia}
+
+    # =====================================================================
+    # CPU & RAM allocation
+    # ---------------------------------------------------------------------
+    # A static nginx server is extremely light. These numbers give plenty of
+    # headroom for a busy venue POS while protecting the host:
+    #   * hard ceiling  -> 1 CPU core / 256 MB  (container is killed if exceeded)
+    #   * reservation   -> 0.25 CPU / 64 MB     (guaranteed minimum)
+    # Real-world idle usage is roughly 5-20 MB RAM and near 0% CPU.
+    # Tune the limits for your fleet via the deploy.resources block below.
+    # =====================================================================
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 256M
+        reservations:
+          cpus: "0.25"
+          memory: 64M
+
+    # Bounded, rotating logs so the host disk never fills up over months.
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+
+    security_opt:
+      - no-new-privileges:true

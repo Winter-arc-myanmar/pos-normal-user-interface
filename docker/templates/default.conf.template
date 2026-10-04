@@ -1,0 +1,70 @@
+# Vision POS - virtual host.
+# Rendered from this template by the official nginx entrypoint at container
+# start. Only API_UPSTREAM is substituted (see NGINX_ENVSUBST_FILTER), every
+# nginx runtime variable such as $uri is left untouched.
+server {
+    listen       80;
+    listen  [::]:80;
+    server_name  _;
+
+    root   /usr/share/nginx/html;
+    index  index.html;
+
+    # ---- Health probe for Docker / load balancers ----
+    location = /healthz {
+        access_log   off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    # ---- Optional same-origin backend proxy ----
+    # Mirrors the Vite dev proxy (vite.config.ts) and public/_redirects. It is
+    # only exercised when the app is built with VITE_API_URL set to this site's
+    # own origin; otherwise the bundle calls the API origin directly.
+    # The ^~ prefix makes these win over the static-file regex below.
+    location ^~ /api/ {
+        include /etc/nginx/snippets/security-headers.conf;
+        include /etc/nginx/snippets/proxy.conf;
+        proxy_pass ${API_UPSTREAM};
+    }
+
+    location ^~ /csrf/ {
+        include /etc/nginx/snippets/security-headers.conf;
+        include /etc/nginx/snippets/proxy.conf;
+        proxy_pass ${API_UPSTREAM};
+    }
+
+    location ^~ /uploads/ {
+        include /etc/nginx/snippets/proxy.conf;
+        proxy_pass ${API_UPSTREAM};
+    }
+
+    # ---- Content-hashed build output: cache hard & immutably ----
+    location ^~ /assets/ {
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        access_log off;
+        try_files $uri =404;
+    }
+
+    # ---- Other static files at the web root (logo, icons, fonts) ----
+    location ~* \.(?:css|js|mjs|map|woff2?|ttf|otf|eot|png|jpe?g|gif|webp|avif|svg|ico)$ {
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "public, max-age=2592000" always;
+        access_log off;
+        try_files $uri =404;
+    }
+
+    # ---- HTML shell must never be cached, so a new deploy is picked up at once ----
+    location = /index.html {
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "no-store, no-cache, must-revalidate" always;
+    }
+
+    # ---- SPA fallback: unknown paths serve the app shell (client-side router) ----
+    location / {
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "no-store, no-cache, must-revalidate" always;
+        try_files $uri $uri/ /index.html;
+    }
+}
