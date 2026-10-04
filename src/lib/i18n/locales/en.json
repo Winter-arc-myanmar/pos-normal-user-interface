@@ -1476,7 +1476,15 @@
     "moreOf": "One more {{name}}",
     "packagesSummary": "Packages: {{count}} · {{minutes}} min",
     "choosePackage": "Choose a service package",
-    "roomNoPriceHint": "The room has no price. Time and price come from the service package sold."
+    "roomNoPriceHint": "The room has no price. Time and price come from the service package sold.",
+    "startOnBill": "Start · {{amount}} on the bill",
+    "startedOnBill": "Started. Everything goes on the bill and is paid at the end.",
+    "addToBillShort": "Add to bill",
+    "addedToBillNotice": "Added to the bill.",
+    "memberCardOnly": "This business takes member cards only for room bills.",
+    "payOtherTitle": "Or pay another way",
+    "payOtherHint": "The room is closed first, then {{amount}} is paid in full.",
+    "payWith": "Close and pay with {{method}}"
   },
   "statusBadge": {
     "verified": "Verified",

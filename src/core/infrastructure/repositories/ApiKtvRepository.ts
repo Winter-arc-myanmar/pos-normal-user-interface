@@ -148,6 +148,11 @@ const toQuote = (value: unknown) => {
     runningTotal: String(item.runningTotal || "0.0000"),
     prepaid: Boolean(item.prepaid),
     paidTotal: String(item.paidTotal || "0.0000"),
+    paymentTiming:
+      item.paymentTiming === "PAY_AT_END" || item.paymentTiming === "PAY_WHEN_ORDERING"
+        ? item.paymentTiming
+        : null,
+    amountDue: String(item.amountDue || "0.0000"),
   });
 };
 

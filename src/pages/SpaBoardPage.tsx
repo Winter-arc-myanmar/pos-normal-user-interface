@@ -24,6 +24,7 @@ import { RoomKind, useRoomPos } from "@/core/presentation/hooks/useRoomPos";
 import { useRoomText } from "@/core/presentation/hooks/useRoomText";
 import { useRoomPromotions } from "@/core/presentation/hooks/useRoomPromotions";
 import { useSpaPackages } from "@/core/presentation/hooks/useSpaPackages";
+import { useVenueSetting } from "@/core/presentation/hooks/useVenueSetting";
 import {
   changeChoice,
   choiceTotals,
@@ -190,6 +191,10 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const room = rooms.find((item) => item.id === selectedRoomId) || null;
   const isSpa = kind === "spa";
   const { packages: spaPackages } = useSpaPackages(isSpa);
+  const venue = useVenueSetting();
+  // A new room follows Venue setup; a running one keeps how it started.
+  const startsAtEnd = venue.paymentTiming === "PAY_AT_END";
+  const atEnd = quote?.paymentTiming === "PAY_AT_END";
   const openSessions = useMemo(
     () => (room?.sessions || []).filter(isOpenSpaSession),
     [room?.sessions]
@@ -200,6 +205,14 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const cashMethod = paymentMethods.find(
     (method) => String(method.kind || "").toUpperCase() === "CASH"
   );
+  const allowOtherPayments = atEnd && !venue.roomCardOnly;
+  const otherMethods = paymentMethods.filter(
+    (method) =>
+      method.id !== cardMethod?.id &&
+      method.id !== LOCAL_MEMBER_CARD_METHOD_ID &&
+      String(method.kind || "").toUpperCase() !== "GUEST_CARD"
+  );
+  const [otherMethodId, setOtherMethodId] = useState("");
   const tipValue = Math.max(0, Number(tip) || 0);
   const cashValue = splitCash ? Math.max(0, Number(cashAmount) || 0) : 0;
   const estimatedCard = estimateCardCharge({
@@ -488,6 +501,92 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     }
   };
 
+  /** Pay at the end: the room starts with what was booked on its bill, no card tap. */
+  const openOnBill = async () => {
+    if (!room) return;
+    setActionError(null);
+    try {
+      const context = await requireCashierContext();
+      const created = await openSession({
+        roomId: room.id,
+        ...(wallet ? { guestWalletId: wallet.id } : {}),
+        guestCount: Math.max(1, Number(guestCount) || 1),
+        ...(isSpa
+          ? { packages: packageOrders(packageChoice, spaPackages) }
+          : { sessions: sessionCount }),
+        posRegisterId: context.posRegisterId,
+        openedByPosSessionId: context.posSessionId,
+        salesChannel: "POS",
+      });
+      await fetchBoard();
+      await selectSession(created);
+      setNotice(tr("startedOnBill"));
+    } catch (caught) {
+      setActionError(caught instanceof Error ? caught.message : tr("errors.openSession"));
+    }
+  };
+
+  /** Pay at the end: more time goes on the bill, no card tap. */
+  const extendOnBill = async () => {
+    if (!session) return;
+    setActionError(null);
+    setIsAdding(true);
+    try {
+      await extendSession(
+        session.id,
+        isSpa
+          ? { packages: packageOrders(extendChoice, spaPackages), idempotencyKey: keyFor("extend") }
+          : { sessions: extendCount, idempotencyKey: keyFor("extend") }
+      );
+      tapKeys.current.extend = undefined;
+      setShowExtend(false);
+      setSession({
+        ...session,
+        plannedMinutes:
+          (session.plannedMinutes || 0) +
+          (isSpa
+            ? choiceTotals(extendChoice, spaPackages).minutes
+            : extendCount * sessionMinutes(room)),
+      });
+      setExtendChoice({});
+      setNotice(tr("addedToBillNotice"));
+      await fetchBoard();
+      await refreshBill(session);
+    } catch (caught) {
+      setActionError(caught instanceof Error ? caught.message : tr("errors.extend"));
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
+  /** Pay at the end: new items go on the bill and to the kitchen, no card tap. */
+  const commitOnBill = async () => {
+    const toAdd = paidPending(pending);
+    if (!session || billClosed || !toAdd.length) return;
+    setActionError(null);
+    setIsAdding(true);
+    try {
+      await chargeItems(session.id, {
+        items: toAdd.map((item) => ({ variantId: item.variantId, quantity: item.quantity })),
+        idempotencyKey: keyFor("add"),
+      });
+      tapKeys.current.add = undefined;
+      setPending(focPending);
+      setNotice(tr("itemsAdded", { count: toAdd.reduce((sum, item) => sum + item.quantity, 0) }));
+    } catch (caught) {
+      setActionError(caught instanceof Error ? caught.message : tr("errors.editLine"));
+    } finally {
+      setIsAdding(false);
+      await refreshBill(session);
+    }
+  };
+
+  /** Adds the tray: a card tap when paying as it goes, straight onto the bill otherwise. */
+  const addPaidItems = () => {
+    if (atEnd) void commitOnBill();
+    else requestCard("add");
+  };
+
   const extendTreatment = async (payer: GuestWallet, payerCard: GuestCard) => {
     if (!session) return;
     setActionError(null);
@@ -584,7 +683,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       void fetchDiscountReasons().catch(() => undefined);
       return;
     }
-    requestCard("add");
+    addPaidItems();
   };
 
   const confirmFoc = async () => {
@@ -603,7 +702,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       setShowFoc(false);
       setNotice(tr("focGiven", { count }));
       await refreshBill(session);
-      if (rest.length) requestCard("add");
+      if (rest.length) addPaidItems();
     } catch (caught) {
       setActionError(caught instanceof Error ? caught.message : tr("errors.foc"));
     } finally {
@@ -716,7 +815,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     event.preventDefault();
     if (!room) return;
     if (isSpa && !choiceTotals(packageChoice, spaPackages).count) return;
-    requestCard("open");
+    if (startsAtEnd) void openOnBill();
+    else requestCard("open");
   };
 
   const handleAddProduct = async (product: Product, variantId: string, quantity: number) => {
@@ -816,6 +916,92 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     await getQuote(session.id);
   };
 
+  const printPaid = async (
+    result: SettleSalesOrderResultDTO,
+    endAt: string,
+    methodName: string
+  ) => {
+    if (!session) return;
+    try {
+      await printer.printReceipt({
+        title: "RECEIPT",
+        place: "CHECKOUT",
+        showLogo: true,
+        showPrices: true,
+        receiptId: result.orderNumber || session.salesOrderId,
+        cashier: user?.name,
+        serviceType: kind === "ktv" ? "KTV" : "SPA",
+        tableOrRoom: room?.roomNumber || quote?.roomNumber,
+        paidAt: new Date().toLocaleString(),
+        startTime: formatDateTime(session.openedAt),
+        endTime: formatDateTime(endAt),
+        startTimeLabel: t("receipt.startTime"),
+        endTimeLabel: t("receipt.endTime"),
+        lines: orderLines
+          .filter((line) => !line.voidedAt)
+          .map((line) => {
+            const modifiers = modifierPrintText(line.selectedModifiers);
+            return {
+              name: lineDisplayName(line) || line.productName || itemNames[line.variantId] || tr("item"),
+              quantity: String(line.quantity || "1"),
+              unitPrice: line.unitPrice?.trim() || undefined,
+              modifiers: modifiers.names,
+              modifierPrices: modifiers.prices,
+            };
+          }),
+        total: result.grandTotal,
+        payments: [{ name: methodName, amount: result.totalPaid || result.grandTotal }],
+      });
+    } catch (printError) {
+      toast.error(
+        printError instanceof Error ? printError.message : t("receipt.printFailed")
+      );
+    }
+  };
+
+  /** Pay at the end with cash or another method: close the room, then settle the bill. */
+  const handlePayOther = async () => {
+    const method = otherMethods.find((item) => item.id === otherMethodId);
+    if (!session?.salesOrderId || !method) return;
+    setActionError(null);
+    setIsPaying(true);
+    try {
+      const context = await requireCashierContext();
+      let endAt = session.closedAt || session.endsAt || "";
+      let due = Number(quote?.amountDue || 0);
+      if (!billClosed) {
+        const closed = await closeSession(session.id, {});
+        endAt = closed.asOf || new Date().toISOString();
+        due = Number(closed.amountDue ?? closed.runningTotal ?? 0);
+        setSession({ ...session, sessionState: "CLOSED" });
+      }
+      const result =
+        due > 0
+          ? await settleOrder(session.salesOrderId, {
+              payments: [{ paymentMethodId: method.id, amount: (due + tipValue).toFixed(4) }],
+              posSessionId: context.posSessionId,
+              ...(tipValue > 0 ? { tipAmount: tipValue.toFixed(4) } : {}),
+              idempotencyKey: spaSettleKey(session.id),
+            })
+          : {
+              orderId: session.salesOrderId,
+              orderNumber: "",
+              grandTotal: "0.0000",
+              totalPaid: "0.0000",
+              change: "0.0000",
+              status: "COMPLETED",
+            };
+      await printPaid(result, endAt, method.name || "Payment");
+      setPaid(result);
+      writeResume(kind, null);
+      await fetchBoard();
+    } catch (caught) {
+      setActionError(caught instanceof Error ? caught.message : tr("errors.pay"));
+    } finally {
+      setIsPaying(false);
+    }
+  };
+
   const handlePay = async () => {
     if (!session?.salesOrderId || !card || !wallet) {
       requestCard("pay");
@@ -861,46 +1047,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         ...(tipValue > 0 ? { tipAmount: tipValue.toFixed(4) } : {}),
         idempotencyKey: spaSettleKey(session.id),
       });
-      try {
-        await printer.printReceipt({
-          title: "RECEIPT",
-          place: "CHECKOUT",
-          showLogo: true,
-          showPrices: true,
-          receiptId: result.orderNumber || session.salesOrderId,
-          cashier: user?.name,
-          serviceType: kind === "ktv" ? "KTV" : "SPA",
-          tableOrRoom: room?.roomNumber || quote?.roomNumber,
-          paidAt: new Date().toLocaleString(),
-          startTime: formatDateTime(session.openedAt),
-          endTime: formatDateTime(endAt),
-          startTimeLabel: t("receipt.startTime"),
-          endTimeLabel: t("receipt.endTime"),
-          lines: orderLines
-            .filter((line) => !line.voidedAt)
-            .map((line) => {
-              const modifiers = modifierPrintText(line.selectedModifiers);
-              return {
-                name: lineDisplayName(line) || line.productName || itemNames[line.variantId] || tr("item"),
-                quantity: String(line.quantity || "1"),
-                unitPrice: line.unitPrice?.trim() || undefined,
-                modifiers: modifiers.names,
-                modifierPrices: modifiers.prices,
-              };
-            }),
-          total: result.grandTotal,
-          payments: [
-            {
-              name: cardMethod.name || "Payment",
-              amount: result.totalPaid || result.grandTotal,
-            },
-          ],
-        });
-      } catch (printError) {
-        toast.error(
-          printError instanceof Error ? printError.message : t("receipt.printFailed")
-        );
-      }
+      await printPaid(result, endAt, cardMethod.name || "Payment");
       setPaid(result);
       writeResume(kind, null);
       setWallet(await getWallet(wallet.id));
@@ -917,7 +1064,9 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       setActionError(tr("errors.pendingItems"));
       return;
     }
-    requestCard("pay");
+    // When other methods are allowed, the cashier chooses on the pay screen first.
+    if (allowOtherPayments) setStep("pay");
+    else requestCard("pay");
   };
 
   const handleSaveRoom = async (event: FormEvent) => {
@@ -1152,15 +1301,19 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               </label>
               {isSpa ? (
                 <Button type="submit" isLoading={isLoading} disabled={!bookingTotals.count}>
-                  {bookingTotals.count
-                    ? tr("startAndPay", { amount: money(bookingDue) })
-                    : tr("choosePackage")}
+                  {!bookingTotals.count
+                    ? tr("choosePackage")
+                    : startsAtEnd
+                      ? tr("startOnBill", { amount: money(bookingDue) })
+                      : tr("startAndPay", { amount: money(bookingDue) })}
                 </Button>
               ) : (
                 <Button type="submit" isLoading={isLoading}>
-                  {roomSessionPrice !== undefined
-                    ? tr("startAndPay", { amount: money(startCharge) })
-                    : tr("startSession")}
+                  {roomSessionPrice === undefined
+                    ? tr("startSession")
+                    : startsAtEnd
+                      ? tr("startOnBill", { amount: money(startCharge) })
+                      : tr("startAndPay", { amount: money(startCharge) })}
                 </Button>
               )}
             </form>
@@ -1278,6 +1431,9 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                   className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2"
                 />
               </label>
+              {atEnd && venue.roomCardOnly ? (
+                <p className="text-xs text-slate-400">{tr("memberCardOnly")}</p>
+              ) : (
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
@@ -1286,6 +1442,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                 />
                 {tr("splitCash")}
               </label>
+              )}
               {splitCash ? (
                 <label className="block text-sm">
                   {tr("cashAmount")}
@@ -1309,6 +1466,42 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                   {billClosed ? tr("retryPay") : tr("confirmPay")}
                 </Button>
               </div>
+              {allowOtherPayments && otherMethods.length ? (
+                <div className="space-y-2 border-t border-slate-800 pt-4">
+                  <p className="text-sm font-semibold">{tr("payOtherTitle")}</p>
+                  <p className="text-xs text-slate-400">
+                    {tr("payOtherHint", { amount: money(Number(quote?.amountDue || quote?.runningTotal || 0) + tipValue) })}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {otherMethods.map((method) => (
+                      <button
+                        key={method.id}
+                        type="button"
+                        aria-pressed={otherMethodId === method.id}
+                        onClick={() => setOtherMethodId(method.id)}
+                        className={`rounded border px-3 py-1.5 text-sm ${
+                          otherMethodId === method.id
+                            ? "border-emerald-500 bg-emerald-500/15"
+                            : "border-slate-700"
+                        }`}
+                      >
+                        {method.name}
+                      </button>
+                    ))}
+                  </div>
+                  <Button
+                    variant="secondary"
+                    className="w-full"
+                    isLoading={isPaying}
+                    disabled={!otherMethodId}
+                    onClick={() => void handlePayOther()}
+                  >
+                    {tr("payWith", {
+                      method: otherMethods.find((item) => item.id === otherMethodId)?.name || "",
+                    })}
+                  </Button>
+                </div>
+              ) : null}
             </div>
           )}
         </div>
@@ -1537,9 +1730,9 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               <Button
                 isLoading={isAdding}
                 disabled={isSpa && !bookingTotals.count}
-                onClick={() => requestCard("extend")}
+                onClick={() => (atEnd ? void extendOnBill() : requestCard("extend"))}
               >
-                {tr("extendAndPay")}
+                {atEnd ? tr("addToBillShort") : tr("extendAndPay")}
               </Button>
             </div>
           </div>

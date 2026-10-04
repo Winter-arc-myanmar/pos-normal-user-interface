@@ -19,6 +19,11 @@ let spaPackages: {
   items: { name: string; quantity: number }[];
 }[] = [];
 
+let venueState: { paymentTiming: "PAY_WHEN_ORDERING" | "PAY_AT_END"; roomCardOnly: boolean } = {
+  paymentTiming: "PAY_WHEN_ORDERING",
+  roomCardOnly: true,
+};
+
 const mocks = vi.hoisted(() => ({
   fetchBoard: vi.fn(),
   getQuote: vi.fn(),
@@ -172,6 +177,10 @@ vi.mock("@/core/presentation/hooks/useSpaManagement", () => ({
   }),
 }));
 
+vi.mock("@/core/presentation/hooks/useVenueSetting", () => ({
+  useVenueSetting: () => venueState,
+}));
+
 vi.mock("@/core/presentation/hooks/useSpaPackages", () => ({
   useSpaPackages: () => ({ packages: spaPackages, error: null }),
 }));
@@ -272,6 +281,7 @@ const tapCard = async (uid = "04A3B2C1") => {
 describe("SpaBoardPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    venueState = { paymentTiming: "PAY_WHEN_ORDERING", roomCardOnly: true };
     rooms = [room("wallet-1")];
     lines = [];
     quote = legacyQuote;
@@ -607,6 +617,114 @@ describe("SpaBoardPage", () => {
   it("keeps packages off the menu: they are booked with the treatment", async () => {
     await openRunningRoom();
     expect(screen.queryByRole("button", { name: /Thai massage 90 min/ })).not.toBeInTheDocument();
+  });
+
+  describe("paid at the end", () => {
+    const atEndQuote = () => ({
+      ...legacyQuote,
+      prepaid: false,
+      paidTotal: "0.0000",
+      paymentTiming: "PAY_AT_END",
+      amountDue: "53000.0000",
+    });
+
+    beforeEach(() => {
+      venueState = { paymentTiming: "PAY_AT_END", roomCardOnly: true };
+      quote = atEndQuote();
+      mocks.chargeItems.mockResolvedValue({ charged: "0.0000", balanceAfter: "0", quote });
+      mocks.extendSession.mockResolvedValue({ charged: "0.0000", balanceAfter: "0", quote });
+    });
+
+    it("starts the room with its packages on the bill, without a card tap", async () => {
+      rooms = [{ ...room("wallet-1"), status: "AVAILABLE", sessions: [] }];
+      mocks.openSession.mockResolvedValue({
+        id: "session-2",
+        roomId: "room-1",
+        salesOrderId: "order-2",
+        guestCount: 1,
+        openedAt: "2026-09-26T08:00:00Z",
+        sessionState: "OPEN",
+      });
+      renderPage();
+      fireEvent.click(screen.getByRole("button", { name: /SUITE1/ }));
+      const [moreThai] = await screen.findAllByRole("button", { name: "spa.moreOf" });
+      fireEvent.click(moreThai);
+      fireEvent.click(screen.getByRole("button", { name: "spa.startOnBill" }));
+
+      await waitFor(() => expect(mocks.openSession).toHaveBeenCalled());
+      const [[payload]] = mocks.openSession.mock.calls as [[Record<string, unknown>]];
+      expect(payload).toMatchObject({ packages: [{ packageId: "pkg-thai", quantity: 1 }] });
+      expect(payload).not.toHaveProperty("prepay");
+      expect(screen.queryByPlaceholderText("spa.cardUid")).not.toBeInTheDocument();
+    });
+
+    it("adds items to the bill without a card tap", async () => {
+      await openRunningRoom();
+      fireEvent.click(screen.getByRole("button", { name: /Foot Scrub/ }));
+      fireEvent.click(await screen.findByRole("button", { name: /spa.addToBill/ }));
+
+      await waitFor(() =>
+        expect(mocks.chargeItems).toHaveBeenCalledWith(
+          "session-1",
+          expect.objectContaining({ items: [{ variantId: "variant-scrub", quantity: 1 }] })
+        )
+      );
+      expect(mocks.chargeItems.mock.calls[0][1]).not.toHaveProperty("guestCardId");
+      expect(mocks.addOrderLine).not.toHaveBeenCalled();
+      expect(screen.queryByPlaceholderText("spa.cardUid")).not.toBeInTheDocument();
+    });
+
+    it("adds a package to the bill without a card tap", async () => {
+      await openRunningRoom();
+      fireEvent.click(screen.getByRole("button", { name: "spa.extend" }));
+      const [moreThai] = screen.getAllByRole("button", { name: "spa.moreOf" });
+      fireEvent.click(moreThai);
+      fireEvent.click(screen.getByRole("button", { name: "spa.addToBillShort" }));
+
+      await waitFor(() =>
+        expect(mocks.extendSession).toHaveBeenCalledWith(
+          "session-1",
+          expect.objectContaining({ packages: [{ packageId: "pkg-thai", quantity: 1 }] })
+        )
+      );
+      expect(mocks.extendSession.mock.calls[0][1]).not.toHaveProperty("guestCardId");
+    });
+
+    it("takes only the member card when the business says so", async () => {
+      await openRunningRoom();
+      fireEvent.click(screen.getByRole("button", { name: "spa.goToPay" }));
+      expect(await screen.findByPlaceholderText("spa.cardUid")).toBeInTheDocument();
+      await tapCard();
+
+      expect(await screen.findByText("spa.memberCardOnly")).toBeInTheDocument();
+      expect(screen.queryByText("spa.splitCash")).not.toBeInTheDocument();
+      expect(screen.queryByText("spa.payOtherTitle")).not.toBeInTheDocument();
+    });
+
+    it("closes the room, then takes cash for the whole bill when other payments are allowed", async () => {
+      venueState = { paymentTiming: "PAY_AT_END", roomCardOnly: false };
+      mocks.closeSession.mockResolvedValue({ ...atEndQuote(), state: "CLOSED" });
+      await openRunningRoom();
+      fireEvent.click(screen.getByRole("button", { name: "spa.goToPay" }));
+
+      expect(await screen.findByText("spa.payOtherTitle")).toBeInTheDocument();
+      expect(screen.queryByPlaceholderText("spa.cardUid")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Cash" }));
+      fireEvent.click(screen.getByRole("button", { name: "spa.payWith" }));
+
+      await waitFor(() =>
+        expect(mocks.settleOrder).toHaveBeenCalledWith(
+          "order-1",
+          expect.objectContaining({
+            payments: [{ paymentMethodId: "cash-method", amount: "53000.0000" }],
+            posSessionId: "pos-session-1",
+          })
+        )
+      );
+      expect(mocks.closeSession.mock.invocationCallOrder[0]).toBeLessThan(
+        mocks.settleOrder.mock.invocationCallOrder[0]
+      );
+    });
   });
 
   describe("paid as it goes", () => {

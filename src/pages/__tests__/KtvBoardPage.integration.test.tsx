@@ -19,6 +19,11 @@ const spaPackages: {
   items: { name: string; quantity: number }[];
 }[] = [];
 
+let venueState: { paymentTiming: "PAY_WHEN_ORDERING" | "PAY_AT_END"; roomCardOnly: boolean } = {
+  paymentTiming: "PAY_WHEN_ORDERING",
+  roomCardOnly: true,
+};
+
 const mocks = vi.hoisted(() => ({
   fetchBoard: vi.fn(),
   getQuote: vi.fn(),
@@ -121,6 +126,10 @@ vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
 vi.mock("@/core/presentation/hooks/useSpaManagement", () => ({
   useSpaManagement: () => ({ rooms: [], quote: null }),
 }));
+vi.mock("@/core/presentation/hooks/useVenueSetting", () => ({
+  useVenueSetting: () => venueState,
+}));
+
 vi.mock("@/core/presentation/hooks/useSpaPackages", () => ({
   useSpaPackages: () => ({ packages: spaPackages, error: null }),
 }));
@@ -227,6 +236,7 @@ const tapCard = async () => {
 describe("KtvBoardPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    venueState = { paymentTiming: "PAY_WHEN_ORDERING", roomCardOnly: true };
     rooms = [freeRoom];
     mocks.fetchBoard.mockResolvedValue(rooms);
     mocks.getQuote.mockResolvedValue(paidQuote);
@@ -278,6 +288,30 @@ describe("KtvBoardPage", () => {
       )
     );
     expect(mocks.openSession.mock.calls[0][0]).not.toHaveProperty("sessions");
+  });
+
+  it("starts a room for the chosen hours on the bill when the business takes payment at the end", async () => {
+    venueState = { paymentTiming: "PAY_AT_END", roomCardOnly: true };
+    mocks.openSession.mockResolvedValue({
+      id: "ktv-session-1",
+      roomId: "ktv-1",
+      salesOrderId: "order-1",
+      guestCount: 1,
+      openedAt: "2026-09-26T12:00:00Z",
+      sessionState: "OPEN",
+    });
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /K1/ }));
+    fireEvent.click(screen.getByRole("button", { name: "ktvPos.moreSessions" }));
+    fireEvent.click(screen.getByRole("button", { name: "ktvPos.startOnBill" }));
+
+    await waitFor(() =>
+      expect(mocks.openSession).toHaveBeenCalledWith(
+        expect.objectContaining({ roomId: "ktv-1", hours: 2 })
+      )
+    );
+    expect(mocks.openSession.mock.calls[0][0].prepay).toBeUndefined();
+    expect(screen.queryByPlaceholderText("ktvPos.cardUid")).not.toBeInTheDocument();
   });
 
   it("sells more time by the hour with a tap", async () => {

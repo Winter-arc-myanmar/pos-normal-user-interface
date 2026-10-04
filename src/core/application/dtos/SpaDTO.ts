@@ -43,14 +43,25 @@ export interface OpenSpaSessionDTO {
   salesChannel?: "POS";
 }
 
-export interface ExtendSpaSessionDTO extends SpaCardChargeDTO {
+/**
+ * The card on an order into a running room: required when the venue takes payment
+ * when ordering, left out when it takes payment at the end.
+ */
+export interface RoomOrderCardDTO {
+  guestCardId?: string;
+  paymentMethodId?: string;
+  posSessionId?: string;
+  idempotencyKey?: string;
+}
+
+export interface ExtendSpaSessionDTO extends RoomOrderCardDTO {
   /** KTV: hours. */
   sessions?: number;
   /** SPA: more service packages. */
   packages?: { packageId: string; quantity: number }[];
 }
 
-export interface ChargeSpaItemsDTO extends SpaCardChargeDTO {
+export interface ChargeSpaItemsDTO extends RoomOrderCardDTO {
   items: { variantId: string; quantity: number }[];
 }
 

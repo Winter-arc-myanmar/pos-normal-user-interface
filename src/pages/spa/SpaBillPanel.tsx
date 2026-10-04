@@ -90,6 +90,8 @@ export function SpaBillPanel({
   const pendingCount = pending.reduce((sum, item) => sum + item.quantity, 0);
   const freeCount = focPending(pending).reduce((sum, item) => sum + item.quantity, 0);
   const prepaid = Boolean(quote?.prepaid);
+  // Time is bought (paid now, or on the bill to pay at the end), never run up on a clock.
+  const canExtend = prepaid || quote?.paymentTiming === "PAY_AT_END";
   const visibleLines = lines.filter(
     (line) => !["VOIDED", "COMPED"].includes(String(line.status || "").toUpperCase())
   );
@@ -438,11 +440,11 @@ export function SpaBillPanel({
       </section>
 
       {!billClosed ? (
-        <div className={`grid shrink-0 gap-2 ${prepaid ? "grid-cols-3" : "grid-cols-2"}`}>
+        <div className={`grid shrink-0 gap-2 ${canExtend ? "grid-cols-3" : "grid-cols-2"}`}>
           <Button variant="secondary" disabled={isBusy} onClick={onTogglePause}>
             {isPaused ? tr("resume") : tr("pause")}
           </Button>
-          {prepaid ? (
+          {canExtend ? (
             <Button variant="secondary" disabled={isBusy} onClick={onExtend}>
               {tr("extend")}
             </Button>
