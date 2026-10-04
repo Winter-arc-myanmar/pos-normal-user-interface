@@ -1,7 +1,21 @@
+import { PosType } from "../../domain/entities/Promotion";
+
+export type { PosType };
+
 export interface ReportRangeQuery {
   from: string;
   to?: string;
   locationId?: string;
+}
+
+export interface PosReportQuery extends ReportRangeQuery {
+  posType: PosType;
+}
+
+export interface PosBillsQuery extends PosReportQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
 }
 
 export interface ItemSalesQuery extends ReportRangeQuery {

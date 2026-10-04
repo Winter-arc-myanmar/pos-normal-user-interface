@@ -36,6 +36,7 @@ function flatten(obj: Tree, prefix = ""): Record<string, string> {
 
 const PAGE_KEYS = [
   "dashboard.title",
+  "salesSummary.title",
   "login.title",
   "users.title",
   "crm.addCustomer",

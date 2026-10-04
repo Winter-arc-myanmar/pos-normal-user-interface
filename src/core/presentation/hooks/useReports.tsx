@@ -3,6 +3,8 @@ import {
   DailyReportQuery,
   DatedRangeQuery,
   ItemSalesQuery,
+  PosBillsQuery,
+  PosReportQuery,
   ReportRangeQuery,
 } from "../../application/dtos/ReportDTO";
 import { IReportService } from "../../domain/services/IReportService";
@@ -32,6 +34,26 @@ export function useReports() {
     (query: ReportRangeQuery) => run(() => reportService.salesSummary(query)),
     [run]
   );
+  const posSummary = useCallback(
+    (query: PosReportQuery) => run(() => reportService.posSummary(query)),
+    [run]
+  );
+  const posBills = useCallback(
+    (query: PosBillsQuery) => run(() => reportService.posBills(query)),
+    [run]
+  );
+  const barCategories = useCallback(
+    (query: ReportRangeQuery) => run(() => reportService.barCategories(query)),
+    [run]
+  );
+  const spaMenu = useCallback(
+    (query: ReportRangeQuery) => run(() => reportService.spaMenu(query)),
+    [run]
+  );
+  const ktvSessions = useCallback(
+    (query: ReportRangeQuery) => run(() => reportService.ktvSessions(query)),
+    [run]
+  );
   const itemSales = useCallback(
     (query: ItemSalesQuery) => run(() => reportService.itemSales(query)),
     [run]
@@ -49,5 +71,18 @@ export function useReports() {
     [run]
   );
 
-  return { isLoading, error, salesSummary, itemSales, zReport, salesByCategory, salesByItem };
+  return {
+    isLoading,
+    error,
+    salesSummary,
+    posSummary,
+    posBills,
+    barCategories,
+    spaMenu,
+    ktvSessions,
+    itemSales,
+    zReport,
+    salesByCategory,
+    salesByItem,
+  };
 }

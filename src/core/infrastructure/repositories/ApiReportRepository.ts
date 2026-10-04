@@ -2,11 +2,17 @@ import {
   DailyReportQuery,
   DatedRangeQuery,
   ItemSalesQuery,
+  PosBillsQuery,
+  PosReportQuery,
   ReportRangeQuery,
 } from "../../application/dtos/ReportDTO";
 import {
+  BarCategoriesReport,
   ItemSalesReport,
+  KtvSessionsReport,
+  PosBillsReport,
   SalesSummaryReport,
+  SpaMenuReport,
   ZReport,
 } from "../../domain/entities/Report";
 import { IReportRepository } from "../../domain/repositories/IReportRepository";
@@ -40,6 +46,26 @@ export class ApiReportRepository implements IReportRepository {
 
   salesSummary(query: ReportRangeQuery) {
     return this.getData<SalesSummaryReport>(API_ENDPOINTS.REPORTS.SALES_SUMMARY, query);
+  }
+
+  posSummary(query: PosReportQuery) {
+    return this.getData<SalesSummaryReport>(API_ENDPOINTS.REPORTS.POS_SUMMARY, query);
+  }
+
+  posBills(query: PosBillsQuery) {
+    return this.getData<PosBillsReport>(API_ENDPOINTS.REPORTS.POS_BILLS, query);
+  }
+
+  barCategories(query: ReportRangeQuery) {
+    return this.getData<BarCategoriesReport>(API_ENDPOINTS.REPORTS.BAR_CATEGORIES, query);
+  }
+
+  spaMenu(query: ReportRangeQuery) {
+    return this.getData<SpaMenuReport>(API_ENDPOINTS.REPORTS.SPA_MENU, query);
+  }
+
+  ktvSessions(query: ReportRangeQuery) {
+    return this.getData<KtvSessionsReport>(API_ENDPOINTS.REPORTS.KTV_SESSIONS, query);
   }
 
   itemSales(query: ItemSalesQuery) {

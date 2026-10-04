@@ -59,6 +59,14 @@ function DashboardIcon() {
   );
 }
 
+function SalesSummaryIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass} aria-hidden="true">
+      <path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h4" />
+    </svg>
+  );
+}
+
 function CashierIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass} aria-hidden="true">
@@ -341,6 +349,12 @@ export function AppShell() {
       label: t("shell.dashboardTitle"),
       icon: <DashboardIcon />,
       visible: canAccess(PAGE_PERMISSIONS.dashboard),
+    },
+    {
+      to: "/sales-summary",
+      label: t("shell.salesSummaryTitle"),
+      icon: <SalesSummaryIcon />,
+      visible: canAccess(PAGE_PERMISSIONS.salesSummary),
     },
     {
       to: "/users",

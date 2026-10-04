@@ -14,7 +14,8 @@ export interface PaymentMethodTotal {
 export interface SalesSummaryReport {
   from: string;
   to: string;
-  locationIds: string[];
+  locationIds: string[] | null;
+  posType?: string;
   orders: {
     count: number;
     averageNetSales: string;
@@ -161,4 +162,168 @@ export interface ZReport {
     orderCount: number;
     totalRevenue: string;
   }>;
+}
+
+export interface PosBillLine {
+  name: string;
+  quantity: string;
+  netSales?: string;
+  value?: string;
+}
+
+export interface PosBill {
+  orderId: string;
+  orderNumber: string;
+  businessDate: string;
+  soldAt: string;
+  place: string | null;
+  guestName?: string | null;
+  items: PosBillLine[];
+  compedItems: PosBillLine[];
+  grossSales: string;
+  discounts: string;
+  netSales: string;
+  tax: string;
+  grandTotal: string;
+  payments: Array<{ name: string; amount: string }>;
+}
+
+export interface PosBillsReport {
+  from: string;
+  to: string;
+  posType: string;
+  totals: {
+    billCount: number;
+    grossSales: string;
+    discounts: string;
+    netSales: string;
+    tax: string;
+    grandTotal: string;
+  };
+  bills: PosBill[];
+  meta: { total: number; page: number; limit: number; totalPages: number };
+}
+
+export interface BarCategoryRow {
+  categoryId: string | null;
+  categoryName: string;
+  orderCount: number;
+  quantity: string;
+  grossSales: string;
+  discounts: string;
+  netSales: string;
+  shareOfNetSales: string;
+  compedQuantity: string;
+  compedValue: string;
+  refundAmount: string;
+  subCategories?: BarCategoryRow[];
+}
+
+export interface BarCategoriesReport {
+  from: string;
+  to: string;
+  totals: {
+    orderCount: number;
+    quantity: string;
+    grossSales: string;
+    discounts: string;
+    netSales: string;
+    refundAmount: string;
+    compedValue: string;
+  };
+  categories: BarCategoryRow[];
+}
+
+export interface SpaMenuRow {
+  variantId: string;
+  name: string;
+  durationMinutes: number | null;
+  includes: string[];
+  orderCount: number;
+  quantity: string;
+  grossSales: string;
+  discounts: string;
+  netSales: string;
+  shareOfNetSales: string;
+  compedQuantity: string;
+  compedValue: string;
+}
+
+export interface SpaMenuSection {
+  totals: {
+    quantity: string;
+    grossSales: string;
+    discounts: string;
+    netSales: string;
+    shareOfNetSales: string;
+    compedValue: string;
+  };
+  rows: SpaMenuRow[];
+}
+
+export interface SpaMenuReport {
+  from: string;
+  to: string;
+  totals: {
+    orderCount: number;
+    netSales: string;
+    grandTotal: string;
+  };
+  spaMenu: SpaMenuSection;
+  roomMenuPackages: SpaMenuSection;
+  roomServices: SpaMenuSection;
+  roomTime: SpaMenuSection;
+}
+
+export interface KtvRoomRow {
+  roomId: string;
+  roomNumber: string;
+  roomName: string | null;
+  sessionCount: number;
+  hoursSold: string;
+  freeHours: string;
+  roomSales: string;
+  fnbSales: string;
+  grandTotal: string;
+}
+
+export interface KtvSessionRow {
+  sessionId: string;
+  orderId: string;
+  orderNumber: string;
+  businessDate: string;
+  roomNumber: string;
+  roomName: string | null;
+  guestName?: string | null;
+  guestCount: number;
+  openedAt: string;
+  closedAt: string | null;
+  minutesUsed: number | null;
+  hoursSold: string;
+  freeHours: string;
+  roomSales: string;
+  fnbSales: string;
+  discounts: string;
+  compedValue: string;
+  netSales: string;
+  grandTotal: string;
+  payments: Array<{ name: string; amount: string }>;
+}
+
+export interface KtvSessionsReport {
+  from: string;
+  to: string;
+  totals: {
+    sessionCount: number;
+    hoursSold: string;
+    freeHours: string;
+    roomSales: string;
+    fnbSales: string;
+    discounts: string;
+    compedValue: string;
+    netSales: string;
+    grandTotal: string;
+  };
+  byRoom: KtvRoomRow[];
+  sessions: KtvSessionRow[];
 }
