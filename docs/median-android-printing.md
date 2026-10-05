@@ -56,3 +56,9 @@ With the native plugin, no LAN print gateway or Docker bridge is required - the 
 
 When `window.median.posPrinter` (or the legacy `window.gonative.posPrinter`) is present, `BrowserPrinterClient` routes every job through it first - including raw TCP `host:9100`, which no Android/iOS browser can open - so Wi-Fi, USB and Bluetooth printers print silently with the same ESC/POS bytes as desktop QZ Tray. WebUSB, Web Bluetooth and the PDF/browser print dialog remain only as fallbacks when the bridge is absent.
 
+
+## Sections without their own printer
+
+A receipt or kitchen job prints to the printer bound to its section (Checkout, Finance, KDS). When nothing is bound to that section, the app falls back to the default printer, then to the only printer on the register, so a single-printer venue still prints everywhere instead of failing with "No checkout printer is connected".
+
+Printer bindings are also mirrored in memory, so they keep working for the session when a WebView denies localStorage.

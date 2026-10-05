@@ -17,6 +17,7 @@ import {
   groupKitchenJobs,
   KitchenPrintPlan,
   KitchenRoutingOptions,
+  PrinterJob,
   StationRoute,
 } from "@/lib/printing/routeKitchenPrint";
 import { printPlaceToTemplateType } from "@/lib/printing/selectPrintTemplate";
@@ -24,10 +25,10 @@ import {
   PRINTER_BINDINGS_CHANGED,
   PrinterBinding,
   PrinterTransport,
-  bindingsForSector,
   listStoredPrinterBindings,
   readPrinterBindings,
   removePrinterBinding,
+  resolveBindingsForPlace,
   savePrinterBinding,
   setDefaultPrinterBinding,
 } from "@/lib/pos/printerBindingStorage";
@@ -193,8 +194,22 @@ export function usePrinterConnection(
         stations,
         options
       );
+      const lines = slip.lines || [];
+      // Station routing can leave every line unrouted (for example a category
+      // with no station, or a station whose printer is not bound on this
+      // device). Rather than silently printing nothing, fall back to the
+      // KDS/default printer so the kitchen ticket still reaches the paper.
+      const jobs: PrinterJob[] =
+        plan.jobs.length || !lines.length
+          ? plan.jobs
+          : resolveBindingsForPlace(
+              current.bindings,
+              current.defaultBinding,
+              "KDS"
+            ).map((binding) => ({ binding, lines }));
+
       const failures: string[] = [];
-      for (const job of plan.jobs) {
+      for (const job of jobs) {
         try {
           await client.printKitchen(job.binding, {
             ...slip,
@@ -222,7 +237,11 @@ export function usePrinterConnection(
       const client = await configureClient(tenantId, registerId);
       const current = currentBindings();
       const place = receipt.place || "CHECKOUT";
-      const targets = bindingsForSector(current.bindings, place);
+      const targets = resolveBindingsForPlace(
+        current.bindings,
+        current.defaultBinding,
+        place
+      );
       if (!targets.length) {
         throw new Error(
           place === "FINANCE"

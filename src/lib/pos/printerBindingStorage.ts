@@ -28,6 +28,54 @@ const keyFor = (tenantId: string, registerId: string) =>
 
 const emptyStore = (): PrinterBindingStore => ({ version: 1, bindings: {} });
 
+/**
+ * localStorage is not always usable: embedded WebViews can deny it, and the
+ * denial can surface as a thrown error rather than a missing API. Mirroring
+ * writes in memory means a printer configured in this session still prints
+ * (Settings -> Checkout/KDS) instead of silently losing the save.
+ */
+const memoryStorage = new Map<string, string>();
+
+const readValue = (key: string): string | null => {
+  try {
+    if (typeof localStorage !== "undefined") {
+      const value = localStorage.getItem(key);
+      if (value !== null) return value;
+      if (!memoryStorage.has(key)) return null;
+    }
+  } catch {
+    // Storage is blocked; fall through to the in-memory mirror.
+  }
+  return memoryStorage.get(key) ?? null;
+};
+
+const writeValue = (key: string, value: string): void => {
+  try {
+    if (typeof localStorage === "undefined") throw new Error("storage unavailable");
+    localStorage.setItem(key, value);
+    memoryStorage.delete(key);
+    return;
+  } catch {
+    // Blocked storage: the in-memory mirror below keeps this session working.
+  }
+  memoryStorage.set(key, value);
+};
+
+const storageKeys = (): string[] => {
+  const keys = new Set<string>(memoryStorage.keys());
+  try {
+    if (typeof localStorage !== "undefined") {
+      for (let index = 0; index < localStorage.length; index += 1) {
+        const key = localStorage.key(index);
+        if (key) keys.add(key);
+      }
+    }
+  } catch {
+    // Blocked storage: the in-memory keys are still returned.
+  }
+  return Array.from(keys);
+};
+
 type LegacyPrinterBinding = PrinterBinding & {
   stationId?: string;
   stationIds?: string[];
@@ -57,7 +105,7 @@ export function readPrinterBindings(
   registerId: string
 ): PrinterBindingStore {
   try {
-    const raw = localStorage.getItem(keyFor(tenantId, registerId));
+    const raw = readValue(keyFor(tenantId, registerId));
     if (!raw) return emptyStore();
     const parsed = JSON.parse(raw) as PrinterBindingStore;
     return parsed?.version === 1 && parsed.bindings
@@ -84,13 +132,12 @@ export function listStoredPrinterBindings(
   registerId: string
 ): { bindings: PrinterBinding[]; defaultBinding: PrinterBinding | null } {
   const current = bindingsFromStore(readPrinterBindings(tenantId, registerId));
-  if (current.bindings.length || typeof localStorage === "undefined") return current;
+  if (current.bindings.length) return current;
 
-  for (let index = 0; index < localStorage.length; index += 1) {
-    const key = localStorage.key(index);
-    if (!key?.startsWith("pos:printerBindings:")) continue;
+  for (const key of storageKeys()) {
+    if (!key.startsWith("pos:printerBindings:")) continue;
     try {
-      const parsed = JSON.parse(localStorage.getItem(key) || "") as PrinterBindingStore;
+      const parsed = JSON.parse(readValue(key) || "") as PrinterBindingStore;
       const found = bindingsFromStore(normalizeStore(parsed));
       if (found.bindings.length) return found;
     } catch {
@@ -106,11 +153,11 @@ const write = (
   registerId: string,
   store: PrinterBindingStore
 ) => {
+  writeValue(keyFor(tenantId, registerId), JSON.stringify(store));
   try {
-    localStorage.setItem(keyFor(tenantId, registerId), JSON.stringify(store));
     window.dispatchEvent(new CustomEvent(PRINTER_BINDINGS_CHANGED));
   } catch {
-    // Embedded WebViews may deny local storage.
+    // The change event is optional outside a browser window.
   }
 };
 
@@ -193,4 +240,23 @@ export function bindingsForSector(
   sector: PrinterSector
 ): PrinterBinding[] {
   return bindings.filter((binding) => binding.sectors?.includes(sector));
+}
+
+/**
+ * Printers a receipt/kitchen job should go to for one section.
+ *
+ * An exact sector match always wins. When nothing is bound to that section we
+ * fall back to the default printer, then to the only printer on this register.
+ * Without this a single-printer venue (very common on Android tablets) fails
+ * with "No checkout printer is connected" even though a printer is configured.
+ */
+export function resolveBindingsForPlace(
+  bindings: PrinterBinding[],
+  defaultBinding: PrinterBinding | null,
+  place: PrinterSector
+): PrinterBinding[] {
+  const bySector = bindingsForSector(bindings, place);
+  if (bySector.length) return bySector;
+  if (defaultBinding) return [defaultBinding];
+  return bindings.length === 1 ? [bindings[0]] : [];
 }
