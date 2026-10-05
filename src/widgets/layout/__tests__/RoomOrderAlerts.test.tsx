@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { RoomOrderAlerts } from "../RoomOrderAlerts";
 
 const mocks = vi.hoisted(() => ({
@@ -38,6 +38,24 @@ describe("RoomOrderAlerts", () => {
     vi.clearAllMocks();
     mocks.listRoomOrders.mockResolvedValue([order]);
     mocks.claimRoomOrderPrint.mockResolvedValue({ claimed: true, order });
+  });
+
+  it("keeps the printing choice collapsed in the rail instead of over bottom actions", async () => {
+    window.localStorage.setItem("print-tablet-orders", "false");
+    const { container } = render(
+      <>
+        <div id="pos-tablet-print-settings" />
+        <RoomOrderAlerts enabled printKitchen={vi.fn()} />
+      </>
+    );
+    await screen.findByText(/roomOrders.newOrder/);
+    const settings = container.querySelector("#pos-tablet-print-settings details");
+    expect(settings).toBeInTheDocument();
+    expect(settings).not.toHaveAttribute("open");
+    expect(container.querySelector("aside input[type=checkbox]")).toBeNull();
+    settings!.setAttribute("open", "");
+    fireEvent.click(screen.getByRole("checkbox"));
+    expect(window.localStorage.getItem("print-tablet-orders")).toBe("true");
   });
 
   it("alerts staff and prints the ticket once on the printing terminal", async () => {

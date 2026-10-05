@@ -1,4 +1,5 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { RoomOrderView } from "@/core/domain/entities/RoomTablet";
@@ -29,6 +30,22 @@ export function RoomOrderAlerts({
   const { t } = useTranslation();
   const [printHere, setPrintHere] = useState(readPrintSetting);
   const [error, setError] = useState<string | null>(null);
+  const [settingsTarget, setSettingsTarget] = useState<HTMLElement | null>(null);
+
+  // Follow the route-dependent rail slot without updating state during render.
+  useEffect(() => {
+    let active = true;
+    const refreshTarget = () => {
+      if (active) setSettingsTarget(document.getElementById("pos-tablet-print-settings"));
+    };
+    const observer = new MutationObserver(refreshTarget);
+    observer.observe(document.body, { childList: true, subtree: true });
+    queueMicrotask(refreshTarget);
+    return () => {
+      active = false;
+      observer.disconnect();
+    };
+  }, []);
 
   const { alerts, acknowledge, deliver } = useRoomOrderAlerts({
     enabled,
@@ -62,63 +79,76 @@ export function RoomOrderAlerts({
     }
   };
 
-  return (
-    <aside className="fixed bottom-4 right-4 z-40 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2">
-      {alerts.slice(0, 3).map((order) => (
-        <div
-          key={order.id}
-          role="alert"
-          className="rounded-lg border border-teal-500 bg-slate-950 p-3 text-sm text-white shadow-xl"
-        >
-          <p className="font-bold">
-            🔔 {t("roomOrders.newOrder", { room: order.roomNumber, number: order.orderNumber })}
-          </p>
-          <p className="text-xs text-slate-400">
-            {order.deviceName || t("roomOrders.tablet")} ·{" "}
-            {new Date(order.createdAt).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}{" "}
-            · {money(order.amount)}
-          </p>
-          <ul className="mt-1">
-            {order.kind === "SESSIONS" ? (
-              <li>
-                {order.orderNumber === 1 ? t("roomOrders.started") : t("roomOrders.timeAdded")}
-                {order.items[0] ? ` · ${order.items[0].name} × ${order.items[0].quantity}` : ""}
-              </li>
-            ) : (
-              order.items.map((item, index) => (
-                <li key={`${order.id}-${index}`}>
-                  {item.name} × {item.quantity}
-                </li>
-              ))
-            )}
-          </ul>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <Button variant="secondary" onClick={() => void acknowledge(order.id)}>
-              {t("roomOrders.seen")}
-            </Button>
-            <Button onClick={() => void deliver(order.id)}>{t("roomOrders.delivered")}</Button>
-          </div>
-        </div>
-      ))}
-      {alerts.length > 3 ? (
-        <p className="rounded bg-slate-900 p-2 text-center text-xs text-slate-300">
-          {t("roomOrders.more", { count: alerts.length - 3 })}
-        </p>
-      ) : null}
-      {error ? (
-        <p className="rounded bg-red-950 p-2 text-xs text-red-200">{error}</p>
-      ) : null}
-      <label className="flex items-center justify-end gap-2 self-end rounded bg-slate-900/90 px-2 py-1 text-xs text-slate-300">
+  const printSettings = (
+    <details className="rounded border border-white/10 bg-slate-900/90 text-xs text-slate-300">
+      <summary className="flex min-h-11 cursor-pointer items-center rounded px-2 py-2 focus-visible:outline-2 focus-visible:outline-white">
+        {t("roomOrders.printSettings")}
+      </summary>
+      <label className="flex min-h-11 cursor-pointer items-start gap-2 px-2 py-2">
         <input
           type="checkbox"
+          className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600"
           checked={printHere}
           onChange={(event) => togglePrint(event.target.checked)}
         />
         {t("roomOrders.printHere")}
       </label>
-    </aside>
+    </details>
+  );
+
+  return (
+    <>
+      {settingsTarget ? createPortal(printSettings, settingsTarget) : null}
+      <aside className="fixed bottom-4 right-4 z-40 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2">
+        {alerts.slice(0, 3).map((order) => (
+          <div
+            key={order.id}
+            role="alert"
+            className="rounded-lg border border-teal-500 bg-slate-950 p-3 text-sm text-white shadow-xl"
+          >
+            <p className="font-bold">
+              🔔 {t("roomOrders.newOrder", { room: order.roomNumber, number: order.orderNumber })}
+            </p>
+            <p className="text-xs text-slate-400">
+              {order.deviceName || t("roomOrders.tablet")} ·{" "}
+              {new Date(order.createdAt).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}{" "}
+              · {money(order.amount)}
+            </p>
+            <ul className="mt-1">
+              {order.kind === "SESSIONS" ? (
+                <li>
+                  {order.orderNumber === 1 ? t("roomOrders.started") : t("roomOrders.timeAdded")}
+                  {order.items[0] ? ` · ${order.items[0].name} × ${order.items[0].quantity}` : ""}
+                </li>
+              ) : (
+                order.items.map((item, index) => (
+                  <li key={`${order.id}-${index}`}>
+                    {item.name} × {item.quantity}
+                  </li>
+                ))
+              )}
+            </ul>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <Button variant="secondary" onClick={() => void acknowledge(order.id)}>
+                {t("roomOrders.seen")}
+              </Button>
+              <Button onClick={() => void deliver(order.id)}>{t("roomOrders.delivered")}</Button>
+            </div>
+          </div>
+        ))}
+        {alerts.length > 3 ? (
+          <p className="rounded bg-slate-900 p-2 text-center text-xs text-slate-300">
+            {t("roomOrders.more", { count: alerts.length - 3 })}
+          </p>
+        ) : null}
+        {error ? (
+          <p className="rounded bg-red-950 p-2 text-xs text-red-200">{error}</p>
+        ) : null}
+        {!settingsTarget ? printSettings : null}
+      </aside>
+    </>
   );
 }
