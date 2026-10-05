@@ -177,12 +177,12 @@ export function usePrinterConnection(
    */
   const backendTargets = useCallback(
     async (place: PrintPlace): Promise<PrinterBinding[]> => {
-      if (!isBrowserPrinting() || !locationId) return [];
+      if (!isBrowserPrinting()) return [];
       try {
         const result = await printerService.list({
           page: 1,
           limit: 100,
-          locationId,
+          locationId: locationId || undefined,
         });
         return result.printers
           .filter((printer) => Boolean(printer.ipAddress))
