@@ -87,28 +87,32 @@ export function CashierBoard({
 
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden p-2 min-[1100px]:p-3">
-      <div className="relative flex min-w-0 flex-wrap items-center gap-2 overflow-x-hidden pr-11">
-        {serviceTabs.map((tab) => {
-          const tabCount = serviceTabCounts?.[tab.key];
-          return (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => onServiceTypeChange(tab.key)}
-              className={[
-                "min-h-10 rounded px-3 py-1.5 text-sm font-medium",
-                serviceType === tab.key
-                  ? "bg-blue-600 text-white"
-                  : "text-slate-200 hover:bg-slate-800",
-              ].join(" ")}
-            >
-              {t(tab.labelKey)}
-              {typeof tabCount === "number" ? (
-                <span className="ml-1 opacity-90">{tabCount}</span>
-              ) : null}
-            </button>
-          );
-        })}
+      <div className="relative flex min-w-0 items-center pr-11">
+        {/* One horizontal row: the board column is narrow on phones, so the tabs
+            scroll sideways instead of stacking and eating vertical space. */}
+        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto min-[1100px]:gap-2">
+          {serviceTabs.map((tab) => {
+            const tabCount = serviceTabCounts?.[tab.key];
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => onServiceTypeChange(tab.key)}
+                className={[
+                  "min-h-10 shrink-0 whitespace-nowrap rounded px-2.5 py-1.5 text-xs font-medium min-[1100px]:px-3 min-[1100px]:text-sm",
+                  serviceType === tab.key
+                    ? "bg-blue-600 text-white"
+                    : "text-slate-200 hover:bg-slate-800",
+                ].join(" ")}
+              >
+                {t(tab.labelKey)}
+                {typeof tabCount === "number" ? (
+                  <span className="ml-1 opacity-90">{tabCount}</span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
         <div className="absolute right-0 top-0">
           <NotificationBell
             count={notificationCount}
@@ -117,7 +121,7 @@ export function CashierBoard({
         </div>
       </div>
 
-      <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 overflow-x-hidden">
+      <div className="mt-1 flex min-w-0 items-center gap-1.5 overflow-x-auto">
         {statusTabs.map((tab) => {
           const tabCount = statusTabCounts?.[tab.key];
           return (
@@ -126,7 +130,7 @@ export function CashierBoard({
               type="button"
               onClick={() => onStatusFilterChange(tab.key)}
               className={[
-                "min-h-8 rounded px-2 py-1 text-xs",
+                "min-h-8 shrink-0 whitespace-nowrap rounded px-2 py-1 text-xs",
                 statusFilter === tab.key
                   ? "bg-blue-600 text-white"
                   : "bg-slate-800 text-slate-300",
