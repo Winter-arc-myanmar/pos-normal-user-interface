@@ -336,11 +336,11 @@ export function PrinterSettingsPanel() {
     <div className="pos-split grid min-h-[34rem] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:grid-cols-[16rem_minmax(0,1fr)]">
       <aside className="border-r border-slate-200 bg-slate-50 p-3">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="font-bold">{t("settings.printer.devices")}</h2>
+          <h2 className="min-w-0 truncate font-bold">{t("settings.printer.devices")}</h2>
           <button
             type="button"
             onClick={reset}
-            className="rounded bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white"
+            className="shrink-0 rounded bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white"
           >
             {t("settings.printer.add")}
           </button>
