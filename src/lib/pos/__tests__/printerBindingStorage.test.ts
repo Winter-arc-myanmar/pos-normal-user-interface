@@ -5,6 +5,7 @@ import {
   readPrinterBindings,
   removeLocalOnlyPrinterBindings,
   removePrinterBinding,
+  resolveBindingsForPlace,
   savePrinterBinding,
 } from "../printerBindingStorage";
 
@@ -146,5 +147,73 @@ describe("printer binding storage", () => {
     ]);
     expect(bindingsForSector([checkout, finance], "FINANCE")).toEqual([finance]);
     expect(bindingsForSector([checkout, finance], "KDS")).toEqual([]);
+  });
+
+  it("falls back to the default printer, then the only printer, for a section", () => {
+    const counter = {
+      id: "printer-1",
+      backendPrinterId: "printer-1",
+      transport: "NETWORK" as const,
+      displayName: "Counter",
+      host: "192.168.1.50",
+      port: 9100,
+      sectors: ["CHECKOUT" as const],
+      lastVerifiedAt: "",
+    };
+    const office = {
+      id: "printer-2",
+      backendPrinterId: "printer-2",
+      transport: "NETWORK" as const,
+      displayName: "Office",
+      host: "192.168.1.51",
+      port: 9100,
+      lastVerifiedAt: "",
+    };
+
+    // An exact sector match always wins over the default printer.
+    expect(resolveBindingsForPlace([counter, office], office, "CHECKOUT")).toEqual([
+      counter,
+    ]);
+    // Nothing bound to the section -> the default printer prints it.
+    expect(resolveBindingsForPlace([counter, office], counter, "KDS")).toEqual([
+      counter,
+    ]);
+    // A single-printer venue prints everything, even without sector config.
+    expect(resolveBindingsForPlace([office], null, "CHECKOUT")).toEqual([office]);
+    // Two printers, no default, no matching sector -> nothing to print to.
+    expect(resolveBindingsForPlace([counter, office], null, "KDS")).toEqual([]);
+  });
+
+  it("keeps printing when the device denies local storage", () => {
+    vi.stubGlobal("localStorage", {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error("localStorage is blocked");
+      },
+      removeItem: () => undefined,
+      clear: () => undefined,
+    });
+
+    savePrinterBinding(
+      "tenant-blocked",
+      "register-blocked",
+      {
+        id: "blocked-1",
+        backendPrinterId: "blocked-1",
+        transport: "USB",
+        displayName: "Blocked printer",
+        deviceName: "USB Printer",
+        sectors: ["CHECKOUT"],
+        lastVerifiedAt: "",
+      },
+      true
+    );
+
+    expect(
+      readPrinterBindings("tenant-blocked", "register-blocked").bindings["blocked-1"]
+    ).toMatchObject({ displayName: "Blocked printer" });
+    expect(getDefaultPrinterBinding("tenant-blocked", "register-blocked")).toMatchObject(
+      { id: "blocked-1" }
+    );
   });
 });

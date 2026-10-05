@@ -83,6 +83,10 @@ export const isDirectTcpSupported = () =>
 export const ANDROID_LAN_PRINTER_ERROR =
   "This Android browser cannot open a Wi-Fi printer by IP. Raw port 9100 only works on a Windows/Mac POS with QZ Tray. On this tablet use USB or Bluetooth.";
 
+/** Shown when a job needs the native Android/Median bridge but it is not installed. */
+export const NATIVE_PRINTER_UNAVAILABLE =
+  "Android direct printing needs the POS printer native plugin (window.median.posPrinter). Enable it in the app build.";
+
 export const canOpenRawLanPrinter = () =>
   Boolean(medianPosPrinter()) || isDirectTcpSupported();
 
@@ -240,40 +244,123 @@ export async function printLanTcp(
   }
 }
 
+export type MedianPrinterDevice = string | { id?: string; name?: string };
+export type MedianDiscoverResult =
+  | string[]
+  | { devices?: MedianPrinterDevice[]; success?: boolean; error?: string };
+
+export type PosPrinterMethod = "connect" | "disconnect" | "discover" | "printRaw";
+
+/**
+ * Shape of the Android/Median native plugin exposed as `window.median.posPrinter`
+ * (or the legacy `window.gonative.posPrinter`). Median's JavaScript bridge passes
+ * ONE options object per call and either resolves a Promise or invokes the
+ * supplied `callback`, so the option/return types are intentionally loose and
+ * normalized by `callPosPrinter`.
+ */
 export interface MedianPosPrinterLike {
-  connect?: () => Promise<void>;
-  disconnect?: () => Promise<void>;
-  discover: (options: { transport?: PrinterTransport }) => Promise<
-    | string[]
-    | {
-        devices?: Array<string | { id?: string; name?: string }>;
-      }
-  >;
-  printRaw: (options: {
-    transport: PrinterTransport;
-    host?: string;
-    port?: number;
-    deviceId?: string;
-    dataBase64: string;
-    encoding: "base64";
-  }) => Promise<void>;
+  connect?: (options?: Record<string, unknown>) => Promise<unknown> | unknown;
+  disconnect?: (options?: Record<string, unknown>) => Promise<unknown> | unknown;
+  discover: (options: Record<string, unknown>) => Promise<unknown> | unknown;
+  printRaw: (options: Record<string, unknown>) => Promise<unknown> | unknown;
 }
 
-export const medianPosPrinter = (): MedianPosPrinterLike | undefined =>
-  window.median?.posPrinter;
+const posPrinterHost = ():
+  | { posPrinter?: MedianPosPrinterLike }
+  | undefined => {
+  if (typeof window === "undefined") return undefined;
+  const scoped = window as unknown as {
+    median?: { posPrinter?: MedianPosPrinterLike };
+    gonative?: { posPrinter?: MedianPosPrinterLike };
+  };
+  return scoped.median ?? scoped.gonative;
+};
 
-export async function printMedianRaw(
-  plugin: MedianPosPrinterLike,
-  options: {
-    transport: PrinterTransport;
-    host?: string;
-    port?: number;
-    deviceId?: string;
-    data: string;
+export const medianPosPrinter = (): MedianPosPrinterLike | undefined =>
+  posPrinterHost()?.posPrinter;
+
+/** True when the Android/Median native ESC/POS bridge is available. */
+export const hasNativePrinterBridge = (): boolean => Boolean(medianPosPrinter());
+
+export const hasPluginMethod = (method: PosPrinterMethod): boolean => {
+  const plugin = medianPosPrinter();
+  return Boolean(
+    plugin &&
+      typeof (plugin as unknown as Record<string, unknown>)[method] === "function"
+  );
+};
+
+/**
+ * Calls a native plugin method using Median's conventions: a single options
+ * object that may carry a `callback`, and a return value that may be a Promise.
+ * Resolves on the first of {promise settlement, callback, sync return value} and
+ * rejects when the native side reports `{ success: false, error }`.
+ */
+export function callPosPrinter<T = unknown>(
+  method: PosPrinterMethod,
+  options: Record<string, unknown> = {}
+): Promise<T> {
+  const plugin = medianPosPrinter();
+  if (!plugin) return Promise.reject(new Error(NATIVE_PRINTER_UNAVAILABLE));
+
+  const fn = (plugin as unknown as Record<string, unknown>)[method];
+  if (typeof fn !== "function") {
+    return Promise.reject(new Error(`Printer bridge is missing ${method}()`));
   }
-) {
-  await plugin.connect?.();
-  await plugin.printRaw({
+
+  const invoke = fn as (args?: Record<string, unknown>) => unknown;
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const settle = (result: unknown) => {
+      if (settled) return;
+      settled = true;
+      const record = (result || {}) as { success?: boolean; error?: string };
+      if (record.success === false) {
+        reject(new Error(record.error || `Printer ${method} failed`));
+        return;
+      }
+      resolve(result as T);
+    };
+    const fail = (caught: unknown) => {
+      if (settled) return;
+      settled = true;
+      reject(caught instanceof Error ? caught : new Error(String(caught)));
+    };
+
+    try {
+      const returned = invoke.call(plugin, { ...options, callback: settle });
+      if (returned && typeof (returned as PromiseLike<unknown>).then === "function") {
+        (returned as Promise<unknown>).then(settle, fail);
+      } else if (returned !== undefined) {
+        settle(returned);
+      } else if (invoke.length === 0) {
+        // A no-argument, non-promise method can never call back: treat as done.
+        settle(undefined);
+      }
+    } catch (caught) {
+      fail(caught);
+    }
+  });
+}
+
+export function nativePrinterNames(result: MedianDiscoverResult): string[] {
+  const devices = Array.isArray(result) ? result : result.devices || [];
+  return devices
+    .map((device) =>
+      typeof device === "string" ? device : device.id || device.name || ""
+    )
+    .filter(Boolean);
+}
+
+export async function printMedianRaw(options: {
+  transport: PrinterTransport;
+  host?: string;
+  port?: number;
+  deviceId?: string;
+  data: string;
+}) {
+  if (hasPluginMethod("connect")) await callPosPrinter("connect", {});
+  await callPosPrinter("printRaw", {
     transport: options.transport,
     host: options.host,
     port: options.port,

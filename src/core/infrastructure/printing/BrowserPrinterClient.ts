@@ -14,16 +14,20 @@ import {
 } from "@/lib/printing/formatKdsTicket";
 import { canSendRawEscPos } from "@/lib/printing/printerCapabilities";
 import {
+  callPosPrinter,
+  hasNativePrinterBridge,
+  hasPluginMethod,
   isWebBluetoothSupported,
   isWebUsbSupported,
   listWebUsbPrinters,
-  medianPosPrinter,
+  nativePrinterNames,
   printLanTcp,
   printMedianRaw,
   printWebBluetooth,
   printWebUsb,
   requestWebBluetoothPrinter,
   requestWebUsbPrinter,
+  type MedianDiscoverResult,
 } from "@/lib/printing/webPrinterTransports";
 import { isBrowserPrinting } from "./PrinterClient";
 import type { IPrinterClient } from "./IPrinterClient";
@@ -32,7 +36,7 @@ export class BrowserPrinterClient implements IPrinterClient {
   private ready = false;
 
   isConnected(): boolean {
-    return this.ready || Boolean(medianPosPrinter()) || isBrowserPrinting();
+    return this.ready || hasNativePrinterBridge() || isBrowserPrinting();
   }
 
   configureScope(_tenantId: string, _registerId: string) {
@@ -40,29 +44,26 @@ export class BrowserPrinterClient implements IPrinterClient {
   }
 
   async connect(): Promise<void> {
-    const plugin = medianPosPrinter();
-    if (plugin) {
-      await plugin.connect?.();
+    if (hasPluginMethod("connect")) {
+      await callPosPrinter("connect", {});
     }
     this.ready = true;
   }
 
   async disconnect(): Promise<void> {
-    await medianPosPrinter()?.disconnect?.();
+    if (hasPluginMethod("disconnect")) {
+      await callPosPrinter("disconnect", {}).catch(() => undefined);
+    }
     this.ready = false;
   }
 
   async findPrinters(transport?: PrinterTransport): Promise<string[]> {
     await this.connect();
-    const plugin = medianPosPrinter();
-    if (plugin) {
-      const result = await plugin.discover({ transport });
-      const devices = Array.isArray(result) ? result : result.devices || [];
-      return devices
-        .map((device) =>
-          typeof device === "string" ? device : device.id || device.name || ""
-        )
-        .filter(Boolean);
+    if (hasNativePrinterBridge()) {
+      const result = await callPosPrinter<MedianDiscoverResult>("discover", {
+        transport,
+      });
+      return nativePrinterNames(result);
     }
     if (transport === "BLUETOOTH" && isWebBluetoothSupported()) {
       return requestWebBluetoothPrinter();
@@ -77,9 +78,8 @@ export class BrowserPrinterClient implements IPrinterClient {
 
   private async printRaw(binding: PrinterBinding, data: string): Promise<void> {
     await this.connect();
-    const plugin = medianPosPrinter();
-    if (plugin) {
-      await printMedianRaw(plugin, {
+    if (hasNativePrinterBridge()) {
+      await printMedianRaw({
         transport: binding.transport,
         host: binding.host,
         port: binding.port,

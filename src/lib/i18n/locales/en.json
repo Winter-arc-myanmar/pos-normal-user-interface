@@ -587,7 +587,10 @@
       "localPrinting": "Local printing",
       "localPrintingReady": "A default printer is connected on this workstation.",
       "localPrintingMissing": "No default printer is connected. Open Printer and run a test print.",
-      "openPrinters": "Open printers"
+      "openPrinters": "Open printers",
+      "directPrinting": "Direct printing (Android)",
+      "directPrintingReady": "Native bridge active",
+      "directPrintingMissing": "Browser fallback"
     },
     "printer": {
       "title": "Printer",
@@ -616,6 +619,10 @@
       "qzRequirement": "QZ Tray must be installed and running on this POS computer.",
       "mobileRequirement": "Android and Median use PDF receipts (tap Print in the viewer). Wi‑Fi printers use PDF; USB and Bluetooth use direct ESC/POS when the device allows it.",
       "networkAndroidHint": "Android Settings → Printing will not find an XPrinter. That screen only sees office IPP printers. Use the XPrinter or RawBT app, or connect this tablet with Bluetooth / USB OTG. Raw IP:9100 works on Windows with QZ Tray.",
+      "nativeConnected": "Android direct printing ready",
+      "nativeDisconnected": "Direct printing unavailable",
+      "nativeRequirement": "This device prints ESC/POS directly through the POS printer native plugin - Wi-Fi, USB and Bluetooth printers print silently, with no Android print dialog.",
+      "networkNativeHint": "Direct printing uses the app's native bridge. Enter the printer IP address and port (usually 9100).",
       "active": "Active",
       "yes": "Yes",
       "no": "No",

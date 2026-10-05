@@ -272,6 +272,15 @@ export function DevicesSettingsPanel() {
             ok={connection.isConnected}
           />
           <StatusRow
+            label={t("settings.devices.directPrinting")}
+            value={
+              connection.nativeBridge
+                ? t("settings.devices.directPrintingReady")
+                : t("settings.devices.directPrintingMissing")
+            }
+            ok={connection.nativeBridge}
+          />
+          <StatusRow
             label={t("settings.devices.qzTray")}
             value={
               connection.isConnected

@@ -7,6 +7,7 @@ describe("BrowserPrinterClient", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     delete window.median;
+    delete window.gonative;
   });
 
   it("uses the Android print sheet for a Wi-Fi printer when raw port 9100 is unavailable", async () => {
@@ -54,5 +55,40 @@ describe("BrowserPrinterClient", () => {
       expect.arrayContaining(["PRINTER TEST", "Kitchen"]),
       "printer-test"
     );
+  });
+
+  it("prefers the native bridge over the Android print sheet", async () => {
+    const printRaw = vi.fn(async (_options?: Record<string, unknown>) => undefined);
+    window.median = {
+      posPrinter: {
+        connect: vi.fn(async (_options?: Record<string, unknown>) => undefined),
+        discover: vi.fn(async (_options?: Record<string, unknown>) => []),
+        printRaw,
+      },
+    };
+    const printDialog = vi
+      .spyOn(documentPrint, "printLinesWithBrowserDialog")
+      .mockResolvedValue(undefined);
+    const client = new BrowserPrinterClient();
+
+    await client.testPrint({
+      id: "printer-1",
+      transport: "NETWORK",
+      displayName: "Kitchen",
+      host: "192.168.1.50",
+      port: 9100,
+      lastVerifiedAt: "",
+      lastError: null,
+    });
+
+    expect(printRaw).toHaveBeenCalledWith(
+      expect.objectContaining({
+        transport: "NETWORK",
+        host: "192.168.1.50",
+        port: 9100,
+        encoding: "base64",
+      })
+    );
+    expect(printDialog).not.toHaveBeenCalled();
   });
 });
