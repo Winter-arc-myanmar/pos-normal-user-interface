@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { KdsTicket } from "../../domain/entities/Cashier";
+import { IKitchenPrinterService } from "../../domain/services/IKitchenPrinterService";
 import { IPrintTemplateService } from "../../domain/services/IPrintTemplateService";
 import container from "../../infrastructure/di/container";
 import { browserPrinterClient } from "../../infrastructure/printing/BrowserPrinterClient";
@@ -161,6 +162,52 @@ export function usePrinterConnection(
     [registerId, tenantId]
   );
 
+  const printerService =
+    container.resolve<IKitchenPrinterService>("kitchenPrinterService");
+
+  /**
+   * Last-resort print targets taken from the back-office printer list.
+   *
+   * A phone can end up with no local binding at all (fresh tablet, or a WebView
+   * that drops localStorage). A network printer configured in the back office is
+   * still reachable from the tablet, so derive a binding from the printer record
+   * instead of failing with "No checkout printer is connected".
+   *
+   * Desktop always has its local binding, so this never runs there.
+   */
+  const backendTargets = useCallback(
+    async (place: PrintPlace): Promise<PrinterBinding[]> => {
+      if (!isBrowserPrinting() || !locationId) return [];
+      try {
+        const result = await printerService.list({
+          page: 1,
+          limit: 100,
+          locationId,
+        });
+        return result.printers
+          .filter((printer) => Boolean(printer.ipAddress))
+          .filter(
+            (printer) =>
+              !printer.sectors?.length || printer.sectors.includes(place)
+          )
+          .map((printer) => ({
+            id: `backend:${printer.id}`,
+            backendPrinterId: printer.id,
+            transport: "NETWORK" as const,
+            displayName: printer.name,
+            host: printer.ipAddress,
+            port: printer.port,
+            sectors: printer.sectors,
+            lastVerifiedAt: "",
+            lastError: null,
+          }));
+      } catch {
+        return [];
+      }
+    },
+    [locationId, printerService]
+  );
+
   const templateFor = useCallback(
     async (place: PrintPlace) => {
       try {
@@ -199,14 +246,18 @@ export function usePrinterConnection(
       // with no station, or a station whose printer is not bound on this
       // device). Rather than silently printing nothing, fall back to the
       // KDS/default printer so the kitchen ticket still reaches the paper.
-      const jobs: PrinterJob[] =
-        plan.jobs.length || !lines.length
-          ? plan.jobs
-          : resolveBindingsForPlace(
-              current.bindings,
-              current.defaultBinding,
-              "KDS"
-            ).map((binding) => ({ binding, lines }));
+      let jobs: PrinterJob[] = plan.jobs;
+      if (!jobs.length && lines.length) {
+        const localTargets = resolveBindingsForPlace(
+          current.bindings,
+          current.defaultBinding,
+          "KDS"
+        );
+        const targets = localTargets.length
+          ? localTargets
+          : await backendTargets("KDS");
+        jobs = targets.map((binding) => ({ binding, lines }));
+      }
 
       const failures: string[] = [];
       for (const job of jobs) {
@@ -229,7 +280,7 @@ export function usePrinterConnection(
       }
       return plan;
     },
-    [currentBindings, registerId, templateFor, tenantId]
+    [backendTargets, currentBindings, registerId, templateFor, tenantId]
   );
 
   const printReceipt = useCallback(
@@ -237,11 +288,14 @@ export function usePrinterConnection(
       const client = await configureClient(tenantId, registerId);
       const current = currentBindings();
       const place = receipt.place || "CHECKOUT";
-      const targets = resolveBindingsForPlace(
+      const localTargets = resolveBindingsForPlace(
         current.bindings,
         current.defaultBinding,
         place
       );
+      const targets = localTargets.length
+        ? localTargets
+        : await backendTargets(place);
       if (!targets.length) {
         throw new Error(
           place === "FINANCE"
@@ -271,7 +325,7 @@ export function usePrinterConnection(
       }
       if (failures.length) throw new Error(failures.join(" "));
     },
-    [currentBindings, registerId, templateFor, tenantId]
+    [backendTargets, currentBindings, registerId, templateFor, tenantId]
   );
 
   const printTicket = useCallback(
