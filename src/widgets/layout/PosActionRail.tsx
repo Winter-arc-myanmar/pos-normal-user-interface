@@ -52,14 +52,15 @@ export function PosActionRail({
           </label>
         ) : null}
         <LanguageSwitcher />
+        <div id="pos-tablet-print-settings" className="w-full" />
       </div>
 
-      <div className="pos-action-buttons mt-auto grid grid-cols-2 gap-1 text-center text-[10px] font-medium">
+      <div className="pos-action-buttons mt-auto flex flex-col gap-1 text-left text-xs font-medium">
         <button
           type="button"
           disabled
           title={t("shell.drawerNotConfigured")}
-          className="min-h-14 rounded bg-[#7165ee] px-1 py-2 opacity-50"
+          className="min-h-11 w-full rounded bg-slate-500 px-2 py-2 text-left opacity-50 disabled:cursor-not-allowed"
         >
           {drawerLabel}
         </button>
@@ -68,8 +69,8 @@ export function PosActionRail({
           onClick={onMenu}
           aria-pressed={activeView === "menu"}
           className={[
-            "min-h-14 rounded px-1 py-2",
-            activeView === "menu" ? "bg-[#1a6fd4] ring-2 ring-white/70" : "bg-[#287fe7]",
+            "min-h-11 w-full rounded px-2 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white",
+            activeView === "menu" ? "bg-blue-600" : "bg-slate-500 hover:bg-slate-600",
           ].join(" ")}
         >
           {menuLabel}
@@ -77,7 +78,11 @@ export function PosActionRail({
         <button
           type="button"
           onClick={onOrders}
-          className="min-h-14 rounded bg-[#f2aa2f] px-1 py-2 text-slate-950"
+          aria-pressed={activeView === "orders"}
+          className={[
+            "min-h-11 w-full rounded px-2 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white",
+            activeView === "orders" ? "bg-blue-600" : "bg-slate-500 hover:bg-slate-600",
+          ].join(" ")}
         >
           {ordersLabel}
         </button>
@@ -86,8 +91,8 @@ export function PosActionRail({
           onClick={onPay}
           aria-pressed={activeView === "pay"}
           className={[
-            "min-h-14 rounded px-1 py-2 text-slate-950",
-            activeView === "pay" ? "bg-[#2eae74] ring-2 ring-white/80" : "bg-[#39c786]",
+            "min-h-11 w-full rounded px-2 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white",
+            activeView === "pay" ? "bg-blue-600" : "bg-slate-500 hover:bg-slate-600",
           ].join(" ")}
         >
           {payLabel}

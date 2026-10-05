@@ -1661,6 +1661,7 @@
     "seen": "Seen",
     "delivered": "Delivered",
     "more": "+{{count}} more orders",
+    "printSettings": "Printing",
     "printHere": "Print tablet orders here",
     "printFailed": "Could not print the ticket.",
     "started": "Started from tablet"
