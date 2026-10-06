@@ -5,17 +5,23 @@ export interface PendingItem {
   unitPrice: number;
   quantity: number;
   foc?: boolean;
+  /** The hostess who gives it, for a KTV service that asks who served. */
+  hostessId?: string;
+  hostessName?: string;
 }
 
-export const pendingKey = (item: Pick<PendingItem, "variantId" | "foc">): string =>
-  item.foc ? `${item.variantId}:foc` : item.variantId;
+/** One row per item, hostess and paid-or-free, so two hostesses never merge. */
+export const pendingKey = (item: Pick<PendingItem, "variantId" | "foc" | "hostessId">): string =>
+  [item.variantId, item.hostessId, item.foc ? "foc" : ""].filter(Boolean).join(":");
 
 export const addPending = (
   items: PendingItem[],
   item: Omit<PendingItem, "quantity" | "foc">,
   quantity = 1
 ): PendingItem[] => {
-  const existing = items.find((entry) => entry.variantId === item.variantId && !entry.foc);
+  const existing = items.find(
+    (entry) => entry.variantId === item.variantId && entry.hostessId === item.hostessId && !entry.foc
+  );
   if (existing) {
     return items.map((entry) =>
       entry === existing ? { ...entry, quantity: entry.quantity + quantity } : entry
@@ -61,3 +67,13 @@ export const pendingSaving = (
   discounts: Record<string, { discount: number }>
 ): number =>
   paidPending(items).reduce((sum, entry) => sum + (discounts[entry.variantId]?.discount || 0), 0);
+
+/** What the server is sent for a list of pending items. */
+export const pendingOrderItems = (
+  items: PendingItem[]
+): { variantId: string; quantity: number; hostessId?: string }[] =>
+  items.map((item) => ({
+    variantId: item.variantId,
+    quantity: item.quantity,
+    ...(item.hostessId ? { hostessId: item.hostessId } : {}),
+  }));

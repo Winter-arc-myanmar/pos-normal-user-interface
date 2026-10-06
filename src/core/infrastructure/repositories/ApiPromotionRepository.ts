@@ -29,8 +29,19 @@ export class ApiPromotionRepository {
       return {
         id: String(item.id || ""),
         name: String(item.name || ""),
-        discountType: item.discountType === "AMOUNT_OFF" ? "AMOUNT_OFF" : "PERCENT_OFF",
+        discountType:
+          item.discountType === "AMOUNT_OFF" || item.discountType === "FREE_TIME"
+            ? item.discountType
+            : "PERCENT_OFF",
         discountValue: Number(item.discountValue || 0),
+        buyUnits: item.buyUnits == null ? null : Number(item.buyUnits),
+        freeUnits: item.freeUnits == null ? null : Number(item.freeUnits),
+        appliesTo:
+          item.appliesTo === "CATEGORIES" || item.appliesTo === "ITEMS"
+            ? item.appliesTo
+            : "ALL_ITEMS",
+        variantIds: Array.isArray(item.variantIds) ? item.variantIds.map(String) : [],
+        priorityLevel: Number(item.priorityLevel || 0),
       };
     });
   }

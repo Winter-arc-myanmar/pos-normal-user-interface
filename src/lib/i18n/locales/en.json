@@ -1119,6 +1119,13 @@
       "orderAlreadyPaid": "This order is already paid and cannot be charged again.",
       "discountReasonRequired": "Choose a discount reason before applying a discount.",
       "discountTooLarge": "Discount cannot be greater than the order subtotal."
+    },
+    "tableCharges": {
+      "title": "Table charges",
+      "start": "Start",
+      "stop": "Stop",
+      "minutes": "{{count}} min",
+      "clocksStopped": "Table time used has been added to the bill."
     }
   },
   "salesOrders": {
@@ -1548,7 +1555,12 @@
     "menuOffTitle": "Food and drinks are off",
     "menuOffBody": "Venue setup has food and drinks turned off here. Turn them on in the admin under Venue setup to take orders.",
     "addPackageTitle": "Add a service package",
-    "addPackageHint": "Food and drinks are off for SPA. Add another package to give the guest more time."
+    "addPackageHint": "Food and drinks are off for SPA. Add another package to give the guest more time.",
+    "freeTimeDeal": "buy {{buy}}, get {{free}} free",
+    "roomCharges": "Room charges",
+    "roomChargeAuto": "added automatically",
+    "roomChargeBlock": "{{minutes}} min",
+    "roomChargeClock": "{{name}}: the time used is added to the bill when the treatment ends."
   },
   "statusBadge": {
     "verified": "Verified",
@@ -1724,7 +1736,16 @@
       "menu": "Order food and drinks"
     },
     "addServices": "Order food and drinks",
-    "noLines": "Nothing ordered yet."
+    "noLines": "Nothing ordered yet.",
+    "chooseRental": "Rate",
+    "rentalPrice": "{{price}} / {{minutes}} min",
+    "freeTimeAdded": "+{{count}} free · {{name}}",
+    "whoServes": "Who gives {{service}}?",
+    "whoServesHint": "Pick the hostess. One already in a room can still be picked.",
+    "noHostesses": "No hostesses are working now. Add them in admin under Hostesses.",
+    "hostessFree": "Free",
+    "hostessInRoom": "In room {{room}}",
+    "hostessInRoomUntil": "In room {{room}} until {{time}}"
   },
   "diningTables": {
     "title": "Dining tables",

@@ -910,6 +910,20 @@ const toProduct = (item: Record<string, unknown>) => {
       toBoolean(item.isPriceInclusive) ??
       toBoolean(item.priceInclusive) ??
       toBoolean(taxRate?.isPriceInclusive),
+    kind:
+      item.kind === "SERVICE" || item.kind === "RENTAL" ? item.kind : "ITEM",
+    soldAt: Array.isArray(item.soldAt)
+      ? (item.soldAt as unknown[]).filter(
+          (area): area is "BAR" | "SPA" | "KTV" =>
+            area === "BAR" || area === "SPA" || area === "KTV"
+        )
+      : [],
+    soldBy: item.soldBy === "TIME" ? "TIME" : "EACH",
+    timeBlockMinutes: toNumber(item.timeBlockMinutes) ?? null,
+    minimumBlocks: toNumber(item.minimumBlocks) ?? null,
+    askWhoServed: toBoolean(item.askWhoServed) ?? false,
+    chargeMode: item.chargeMode === "CLOCK" ? "CLOCK" : item.chargeMode === "PAY_FIRST" ? "PAY_FIRST" : null,
+    autoApply: toBoolean(item.autoApply) ?? false,
     deletedAt: item.deletedAt ? String(item.deletedAt) : item.deletedAt === null ? null : undefined,
     createdAt: item.createdAt ? String(item.createdAt) : undefined,
     updatedAt: item.updatedAt ? String(item.updatedAt) : undefined,

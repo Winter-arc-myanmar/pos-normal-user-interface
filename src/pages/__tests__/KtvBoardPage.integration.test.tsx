@@ -5,10 +5,19 @@ import { Toaster } from "@/components/ui/Toaster";
 import { KtvBoardPage } from "../KtvBoardPage";
 
 const promotionState: {
-  running: { id: string; name: string; discountType: string; discountValue: number }[];
+  running: Record<string, unknown>[];
   discounts: Record<string, { discount: number; names: string[] }>;
   promotionName: (id: string | undefined) => string | undefined;
 } = { running: [], discounts: {}, promotionName: () => undefined };
+
+let rentalsState: {
+  variantId: string;
+  productId: string;
+  name: string;
+  unitPrice: number;
+  blockMinutes: number;
+  minimumUnits: number;
+}[] = [];
 
 const spaPackages: {
   id: string;
@@ -42,6 +51,7 @@ const mocks = vi.hoisted(() => ({
   getWallet: vi.fn(),
   requireCashierContext: vi.fn(),
   printReceipt: vi.fn(),
+  loadHostesses: vi.fn(),
   noop: vi.fn(),
 }));
 
@@ -166,14 +176,39 @@ vi.mock("@/core/presentation/hooks/useKtvManagement", () => ({
     clearQuote: mocks.noop,
   }),
 }));
+vi.mock("@/core/presentation/hooks/usePlaceCharges", () => ({
+  usePlaceCharges: () => rentalsState,
+}));
+vi.mock("@/core/presentation/hooks/useWorkingHostesses", () => ({
+  useWorkingHostesses: () => ({
+    hostesses: [
+      { id: "hostess-snow", name: "Ma Hnin", nickname: "Snow", inRoom: null },
+      { id: "hostess-rose", name: "Ma Thiri", nickname: "Rose", inRoom: { roomNumber: "K3", until: null } },
+    ],
+    isLoading: false,
+    error: null,
+    load: mocks.loadHostesses,
+  }),
+}));
 vi.mock("@/core/presentation/hooks/useCashier", () => ({
   useCashier: () => ({
     products: [
       { id: "product-beer", name: "Myanmar Beer", categoryName: "Beer", basePrice: "4000.0000" },
       { id: "product-ktv", name: "KTV room K1", categoryName: "KTV Rooms", basePrice: "30000.0000" },
+      {
+        id: "product-hostess",
+        name: "Hostess per hour",
+        categoryName: "Hostess",
+        basePrice: "20000.0000",
+        kind: "SERVICE",
+        soldAt: ["KTV"],
+        askWhoServed: true,
+      },
+      { id: "product-tea", name: "Herbal tea", categoryName: "Spa drinks", basePrice: "2000.0000", soldAt: ["SPA"] },
     ],
     variantsByProductId: {
       "product-beer": [{ id: "variant-beer", productId: "product-beer", priceModifier: "0" }],
+      "product-hostess": [{ id: "variant-hostess", productId: "product-hostess", priceModifier: "0" }],
     },
     paymentMethods: [
       { id: "card-method", tenantId: "tenant-1", name: "Guest Card", kind: "GUEST_CARD" },
@@ -243,6 +278,8 @@ describe("KtvBoardPage", () => {
     vi.clearAllMocks();
     venueState = { paymentTiming: "PAY_WHEN_ORDERING", roomCardOnly: true };
     rooms = [freeRoom];
+    rentalsState = [];
+    promotionState.running = [];
     mocks.fetchBoard.mockResolvedValue(rooms);
     mocks.getQuote.mockResolvedValue(paidQuote);
     mocks.fetchOrderLines.mockResolvedValue({ lines: [] });
@@ -347,5 +384,114 @@ describe("KtvBoardPage", () => {
 
     expect(await screen.findByRole("button", { name: /Myanmar Beer/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /KTV room K1/ })).not.toBeInTheDocument();
+  });
+
+  describe("rentals, free time and hostesses", () => {
+    const ownRate = {
+      variantId: "variant-ktv",
+      productId: "product-ktv",
+      name: "KTV room K1",
+      unitPrice: 30000,
+      blockMinutes: 60,
+      minimumUnits: 1,
+    };
+    const vip = {
+      variantId: "variant-vip",
+      productId: "product-vip",
+      name: "VIP hourly",
+      unitPrice: 50000,
+      blockMinutes: 60,
+      minimumUnits: 2,
+    };
+    const started = {
+      id: "ktv-session-1",
+      roomId: "ktv-1",
+      salesOrderId: "order-1",
+      guestWalletId: "wallet-1",
+      guestCount: 1,
+      openedAt: "2026-09-26T12:00:00Z",
+      sessionState: "OPEN",
+    };
+
+    it("starts a room on another rental the cashier picks, at its minimum", async () => {
+      rentalsState = [ownRate, vip];
+      mocks.openSession.mockResolvedValue(started);
+      renderPage();
+      fireEvent.click(screen.getByRole("button", { name: /K1/ }));
+      fireEvent.click(screen.getByRole("button", { name: /VIP hourly/ }));
+      fireEvent.click(screen.getByRole("button", { name: "ktvPos.startAndPay" }));
+      await tapCard();
+
+      await waitFor(() =>
+        expect(mocks.openSession).toHaveBeenCalledWith(
+          expect.objectContaining({ rentalVariantId: "variant-vip", hours: 2 })
+        )
+      );
+    });
+
+    it("does not offer a choice when the room has one rental", () => {
+      rentalsState = [ownRate];
+      renderPage();
+      fireEvent.click(screen.getByRole("button", { name: /K1/ }));
+
+      expect(screen.queryByText("ktvPos.chooseRental")).not.toBeInTheDocument();
+    });
+
+    it("shows the free hours a running promotion adds", () => {
+      rentalsState = [ownRate];
+      promotionState.running = [
+        {
+          id: "b1g1",
+          name: "1 hour + 1 free",
+          discountType: "FREE_TIME",
+          discountValue: 0,
+          buyUnits: 1,
+          freeUnits: 1,
+          appliesTo: "ITEMS",
+          variantIds: ["variant-ktv"],
+          priorityLevel: 0,
+        },
+      ];
+      renderPage();
+      fireEvent.click(screen.getByRole("button", { name: /K1/ }));
+
+      expect(screen.getByText("ktvPos.freeTimeAdded")).toBeInTheDocument();
+    });
+
+    it("asks which hostess gives a hostess service and sends her with it", async () => {
+      rooms = [busyRoom];
+      mocks.chargeItems.mockResolvedValue({
+        charged: "20000.0000",
+        balanceAfter: "180000.0000",
+        quote: paidQuote,
+      });
+      renderPage();
+      fireEvent.click(screen.getByRole("button", { name: /K1/ }));
+      fireEvent.click(await screen.findByRole("button", { name: /Hostess per hour/ }));
+
+      expect(await screen.findByText("ktvPos.whoServes")).toBeInTheDocument();
+      expect(screen.getByText("ktvPos.hostessInRoom")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /Snow/ }));
+      fireEvent.click(await screen.findByRole("button", { name: /ktvPos.addToBill/ }));
+      await tapCard();
+
+      await waitFor(() =>
+        expect(mocks.chargeItems).toHaveBeenCalledWith(
+          "ktv-session-1",
+          expect.objectContaining({
+            items: [{ variantId: "variant-hostess", quantity: 1, hostessId: "hostess-snow" }],
+          })
+        )
+      );
+    });
+
+    it("keeps products sold only at the SPA off the KTV menu", async () => {
+      rooms = [busyRoom];
+      renderPage();
+      fireEvent.click(screen.getByRole("button", { name: /K1/ }));
+
+      expect(await screen.findByRole("button", { name: /Myanmar Beer/ })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Herbal tea/ })).not.toBeInTheDocument();
+    });
   });
 });
