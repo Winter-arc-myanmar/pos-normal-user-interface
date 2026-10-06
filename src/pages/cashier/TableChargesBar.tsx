@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TableChargeOffer, TableCharges } from "@/core/domain/entities/TableCharge";
+import { clockSoFar, minutesSince } from "@/lib/pos/tableCharges";
 
 const money = (value: number) => value.toLocaleString(undefined, { maximumFractionDigits: 2 });
 
 const elapsed = (startedAt: string, now: number) => {
-  const minutes = Math.max(0, Math.floor((now - new Date(startedAt).getTime()) / 60_000));
+  const minutes = minutesSince(startedAt, now);
   return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")}`;
 };
 
@@ -54,6 +55,14 @@ export function TableChargesBar({
           className="inline-flex items-center gap-2 rounded border border-sky-700 bg-sky-950/40 px-2 py-1"
         >
           ⏱ {clock.name} {elapsed(clock.startedAt, now)}
+          {(() => {
+            const soFar = clockSoFar(
+              charges.offered.find((charge) => charge.variantId === clock.variantId),
+              clock.startedAt,
+              now
+            );
+            return soFar === null ? null : <span className="text-sky-200">≈ {money(soFar)}</span>;
+          })()}
           <button
             type="button"
             disabled={isBusy}
