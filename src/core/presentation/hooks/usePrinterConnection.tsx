@@ -246,8 +246,15 @@ export function usePrinterConnection(
       // with no station, or a station whose printer is not bound on this
       // device). Rather than silently printing nothing, fall back to the
       // KDS/default printer so the kitchen ticket still reaches the paper.
+      //
+      // This fallback must NOT run when the caller requires strict station
+      // routing (`requireStationRouting`). Otherwise a category that is not
+      // assigned to the matching station would be sprayed onto the default KDS
+      // printer (for example "only salad" routed to the drink-station printer
+      // would still receive every other category). In strict mode the plan is
+      // returned untouched so the caller can surface the unrouted lines.
       let jobs: PrinterJob[] = plan.jobs;
-      if (!jobs.length && lines.length) {
+      if (!options.requireStationRouting && !jobs.length && lines.length) {
         const localTargets = resolveBindingsForPlace(
           current.bindings,
           current.defaultBinding,
