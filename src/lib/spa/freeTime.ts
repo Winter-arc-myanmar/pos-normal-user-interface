@@ -10,6 +10,12 @@ export interface RentalChoice {
   /** Minutes one unit buys (60 = per hour). */
   blockMinutes: number;
   minimumUnits: number;
+  /** EACH: a fixed fee. TIME: priced per block. */
+  soldBy: "EACH" | "TIME";
+  /** TIME only: paid up front, or a clock billed when the bill closes. */
+  chargeMode: "PAY_FIRST" | "CLOCK" | null;
+  /** Added by itself when the place opens. */
+  autoApply: boolean;
 }
 
 export interface FreeTimeOffer {

@@ -10,6 +10,8 @@ let promotionState: {
   promotionName: (id: string | undefined) => string | undefined;
 } = { running: [], discounts: {}, promotionName: () => undefined };
 
+let placeChargesState: Record<string, unknown>[] = [];
+
 let spaPackages: {
   id: string;
   name: string;
@@ -198,8 +200,8 @@ vi.mock("@/core/presentation/hooks/useSpaPackages", () => ({
   useSpaPackages: () => ({ packages: spaPackages, error: null }),
 }));
 
-vi.mock("@/core/presentation/hooks/useKtvRentals", () => ({
-  useKtvRentals: () => [],
+vi.mock("@/core/presentation/hooks/usePlaceCharges", () => ({
+  usePlaceCharges: () => placeChargesState,
 }));
 vi.mock("@/core/presentation/hooks/useWorkingHostesses", () => ({
   useWorkingHostesses: () => ({ hostesses: [], isLoading: false, error: null, load: () => undefined }),
@@ -300,6 +302,7 @@ const tapCard = async (uid = "04A3B2C1") => {
 describe("SpaBoardPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    placeChargesState = [];
     venueState = { paymentTiming: "PAY_WHEN_ORDERING", roomCardOnly: true };
     rooms = [room("wallet-1")];
     lines = [];
@@ -632,6 +635,58 @@ describe("SpaBoardPage", () => {
     });
     expect(payload).not.toHaveProperty("sessions");
     expect(payload).not.toHaveProperty("items");
+  });
+
+  it("adds the room's automatic fee and a ticked sauna to the start", async () => {
+    rooms = [{ ...room("wallet-1"), status: "AVAILABLE", sessions: [] }];
+    placeChargesState = [
+      {
+        variantId: "variant-vip",
+        productId: "product-vip",
+        name: "VIP room",
+        unitPrice: 15000,
+        blockMinutes: 60,
+        minimumUnits: 1,
+        soldBy: "EACH",
+        chargeMode: null,
+        autoApply: true,
+      },
+      {
+        variantId: "variant-sauna",
+        productId: "product-sauna",
+        name: "Sauna",
+        unitPrice: 8000,
+        blockMinutes: 60,
+        minimumUnits: 1,
+        soldBy: "TIME",
+        chargeMode: "PAY_FIRST",
+        autoApply: false,
+      },
+    ];
+    mocks.openSession.mockResolvedValue({
+      id: "session-2",
+      roomId: "room-1",
+      salesOrderId: "order-2",
+      guestWalletId: "wallet-1",
+      guestCount: 1,
+      openedAt: "2026-09-26T08:00:00Z",
+      sessionState: "OPEN",
+    });
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /SUITE1/ }));
+    const [moreThai] = await screen.findAllByRole("button", { name: "spa.moreOf" });
+    fireEvent.click(moreThai);
+
+    expect(screen.getByText("spa.roomCharges")).toBeInTheDocument();
+    expect(screen.getByText("VIP room")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Sauna/ }));
+    fireEvent.click(screen.getByRole("button", { name: "spa.startAndPay" }));
+    await tapCard();
+
+    await waitFor(() => expect(mocks.openSession).toHaveBeenCalled());
+    const [[payload]] = mocks.openSession.mock.calls as [[Record<string, unknown>]];
+    // The VIP fee is added by the server; only the ticked sauna is sent.
+    expect(payload).toMatchObject({ roomCharges: [{ variantId: "variant-sauna" }] });
   });
 
   it("offers packages to extend instead of the menu when SPA food and drinks are off", async () => {

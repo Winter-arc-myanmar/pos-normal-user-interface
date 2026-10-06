@@ -1549,7 +1549,11 @@
     "menuOffBody": "Venue setup has food and drinks turned off here. Turn them on in the admin under Venue setup to take orders.",
     "addPackageTitle": "Add a service package",
     "addPackageHint": "Food and drinks are off for SPA. Add another package to give the guest more time.",
-    "freeTimeDeal": "buy {{buy}}, get {{free}} free"
+    "freeTimeDeal": "buy {{buy}}, get {{free}} free",
+    "roomCharges": "Room charges",
+    "roomChargeAuto": "added automatically",
+    "roomChargeBlock": "{{minutes}} min",
+    "roomChargeClock": "{{name}}: the time used is added to the bill when the treatment ends."
   },
   "statusBadge": {
     "verified": "Verified",

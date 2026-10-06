@@ -176,8 +176,8 @@ vi.mock("@/core/presentation/hooks/useKtvManagement", () => ({
     clearQuote: mocks.noop,
   }),
 }));
-vi.mock("@/core/presentation/hooks/useKtvRentals", () => ({
-  useKtvRentals: () => rentalsState,
+vi.mock("@/core/presentation/hooks/usePlaceCharges", () => ({
+  usePlaceCharges: () => rentalsState,
 }));
 vi.mock("@/core/presentation/hooks/useWorkingHostesses", () => ({
   useWorkingHostesses: () => ({

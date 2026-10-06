@@ -41,6 +41,10 @@ export class Product {
   minimumBlocks?: number | null;
   /** A service whose till asks which hostess gave it. */
   askWhoServed?: boolean;
+  /** Room or table charge sold by time: paid up front, or on a clock. */
+  chargeMode?: "PAY_FIRST" | "CLOCK" | null;
+  /** Room or table charge added by itself when the place opens. */
+  autoApply?: boolean;
   deletedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
