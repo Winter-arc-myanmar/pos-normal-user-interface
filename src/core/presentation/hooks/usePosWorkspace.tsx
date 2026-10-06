@@ -403,6 +403,24 @@ export function PosWorkspaceProvider({ children }: { children: ReactNode }) {
     tenantId,
   ]);
 
+  // What a device sells and its shift can change in admin while staff are on it;
+  // picked up again every minute and when the screen comes back.
+  useEffect(() => {
+    if (!activePosRegisterId) return;
+    const reload = () => {
+      shiftApi()
+        .current(activePosRegisterId)
+        .then(setCurrentShift)
+        .catch(() => undefined);
+    };
+    const timer = window.setInterval(reload, 60_000);
+    window.addEventListener("focus", reload);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", reload);
+    };
+  }, [activePosRegisterId]);
+
   const shiftClosed = useCallback(
     async (options?: { signingOut?: boolean }) => {
       setActivePosSessionId("");
