@@ -1507,7 +1507,11 @@
     "menuOffBody": "Venue setup တွင် ဤနေရာအတွက် အစားအသောက် ပိတ်ထားသည်။ မှာယူရန် admin ၏ Venue setup တွင် ဖွင့်ပါ။",
     "addPackageTitle": "ဝန်ဆောင်မှု ပက်ကေ့ချ် ထပ်ထည့်ရန်",
     "addPackageHint": "SPA အတွက် အစားအသောက် ပိတ်ထားသည်။ ဧည့်သည်အား အချိန်ပိုပေးရန် ပက်ကေ့ချ် ထပ်ထည့်ပါ။",
-    "freeTimeDeal": "{{buy}} ခု ဝယ်လျှင် {{free}} ခု အခမဲ့"
+    "freeTimeDeal": "{{buy}} ခု ဝယ်လျှင် {{free}} ခု အခမဲ့",
+    "roomCharges": "အခန်းခ",
+    "roomChargeAuto": "အလိုအလျောက် ထည့်ထားသည်",
+    "roomChargeBlock": "{{minutes}} မိနစ်",
+    "roomChargeClock": "{{name}}: သုံးသည့်အချိန်ကို ကုသမှု ပြီးသည့်အခါ ဘေလ်ထဲ ထည့်ပါမည်။"
   },
   "statusBadge": {
     "verified": "အတည်ပြုပြီး",

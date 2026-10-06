@@ -4,10 +4,11 @@ import type { ICashierRepository } from "../../domain/repositories/ICashierRepos
 import type { RentalChoice } from "@/lib/spa/freeTime";
 
 /**
- * The rentals a KTV room can be sold under (GET /products?placeId=<room>), each
- * with its variant and how its time is counted. Empty until a room is chosen.
+ * The charges a room or table offers (GET /products?placeId=<place>): a KTV room's
+ * rentals, a SPA room's fees. Each with its variant and how it is charged. Empty
+ * until a place is chosen.
  */
-export function useKtvRentals(roomId: string | null) {
+export function usePlaceCharges(roomId: string | null) {
   const [loaded, setLoaded] = useState<{ roomId: string; rentals: RentalChoice[] } | null>(null);
 
   useEffect(() => {
@@ -33,6 +34,9 @@ export function useKtvRentals(roomId: string | null) {
               unitPrice: Number(product.basePrice || 0) + Number(variant.priceModifier || 0),
               blockMinutes: product.timeBlockMinutes || 60,
               minimumUnits: product.minimumBlocks || 1,
+              soldBy: product.soldBy ?? "TIME",
+              chargeMode: product.chargeMode ?? null,
+              autoApply: product.autoApply ?? false,
             };
           })
         );

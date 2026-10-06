@@ -38,6 +38,8 @@ export interface OpenSpaSessionDTO {
   packages?: { packageId: string; quantity: number }[];
   /** KTV: the rental the room is sold under. */
   rentalVariantId?: string;
+  /** SPA: room charges the cashier ticked; automatic ones are added by the server. */
+  roomCharges?: { variantId: string; units?: number }[];
   items?: { variantId: string; quantity: number; hostessId?: string }[];
   prepay?: SpaCardChargeDTO;
   posRegisterId?: string;
