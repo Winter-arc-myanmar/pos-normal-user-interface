@@ -858,6 +858,47 @@ describe("SpaBoardPage", () => {
       expect(await screen.findByText("spa.charged")).toBeInTheDocument();
     });
 
+    it("adds more sauna time to a running treatment from the room's charges", async () => {
+      placeChargesState = [
+        {
+          variantId: "variant-sauna",
+          productId: "product-sauna",
+          name: "Sauna",
+          unitPrice: 8000,
+          blockMinutes: 60,
+          minimumUnits: 1,
+          soldBy: "TIME",
+          chargeMode: "PAY_FIRST",
+          autoApply: false,
+        },
+        {
+          variantId: "variant-steam",
+          productId: "product-steam",
+          name: "Steam room",
+          unitPrice: 5000,
+          blockMinutes: 30,
+          minimumUnits: 1,
+          soldBy: "TIME",
+          chargeMode: "CLOCK",
+          autoApply: false,
+        },
+      ];
+      await openRunningRoom();
+
+      // A clock starts with the treatment, so only the sauna can be added now.
+      expect(screen.queryByRole("button", { name: /Steam room/ })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /Sauna/ }));
+      fireEvent.click(await screen.findByRole("button", { name: /spa.addToBill/ }));
+      await tapCard();
+
+      await waitFor(() =>
+        expect(mocks.chargeItems).toHaveBeenCalledWith(
+          "session-1",
+          expect.objectContaining({ items: [{ variantId: "variant-sauna", quantity: 1 }] })
+        )
+      );
+    });
+
     it("shows the promotion running now and the discounted total before the tap", async () => {
       promotionState = {
         running: [

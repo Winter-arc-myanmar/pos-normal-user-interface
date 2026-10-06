@@ -291,6 +291,41 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       })
     : null;
   const optionalCharges = isSpa ? placeCharges.filter((charge) => !charge.autoApply) : [];
+  // While a treatment runs, the room's charges that can be added later: not clocks,
+  // which start with the treatment.
+  const laterCharges = optionalCharges.filter(
+    (charge) => !(charge.soldBy === "TIME" && charge.chargeMode === "CLOCK")
+  );
+  const roomChargeChips =
+    isSpa && session && !billClosed && laterCharges.length ? (
+      <div className="flex flex-wrap items-center gap-2 rounded border border-slate-700 bg-slate-950 p-2 text-sm">
+        <span className="font-semibold text-slate-300">{tr("roomCharges")}</span>
+        {laterCharges.map((charge) => (
+          <button
+            key={charge.variantId}
+            type="button"
+            onClick={() =>
+              setPending((current) =>
+                addPending(
+                  current,
+                  {
+                    variantId: charge.variantId,
+                    productId: charge.productId,
+                    name: charge.name,
+                    unitPrice: charge.unitPrice,
+                  },
+                  charge.soldBy === "TIME" ? charge.minimumUnits : 1
+                )
+              )
+            }
+            className="rounded border border-slate-600 px-2 py-1 hover:border-emerald-500"
+          >
+            + {charge.name} · {money(charge.unitPrice)}
+            {charge.soldBy === "TIME" ? ` / ${tr("roomChargeBlock", { minutes: charge.blockMinutes })}` : ""}
+          </button>
+        ))}
+      </div>
+    ) : null;
   const rental =
     rentals.find((item) => item.variantId === rentalVariantId) ||
     rentals.find((item) => item.variantId === room?.rateVariantId) ||
@@ -1572,6 +1607,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
 
           {step === "menu" && !menuAllowed && isSpa ? (
             <div className="space-y-4 rounded-lg border border-slate-700 bg-slate-900 p-5">
+              {roomChargeChips}
               <div>
                 <h2 className="text-lg font-semibold text-white">{tr("addPackageTitle")}</h2>
                 <p className="mt-1 text-sm text-slate-400">{tr("addPackageHint")}</p>
@@ -1603,15 +1639,20 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               <p className="text-sm text-slate-300">{tr("menuOffBody")}</p>
             </div>
           ) : step === "menu" ? (
-            <ProductMenu
-              products={menuProducts}
-              groupByCategory
-              variantsByProductId={variantsByProductId}
-              orderedProductQuantities={pendingByProduct}
-              onLoadVariants={fetchProductVariants}
-              onAdd={handleAddProduct}
-              onClose={goToPay}
-            />
+            <div className="flex min-h-0 flex-col gap-2">
+              {roomChargeChips}
+              <div className="min-h-0 flex-1">
+                <ProductMenu
+                  products={menuProducts}
+                  groupByCategory
+                  variantsByProductId={variantsByProductId}
+                  orderedProductQuantities={pendingByProduct}
+                  onLoadVariants={fetchProductVariants}
+                  onAdd={handleAddProduct}
+                  onClose={goToPay}
+                />
+              </div>
+            </div>
           ) : paid ? (
             <div className="rounded-lg border border-slate-700 bg-slate-900 p-5">
               <h2 className="text-lg font-semibold text-white">{tr("paidTitle")}</h2>
