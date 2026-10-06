@@ -9,7 +9,15 @@ import {
 import { AppShell } from "../AppShell";
 
 const mocks = vi.hoisted(() => ({
+  approve: vi.fn(),
   setActiveBranch: vi.fn(),
+}));
+
+vi.mock("@/components/shift/shiftApi", () => ({
+  shiftApi: () => ({ approve: mocks.approve }),
+  money: (value: number) => String(value),
+  errorText: (caught: unknown, fallback: string) =>
+    caught instanceof Error ? caught.message : fallback,
 }));
 
 vi.mock("react-i18next", () => ({

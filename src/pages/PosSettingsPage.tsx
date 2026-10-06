@@ -13,6 +13,9 @@ import { DevicesSettingsPanel } from "./settings/DevicesSettingsPanel";
 import { PrinterSettingsPanel } from "./settings/PrinterSettingsPanel";
 import { PrintTemplateSettingsPanel } from "./settings/PrintTemplateSettingsPanel";
 import { KdsStationSettingsPanel } from "./settings/KdsStationSettingsPanel";
+import { ShiftSettingsPanel } from "./settings/ShiftSettingsPanel";
+import { CloseShiftDialog } from "@/components/shift/CloseShiftDialog";
+import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
 
 type SettingsTab =
   | "cashier"
@@ -21,10 +24,12 @@ type SettingsTab =
   | "print-template"
   | "kds-station"
   | "pos-terminal"
+  | "shift"
   | "logout";
 
 const tabIds: SettingsTab[] = [
   // "cashier",
+  "shift",
   "devices",
   "printer",
   "print-template",
@@ -61,6 +66,9 @@ export function PosSettingsPage() {
   const navigate = useNavigate();
   const { tab } = useParams<{ tab?: string }>();
   const { user, logout } = useAuth();
+  const { currentShift, activePosSessionId, shiftClosed } = usePosWorkspace();
+  const [endingShift, setEndingShift] = useState(false);
+  const cashierShiftOpen = Boolean(activePosSessionId && currentShift?.mode !== "ROOM");
 
   const activeTab = tabIds.includes((tab || "") as SettingsTab)
     ? (tab as SettingsTab)
@@ -93,6 +101,7 @@ export function PosSettingsPage() {
         "print-template": t("settings.tabs.printTemplate"),
         "kds-station": t("settings.tabs.kdsStation"),
         "pos-terminal": t("settings.tabs.posTerminal"),
+        shift: t("shift.tab"),
         logout: t("settings.tabs.logout"),
       }) satisfies Record<SettingsTab, string>,
     [t]
@@ -226,6 +235,8 @@ export function PosSettingsPage() {
           </div>
         ) : null}
 
+        {activeTab === "shift" ? <ShiftSettingsPanel /> : null}
+
         {activeTab === "devices" ? <DevicesSettingsPanel /> : null}
 
         {activeTab === "printer" ? (
@@ -289,16 +300,40 @@ export function PosSettingsPage() {
               {t("settings.logout.title")}
             </h2>
             <p className="mt-2 text-sm text-slate-500">
-              {t("settings.logout.description")}
+              {activePosSessionId
+                ? t(cashierShiftOpen ? "shift.logoutCashier" : "shift.logoutRoom")
+                : t("settings.logout.description")}
             </p>
-            <Button
-              variant="destructive"
-              className="mt-6 min-w-40"
-              onClick={() => void handleLogout()}
-            >
-              {t("shell.logout")}
-            </Button>
+            {cashierShiftOpen ? (
+              <div className="mt-6 flex flex-wrap justify-center gap-2">
+                <Button variant="secondary" className="min-w-40" onClick={() => void handleLogout()}>
+                  {t("shift.break")}
+                </Button>
+                <Button variant="destructive" className="min-w-40" onClick={() => setEndingShift(true)}>
+                  {t("shift.endShift")}
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="destructive"
+                className="mt-6 min-w-40"
+                onClick={() => void handleLogout()}
+              >
+                {t("shell.logout")}
+              </Button>
+            )}
           </div>
+        ) : null}
+        {endingShift && activePosSessionId ? (
+          <CloseShiftDialog
+            sessionId={activePosSessionId}
+            title={t("shift.endShift")}
+            onCancel={() => setEndingShift(false)}
+            onClosed={() => {
+              setEndingShift(false);
+              void shiftClosed({ signingOut: true }).then(handleLogout);
+            }}
+          />
         ) : null}
       </div>
     </section>

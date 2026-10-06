@@ -38,6 +38,11 @@ export const API_ENDPOINTS = {
     SIGNIN: "/api/v1/auth/signin",
     SESSION: "/api/v1/auth/session",
     SET_ACTIVE_BRANCH: "/api/v1/auth/set-active-branch",
+    APPROVE: "/api/v1/auth/approve",
+  },
+
+  CASH_MOVEMENTS: {
+    CREATE: "/api/v1/cash-movements",
   },
 
   USERS: {
@@ -216,6 +221,7 @@ export const API_ENDPOINTS = {
     DELETE: (id: string) => `/api/v1/pos-sessions/${id}`,
     CLOSE: (id: string) => `/api/v1/pos-sessions/${id}/close`,
     SUMMARY: (id: string) => `/api/v1/pos-sessions/${id}/summary`,
+    CURRENT: "/api/v1/pos-sessions/current",
   },
 
   DINING_ZONES: {

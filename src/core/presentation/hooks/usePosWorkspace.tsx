@@ -10,6 +10,8 @@ import {
 import { useTranslation } from "react-i18next";
 import { PosWorkspaceSetupModal } from "@/components/PosWorkspaceSetupModal";
 import { PosRegister, PosSession } from "@/core/domain/entities/Cashier";
+import type { CurrentShift } from "@/core/domain/entities/Shift";
+import { shiftApi } from "@/components/shift/shiftApi";
 import { useAuth } from "@/core/presentation/hooks/useAuth";
 import { useCashier } from "@/core/presentation/hooks/useCashier";
 import {
@@ -32,8 +34,12 @@ interface PosWorkspaceContextType {
   isPosSessionLoading: boolean;
   isSetupModalOpen: boolean;
   isWorkspaceReady: boolean;
+  /** The till and the shift open on it: its mode, who has it, when a room board's day ends. */
+  currentShift: CurrentShift | null;
   requireCashierContext: () => Promise<CashierContext>;
   refreshPosContext: () => Promise<void>;
+  /** After a shift is counted and closed: forget it, and ask for a new one unless signing out. */
+  shiftClosed: (options?: { signingOut?: boolean }) => Promise<void>;
 }
 
 const PosWorkspaceContext = createContext<PosWorkspaceContextType | undefined>(
@@ -52,7 +58,6 @@ export function PosWorkspaceProvider({ children }: { children: ReactNode }) {
     fetchPosRegisters,
     createPosRegister,
     fetchPosSessions,
-    createPosSession,
   } = useCashier();
 
   const tenantId = String(user?.tenantId || "");
@@ -61,7 +66,8 @@ export function PosWorkspaceProvider({ children }: { children: ReactNode }) {
   const [activePosRegisterId, setActivePosRegisterId] = useState("");
   const [activePosSessionId, setActivePosSessionId] = useState("");
   const [posRegisters, setPosRegisters] = useState<PosRegister[]>([]);
-  const [posSessions, setPosSessions] = useState<PosSession[]>([]);
+  const [, setPosSessions] = useState<PosSession[]>([]);
+  const [currentShift, setCurrentShift] = useState<CurrentShift | null>(null);
   const [posSessionScopeKey, setPosSessionScopeKey] = useState("");
   const [isPosSessionLoading, setIsPosSessionLoading] = useState(false);
   const [isSetupModalOpen, setIsSetupModalOpen] = useState(false);
@@ -104,7 +110,6 @@ export function PosWorkspaceProvider({ children }: { children: ReactNode }) {
       resolvedLocationId: string,
       options?: {
         preferredRegisterId?: string;
-        autoCreateSession?: boolean;
         forceRefresh?: boolean;
       }
     ) => {
@@ -127,7 +132,7 @@ export function PosWorkspaceProvider({ children }: { children: ReactNode }) {
 
       setIsPosSessionLoading(true);
       try {
-        const { registers, sessions } = await loadPosContextData(
+        const { registers } = await loadPosContextData(
           resolvedTenantId,
           resolvedLocationId
         );
@@ -155,40 +160,24 @@ export function PosWorkspaceProvider({ children }: { children: ReactNode }) {
           throw new Error("Unable to resolve POS register");
         }
 
-        let session =
-          sessions.find(
-            (item) =>
-              item.registerId === register.id &&
-              item.cashierId === cashierId &&
-              item.status === "OPEN" &&
-              !item.closedAt
-          ) ||
-          sessions.find(
-            (item) =>
-              item.registerId === register.id &&
-              item.status === "OPEN" &&
-              !item.closedAt
-          );
+        // A shift opens only with its drawer counted, never by itself. On a
+        // cashier's till only your own shift is yours to sell on; a room board's
+        // day is shared by whoever is on it.
+        const current = await shiftApi().current(register.id);
+        const usable =
+          current.shift &&
+          (current.mode === "ROOM" || current.shift.cashierId === cashierId)
+            ? current.shift.id
+            : "";
 
-        if (!session && options?.autoCreateSession) {
-          session = await createPosSession({
-            tenantId: resolvedTenantId,
-            registerId: register.id,
-            cashierId,
-            openingCashFloat: "0.0000",
-            expectedClosingCash: "0.0000",
-            status: "OPEN",
-          });
-          setPosSessions((current) => [session!, ...current]);
-        }
-
+        setCurrentShift(current);
         setActivePosRegisterId(register.id);
-        setActivePosSessionId(session?.id || "");
+        setActivePosSessionId(usable);
         setPosSessionScopeKey(scopeKey);
 
         return {
           posRegisterId: register.id,
-          posSessionId: session?.id || "",
+          posSessionId: usable,
         };
       } finally {
         setIsPosSessionLoading(false);
@@ -200,7 +189,6 @@ export function PosWorkspaceProvider({ children }: { children: ReactNode }) {
       buildRegisterCode,
       cashierId,
       createPosRegister,
-      createPosSession,
       loadPosContextData,
       posSessionScopeKey,
     ]
@@ -211,6 +199,7 @@ export function PosWorkspaceProvider({ children }: { children: ReactNode }) {
     setActivePosSessionId("");
     setPosRegisters([]);
     setPosSessions([]);
+    setCurrentShift(null);
     setPosSessionScopeKey("");
   }, []);
 
@@ -237,7 +226,6 @@ export function PosWorkspaceProvider({ children }: { children: ReactNode }) {
 
           await ensurePosSessionContext(tenantId, resolvedLocationId, {
             forceRefresh: true,
-            autoCreateSession: false,
           });
         } catch (caught) {
           setErrorMessage(
@@ -257,7 +245,7 @@ export function PosWorkspaceProvider({ children }: { children: ReactNode }) {
         }
 
         const result = await ensurePosSessionContext(tenantId, resolvedLocationId, {
-          autoCreateSession: true,
+          forceRefresh: true,
         });
 
         if (!result.posSessionId) {
@@ -298,7 +286,6 @@ export function PosWorkspaceProvider({ children }: { children: ReactNode }) {
     try {
       await ensurePosSessionContext(tenantId, nextLocationId, {
         forceRefresh: true,
-        autoCreateSession: false,
       });
     } catch (caught) {
       setErrorMessage(
@@ -320,7 +307,6 @@ export function PosWorkspaceProvider({ children }: { children: ReactNode }) {
       const result = await ensurePosSessionContext(tenantId, activeLocationId, {
         preferredRegisterId: registerId,
         forceRefresh: true,
-        autoCreateSession: false,
       });
       if (!result.posSessionId) {
         setNotice(t("cashier.pos.sessionRequired"));
@@ -332,41 +318,36 @@ export function PosWorkspaceProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const handleOpenSession = async () => {
+  const handleOpenSession = async (openingCashFloat: number) => {
     setErrorMessage(null);
     setNotice(null);
     if (!tenantId || !activeLocationId || !activePosRegisterId) return;
 
     try {
-      const existingOpenSession = posSessions.find(
-        (session) =>
-          session.registerId === activePosRegisterId &&
-          session.cashierId === cashierId &&
-          session.status === "OPEN" &&
-          !session.closedAt
-      );
-      if (existingOpenSession) {
-        setActivePosSessionId(existingOpenSession.id);
-        setNotice(t("cashier.pos.sessionAlreadyOpen"));
-        return;
-      }
-
-      const opened = await createPosSession({
+      await shiftApi().open({
         tenantId,
         registerId: activePosRegisterId,
         cashierId,
-        openingCashFloat: "0.0000",
-        expectedClosingCash: "0.0000",
-        status: "OPEN",
+        openingCashFloat,
       });
-      setActivePosSessionId(opened.id);
-      setPosSessions((current) => [opened, ...current]);
+      await ensurePosSessionContext(tenantId, activeLocationId, {
+        preferredRegisterId: activePosRegisterId,
+        forceRefresh: true,
+      });
       setNotice(t("cashier.pos.sessionOpened"));
     } catch (caught) {
       setErrorMessage(
         caught instanceof Error ? caught.message : t("cashier.errors.posSessionControl")
       );
     }
+  };
+
+  const handleShiftClosedInSetup = async () => {
+    if (!tenantId || !activeLocationId) return;
+    await ensurePosSessionContext(tenantId, activeLocationId, {
+      preferredRegisterId: activePosRegisterId || undefined,
+      forceRefresh: true,
+    });
   };
 
   const handleContinue = () => {
@@ -408,12 +389,25 @@ export function PosWorkspaceProvider({ children }: { children: ReactNode }) {
     tenantId,
   ]);
 
+  const shiftClosed = useCallback(
+    async (options?: { signingOut?: boolean }) => {
+      setActivePosSessionId("");
+      setPosSessionScopeKey("");
+      if (options?.signingOut || !tenantId || !activeLocationId) return;
+      setIsSetupModalOpen(true);
+      await ensurePosSessionContext(tenantId, activeLocationId, {
+        preferredRegisterId: activePosRegisterId || undefined,
+        forceRefresh: true,
+      });
+    },
+    [activeLocationId, activePosRegisterId, ensurePosSessionContext, tenantId]
+  );
+
   const refreshPosContext = useCallback(async () => {
     if (!tenantId || !activeLocationId) return;
     setPosSessionScopeKey("");
     await ensurePosSessionContext(tenantId, activeLocationId, {
       preferredRegisterId: activePosRegisterId || undefined,
-      autoCreateSession: false,
     });
   }, [
     activeLocationId,
@@ -435,19 +429,23 @@ export function PosWorkspaceProvider({ children }: { children: ReactNode }) {
       isPosSessionLoading,
       isSetupModalOpen,
       isWorkspaceReady,
+      currentShift,
       requireCashierContext,
       refreshPosContext,
+      shiftClosed,
     }),
     [
       activeLocationId,
       activePosRegisterId,
       activePosSessionId,
+      currentShift,
       isPosSessionLoading,
       isSetupModalOpen,
       isWorkspaceReady,
       posRegisters,
       refreshPosContext,
       requireCashierContext,
+      shiftClosed,
     ]
   );
 
@@ -466,7 +464,9 @@ export function PosWorkspaceProvider({ children }: { children: ReactNode }) {
         notice={notice}
         onLocationChange={(value) => void handleLocationChange(value)}
         onRegisterChange={(value) => void handleRegisterChange(value)}
-        onOpenSession={() => void handleOpenSession()}
+        currentShift={currentShift}
+        onOpenSession={(float) => void handleOpenSession(float)}
+        onShiftClosed={() => void handleShiftClosedInSetup()}
         onContinue={handleContinue}
       />
     </PosWorkspaceContext.Provider>
