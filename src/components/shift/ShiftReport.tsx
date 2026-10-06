@@ -5,18 +5,7 @@ import { money } from "./shiftApi";
 const when = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" }) : "—";
 
-export function Difference({ value }: { value: number | null }) {
-  const { t } = useTranslation();
-  if (value == null) return <span>—</span>;
-  if (value === 0) return <span className="text-emerald-400">{t("shift.exact")}</span>;
-  return (
-    <span className={value < 0 ? "text-red-400" : "text-amber-400"}>
-      {t(value < 0 ? "shift.short" : "shift.over", { amount: money(Math.abs(value)) })}
-    </span>
-  );
-}
-
-/** What a shift took and what its drawer came to; printable as it is. */
+/** What a shift sold and who ran it; printable as it is. */
 export function ShiftReport({ summary }: { summary: ShiftSummary }) {
   const { t } = useTranslation();
   const rows: [string, React.ReactNode][] = [
@@ -27,15 +16,6 @@ export function ShiftReport({ summary }: { summary: ShiftSummary }) {
     [t("shift.sales"), `${money(summary.totalSales)} (${summary.salesCount})`],
     [t("shift.refunds"), `${money(summary.totalRefunds)} (${summary.refundCount})`],
     [t("shift.net"), money(summary.netTotal)],
-    ...summary.paymentBreakdown.map(
-      (row): [string, React.ReactNode] => [`  ${row.methodName}`, money(row.totalAmount)]
-    ),
-    [t("shift.float"), money(summary.openingCashFloat)],
-    [t("shift.cashIn"), money(summary.nonSalesCashIn)],
-    [t("shift.cashOut"), money(summary.nonSalesCashOut)],
-    [t("shift.expected"), money(summary.expectedClosingCash)],
-    [t("shift.counted"), summary.actualClosingCash == null ? "—" : money(summary.actualClosingCash)],
-    [t("shift.difference"), <Difference key="d" value={summary.cashVariance} />],
   ];
   return (
     <div className="shift-report rounded-xl border border-slate-700 bg-slate-950 p-4 text-sm">
@@ -48,6 +28,21 @@ export function ShiftReport({ summary }: { summary: ShiftSummary }) {
           </div>
         ))}
       </dl>
+      <h4 className="mb-1 mt-4 font-medium text-slate-300">{t("shift.byPayment")}</h4>
+      {summary.paymentBreakdown.length ? (
+        <dl className="space-y-1">
+          {summary.paymentBreakdown.map((row) => (
+            <div key={row.methodName} className="flex justify-between gap-4">
+              <dt className="text-slate-400">
+                {row.methodName} <span className="text-slate-500">({row.transactionCount})</span>
+              </dt>
+              <dd className="text-right tabular-nums text-slate-100">{money(row.totalAmount)}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : (
+        <p className="text-slate-500">—</p>
+      )}
     </div>
   );
 }

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
-import { CashCounter } from "@/components/shift/CashCounter";
 import { CloseShiftDialog } from "@/components/shift/CloseShiftDialog";
 import type { InventoryLocation, PosRegister } from "@/core/domain/entities/Cashier";
 import type { CurrentShift } from "@/core/domain/entities/Shift";
@@ -22,7 +21,7 @@ interface PosWorkspaceSetupModalProps {
   currentShift: CurrentShift | null;
   onLocationChange: (locationId: string) => void;
   onRegisterChange: (registerId: string) => void;
-  onOpenSession: (openingCashFloat: number) => void;
+  onOpenSession: () => void;
   onShiftClosed: () => void;
   onContinue: () => void;
 }
@@ -45,7 +44,6 @@ export function PosWorkspaceSetupModal({
   onContinue,
 }: PosWorkspaceSetupModalProps) {
   const { t } = useTranslation();
-  const [float, setFloat] = useState<number | null>(null);
   const [closingId, setClosingId] = useState<string | null>(null);
 
   if (!open) return null;
@@ -151,10 +149,7 @@ export function PosWorkspaceSetupModal({
               </Button>
             </div>
           ) : activePosRegisterId ? (
-            <div className="space-y-3 rounded-lg border border-slate-700 bg-slate-900 p-3">
-              <p className="text-sm text-slate-400">{t("shift.openHint")}</p>
-              <CashCounter label={t("shift.cashInDrawer")} value={float} onChange={setFloat} />
-            </div>
+            <p className="text-sm text-slate-500 dark:text-slate-400">{t("shift.openHint")}</p>
           ) : null}
 
           {errorMessage ? (
@@ -174,9 +169,9 @@ export function PosWorkspaceSetupModal({
               type="button"
               variant="secondary"
               disabled={
-                isLoading || !activePosRegisterId || Boolean(activePosSessionId || someoneElses) || float == null
+                isLoading || !activePosRegisterId || Boolean(activePosSessionId || someoneElses)
               }
-              onClick={() => float != null && onOpenSession(float)}
+              onClick={onOpenSession}
             >
               {t("shift.openButton")}
             </Button>
@@ -197,7 +192,6 @@ export function PosWorkspaceSetupModal({
           onCancel={() => setClosingId(null)}
           onClosed={() => {
             setClosingId(null);
-            setFloat(null);
             onShiftClosed();
           }}
         />

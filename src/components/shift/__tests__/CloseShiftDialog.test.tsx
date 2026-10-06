@@ -5,7 +5,6 @@ import { CloseShiftDialog } from "../CloseShiftDialog";
 const mocks = vi.hoisted(() => ({
   summary: vi.fn(),
   close: vi.fn(),
-  approve: vi.fn(),
 }));
 
 vi.mock("../shiftApi", () => ({
@@ -16,10 +15,7 @@ vi.mock("../shiftApi", () => ({
 }));
 
 vi.mock("react-i18next", () => ({
-  useTranslation: () => ({
-    t: (key: string, values?: Record<string, unknown>) =>
-      values?.amount ? `${key}:${values.amount}` : key,
-  }),
+  useTranslation: () => ({ t: (key: string) => key }),
 }));
 
 const summary = (over: Record<string, unknown> = {}) => ({
@@ -28,23 +24,23 @@ const summary = (over: Record<string, unknown> = {}) => ({
   cashierName: "Ma Aye",
   openedAt: "2026-10-07T08:00:00Z",
   closedAt: null,
-  openingCashFloat: 50000,
-  expectedClosingCash: 120000,
+  openingCashFloat: 0,
+  expectedClosingCash: 0,
   actualClosingCash: null,
   cashVariance: null,
   totalSales: 70000,
-  totalRefunds: 0,
-  netTotal: 70000,
+  totalRefunds: 5000,
+  netTotal: 65000,
   salesCount: 4,
-  refundCount: 0,
+  refundCount: 1,
   nonSalesCashIn: 0,
   nonSalesCashOut: 0,
-  paymentBreakdown: [],
+  paymentBreakdown: [
+    { methodName: "Cash", transactionCount: 3, totalAmount: 40000 },
+    { methodName: "KBZPay", transactionCount: 1, totalAmount: 30000 },
+  ],
   ...over,
 });
-
-const count = (amount: string) =>
-  fireEvent.change(screen.getByLabelText("shift.counted"), { target: { value: amount } });
 
 describe("CloseShiftDialog", () => {
   const onClosed = vi.fn();
@@ -54,57 +50,39 @@ describe("CloseShiftDialog", () => {
     mocks.summary.mockResolvedValue(summary());
   });
 
-  it("counts blind, then closes a drawer that matches without a manager", async () => {
-    mocks.close.mockResolvedValue(summary({ actualClosingCash: 120000, cashVariance: 0 }));
+  it("shows who sold how much, by payment type, before closing", async () => {
     render(<CloseShiftDialog sessionId="shift-1" title="shift.endShift" onClosed={onClosed} />);
 
-    expect(screen.queryByText("120000")).not.toBeInTheDocument();
-    count("120000");
-    fireEvent.click(screen.getByText("shift.next"));
-
-    expect(await screen.findByText("shift.exact")).toBeInTheDocument();
-    expect(screen.queryByLabelText("shift.managerId")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText("shift.closeButton"));
-
-    await waitFor(() => expect(mocks.close).toHaveBeenCalledWith("shift-1", 120000, undefined));
-    expect(mocks.approve).not.toHaveBeenCalled();
-    fireEvent.click(await screen.findByText("shift.done"));
-    expect(onClosed).toHaveBeenCalled();
-  });
-
-  it("needs a manager's own login when the drawer is short, and sends their approval", async () => {
-    mocks.approve.mockResolvedValue({ token: "approval-token", approverName: "U Kyaw" });
-    mocks.close.mockResolvedValue(summary({ actualClosingCash: 115000, cashVariance: -5000 }));
-    render(<CloseShiftDialog sessionId="shift-1" title="shift.endShift" onClosed={onClosed} />);
-
-    count("115000");
-    fireEvent.click(screen.getByText("shift.next"));
-    expect(await screen.findByText("shift.short:5000")).toBeInTheDocument();
-
-    const approve = screen.getByText("shift.approve").closest("button")!;
-    expect(approve).toBeDisabled();
-    fireEvent.change(screen.getByLabelText("shift.managerId"), { target: { value: "MGR0001" } });
-    fireEvent.change(screen.getByLabelText("shift.managerPassword"), { target: { value: "secret" } });
-    fireEvent.click(approve);
-
-    await waitFor(() =>
-      expect(mocks.close).toHaveBeenCalledWith("shift-1", 115000, "approval-token")
-    );
-    expect(mocks.approve).toHaveBeenCalledWith("MGR0001", "secret", "pos:cash-variance:approve");
-  });
-
-  it("shows why the manager's login was refused and keeps the count", async () => {
-    mocks.approve.mockRejectedValue(new Error("Wrong User ID or password"));
-    render(<CloseShiftDialog sessionId="shift-1" title="shift.endShift" onClosed={onClosed} />);
-
-    count("100000");
-    fireEvent.click(screen.getByText("shift.next"));
-    await screen.findByText("shift.short:20000");
-    fireEvent.change(screen.getByLabelText("shift.managerId"), { target: { value: "MGR0001" } });
-    fireEvent.change(screen.getByLabelText("shift.managerPassword"), { target: { value: "nope" } });
-    fireEvent.click(screen.getByText("shift.approve"));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent("Wrong User ID or password");
+    expect(await screen.findByText("Ma Aye")).toBeInTheDocument();
+    expect(screen.getByText("65000")).toBeInTheDocument();
+    expect(screen.getByText("shift.byPayment")).toBeInTheDocument();
+    expect(screen.getByText("Cash")).toBeInTheDocument();
+    expect(screen.getByText("40000")).toBeInTheDocument();
+    expect(screen.getByText("KBZPay")).toBeInTheDocument();
+    expect(screen.getByText("30000")).toBeInTheDocument();
     expect(mocks.close).not.toHaveBeenCalled();
+  });
+
+  it("closes the shift without counting the drawer and hands back the report", async () => {
+    mocks.close.mockResolvedValue(summary({ closedAt: "2026-10-07T16:00:00Z" }));
+    render(<CloseShiftDialog sessionId="shift-1" title="shift.endShift" onClosed={onClosed} />);
+
+    await screen.findByText("Ma Aye");
+    fireEvent.click(screen.getByRole("button", { name: "shift.endShift" }));
+
+    await waitFor(() => expect(mocks.close).toHaveBeenCalledWith("shift-1"));
+    fireEvent.click(await screen.findByText("shift.done"));
+    expect(onClosed).toHaveBeenCalledWith(expect.objectContaining({ sessionId: "shift-1" }));
+  });
+
+  it("says why a shift could not be closed", async () => {
+    mocks.close.mockRejectedValue(new Error("This shift is closed."));
+    render(<CloseShiftDialog sessionId="shift-1" title="shift.endShift" onClosed={onClosed} />);
+
+    await screen.findByText("Ma Aye");
+    fireEvent.click(screen.getByRole("button", { name: "shift.endShift" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("This shift is closed.");
+    expect(onClosed).not.toHaveBeenCalled();
   });
 });

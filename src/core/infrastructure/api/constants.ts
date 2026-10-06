@@ -41,10 +41,6 @@ export const API_ENDPOINTS = {
     APPROVE: "/api/v1/auth/approve",
   },
 
-  CASH_MOVEMENTS: {
-    CREATE: "/api/v1/cash-movements",
-  },
-
   USERS: {
     BASE: "/api/v1/users",
     CREATE: "/api/v1/users",

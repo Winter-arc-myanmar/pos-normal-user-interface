@@ -4,7 +4,7 @@ import { PosWorkspaceSetupModal } from "../PosWorkspaceSetupModal";
 import type { CurrentShift } from "@/core/domain/entities/Shift";
 
 vi.mock("@/components/shift/shiftApi", () => ({
-  shiftApi: () => ({}),
+  shiftApi: () => ({ summary: () => new Promise(() => undefined) }),
   money: (value: number) => String(value),
   errorText: (_: unknown, fallback: string) => fallback,
 }));
@@ -47,18 +47,13 @@ const renderModal = (props: Partial<Parameters<typeof PosWorkspaceSetupModal>[0]
 };
 
 describe("PosWorkspaceSetupModal shifts", () => {
-  it("opens a shift only with the cash in the drawer counted", () => {
+  it("opens a free till's shift with one tap", () => {
     const { onOpenSession } = renderModal();
-    const open = screen.getByText("shift.openButton").closest("button")!;
-
-    expect(open).toBeDisabled();
-    fireEvent.change(screen.getByLabelText("shift.cashInDrawer"), { target: { value: "50000" } });
-    fireEvent.click(open);
-
-    expect(onOpenSession).toHaveBeenCalledWith(50000);
+    fireEvent.click(screen.getByText("shift.openButton"));
+    expect(onOpenSession).toHaveBeenCalled();
   });
 
-  it("names whoever has the till and offers to count and close their shift", () => {
+  it("names whoever has the till and offers to close their shift", () => {
     renderModal({
       currentShift: till({
         shift: {

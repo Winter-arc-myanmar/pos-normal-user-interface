@@ -178,6 +178,7 @@ export function PosWorkspaceProvider({ children }: { children: ReactNode }) {
         return {
           posRegisterId: register.id,
           posSessionId: usable,
+          tillFree: !current.shift,
         };
       } finally {
         setIsPosSessionLoading(false);
@@ -244,9 +245,23 @@ export function PosWorkspaceProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        const result = await ensurePosSessionContext(tenantId, resolvedLocationId, {
+        let result = await ensurePosSessionContext(tenantId, resolvedLocationId, {
           forceRefresh: true,
         });
+
+        // Logging in opens your shift when the till is free, so every sale is
+        // put to the person who made it.
+        if (!result.posSessionId && "tillFree" in result && result.tillFree) {
+          await shiftApi().open({
+            tenantId,
+            registerId: result.posRegisterId,
+            cashierId,
+          });
+          result = await ensurePosSessionContext(tenantId, resolvedLocationId, {
+            preferredRegisterId: result.posRegisterId,
+            forceRefresh: true,
+          });
+        }
 
         if (!result.posSessionId) {
           setIsSetupModalOpen(true);
@@ -318,7 +333,7 @@ export function PosWorkspaceProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const handleOpenSession = async (openingCashFloat: number) => {
+  const handleOpenSession = async () => {
     setErrorMessage(null);
     setNotice(null);
     if (!tenantId || !activeLocationId || !activePosRegisterId) return;
@@ -328,7 +343,6 @@ export function PosWorkspaceProvider({ children }: { children: ReactNode }) {
         tenantId,
         registerId: activePosRegisterId,
         cashierId,
-        openingCashFloat,
       });
       await ensurePosSessionContext(tenantId, activeLocationId, {
         preferredRegisterId: activePosRegisterId,
@@ -465,7 +479,7 @@ export function PosWorkspaceProvider({ children }: { children: ReactNode }) {
         onLocationChange={(value) => void handleLocationChange(value)}
         onRegisterChange={(value) => void handleRegisterChange(value)}
         currentShift={currentShift}
-        onOpenSession={(float) => void handleOpenSession(float)}
+        onOpenSession={() => void handleOpenSession()}
         onShiftClosed={() => void handleShiftClosedInSetup()}
         onContinue={handleContinue}
       />

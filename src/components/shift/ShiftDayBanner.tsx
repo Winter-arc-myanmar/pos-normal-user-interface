@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
-import { dayStatus } from "@/lib/pos/cashCount";
+import { dayStatus } from "@/lib/pos/shiftDay";
 import { CloseShiftDialog } from "./CloseShiftDialog";
 
 const clock = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { timeStyle: "short" });

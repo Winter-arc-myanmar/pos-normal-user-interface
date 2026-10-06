@@ -39,8 +39,6 @@ export interface ShiftSummary {
   paymentBreakdown: { methodName: string; transactionCount: number; totalAmount: number }[];
 }
 
-export type CashMovementKind = "PAID_IN" | "PAID_OUT" | "DROP";
-
 export interface ManagerApproval {
   token: string;
   approverName: string | null;

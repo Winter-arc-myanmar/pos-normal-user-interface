@@ -1,5 +1,4 @@
 import type {
-  CashMovementKind,
   CurrentShift,
   ManagerApproval,
   ShiftSummary,
@@ -72,8 +71,6 @@ const toSummary = (response: unknown): ShiftSummary => {
   };
 };
 
-const decimal = (amount: number) => amount.toFixed(4);
-
 export class ApiShiftRepository {
   constructor(private httpClient: HttpClient) {}
 
@@ -83,12 +80,13 @@ export class ApiShiftRepository {
     );
   }
 
-  async open(input: { tenantId: string; registerId: string; cashierId: string; openingCashFloat: number }) {
+  /** Opens a shift for whoever is signed in; the drawer is not counted. */
+  async open(input: { tenantId: string; registerId: string; cashierId: string }) {
     const response = await this.httpClient.post(API_ENDPOINTS.POS_SESSIONS.CREATE, {
       tenantId: input.tenantId,
       registerId: input.registerId,
       cashierId: input.cashierId,
-      openingCashFloat: decimal(input.openingCashFloat),
+      openingCashFloat: "0.0000",
     });
     return String(unwrap(response, "id").id || "");
   }
@@ -97,33 +95,9 @@ export class ApiShiftRepository {
     return toSummary(await this.httpClient.get(API_ENDPOINTS.POS_SESSIONS.SUMMARY(sessionId)));
   }
 
-  async close(sessionId: string, counted: number, approverToken?: string): Promise<ShiftSummary> {
-    return toSummary(
-      await this.httpClient.post(
-        API_ENDPOINTS.POS_SESSIONS.CLOSE(sessionId),
-        { actualClosingCash: decimal(counted) },
-        approverToken ? { headers: { "x-approver-authorization": approverToken } } : undefined
-      )
-    );
-  }
-
-  async recordCash(input: {
-    posSessionId: string;
-    locationId: string;
-    paymentMethodId: string;
-    kind: CashMovementKind;
-    amount: number;
-    notes?: string;
-  }): Promise<void> {
-    await this.httpClient.post(API_ENDPOINTS.CASH_MOVEMENTS.CREATE, {
-      posSessionId: input.posSessionId,
-      locationId: input.locationId,
-      paymentMethodId: input.paymentMethodId,
-      direction: input.kind === "PAID_IN" ? "IN" : "OUT",
-      reason: input.kind,
-      amount: decimal(input.amount),
-      ...(input.notes ? { notes: input.notes } : {}),
-    });
+  /** Closes the shift for its sales report; nobody counts the drawer. */
+  async close(sessionId: string): Promise<ShiftSummary> {
+    return toSummary(await this.httpClient.post(API_ENDPOINTS.POS_SESSIONS.CLOSE(sessionId), {}));
   }
 
   /** A manager types their own login on this till; the token approves one thing for 5 minutes. */
