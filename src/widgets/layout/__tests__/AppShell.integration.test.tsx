@@ -9,6 +9,7 @@ import {
 import { AppShell } from "../AppShell";
 
 const mocks = vi.hoisted(() => ({
+  currentShift: null as null | { sellsAt: string[] },
   approve: vi.fn(),
   setActiveBranch: vi.fn(),
 }));
@@ -48,7 +49,7 @@ vi.mock("@/core/presentation/hooks/useAuth", () => ({
 }));
 
 vi.mock("@/core/presentation/hooks/usePosWorkspace", () => ({
-  usePosWorkspace: () => ({ activePosRegisterId: "register-1" }),
+  usePosWorkspace: () => ({ activePosRegisterId: "register-1", currentShift: mocks.currentShift }),
 }));
 
 vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
@@ -110,6 +111,26 @@ describe("AppShell POS actions", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "shell.menu" }));
     expect(screen.getByText("/cashier?view=menu")).toBeInTheDocument();
+  });
+
+  it("shows a SPA-only POS device just its SPA board, and sends it there from the till", () => {
+    mocks.currentShift = { sellsAt: ["SPA"] };
+    render(
+      <MemoryRouter initialEntries={["/cashier"]}>
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route path="*" element={<LocationDisplay />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText("/spa")).toBeInTheDocument();
+    expect(screen.getByLabelText("shell.spaTitle")).toBeInTheDocument();
+    expect(screen.queryByLabelText("shell.cashierTitle")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("shell.ktvTitle")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("shell.salesOrdersTitle")).toBeInTheDocument();
+    mocks.currentShift = null;
   });
 
   it("expands the side menu and shows page labels", () => {

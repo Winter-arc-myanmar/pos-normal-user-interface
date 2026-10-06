@@ -68,7 +68,7 @@ export function PosSettingsPage() {
   const { user, logout } = useAuth();
   const { currentShift, activePosSessionId, shiftClosed } = usePosWorkspace();
   const [endingShift, setEndingShift] = useState(false);
-  const cashierShiftOpen = Boolean(activePosSessionId && currentShift?.mode !== "ROOM");
+  const cashierShiftOpen = Boolean(activePosSessionId && currentShift?.shiftRule !== "DAILY");
 
   const activeTab = tabIds.includes((tab || "") as SettingsTab)
     ? (tab as SettingsTab)

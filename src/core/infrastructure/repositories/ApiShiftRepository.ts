@@ -1,5 +1,6 @@
 import type {
   CurrentShift,
+  PosKind,
   ManagerApproval,
   ShiftSummary,
 } from "../../domain/entities/Shift";
@@ -17,6 +18,12 @@ const unwrap = (response: unknown, key: string): RecordValue => {
 };
 
 const money = (value: unknown) => Number(value ?? 0) || 0;
+
+const POS_KINDS: PosKind[] = ["BAR", "KTV", "SPA"];
+const sellsAtOf = (value: unknown): PosKind[] => {
+  const kinds = Array.isArray(value) ? POS_KINDS.filter((kind) => value.includes(kind)) : [];
+  return kinds.length ? kinds : POS_KINDS;
+};
 const moneyOrNull = (value: unknown) => (value == null ? null : money(value));
 
 const toCurrent = (response: unknown): CurrentShift => {
@@ -25,7 +32,8 @@ const toCurrent = (response: unknown): CurrentShift => {
   return {
     registerId: String(body.registerId || ""),
     registerName: String(body.registerName || ""),
-    mode: body.mode === "ROOM" ? "ROOM" : "CASHIER",
+    shiftRule: body.shiftRule === "DAILY" ? "DAILY" : "PER_LOGIN",
+    sellsAt: sellsAtOf(body.sellsAt),
     shift: shift
       ? {
           id: String(shift.id || ""),

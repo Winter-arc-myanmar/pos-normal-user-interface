@@ -1874,7 +1874,7 @@
   "shift": {
     "openHint": "Your shift starts now, so your sales are put to you.",
     "openButton": "Open shift",
-    "openBy": "{{name}} has a shift open on this till.",
+    "openBy": "{{name}} has a shift open on this POS device.",
     "openByHint": "They end it when they log out, or you close it now and start yours.",
     "closeTheirs": "Close it",
     "endShift": "End shift",
@@ -1886,7 +1886,7 @@
     "report": "Shift report",
     "print": "Print",
     "done": "Done",
-    "till": "Till",
+    "till": "POS device",
     "cashier": "Cashier",
     "opened": "Opened",
     "closed": "Closed",
@@ -1898,14 +1898,14 @@
     "current": "Shift open since {{time}}",
     "by": "by {{name}}",
     "dueAt": "Day ends at {{time}}",
-    "dayEnding": "The day on this till ends at {{time}}. Close the day and count the cash.",
-    "dayOver": "The day on this till has ended",
+    "dayEnding": "The day on this POS device ends at {{time}}. Close the day and count the cash.",
+    "dayOver": "The day on this POS device has ended",
     "dayOverHint": "Count the cash and close the day. Then open a new shift to keep selling.",
     "logoutCashier": "Taking a break? Keep your shift open. Going home? End your shift to see what you sold.",
     "break": "Break (keep shift open)",
     "logoutRoom": "The day stays open for the next person until it is closed.",
-    "roomTill": "Room POS",
-    "cashierTill": "Cashier till",
-    "byPayment": "By payment type"
+    "byPayment": "By payment type",
+    "dailyShift": "Shift: once a day",
+    "perLoginShift": "Shift: per login"
   }
 }

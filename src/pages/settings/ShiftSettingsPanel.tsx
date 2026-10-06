@@ -31,7 +31,7 @@ export function ShiftSettingsPanel() {
   }, [activePosSessionId]);
 
   const shift = activePosSessionId ? currentShift?.shift : null;
-  const isRoom = currentShift?.mode === "ROOM";
+  const isRoom = currentShift?.shiftRule === "DAILY";
   const endLabel = isRoom ? t("shift.closeDay") : t("shift.endShift");
 
   return (

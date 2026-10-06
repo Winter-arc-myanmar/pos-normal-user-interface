@@ -34,7 +34,7 @@ interface PosWorkspaceContextType {
   isPosSessionLoading: boolean;
   isSetupModalOpen: boolean;
   isWorkspaceReady: boolean;
-  /** The till and the shift open on it: its mode, who has it, when a room board's day ends. */
+  /** The POS device and its shift: what it sells, who has the shift, when a daily one ends. */
   currentShift: CurrentShift | null;
   requireCashierContext: () => Promise<CashierContext>;
   refreshPosContext: () => Promise<void>;
@@ -161,12 +161,12 @@ export function PosWorkspaceProvider({ children }: { children: ReactNode }) {
         }
 
         // A shift opens only with its drawer counted, never by itself. On a
-        // cashier's till only your own shift is yours to sell on; a room board's
-        // day is shared by whoever is on it.
+        // per-login device only your own shift is yours to sell on; a daily
+        // one is shared by whoever is on it.
         const current = await shiftApi().current(register.id);
         const usable =
           current.shift &&
-          (current.mode === "ROOM" || current.shift.cashierId === cashierId)
+          (current.shiftRule === "DAILY" || current.shift.cashierId === cashierId)
             ? current.shift.id
             : "";
 

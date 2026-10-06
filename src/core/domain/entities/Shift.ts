@@ -1,4 +1,5 @@
-export type RegisterMode = "CASHIER" | "ROOM";
+export type PosKind = "BAR" | "KTV" | "SPA";
+export type ShiftRule = "PER_LOGIN" | "DAILY";
 
 export interface OpenShift {
   id: string;
@@ -8,13 +9,15 @@ export interface OpenShift {
   cashierName: string | null;
 }
 
-/** A till and the shift open on it now. */
+/** A POS device and the shift open on it now. */
 export interface CurrentShift {
   registerId: string;
   registerName: string;
-  mode: RegisterMode;
+  shiftRule: ShiftRule;
+  /** The screens this POS device shows. */
+  sellsAt: PosKind[];
   shift: OpenShift | null;
-  /** A room board's shift is due a day after it opened; a cashier's has none. */
+  /** A daily shift is due a day after it opened; a per-login one has none. */
   dueAt: string | null;
   overdue: boolean;
 }

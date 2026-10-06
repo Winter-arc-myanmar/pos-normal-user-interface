@@ -124,7 +124,7 @@ export function PosWorkspaceSetupModal({
 
           {activePosRegisterId && shift ? (
             <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-              {shift.mode === "ROOM" ? t("shift.roomTill") : t("shift.cashierTill")}
+              {shift.shiftRule === "DAILY" ? t("shift.dailyShift") : t("shift.perLoginShift")}
             </p>
           ) : null}
 

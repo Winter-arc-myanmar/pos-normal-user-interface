@@ -18,7 +18,8 @@ vi.mock("react-i18next", () => ({
 const till = (over: Partial<CurrentShift> = {}): CurrentShift => ({
   registerId: "reg-1",
   registerName: "Front desk",
-  mode: "CASHIER",
+  shiftRule: "PER_LOGIN",
+  sellsAt: ["BAR", "KTV", "SPA"],
   shift: null,
   dueAt: null,
   overdue: false,
@@ -72,10 +73,10 @@ describe("PosWorkspaceSetupModal shifts", () => {
     expect(screen.getByRole("dialog", { name: "shift.endShift" })).toBeInTheDocument();
   });
 
-  it("stops a room board whose day is over until the day is closed", () => {
+  it("stops a daily shift whose day is over until the day is closed", () => {
     const { onContinue } = renderModal({
       activePosSessionId: "shift-1",
-      currentShift: till({ mode: "ROOM", overdue: true, dueAt: "2026-10-07T08:00:00Z" }),
+      currentShift: till({ shiftRule: "DAILY", overdue: true, dueAt: "2026-10-07T08:00:00Z" }),
     });
 
     expect(screen.getByText("shift.dayOver")).toBeInTheDocument();
