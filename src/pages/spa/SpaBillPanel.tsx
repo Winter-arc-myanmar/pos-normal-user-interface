@@ -186,9 +186,14 @@ export function SpaBillPanel({
           <span className="font-semibold">{tr("promotionsNow")}</span>{" "}
           {promotions
             .map((promotion) =>
-              promotion.discountType === "PERCENT_OFF"
-                ? `${promotion.name} (${promotion.discountValue}%)`
-                : `${promotion.name} (−${money(promotion.discountValue)})`
+              promotion.discountType === "FREE_TIME"
+                ? `${promotion.name} (${tr("freeTimeDeal", {
+                    buy: promotion.buyUnits ?? 1,
+                    free: promotion.freeUnits ?? 1,
+                  })})`
+                : promotion.discountType === "PERCENT_OFF"
+                  ? `${promotion.name} (${promotion.discountValue}%)`
+                  : `${promotion.name} (−${money(promotion.discountValue)})`
             )
             .join(" · ")}
         </p>

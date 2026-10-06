@@ -47,7 +47,9 @@ export interface OpenKtvSessionDTO {
   openedByPosSessionId?: string;
   salesChannel: "POS";
   hours?: number;
-  items?: { variantId: string; quantity: number }[];
+  /** The rental the room is sold under; left out, the room's own rate. */
+  rentalVariantId?: string;
+  items?: { variantId: string; quantity: number; hostessId?: string }[];
   prepay?: SpaCardChargeDTO;
 }
 
@@ -57,10 +59,13 @@ export interface CloseKtvSessionDTO {
 
 export interface ExtendKtvSessionDTO extends RoomOrderCardDTO {
   hours: number;
+  /** Left out: the rental the room is already on. */
+  rentalVariantId?: string;
 }
 
 export interface ChargeKtvItemsDTO extends RoomOrderCardDTO {
-  items: { variantId: string; quantity: number }[];
+  /** hostessId: who gave a service that asks who served (KTV only). */
+  items: { variantId: string; quantity: number; hostessId?: string }[];
 }
 
 export interface KtvChargeResultDTO {

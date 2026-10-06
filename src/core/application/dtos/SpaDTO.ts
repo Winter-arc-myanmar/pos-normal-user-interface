@@ -36,7 +36,9 @@ export interface OpenSpaSessionDTO {
   sessions?: number;
   /** SPA: the service packages booked; their time is the treatment's. */
   packages?: { packageId: string; quantity: number }[];
-  items?: { variantId: string; quantity: number }[];
+  /** KTV: the rental the room is sold under. */
+  rentalVariantId?: string;
+  items?: { variantId: string; quantity: number; hostessId?: string }[];
   prepay?: SpaCardChargeDTO;
   posRegisterId?: string;
   openedByPosSessionId?: string;
@@ -57,16 +59,18 @@ export interface RoomOrderCardDTO {
 export interface ExtendSpaSessionDTO extends RoomOrderCardDTO {
   /** KTV: hours. */
   sessions?: number;
+  /** KTV: the rental to extend on; left out, the one the room is on. */
+  rentalVariantId?: string;
   /** SPA: more service packages. */
   packages?: { packageId: string; quantity: number }[];
 }
 
 export interface ChargeSpaItemsDTO extends RoomOrderCardDTO {
-  items: { variantId: string; quantity: number }[];
+  items: { variantId: string; quantity: number; hostessId?: string }[];
 }
 
 export interface GiveFreeItemsDTO {
-  items: { variantId: string; quantity: number }[];
+  items: { variantId: string; quantity: number; hostessId?: string }[];
   compReasonId?: string;
   reason?: string;
 }
