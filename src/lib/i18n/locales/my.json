@@ -1119,6 +1119,13 @@
       "orderAlreadyPaid": "ဤအော်ဒါ ပေးပြီးသားဖြစ်၍ ထပ်ကောက်၍မရပါ။",
       "discountReasonRequired": "လျှော့စျေး မသုံးမီ အကြောင်းရင်း ရွေးပါ။",
       "discountTooLarge": "လျှော့စျေးသည် အော်ဒါခွဲစုစုပေါင်းထက် မကြီးနိုင်ပါ။"
+    },
+    "tableCharges": {
+      "title": "စားပွဲ ခ",
+      "start": "စတင်",
+      "stop": "ရပ်",
+      "minutes": "{{count}} မိနစ်",
+      "clocksStopped": "စားပွဲ သုံးချိန်ကို ဘေလ်ထဲ ထည့်ပြီးပါပြီ။"
     }
   },
   "salesOrders": {

@@ -1119,6 +1119,13 @@
       "orderAlreadyPaid": "This order is already paid and cannot be charged again.",
       "discountReasonRequired": "Choose a discount reason before applying a discount.",
       "discountTooLarge": "Discount cannot be greater than the order subtotal."
+    },
+    "tableCharges": {
+      "title": "Table charges",
+      "start": "Start",
+      "stop": "Stop",
+      "minutes": "{{count}} min",
+      "clocksStopped": "Table time used has been added to the bill."
     }
   },
   "salesOrders": {

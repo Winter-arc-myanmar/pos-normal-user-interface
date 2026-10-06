@@ -27,6 +27,8 @@ import { MultiOrderingView } from "./cashier/MultiOrderingView";
 import { OrderPanel } from "./cashier/OrderPanel";
 import { PaymentView } from "./cashier/PaymentView";
 import { ProductMenu } from "./cashier/ProductMenu";
+import { TableChargesBar } from "./cashier/TableChargesBar";
+import { useTableCharges } from "@/core/presentation/hooks/useTableCharges";
 import {
   Product,
   ProductVariant,
@@ -331,6 +333,18 @@ export function CashierPage() {
         : null,
     [selectedOrder, tableSessions]
   );
+  // The table's own charges: a pool table clock, a VIP room fee, a service charge.
+  const tableCharges = useTableCharges(selectedOrderSession?.id ?? null);
+
+  /** Bills every running clock (a pool table) so the time used is on the bill. */
+  const stopTableClocks = async () => {
+    if (!selectedOrder || !tableCharges.charges.running.length) return;
+    const stopped = await tableCharges.stop();
+    if (stopped) {
+      await selectOrderById(selectedOrder.id);
+      setNotice(t("cashier.tableCharges.clocksStopped"));
+    }
+  };
 
   const selectedOrderTable = useMemo(
     () =>
@@ -379,11 +393,17 @@ export function CashierPage() {
     return [...categories.entries()].map(([id, name]) => ({ id, name }));
   }, [products]);
 
+  // The restaurant's menu: room and table charges are added from the table, a
+  // hostess is chosen at the KTV till, and products sold only elsewhere stay there.
   const menuProducts = useMemo(
     () =>
-      menuCategoryId === "ALL"
-        ? products
-        : products.filter((product) => product.categoryId === menuCategoryId),
+      products.filter(
+        (product) =>
+          product.kind !== "RENTAL" &&
+          !product.askWhoServed &&
+          (!product.soldAt?.length || product.soldAt.includes("BAR")) &&
+          (menuCategoryId === "ALL" || product.categoryId === menuCategoryId)
+      ),
     [menuCategoryId, products]
   );
 
@@ -1702,7 +1722,7 @@ export function CashierPage() {
     setSearchParams({ view: nextView });
   };
 
-  const handleOpenPay = () => {
+  const handleOpenPay = async () => {
     if (requiresTableAssignment) {
       promptTableSelection();
       return;
@@ -1711,6 +1731,7 @@ export function CashierPage() {
       setLocalError(t("cashier.errors.orderAlreadyPaid"));
       return;
     }
+    await stopTableClocks();
     if (activeView !== "pay") {
       payReturnViewRef.current = activeView;
     }
@@ -1719,7 +1740,7 @@ export function CashierPage() {
     setNotice(null);
   };
 
-  const handleOpenSplit = () => {
+  const handleOpenSplit = async () => {
     if (requiresTableAssignment) {
       promptTableSelection();
       return;
@@ -1728,6 +1749,7 @@ export function CashierPage() {
       setLocalError(t("cashier.errors.orderAlreadyPaid"));
       return;
     }
+    await stopTableClocks();
     if (activeView !== "pay") {
       payReturnViewRef.current = activeView;
     }
@@ -2182,14 +2204,35 @@ export function CashierPage() {
 
       <main className="h-full min-h-0 min-w-0 overflow-hidden">
         {activeView === "menu" ? (
-          <ProductMenu
-            products={menuProducts}
-            variantsByProductId={variantsByProductId}
-            orderedProductQuantities={orderedProductQuantities}
-            onLoadVariants={fetchProductVariants}
-            onAdd={handleAddProduct}
-            onClose={handleCloseMenu}
-          />
+          <div className="flex h-full min-h-0 flex-col">
+            {selectedOrderSession ? (
+              <TableChargesBar
+                charges={tableCharges.charges}
+                isBusy={tableCharges.isBusy}
+                error={tableCharges.error}
+                onAdd={(charge) =>
+                  void tableCharges
+                    .add(charge.variantId, charge.minimumBlocks ?? undefined)
+                    .then((done) => (done && selectedOrder ? selectOrderById(selectedOrder.id) : null))
+                }
+                onStop={(variantId) =>
+                  void tableCharges
+                    .stop(variantId)
+                    .then((done) => (done && selectedOrder ? selectOrderById(selectedOrder.id) : null))
+                }
+              />
+            ) : null}
+            <div className="min-h-0 flex-1">
+              <ProductMenu
+                products={menuProducts}
+                variantsByProductId={variantsByProductId}
+                orderedProductQuantities={orderedProductQuantities}
+                onLoadVariants={fetchProductVariants}
+                onAdd={handleAddProduct}
+                onClose={handleCloseMenu}
+              />
+            </div>
+          </div>
         ) : activeView === "pay" ? (
           <PaymentView
             methods={checkoutPaymentMethods}

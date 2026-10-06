@@ -238,6 +238,8 @@ export const API_ENDPOINTS = {
     STATE: (id: string) => `/api/v1/table-sessions/${id}/state`,
     LINES: (id: string) => `/api/v1/table-sessions/${id}/lines`,
     CHECKOUT: (id: string) => `/api/v1/table-sessions/${id}/checkout`,
+    CHARGES: (id: string) => `/api/v1/table-sessions/${id}/charges`,
+    CHARGES_STOP: (id: string) => `/api/v1/table-sessions/${id}/charges/stop`,
   },
 
   KTV_ROOMS: {
