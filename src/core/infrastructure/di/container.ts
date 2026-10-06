@@ -58,6 +58,7 @@ import { KtvService } from "../../application/services/KtvService";
 import { ISpaRepository } from "../../domain/repositories/ISpaRepository";
 import { ApiPromotionRepository } from "../repositories/ApiPromotionRepository";
 import { ApiHostessRepository } from "../repositories/ApiHostessRepository";
+import { ApiTableChargeRepository } from "../repositories/ApiTableChargeRepository";
 import { ApiSpaPackageRepository } from "../repositories/ApiSpaPackageRepository";
 import { ApiVenueSettingRepository } from "../repositories/ApiVenueSettingRepository";
 import { ApiSpaRepository } from "../repositories/ApiSpaRepository";
@@ -167,6 +168,10 @@ class Container {
     this.register<ApiHostessRepository>(
       "hostessRepository",
       new ApiHostessRepository(this.resolve("httpClient"))
+    );
+    this.register<ApiTableChargeRepository>(
+      "tableChargeRepository",
+      new ApiTableChargeRepository(this.resolve("httpClient"))
     );
     this.register<IRoomTabletRepository>(
       "roomTabletRepository",

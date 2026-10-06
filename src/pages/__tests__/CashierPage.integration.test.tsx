@@ -4,6 +4,8 @@ import { MemoryRouter } from "react-router-dom";
 import { CashierPage } from "../CashierPage";
 
 const mocks = vi.hoisted(() => ({
+  addTableCharge: vi.fn(),
+  stopTableCharges: vi.fn(),
   addProductToTableSession: vi.fn(),
   checkoutTableSession: vi.fn(),
   closePosSession: vi.fn(),
@@ -146,9 +148,28 @@ vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
   }),
 }));
 
+let tableChargesState: { offered: Record<string, unknown>[]; running: Record<string, unknown>[] } = {
+  offered: [],
+  running: [],
+};
+vi.mock("@/core/presentation/hooks/useTableCharges", () => ({
+  useTableCharges: () => ({
+    charges: tableChargesState,
+    add: mocks.addTableCharge,
+    stop: mocks.stopTableCharges,
+    isBusy: false,
+    error: null,
+  }),
+}));
+
 vi.mock("@/core/presentation/hooks/useCashier", () => ({
   useCashier: () => ({
-    products: [product, soup],
+    products: [
+      product,
+      soup,
+      { ...product, id: "product-vip", name: "VIP room fee", kind: "RENTAL" },
+      { ...product, id: "product-spa-tea", name: "Spa tea", soldAt: ["SPA"] },
+    ],
     variantsByProductId: { "product-1": [variant] },
     salesOrders: [order],
     selectedOrder: order,
@@ -236,6 +257,9 @@ vi.mock("@/core/presentation/hooks/useGuestWalletManagement", () => ({
 describe("CashierPage integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    tableChargesState = { offered: [], running: [] };
+    mocks.addTableCharge.mockResolvedValue({ offered: [], running: [] });
+    mocks.stopTableCharges.mockResolvedValue({ offered: [], running: [] });
     mocks.fetchProductVariants.mockResolvedValue([variant]);
     mocks.fetchManagedOrderLines.mockResolvedValue({
       lines: [],
@@ -499,6 +523,62 @@ describe("CashierPage integration", () => {
         "table-1",
         "AVAILABLE"
       );
+    });
+  });
+
+  describe("table charges", () => {
+    const poolClock = {
+      variantId: "variant-pool",
+      name: "Pool table",
+      unitPrice: 3000,
+      soldBy: "TIME",
+      timeBlockMinutes: 30,
+      minimumBlocks: 1,
+      chargeMode: "CLOCK",
+      autoApply: false,
+    };
+
+    it("starts a pool table clock from the table's menu", async () => {
+      tableChargesState = { offered: [poolClock], running: [] };
+      render(
+        <MemoryRouter initialEntries={["/cashier?view=menu"]}>
+          <CashierPage />
+        </MemoryRouter>
+      );
+
+      expect(screen.getByText("cashier.tableCharges.title")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /Pool table/ }));
+
+      await waitFor(() => expect(mocks.addTableCharge).toHaveBeenCalledWith("variant-pool", 1));
+      await waitFor(() => expect(mocks.selectOrderById).toHaveBeenCalledWith("order-1"));
+    });
+
+    it("bills a running clock before taking payment", async () => {
+      tableChargesState = {
+        offered: [poolClock],
+        running: [{ variantId: "variant-pool", name: "Pool table", startedAt: "2026-10-07T12:00:00Z" }],
+      };
+      render(
+        <MemoryRouter initialEntries={["/cashier?view=menu"]}>
+          <CashierPage />
+        </MemoryRouter>
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "cashier.payNow" }));
+
+      await waitFor(() => expect(mocks.stopTableCharges).toHaveBeenCalledWith());
+      await waitFor(() => expect(mocks.selectOrderById).toHaveBeenCalledWith("order-1"));
+    });
+
+    it("keeps room charges and other areas' products off the restaurant menu", () => {
+      render(
+        <MemoryRouter initialEntries={["/cashier?view=menu"]}>
+          <CashierPage />
+        </MemoryRouter>
+      );
+      expect(screen.queryByRole("button", { name: /VIP room fee/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Spa tea/ })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Coffee/ })).toBeInTheDocument();
     });
   });
 });
