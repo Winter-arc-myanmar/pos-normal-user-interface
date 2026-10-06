@@ -31,6 +31,16 @@ export class Product {
   taxRate?: number;
   isPriceInclusive?: boolean;
   trackingType?: string;
+  /** ITEM (menu), SERVICE (SPA package, hostess) or RENTAL (room time). */
+  kind?: "ITEM" | "SERVICE" | "RENTAL";
+  /** POS areas it is sold at; empty means every area. */
+  soldAt?: ("BAR" | "SPA" | "KTV")[];
+  soldBy?: "EACH" | "TIME";
+  /** TIME: minutes one unit buys (60 = per hour) and the fewest units sold. */
+  timeBlockMinutes?: number | null;
+  minimumBlocks?: number | null;
+  /** A service whose till asks which hostess gave it. */
+  askWhoServed?: boolean;
   deletedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;

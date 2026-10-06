@@ -1506,7 +1506,8 @@
     "menuOffTitle": "အစားအသောက် ပိတ်ထားသည်",
     "menuOffBody": "Venue setup တွင် ဤနေရာအတွက် အစားအသောက် ပိတ်ထားသည်။ မှာယူရန် admin ၏ Venue setup တွင် ဖွင့်ပါ။",
     "addPackageTitle": "ဝန်ဆောင်မှု ပက်ကေ့ချ် ထပ်ထည့်ရန်",
-    "addPackageHint": "SPA အတွက် အစားအသောက် ပိတ်ထားသည်။ ဧည့်သည်အား အချိန်ပိုပေးရန် ပက်ကေ့ချ် ထပ်ထည့်ပါ။"
+    "addPackageHint": "SPA အတွက် အစားအသောက် ပိတ်ထားသည်။ ဧည့်သည်အား အချိန်ပိုပေးရန် ပက်ကေ့ချ် ထပ်ထည့်ပါ။",
+    "freeTimeDeal": "{{buy}} ခု ဝယ်လျှင် {{free}} ခု အခမဲ့"
   },
   "statusBadge": {
     "verified": "အတည်ပြုပြီး",
@@ -1682,7 +1683,16 @@
       "menu": "အစားအသောက် မှာမည်"
     },
     "addServices": "အစားအသောက် မှာမည်",
-    "noLines": "မှာယူထားခြင်း မရှိသေးပါ။"
+    "noLines": "မှာယူထားခြင်း မရှိသေးပါ။",
+    "chooseRental": "နှုန်း",
+    "rentalPrice": "{{price}} / {{minutes}} မိနစ်",
+    "freeTimeAdded": "+{{count}} အခမဲ့ · {{name}}",
+    "whoServes": "{{service}} ကို ဘယ်သူ ပေးမလဲ?",
+    "whoServesHint": "Hostess ကို ရွေးပါ။ အခန်းထဲ ရောက်နေသူကိုလည်း ရွေးနိုင်ပါသည်။",
+    "noHostesses": "ယခု အလုပ်လုပ်နေသော Hostess မရှိပါ။ Admin ရှိ Hostesses တွင် ထည့်ပါ။",
+    "hostessFree": "အားသည်",
+    "hostessInRoom": "အခန်း {{room}} တွင်",
+    "hostessInRoomUntil": "အခန်း {{room}} တွင် {{time}} အထိ"
   },
   "diningTables": {
     "title": "စားပွဲ စီမံမှု",

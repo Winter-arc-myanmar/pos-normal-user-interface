@@ -412,6 +412,10 @@ export const API_ENDPOINTS = {
     LIST: "/api/v1/spa-packages",
   },
 
+  HOSTESSES: {
+    LIST: "/api/v1/hostesses",
+  },
+
   PROMOTIONS: {
     RUNNING: "/api/v1/promotion-rules/running",
     PREVIEW: "/api/v1/promotion-rules/preview",

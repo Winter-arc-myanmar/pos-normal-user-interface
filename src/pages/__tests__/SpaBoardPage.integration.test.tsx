@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/Toaster";
 import { SpaBoardPage } from "../SpaBoardPage";
 
 let promotionState: {
-  running: { id: string; name: string; discountType: string; discountValue: number }[];
+  running: Record<string, unknown>[];
   discounts: Record<string, { discount: number; names: string[] }>;
   promotionName: (id: string | undefined) => string | undefined;
 } = { running: [], discounts: {}, promotionName: () => undefined };
@@ -198,6 +198,12 @@ vi.mock("@/core/presentation/hooks/useSpaPackages", () => ({
   useSpaPackages: () => ({ packages: spaPackages, error: null }),
 }));
 
+vi.mock("@/core/presentation/hooks/useKtvRentals", () => ({
+  useKtvRentals: () => [],
+}));
+vi.mock("@/core/presentation/hooks/useWorkingHostesses", () => ({
+  useWorkingHostesses: () => ({ hostesses: [], isLoading: false, error: null, load: () => undefined }),
+}));
 vi.mock("@/core/presentation/hooks/useRoomPromotions", () => ({
   useRoomPromotions: () => promotionState,
 }));

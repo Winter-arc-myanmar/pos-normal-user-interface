@@ -4,8 +4,14 @@ export type PosType = "SPA" | "KTV" | "BAR";
 export interface RunningPromotion {
   id: string;
   name: string;
-  discountType: "PERCENT_OFF" | "AMOUNT_OFF";
+  /** FREE_TIME gives time, not money off: buy some hours, get more free. */
+  discountType: "PERCENT_OFF" | "AMOUNT_OFF" | "FREE_TIME";
   discountValue: number;
+  buyUnits: number | null;
+  freeUnits: number | null;
+  appliesTo: "ALL_ITEMS" | "CATEGORIES" | "ITEMS";
+  variantIds: string[];
+  priorityLevel: number;
 }
 
 /** What promotions take off one item in the cart. */

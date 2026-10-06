@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { addPending, focPending, pendingTotal, toggleOneFoc } from "../pending";
+import {
+  addPending,
+  focPending,
+  pendingKey,
+  pendingOrderItems,
+  pendingTotal,
+  toggleOneFoc,
+} from "../pending";
 
 const beer = { variantId: "v-beer", productId: "p-beer", name: "Beer", unitPrice: 3500 };
 
@@ -28,5 +35,30 @@ describe("pending tray", () => {
       { ...beer, quantity: 1, foc: true },
       { ...beer, quantity: 1 },
     ]);
+  });
+
+  it("keeps one row per hostess for the same service", () => {
+    const hostess = { variantId: "v-hostess", productId: "p-hostess", name: "Hostess", unitPrice: 20000 };
+    const tray = addPending(
+      addPending(addPending([], { ...hostess, hostessId: "snow", hostessName: "Snow" }), {
+        ...hostess,
+        hostessId: "rose",
+        hostessName: "Rose",
+      }),
+      { ...hostess, hostessId: "snow", hostessName: "Snow" }
+    );
+
+    expect(tray.map((item) => [pendingKey(item), item.quantity])).toEqual([
+      ["v-hostess:snow", 2],
+      ["v-hostess:rose", 1],
+    ]);
+    expect(pendingOrderItems(tray)).toEqual([
+      { variantId: "v-hostess", quantity: 2, hostessId: "snow" },
+      { variantId: "v-hostess", quantity: 1, hostessId: "rose" },
+    ]);
+  });
+
+  it("sends no hostess for ordinary items", () => {
+    expect(pendingOrderItems(addPending([], beer, 2))).toEqual([{ variantId: "v-beer", quantity: 2 }]);
   });
 });

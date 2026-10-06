@@ -73,6 +73,10 @@ export interface ProductFilterDTO extends PaginatedQueryDTO {
   trackingType?: string;
   inStockOnly?: boolean;
   locationId?: string;
+  kind?: "ITEM" | "SERVICE" | "RENTAL";
+  /** A room or table: only the rentals usable there. */
+  placeId?: string;
+  isAvailable?: boolean;
 }
 
 export type ProductTrackingType = "STANDARD" | "SERIALIZED";

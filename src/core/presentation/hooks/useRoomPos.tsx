@@ -153,6 +153,7 @@ export function useRoomPos(kind: RoomKind) {
             guestWalletId: payload.guestWalletId,
             guestCount: payload.guestCount,
             hours: payload.sessions,
+            rentalVariantId: payload.rentalVariantId,
             items: payload.items,
             prepay: payload.prepay,
             posRegisterId: payload.posRegisterId,
@@ -170,7 +171,14 @@ export function useRoomPos(kind: RoomKind) {
           })
         ),
       extendSession: async (id: string, payload: ExtendSpaSessionDTO) => {
-        const { guestCardId, paymentMethodId, posSessionId, idempotencyKey, sessions } = payload;
+        const {
+          guestCardId,
+          paymentMethodId,
+          posSessionId,
+          idempotencyKey,
+          sessions,
+          rentalVariantId,
+        } = payload;
         return fromKtvCharge(
           await ktvExtendSession(id, {
             guestCardId,
@@ -178,6 +186,7 @@ export function useRoomPos(kind: RoomKind) {
             posSessionId,
             idempotencyKey,
             hours: sessions || 1,
+            rentalVariantId,
           })
         );
       },
