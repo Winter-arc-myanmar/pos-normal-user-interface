@@ -11,6 +11,9 @@ import {
 import { PosActionRail } from "./PosActionRail";
 import { RoomOrderAlerts } from "./RoomOrderAlerts";
 import { Toaster } from "@/components/ui/Toaster";
+import { ShiftDayBanner } from "@/components/shift/ShiftDayBanner";
+import type { PosKind } from "@/core/domain/entities/Shift";
+import { hiddenPosScreen } from "@/lib/pos/posScreens";
 import { PosIconRail, type PosRailItem } from "./PosIconRail";
 
 const iconClass = "h-5 w-5";
@@ -205,7 +208,8 @@ function RefundsIcon() {
 export function AppShell() {
   const { t } = useTranslation();
   const { user, setActiveBranch } = useAuth();
-  const { activePosRegisterId, activeLocationId } = usePosWorkspace();
+  const { activePosRegisterId, activeLocationId, currentShift } = usePosWorkspace();
+  const sells = (kind: PosKind) => !currentShift || currentShift.sellsAt.includes(kind);
   const printerConnection = usePrinterConnection(
     String(user?.tenantId || ""),
     activePosRegisterId,
@@ -264,25 +268,25 @@ export function AppShell() {
       to: "/cashier",
       label: t("shell.cashierTitle"),
       icon: <CashierIcon />,
-      visible: canAccess(PAGE_PERMISSIONS.cashier),
+      visible: canAccess(PAGE_PERMISSIONS.cashier) && sells("BAR"),
     },
     {
       to: "/ktv",
       label: t("shell.ktvTitle"),
       icon: <KtvIcon />,
-      visible: canAccess(PAGE_PERMISSIONS.ktv),
+      visible: canAccess(PAGE_PERMISSIONS.ktv) && sells("KTV"),
     },
     {
       to: "/spa",
       label: t("shell.spaTitle"),
       icon: <SpaIcon />,
-      visible: canAccess(PAGE_PERMISSIONS.spa),
+      visible: canAccess(PAGE_PERMISSIONS.spa) && sells("SPA"),
     },
     {
       to: "/counter-orders",
       label: t("shell.counterOrdersTitle"),
       icon: <OrdersIcon />,
-      visible: canAccess(PAGE_PERMISSIONS.counterOrders),
+      visible: canAccess(PAGE_PERMISSIONS.counterOrders) && sells("BAR"),
     },
     {
       to: "/sales-orders",
@@ -312,13 +316,13 @@ export function AppShell() {
       to: "/waitlist",
       label: t("shell.waitlistTitle"),
       icon: <WaitlistIcon />,
-      visible: canAccess(PAGE_PERMISSIONS.waitlist),
+      visible: canAccess(PAGE_PERMISSIONS.waitlist) && sells("BAR"),
     },
     {
       to: "/dining-tables",
       label: t("shell.diningTablesTitle"),
       icon: <TablesIcon />,
-      visible: canAccess(PAGE_PERMISSIONS.diningTables),
+      visible: canAccess(PAGE_PERMISSIONS.diningTables) && sells("BAR"),
     },
     {
       to: "/products",
@@ -421,6 +425,8 @@ export function AppShell() {
   const closeMobileMenu = () => setMobileOpen(false);
 
   if (isTabletAccount) return <Navigate to="/tablet" replace />;
+  const ownScreen = currentShift ? hiddenPosScreen(location.pathname, currentShift.sellsAt) : null;
+  if (ownScreen) return <Navigate to={ownScreen} replace />;
 
   const navMode = isNarrow
     ? "overlay"
@@ -555,6 +561,8 @@ export function AppShell() {
     ) : null}
 
     <Toaster />
+
+    <ShiftDayBanner />
 
     <RoomOrderAlerts
       enabled={canAccess(["hospitality:spa-session:read"])}
