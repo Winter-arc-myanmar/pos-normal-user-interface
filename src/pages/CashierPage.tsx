@@ -1486,9 +1486,8 @@ export function CashierPage() {
         lines: printableLines(displayOrderLines),
         subtotal: lineSubtotal.toFixed(4),
         discount: orderDiscount > 0 ? toMoney(orderDiscount) : undefined,
-        // Print template does not support extra fee or tip.
-        // extraFee: extraFee > 0 ? toMoney(extraFee) : undefined,
-        // tip: tip > 0 ? toMoney(tip) : undefined,
+        tax: Number(orderTax) > 0 ? toMoney(Number(orderTax)) : undefined,
+        serviceCharge: extraFee > 0 ? toMoney(extraFee) : undefined,
         total: orderTotal,
         payments: checkoutPayments.map((payment) => ({
           name:
@@ -2188,10 +2187,8 @@ export function CashierPage() {
                 ? toMoney(Number(discountAmount))
                 : undefined,
             tax: Number(orderTax) > 0 ? toMoney(Number(orderTax)) : undefined,
-            // Print template does not support extra fee or tip.
-            // extraFee:
-            //   Number(serviceCharge) > 0 ? toMoney(Number(serviceCharge)) : undefined,
-            // tip: Number(tipAmount) > 0 ? toMoney(Number(tipAmount)) : undefined,
+            serviceCharge:
+              Number(serviceCharge) > 0 ? toMoney(Number(serviceCharge)) : undefined,
             total: orderTotal,
           })
         }
