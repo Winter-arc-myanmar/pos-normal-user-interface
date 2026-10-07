@@ -280,6 +280,7 @@ describe("KtvBoardPage", () => {
     rooms = [freeRoom];
     rentalsState = [];
     promotionState.running = [];
+    promotionState.discounts = {};
     mocks.fetchBoard.mockResolvedValue(rooms);
     mocks.getQuote.mockResolvedValue(paidQuote);
     mocks.fetchOrderLines.mockResolvedValue({ lines: [] });
@@ -435,6 +436,15 @@ describe("KtvBoardPage", () => {
       fireEvent.click(screen.getByRole("button", { name: /K1/ }));
 
       expect(screen.queryByText("ktvPos.chooseRental")).not.toBeInTheDocument();
+    });
+
+    it("shows what a promotion takes off the hours before the card is tapped", () => {
+      rentalsState = [ownRate];
+      promotionState.discounts = { "variant-ktv": { discount: 7000, names: ["Happy hour"] } };
+      renderPage();
+      fireEvent.click(screen.getByRole("button", { name: /K1/ }));
+
+      expect(screen.getByText("ktvPos.promotionDiscount −7,000")).toBeInTheDocument();
     });
 
     it("shows the free hours a running promotion adds", () => {

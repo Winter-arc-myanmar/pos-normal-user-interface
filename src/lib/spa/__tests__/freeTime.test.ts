@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RunningPromotion } from "@/core/domain/entities/Promotion";
-import { freeTimeFor } from "../freeTime";
+import { freeTimeFor, freeWithin } from "../freeTime";
 
 const deal = (over: Partial<RunningPromotion> = {}): RunningPromotion => ({
   id: "b1g1",
@@ -10,6 +10,7 @@ const deal = (over: Partial<RunningPromotion> = {}): RunningPromotion => ({
   buyUnits: 1,
   freeUnits: 1,
   appliesTo: "ITEMS",
+  productGroups: [],
   variantIds: ["ktv-hour"],
   priorityLevel: 0,
   ...over,
@@ -43,5 +44,25 @@ describe("free time preview", () => {
 
   it("covers every rental when the deal applies to everything", () => {
     expect(freeTimeFor("any-hour", 1, [deal({ appliesTo: "ALL_ITEMS", variantIds: [] })])?.units).toBe(1);
+  });
+
+  it("covers only the groups a whole-menu deal names", () => {
+    const spaOnly = deal({ appliesTo: "ALL_ITEMS", variantIds: [], productGroups: ["SPA_PACKAGE"] });
+    expect(freeTimeFor("massage", 1, [spaOnly], "SPA_PACKAGE")?.units).toBe(1);
+    expect(freeTimeFor("ktv-hour", 1, [spaOnly], "ROOM_TIME")).toBeNull();
+  });
+
+  it("frees units inside time already set", () => {
+    const twoGetOne = deal({ appliesTo: "ALL_ITEMS", variantIds: [], buyUnits: 2, freeUnits: 1 });
+    expect(freeTimeFor("sauna", 3, [twoGetOne], "ROOM_TIME", "WITHIN")?.units).toBe(1);
+    expect(freeTimeFor("sauna", 2, [twoGetOne], "ROOM_TIME", "WITHIN")).toBeNull();
+  });
+});
+
+describe("freeWithin", () => {
+  it("matches the server", () => {
+    expect(freeWithin(3, 2, 1)).toBe(1);
+    expect(freeWithin(7, 2, 1)).toBe(2);
+    expect(freeWithin(2, 1, 2)).toBe(1);
   });
 });

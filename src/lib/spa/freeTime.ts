@@ -1,4 +1,4 @@
-import type { RunningPromotion } from "@/core/domain/entities/Promotion";
+import type { PromotionGroup, RunningPromotion } from "@/core/domain/entities/Promotion";
 
 /** A rental the till can sell, and how its time is counted. */
 export interface RentalChoice {
@@ -24,26 +24,41 @@ export interface FreeTimeOffer {
 }
 
 /**
- * The free units a running "buy X, get Y free" promotion would add to this many
- * units of a rental, the same way the server works it out: only the best deal
- * applies. A deal limited to categories is not previewed - the till does not know
- * the rental's category - so the server may still add time the till did not show.
+ * Of time already set (a treatment's room time), the units "buy 2, get 1 free" makes
+ * free: the last of every 3, and of a part lot only those past the units bought.
+ */
+export const freeWithin = (units: number, buy: number, free: number): number =>
+  Math.floor(units / (buy + free)) * free + Math.max(0, (units % (buy + free)) - buy);
+
+/**
+ * The free units a running "buy X, get Y free" promotion gives, the same way the
+ * server works it out: only the best deal applies. ON_TOP adds them to what was
+ * bought (KTV hours, SPA packages); WITHIN frees some of time already set (a SPA
+ * room charge for the treatment's time). A deal limited to categories is not
+ * previewed - the till does not know the category - so the server may still give
+ * time the till did not show.
  */
 export function freeTimeFor(
   variantId: string,
   units: number,
-  promotions: RunningPromotion[]
+  promotions: RunningPromotion[],
+  group: PromotionGroup = "ROOM_TIME",
+  mode: "ON_TOP" | "WITHIN" = "ON_TOP"
 ): FreeTimeOffer | null {
   const best = promotions
     .filter((deal) => deal.discountType === "FREE_TIME" && deal.buyUnits && deal.freeUnits)
     .filter(
       (deal) =>
-        deal.appliesTo === "ALL_ITEMS" ||
+        (deal.appliesTo === "ALL_ITEMS" &&
+          (!deal.productGroups?.length || deal.productGroups.includes(group))) ||
         (deal.appliesTo === "ITEMS" && deal.variantIds.includes(variantId))
     )
     .map((deal) => ({
       deal,
-      units: Math.floor(units / deal.buyUnits!) * deal.freeUnits!,
+      units:
+        mode === "WITHIN"
+          ? freeWithin(units, deal.buyUnits!, deal.freeUnits!)
+          : Math.floor(units / deal.buyUnits!) * deal.freeUnits!,
     }))
     .filter((offer) => offer.units > 0)
     .sort(

@@ -40,6 +40,9 @@ export class ApiPromotionRepository {
           item.appliesTo === "CATEGORIES" || item.appliesTo === "ITEMS"
             ? item.appliesTo
             : "ALL_ITEMS",
+        productGroups: Array.isArray(item.productGroups)
+          ? (item.productGroups.map(String) as RunningPromotion["productGroups"])
+          : [],
         variantIds: Array.isArray(item.variantIds) ? item.variantIds.map(String) : [],
         priorityLevel: Number(item.priorityLevel || 0),
       };
@@ -50,11 +53,13 @@ export class ApiPromotionRepository {
   async preview(
     posType: PosType,
     locationId: string | undefined,
-    items: { variantId: string; quantity: number }[]
+    items: { variantId: string; quantity: number; unitPrice?: number }[],
+    salesOrderId?: string
   ): Promise<Record<string, PromotionDiscount>> {
     const response = await this.httpClient.post<unknown>(API_ENDPOINTS.PROMOTIONS.PREVIEW, {
       posType,
       ...(locationId ? { locationId } : {}),
+      ...(salesOrderId ? { salesOrderId } : {}),
       items,
     });
     const lines = asRecord(unwrap(response)).lines;

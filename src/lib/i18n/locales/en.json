@@ -1560,7 +1560,9 @@
     "roomCharges": "Room charges",
     "roomChargeAuto": "added automatically",
     "roomChargeBlock": "{{minutes}} min",
-    "roomChargeClock": "{{name}}: the time used is added to the bill when the treatment ends."
+    "roomChargeClock": "{{name}}: the time used is added to the bill when the treatment ends.",
+    "freePackageAdded": "+{{count}} free {{package}} · {{name}}",
+    "roomChargeFree": "{{count}} free"
   },
   "statusBadge": {
     "verified": "Verified",
