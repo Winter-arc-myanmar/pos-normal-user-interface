@@ -18,6 +18,13 @@ import {
   assertPaymentReference,
   paymentRequiresReference,
 } from "@/lib/pos/paymentReference";
+import { ManagerApprovalFields } from "@/components/shift/ManagerApprovalFields";
+import {
+  EMPTY_MANAGER_LOGIN,
+  managerLoginFilled,
+  type ManagerLogin,
+} from "@/lib/pos/managerLogin";
+import { shiftApi } from "@/components/shift/shiftApi";
 
 const amountNumpadRows = [
   ["1", "2", "3"],
@@ -150,7 +157,7 @@ export function CardRefundPage() {
   const prefillAppliedRef = useRef(false);
   const [paymentMethodId, setPaymentMethodId] = useState("");
   const [paymentReference, setPaymentReference] = useState("");
-  const [approverToken, setApproverToken] = useState("");
+  const [manager, setManager] = useState<ManagerLogin>(EMPTY_MANAGER_LOGIN);
   const [actionError, setActionError] = useState<string | null>(null);
   const {
     step,
@@ -240,7 +247,9 @@ export function CardRefundPage() {
         locationId: context.locationId,
         posSessionId: context.posSessionId,
         paymentMethodId,
-        approverAuthorization: approverToken,
+        approverAuthorization: (
+          await shiftApi().approve(manager.userId.trim(), manager.password, "guestcard:refund:approve")
+        ).token,
         reference: paymentReference,
       });
       if (printed) {
@@ -485,14 +494,7 @@ export function CardRefundPage() {
                     value={paymentReference}
                     onChange={(event) => setPaymentReference(event.target.value)}
                   />
-                  <input
-                    type="password"
-                    aria-label={t("crm.approverToken")}
-                    placeholder={t("crm.approverToken")}
-                    className="min-h-12 w-full rounded-lg border border-slate-700 bg-slate-900 px-4 text-white outline-none focus:border-amber-500"
-                    value={approverToken}
-                    onChange={(event) => setApproverToken(event.target.value)}
-                  />
+                  <ManagerApprovalFields value={manager} onChange={setManager} />
                 </div>
               ) : null}
               <div className="flex flex-wrap gap-2 print:hidden">
@@ -503,7 +505,7 @@ export function CardRefundPage() {
                   <Button
                     type="button"
                     onClick={() => void handleConfirmPrint()}
-                    disabled={isLoading || !paymentMethodId || !approverToken.trim()}
+                    disabled={isLoading || !paymentMethodId || !managerLoginFilled(manager)}
                   >
                     {isLoading ? t("cardRefund.printing") : t("cardRefund.confirmPrint")}
                   </Button>

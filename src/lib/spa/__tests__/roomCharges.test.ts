@@ -43,4 +43,12 @@ describe("room charge estimate", () => {
     const estimate = estimateRoomCharges([steam], [], { minutes: 90, billAtEnd: false });
     expect(estimate.now[0].units).toBe(3);
   });
+
+  it("charges only the paid units when a promotion frees some of the time", () => {
+    const estimate = estimateRoomCharges([sauna], ["sauna"], { minutes: 180, billAtEnd: false }, (_c, units) =>
+      units >= 3 ? { name: "Sauna 2+1", units: 1 } : null
+    );
+    expect(estimate.now[0]).toMatchObject({ units: 3, amount: 16000, free: { units: 1 } });
+    expect(estimate.total).toBe(16000);
+  });
 });

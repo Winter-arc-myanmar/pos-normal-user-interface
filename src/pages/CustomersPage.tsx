@@ -19,6 +19,13 @@ import {
   assertPaymentReference,
   paymentRequiresReference,
 } from "@/lib/pos/paymentReference";
+import { ManagerApprovalFields } from "@/components/shift/ManagerApprovalFields";
+import {
+  EMPTY_MANAGER_LOGIN,
+  managerLoginFilled,
+  type ManagerLogin,
+} from "@/lib/pos/managerLogin";
+import { shiftApi } from "@/components/shift/shiftApi";
 
 const PAGE_SIZE = 6;
 const LEDGER_PAGE_SIZE = 10;
@@ -371,7 +378,9 @@ export function CustomersPage() {
   const [notes, setNotes] = useState("");
   const [paymentMethodId, setPaymentMethodId] = useState("");
   const [collectPaymentMethodId, setCollectPaymentMethodId] = useState("");
-  const [approverToken, setApproverToken] = useState("");
+  const [manager, setManager] = useState<ManagerLogin>(EMPTY_MANAGER_LOGIN);
+  const managerToken = async (permission: string) =>
+    (await shiftApi().approve(manager.userId.trim(), manager.password, permission)).token;
   const [cardUid, setCardUid] = useState("");
   const [cardLabel, setCardLabel] = useState("");
   const [roomNumber, setRoomNumber] = useState("");
@@ -712,7 +721,7 @@ export function CustomersPage() {
     setNotes("");
     setPaymentMethodId("");
     setCollectPaymentMethodId("");
-    setApproverToken("");
+    setManager(EMPTY_MANAGER_LOGIN);
     setCardUid("");
     setCardLabel("");
     setRoomNumber("");
@@ -753,7 +762,7 @@ export function CustomersPage() {
     setAmount("");
     setReference("");
     setNotes("");
-    setApproverToken("");
+    setManager(EMPTY_MANAGER_LOGIN);
     setPaymentMethodId(defaultPaymentMethodId);
     setCollectPaymentMethodId(defaultPaymentMethodId);
     setCardUid("");
@@ -927,7 +936,7 @@ export function CustomersPage() {
           locationId: context.locationId,
           reference: reference.trim() || undefined,
           notes: notes.trim() || undefined,
-          approverAuthorization: approverToken.trim(),
+          approverAuthorization: await managerToken("guestcard:refund:approve"),
         });
         setNotice(t("crm.refundSuccess"));
       } else if (walletAction === "bind") {
@@ -956,7 +965,7 @@ export function CustomersPage() {
         setNotice(t("crm.replaceSuccess"));
       } else if (walletAction === "void") {
         await voidWallet(selectedWallet.id, {
-          approverAuthorization: approverToken.trim(),
+          approverAuthorization: await managerToken("guestcard:adjustment:approve"),
         });
         setNotice(t("crm.voidSuccess"));
       } else if (walletAction === "close") {
@@ -985,7 +994,7 @@ export function CustomersPage() {
                 }
               : undefined,
           notes: notes.trim() || undefined,
-          approverAuthorization: approverToken.trim(),
+          approverAuthorization: await managerToken("guestcard:refund:approve"),
         });
         setNotice(t("crm.closeCardSuccess"));
       }
@@ -1699,7 +1708,11 @@ export function CustomersPage() {
                 size="sm"
                 type="submit"
                 isLoading={isWalletLoading}
-                disabled={walletAction === "close" && !canConfirmClose}
+                disabled={
+                  (walletAction === "close" && !canConfirmClose) ||
+                  ((walletAction === "refund" || walletAction === "close" || walletAction === "void") &&
+                    !managerLoginFilled(manager))
+                }
               >
                 {walletAction === "topup"
                   ? t("crm.confirmTopup")
@@ -1784,14 +1797,7 @@ export function CustomersPage() {
               walletAction === "close" ||
               walletAction === "void" ? (
                 <>
-                  <input
-            required
-                    aria-label={t("crm.approverToken")}
-                    placeholder={t("crm.approverToken")}
-                    className={modalFieldClass}
-                    value={approverToken}
-                    onChange={(event) => setApproverToken(event.target.value)}
-                  />
+                  <ManagerApprovalFields value={manager} onChange={setManager} />
                   <p className="text-xs text-slate-500">{t("crm.approverHint")}</p>
                 </>
               ) : null}

@@ -23,6 +23,7 @@ import { useSalesOrderManagement } from "@/core/presentation/hooks/useSalesOrder
 import { RoomKind, useRoomPos } from "@/core/presentation/hooks/useRoomPos";
 import { useRoomText } from "@/core/presentation/hooks/useRoomText";
 import { useRoomPromotions } from "@/core/presentation/hooks/useRoomPromotions";
+import type { RunningPromotion } from "@/core/domain/entities/Promotion";
 import { useSpaPackages } from "@/core/presentation/hooks/useSpaPackages";
 import { useVenueSetting } from "@/core/presentation/hooks/useVenueSetting";
 import {
@@ -265,31 +266,85 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   );
   // Before the room starts, the packages it starts with; once it runs, the ones added.
   const booking = session ? extendChoice : packageChoice;
-  const promotions = useRoomPromotions(kind, activeLocationId || undefined, [
-    ...paidPending(pending).map((item) => ({ variantId: item.variantId, quantity: item.quantity })),
-    ...chosenPackages(booking, spaPackages).map(({ package: item, quantity }) => ({
-      variantId: item.variantId,
-      quantity,
-    })),
-  ]);
-  const bookingTotals = choiceTotals(booking, spaPackages);
-  const bookingDue =
-    bookingTotals.price -
-    chosenPackages(booking, spaPackages).reduce(
-      (sum, { package: item }) => sum + (promotions.discounts[item.variantId]?.discount || 0),
-      0
-    );
-  const pendingDue = pendingTotal(pending) - pendingSaving(pending, promotions.discounts);
   // KTV: the rentals this room can be sold under; the room's own rate unless another is picked.
   const placeCharges = usePlaceCharges(room ? room.id : null);
   const rentals = isSpa ? [] : placeCharges;
+  const rental =
+    rentals.find((item) => item.variantId === rentalVariantId) ||
+    rentals.find((item) => item.variantId === room?.rateVariantId) ||
+    rentals[0] ||
+    null;
+  // The room's own rate is quoted at the price now (peak hours included).
+  const roomSessionPrice =
+    rental && rental.variantId !== room?.rateVariantId ? rental.unitPrice : room?.sessionPrice;
+  const unitMinutes = !isSpa && rental ? rental.blockMinutes : sessionMinutes(room);
+  const minimumUnits = !isSpa && rental ? rental.minimumUnits : 1;
+  const hoursBought = session ? extendCount : sessionCount;
+  // Packages a running "buy X, get Y free" adds on top, with their time.
+  const freePackagesFor = (running: RunningPromotion[]) =>
+    chosenPackages(booking, spaPackages).flatMap(({ package: item, quantity }) => {
+      const free = freeTimeFor(item.variantId, quantity, running, "SPA_PACKAGE");
+      return free ? [{ package: item, free }] : [];
+    });
   // SPA: the room's own charges, e.g. a VIP room fee or a sauna by the hour.
-  const roomCharges = isSpa
-    ? estimateRoomCharges(placeCharges, pickedCharges, {
-        minutes: choiceTotals(packageChoice, spaPackages).minutes,
-        billAtEnd: startsAtEnd,
-      })
-    : null;
+  const roomChargesFor = (running: RunningPromotion[]) =>
+    isSpa
+      ? estimateRoomCharges(
+          placeCharges,
+          pickedCharges,
+          {
+            minutes:
+              choiceTotals(packageChoice, spaPackages).minutes +
+              (session
+                ? 0
+                : freePackagesFor(running).reduce(
+                    (sum, { package: item, free }) => sum + item.durationMinutes * free.units,
+                    0
+                  )),
+            billAtEnd: startsAtEnd,
+          },
+          (charge, units) => freeTimeFor(charge.variantId, units, running, "ROOM_TIME", "WITHIN")
+        )
+      : null;
+  const promotions = useRoomPromotions(
+    kind,
+    activeLocationId || undefined,
+    (running) => [
+      ...paidPending(pending).map((item) => ({ variantId: item.variantId, quantity: item.quantity })),
+      ...chosenPackages(booking, spaPackages).map(({ package: item, quantity }) => ({
+        variantId: item.variantId,
+        quantity,
+      })),
+      ...(rental && roomSessionPrice !== undefined
+        ? [{ variantId: rental.variantId, quantity: hoursBought, unitPrice: roomSessionPrice }]
+        : []),
+      ...(session
+        ? []
+        : (roomChargesFor(running)?.now ?? [])
+            .filter((line) => line.units - (line.free?.units || 0) > 0)
+            .map((line) => ({
+              variantId: line.charge.variantId,
+              quantity: line.units - (line.free?.units || 0),
+              unitPrice: line.charge.unitPrice,
+            }))),
+    ],
+    session?.salesOrderId || undefined
+  );
+  const saving = (variantId: string | undefined) =>
+    (variantId && promotions.discounts[variantId]?.discount) || 0;
+  const bookingTotals = choiceTotals(booking, spaPackages);
+  const freePackages = freePackagesFor(promotions.running);
+  const bookingDue =
+    bookingTotals.price -
+    chosenPackages(booking, spaPackages).reduce((sum, { package: item }) => sum + saving(item.variantId), 0);
+  const pendingDue = pendingTotal(pending) - pendingSaving(pending, promotions.discounts);
+  const roomCharges = roomChargesFor(promotions.running);
+  const roomChargesSaving = (roomCharges?.now ?? []).reduce(
+    (sum, line) => sum + saving(line.charge.variantId),
+    0
+  );
+  const roomChargesDue = (roomCharges?.total || 0) - roomChargesSaving;
+  const hoursSaving = saving(rental?.variantId);
   const optionalCharges = isSpa ? placeCharges.filter((charge) => !charge.autoApply) : [];
   // While a treatment runs, the room's charges that can be added later: not clocks,
   // which start with the treatment.
@@ -326,16 +381,6 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         ))}
       </div>
     ) : null;
-  const rental =
-    rentals.find((item) => item.variantId === rentalVariantId) ||
-    rentals.find((item) => item.variantId === room?.rateVariantId) ||
-    rentals[0] ||
-    null;
-  // The room's own rate is quoted at the price now (peak hours included).
-  const roomSessionPrice =
-    rental && rental.variantId !== room?.rateVariantId ? rental.unitPrice : room?.sessionPrice;
-  const unitMinutes = !isSpa && rental ? rental.blockMinutes : sessionMinutes(room);
-  const minimumUnits = !isSpa && rental ? rental.minimumUnits : 1;
   const freeTime = !isSpa && rental ? freeTimeFor(rental.variantId, sessionCount, promotions.running) : null;
   const extendFreeTime =
     !isSpa && rental ? freeTimeFor(rental.variantId, extendCount, promotions.running) : null;
@@ -358,7 +403,20 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       ),
     [area, isSpa, products, rateProductIds]
   );
-  const startCharge = (roomSessionPrice || 0) * sessionCount;
+  const startCharge = (roomSessionPrice || 0) * sessionCount - (session ? 0 : hoursSaving);
+  const extendCharge = (roomSessionPrice || 0) * extendCount - (session ? hoursSaving : 0);
+  const freePackageNotes = freePackages.length ? (
+    <div className="space-y-1">
+      {freePackages.map(({ package: item, free }) => (
+        <p
+          key={item.id}
+          className="rounded border border-emerald-700/60 bg-emerald-950/40 px-2 py-1 text-sm text-emerald-200"
+        >
+          {tr("freePackageAdded", { count: free.units, package: item.name, name: free.name })}
+        </p>
+      ))}
+    </div>
+  ) : null;
   const visibleRooms = useMemo(
     () =>
       rooms.filter((item) => {
@@ -1383,6 +1441,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                       })}
                     </p>
                   ) : null}
+                  {freePackageNotes}
                   {roomCharges && (roomCharges.now.length || roomCharges.atEnd.length || optionalCharges.length) ? (
                     <div className="space-y-2 rounded border border-slate-700 bg-slate-950 p-3">
                       <p className="text-sm font-semibold">{tr("roomCharges")}</p>
@@ -1394,8 +1453,13 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                               {line.charge.name}
                               {line.units > 1 ? ` × ${line.units}` : ""}
                               <span className="ml-1 text-xs text-slate-500">{tr("roomChargeAuto")}</span>
+                              {line.free ? (
+                                <span className="ml-1 text-xs text-emerald-300">
+                                  {tr("roomChargeFree", { count: line.free.units })}
+                                </span>
+                              ) : null}
                             </span>
-                            <span>{money(line.amount)}</span>
+                            <span>{money(line.amount - saving(line.charge.variantId))}</span>
                           </p>
                         ))}
                       {optionalCharges.length ? (
@@ -1428,6 +1492,17 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                           })}
                         </div>
                       ) : null}
+                      {roomCharges.now
+                        .filter((line) => !line.charge.autoApply && (line.free || saving(line.charge.variantId)))
+                        .map((line) => (
+                          <p key={line.charge.variantId} className="flex justify-between text-sm text-emerald-300">
+                            <span>
+                              {line.charge.name}
+                              {line.free ? ` · ${tr("roomChargeFree", { count: line.free.units })}` : ""}
+                            </span>
+                            <span>{money(line.amount - saving(line.charge.variantId))}</span>
+                          </p>
+                        ))}
                       {roomCharges.atEnd.map((item) => (
                         <p key={item.variantId} className="text-xs text-slate-400">
                           {tr("roomChargeClock", { name: item.name })}
@@ -1501,10 +1576,13 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                   minutes: (sessionCount + (freeTime?.units || 0)) * unitMinutes,
                   perSession: unitMinutes,
                 })}
-                {roomSessionPrice
-                  ? ` · ${money(roomSessionPrice * sessionCount)}`
-                  : ""}
+                {roomSessionPrice ? ` · ${money(startCharge)}` : ""}
               </p>
+              {hoursSaving > 0 && !session ? (
+                <p className="text-sm text-emerald-300">
+                  {tr("promotionDiscount")} −{money(hoursSaving)}
+                </p>
+              ) : null}
               {freeTime ? (
                 <p className="rounded border border-emerald-700/60 bg-emerald-950/40 px-2 py-1 text-sm text-emerald-200">
                   {tr("freeTimeAdded", { count: freeTime.units, name: freeTime.name })}
@@ -1528,8 +1606,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                   {!bookingTotals.count
                     ? tr("choosePackage")
                     : startsAtEnd
-                      ? tr("startOnBill", { amount: money(bookingDue + (roomCharges?.total || 0)) })
-                      : tr("startAndPay", { amount: money(bookingDue + (roomCharges?.total || 0)) })}
+                      ? tr("startOnBill", { amount: money(bookingDue + roomChargesDue) })
+                      : tr("startAndPay", { amount: money(bookingDue + roomChargesDue) })}
                 </Button>
               ) : (
                 <Button type="submit" isLoading={isLoading}>
@@ -1625,6 +1703,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                   {` · ${money(bookingDue)}`}
                 </p>
               ) : null}
+              {freePackageNotes}
               <Button
                 isLoading={isAdding}
                 disabled={!bookingTotals.count || billClosed}
@@ -1823,20 +1902,29 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                       <span>
                         {line.charge.name}
                         {line.units > 1 ? ` × ${line.units}` : ""}
+                        {line.free ? ` · ${tr("roomChargeFree", { count: line.free.units })}` : ""}
                       </span>
                       <span>{money(line.amount)}</span>
                     </p>
                   ))
                 : null}
-              {bookingDue < bookingTotals.price ? (
+              {freePackages.map(({ package: item, free }) => (
+                <p key={item.id} className="flex justify-between gap-2 text-emerald-300">
+                  <span>{tr("freePackageAdded", { count: free.units, package: item.name, name: free.name })}</span>
+                  <span>{money(0)}</span>
+                </p>
+              ))}
+              {bookingDue < bookingTotals.price || (cardPrompt === "open" && roomChargesSaving) ? (
                 <p className="flex justify-between text-emerald-300">
                   <span>{tr("promotionDiscount")}</span>
-                  <span>−{money(bookingTotals.price - bookingDue)}</span>
+                  <span>
+                    −{money(bookingTotals.price - bookingDue + (cardPrompt === "open" ? roomChargesSaving : 0))}
+                  </span>
                 </p>
               ) : null}
               <p className="mt-1 flex justify-between border-t border-slate-800 pt-1 font-semibold">
                 <span>{tr("packagesSummary", { count: bookingTotals.count, minutes: bookingTotals.minutes })}</span>
-                <span>{money(bookingDue + (cardPrompt === "open" ? roomCharges?.total || 0 : 0))}</span>
+                <span>{money(bookingDue + (cardPrompt === "open" ? roomChargesDue : 0))}</span>
               </p>
             </>
           ) : cardPrompt === "extend" ? (
@@ -1847,7 +1935,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                   perSession: sessionMinutes(room),
                 })}
               </span>
-              {roomSessionPrice ? <span>{money(roomSessionPrice * extendCount)}</span> : null}
+              {roomSessionPrice ? <span>{money(extendCharge)}</span> : null}
             </p>
           ) : cardPrompt === "open" ? (
             <>
@@ -1860,10 +1948,14 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                     count: Math.max(1, Number(guestCount) || 1),
                   })}
                 </span>
-                {roomSessionPrice !== undefined ? (
-                  <span>{money(roomSessionPrice * sessionCount)}</span>
-                ) : null}
+                {roomSessionPrice !== undefined ? <span>{money(startCharge)}</span> : null}
               </p>
+              {hoursSaving ? (
+                <p className="flex justify-between text-emerald-300">
+                  <span>{tr("promotionDiscount")}</span>
+                  <span>−{money(hoursSaving)}</span>
+                </p>
+              ) : null}
             </>
           ) : (
             <p className="flex justify-between font-semibold">
@@ -1969,6 +2061,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                     {` · ${money(bookingDue)}`}
                   </p>
                 ) : null}
+                {freePackageNotes}
               </>
             ) : (
               <>
@@ -2000,7 +2093,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                 minutes: extendCount * sessionMinutes(room),
                 perSession: sessionMinutes(room),
               })}
-              {roomSessionPrice ? ` · ${money(roomSessionPrice * extendCount)}` : ""}
+              {roomSessionPrice ? ` · ${money(extendCharge)}` : ""}
             </p>
               </>
             )}

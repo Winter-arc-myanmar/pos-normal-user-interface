@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CustomersPage } from "../CustomersPage";
 
 const mocks = vi.hoisted(() => ({
+  approve: vi.fn(),
   getCustomers: vi.fn(),
   getCustomerById: vi.fn(),
   createCustomer: vi.fn(),
@@ -18,6 +19,13 @@ const mocks = vi.hoisted(() => ({
   loadLedger: vi.fn(),
   beginSettlement: vi.fn(),
   requireCashierContext: vi.fn(),
+}));
+
+vi.mock("@/components/shift/shiftApi", () => ({
+  shiftApi: () => ({ approve: mocks.approve }),
+  money: (value: number) => String(value),
+  errorText: (caught: unknown, fallback: string) =>
+    caught instanceof Error ? caught.message : fallback,
 }));
 
 vi.mock("react-i18next", () => ({

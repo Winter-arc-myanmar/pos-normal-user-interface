@@ -5,12 +5,20 @@ import { CardRefundPage } from "../CardRefundPage";
 import { GuestCard, GuestWallet } from "@/core/domain/entities/GuestWallet";
 
 const mocks = vi.hoisted(() => ({
+  approve: vi.fn(),
   lookupCard: vi.fn(),
   getWallet: vi.fn(),
   refundWallet: vi.fn(),
   requireCashierContext: vi.fn(),
   fetchPaymentMethods: vi.fn(),
   printReceipt: vi.fn(),
+}));
+
+vi.mock("@/components/shift/shiftApi", () => ({
+  shiftApi: () => ({ approve: mocks.approve }),
+  money: (value: number) => String(value),
+  errorText: (caught: unknown, fallback: string) =>
+    caught instanceof Error ? caught.message : fallback,
 }));
 
 vi.mock("react-i18next", () => ({
@@ -120,8 +128,12 @@ describe("CardRefundPage", () => {
 
     fireEvent.click(screen.getByText("10,000"));
     fireEvent.click(screen.getByText("cardRefund.continueToPrint"));
-    fireEvent.change(screen.getByPlaceholderText("crm.approverToken"), {
-      target: { value: "approver-token" },
+    mocks.approve.mockResolvedValue({ token: "approver-token", approverName: "U Kyaw" });
+    fireEvent.change(screen.getByPlaceholderText("shift.managerId"), {
+      target: { value: "MGR0001" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("shift.managerPassword"), {
+      target: { value: "secret" },
     });
     fireEvent.click(screen.getByText("cardRefund.confirmPrint"));
 
@@ -135,6 +147,7 @@ describe("CardRefundPage", () => {
         notes: undefined,
         approverAuthorization: "approver-token",
       });
+      expect(mocks.approve).toHaveBeenCalledWith("MGR0001", "secret", "guestcard:refund:approve");
       expect(mocks.printReceipt).toHaveBeenCalledWith(
         expect.objectContaining({ title: "CARD REFUND", total: "10000.0000" })
       );
