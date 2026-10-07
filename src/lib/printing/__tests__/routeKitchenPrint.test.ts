@@ -260,7 +260,7 @@ describe("station print routing", () => {
     );
 
     expect(slip).toContain("Dish Soap");
-    expect(slip).toContain("2  Dish Soap");
+    expect(slip).toContain("2 × Dish Soap");
     expect(slip).toContain("No ice");
     expect(slip).toContain("Station: Hot line");
   });
@@ -349,7 +349,7 @@ describe("station print routing", () => {
       expect(slip).toContain("Soup");
     }
     for (const rows of [checkoutPlain, financePlain, kitchenPlain]) {
-      expect(rows.join("\n")).toMatch(/Beer[^\n]*\n\n1  Soup/);
+      expect(rows.join("\n")).toMatch(/Beer[^\n]*\n\n1 × Soup/);
     }
   });
 

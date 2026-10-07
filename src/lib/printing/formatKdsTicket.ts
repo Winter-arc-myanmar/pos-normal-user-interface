@@ -4,6 +4,9 @@ import { PrintTemplateSettings } from "@/core/domain/entities/PrintTemplate";
 const ESC = "\x1b";
 const GS = "\x1d";
 
+/** Fixed heading on every KDS/kitchen slip, instead of the raw order/ticket number. */
+const KITCHEN_SLIP_TITLE = "KDS";
+
 export type PrintPlace = "KDS" | "CHECKOUT" | "FINANCE";
 
 export interface PrintLine {
@@ -18,10 +21,20 @@ export interface PrintLine {
   remarks?: string;
 }
 
-const linePrice = (showPrices: boolean, unitPrice?: string) => {
-  const price = unitPrice?.trim();
-  return showPrices && price ? `  ${price}` : "";
+/** Fixed receipt column width, matching the 32-dash separators. */
+const RECEIPT_WIDTH = 32;
+
+/** Amount text for an item row (empty when prices are hidden or missing). */
+const itemAmountText = (showPrices: boolean, unitPrice?: string) => {
+  if (!showPrices) return "";
+  return unitPrice?.trim() || "";
 };
+
+/** Left text + right text on one padded line so amounts line up in a column. */
+const padRow = (left: string, right: string, width = RECEIPT_WIDTH) =>
+  right
+    ? `${left}${" ".repeat(Math.max(1, width - left.length - right.length))}${right}`
+    : left;
 
 const modifierLine = (item: PrintLine, showPrices: boolean, showModifiers: boolean) => {
   if (!showModifiers || !item.modifiers?.trim()) return "";
@@ -69,6 +82,7 @@ export interface SaleReceipt extends PrintParty {
   subtotal?: string;
   discount?: string;
   tax?: string;
+  serviceCharge?: string;
   // extraFee and tip are not print-template fields, so they stay off the voucher.
   // extraFee?: string;
   // tip?: string;
@@ -84,6 +98,10 @@ export interface SaleReceipt extends PrintParty {
 
 const detail = (label: string, value?: string | null) =>
   value ? `${label}: ${value}\n` : "";
+
+/** Right-aligned "label ... value" line for receipt totals. */
+const totalRow = (label: string, value?: string | null) =>
+  value ? `${padRow(label, value)}\n` : "";
 
 const itemFont = (size?: string) => {
   if (size === "LARGE") return `${ESC}!\x30`;
@@ -103,9 +121,11 @@ const plainItemLines = (
   lines.forEach((item, index) => {
     const qty = Number(item.quantity);
     const quantity = Number.isFinite(qty) ? String(qty) : item.quantity;
-    const price = linePrice(options.showPrices, item.unitPrice);
-    const lead = options.qtyFirst ? `${quantity}  ${item.name}` : `${item.name}  ${quantity}`;
-    rows.push(`${lead}${price}`);
+    const amount = itemAmountText(options.showPrices, item.unitPrice);
+    const lead = options.qtyFirst
+      ? `${quantity} × ${item.name}`
+      : `${item.name}  ${quantity} ×`;
+    rows.push(padRow(lead, amount));
     const modifiers = modifierLine(item, options.showPrices, options.showModifiers);
     if (modifiers) rows.push(`  ${modifiers}`);
     if (index < lines.length - 1) rows.push("");
@@ -126,12 +146,14 @@ const itemLines = (
     .map((item) => {
       const qty = Number(item.quantity);
       const quantity = Number.isFinite(qty) ? String(qty) : item.quantity;
-      const price = linePrice(options.showPrices, item.unitPrice);
-      const lead = options.qtyFirst ? `${quantity}  ${item.name}` : `${item.name}  ${quantity}`;
+      const amount = itemAmountText(options.showPrices, item.unitPrice);
+      const lead = options.qtyFirst
+        ? `${quantity} × ${item.name}`
+        : `${item.name}  ${quantity} ×`;
       const extras = [modifierLine(item, options.showPrices, options.showModifiers)]
         .filter(Boolean)
         .join("\n  ");
-      return `${itemFont(options.fontSize)}${lead}${price}\n${ESC}!\x00${extras ? `  ${extras}\n` : ""}\n`;
+      return `${itemFont(options.fontSize)}${padRow(lead, amount)}\n${ESC}!\x00${extras ? `  ${extras}\n` : ""}\n`;
     })
     .join("");
 
@@ -146,7 +168,7 @@ const categorySubtotalRows = (lines: PrintLine[] = [], enabled: boolean) => {
     if (!Number.isFinite(qty) || !Number.isFinite(price)) continue;
     totals.set(name, (totals.get(name) || 0) + qty * price);
   }
-  return [...totals.entries()].map(([name, total]) => `${name}  ${total.toFixed(2)}`);
+  return [...totals.entries()].map(([name, total]) => padRow(name, total.toFixed(2)));
 };
 
 const sessionTimeRows = (receipt: SaleReceipt) => {
@@ -169,7 +191,9 @@ const partyRows = (
   const rows: string[] = [];
   if (showOrderNumber && orderNumber) rows.push(orderNumber);
   if (settings?.other.serviceType && party.serviceType) rows.push(party.serviceType);
-  if (settings?.other.tableOrRoom && party.tableOrRoom) rows.push(party.tableOrRoom);
+  if (settings?.other.tableOrRoom && party.tableOrRoom) {
+    rows.push(padRow("Table", party.tableOrRoom));
+  }
   if (settings?.other.cashier && party.cashier) rows.push(party.cashier);
   if (settings?.other.pickupCode && party.pickupCode) rows.push(party.pickupCode);
   return rows;
@@ -229,7 +253,7 @@ export function formatKitchenSlip(slip: KitchenSlip): string {
     [
       `${ESC}a\x01`,
       `${ESC}!\x20`,
-      `${slip.title}\n`,
+      `${KITCHEN_SLIP_TITLE}\n`,
       `${ESC}!\x00`,
       slip.status ? `${slip.status}\n` : "",
       heading,
@@ -301,13 +325,16 @@ export function formatSaleReceipt(receipt: SaleReceipt): string {
       }),
       categories,
       "--------------------------------\n",
-      showBreakdown ? detail("Subtotal", receipt.subtotal) : "",
-      showBreakdown ? detail("Discount", receipt.discount) : "",
-      showBreakdown ? detail("Tax", receipt.tax) : "",
-      // Print template does not support extra fee or tip.
-      // showExtraFee ? detail("Extra fee", receipt.extraFee) : "",
-      // showTip ? detail("Tip", receipt.tip) : "",
-      showTotal ? `${ESC}!\x10TOTAL  ${receipt.total}\n${ESC}!\x00` : "",
+      showBreakdown ? totalRow("Subtotal", receipt.subtotal) : "",
+      showBreakdown ? totalRow("Discount", receipt.discount) : "",
+      showBreakdown ? totalRow("Tax", receipt.tax) : "",
+      showBreakdown ? totalRow("Service charge", receipt.serviceCharge) : "",
+      showTotal &&
+      showBreakdown &&
+      (receipt.subtotal || receipt.discount || receipt.tax || receipt.serviceCharge)
+        ? "--------------------------------\n"
+        : "",
+      showTotal ? `${ESC}!\x10${padRow("TOTAL", receipt.total)}\n${ESC}!\x00` : "",
       payments,
       settings?.bill.payTime && receipt.paidAt ? `${receipt.paidAt}\n` : "",
       settings?.other.footerText ? `${ESC}a\x01${settings.other.footerText}\n` : "",
@@ -365,7 +392,7 @@ export function buildKitchenSlipLines(slip: KitchenSlip): string[] {
   const showPrices = showsPrice(settings, false);
   const showOrderNumber = !settings || settings.other.orderNumber;
   const rows: string[] = [];
-  rows.push(slip.title);
+  rows.push(KITCHEN_SLIP_TITLE);
   if (slip.status) rows.push(slip.status);
   rows.push(...headerRows(settings, slip));
   rows.push("--------------------------------");
@@ -429,13 +456,20 @@ export function buildSaleReceiptLines(receipt: SaleReceipt): string[] {
     )
   );
   rows.push("--------------------------------");
-  if (showBreakdown && receipt.subtotal) rows.push(`Subtotal: ${receipt.subtotal}`);
-  if (showBreakdown && receipt.discount) rows.push(`Discount: ${receipt.discount}`);
-  if (showBreakdown && receipt.tax) rows.push(`Tax: ${receipt.tax}`);
-  // Print template does not support extra fee or tip.
-  // if (showExtraFee && receipt.extraFee) rows.push(`Extra fee: ${receipt.extraFee}`);
-  // if (showTip && receipt.tip) rows.push(`Tip: ${receipt.tip}`);
-  if (showTotal) rows.push(`TOTAL  ${receipt.total}`);
+  if (showBreakdown && receipt.subtotal) rows.push(padRow("Subtotal", receipt.subtotal));
+  if (showBreakdown && receipt.discount) rows.push(padRow("Discount", receipt.discount));
+  if (showBreakdown && receipt.tax) rows.push(padRow("Tax", receipt.tax));
+  if (showBreakdown && receipt.serviceCharge) {
+    rows.push(padRow("Service charge", receipt.serviceCharge));
+  }
+  if (
+    showTotal &&
+    showBreakdown &&
+    (receipt.subtotal || receipt.discount || receipt.tax || receipt.serviceCharge)
+  ) {
+    rows.push("--------------------------------");
+  }
+  if (showTotal) rows.push(padRow("TOTAL", receipt.total));
   if (showPayments) {
     for (const payment of receipt.payments || []) {
       rows.push(`${payment.name}  ${payment.amount}`);
