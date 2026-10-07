@@ -4,6 +4,8 @@ import type { ApiPromotionRepository } from "../../infrastructure/repositories/A
 import type { PromotionDiscount, RunningPromotion } from "../../domain/entities/Promotion";
 import type { RoomKind } from "./useRoomPos";
 
+type PreviewItem = { variantId: string; quantity: number; unitPrice?: number };
+
 const REFRESH_MS = 60000;
 const PREVIEW_DELAY_MS = 300;
 
@@ -15,7 +17,10 @@ const PREVIEW_DELAY_MS = 300;
 export function useRoomPromotions(
   kind: RoomKind,
   locationId: string | undefined,
-  items: { variantId: string; quantity: number }[]
+  /** The items to preview; given what is running, as free time changes what is paid. */
+  itemsFor: (running: RunningPromotion[]) => PreviewItem[],
+  /** The room's open bill, so a per-bill limit counts what it already used. */
+  salesOrderId?: string
 ) {
   const posType = kind === "ktv" ? "KTV" : "SPA";
   const [running, setRunning] = useState<RunningPromotion[]>([]);
@@ -41,7 +46,10 @@ export function useRoomPromotions(
     };
   }, [locationId, posType]);
 
-  const itemsKey = items.map((item) => `${item.variantId}:${item.quantity}`).join(",");
+  const items = itemsFor(running);
+  const itemsKey = items
+    .map((item) => `${item.variantId}:${item.quantity}:${item.unitPrice ?? ""}`)
+    .join(",");
   const hasPromotions = running.length > 0;
 
   useEffect(() => {
@@ -50,11 +58,15 @@ export function useRoomPromotions(
     let cancelled = false;
     const timer = window.setTimeout(() => {
       const wanted = itemsKey.split(",").map((entry) => {
-        const [variantId, quantity] = entry.split(":");
-        return { variantId, quantity: Number(quantity) };
+        const [variantId, quantity, unitPrice] = entry.split(":");
+        return {
+          variantId,
+          quantity: Number(quantity),
+          ...(unitPrice ? { unitPrice: Number(unitPrice) } : {}),
+        };
       });
       repository
-        .preview(posType, locationId, wanted)
+        .preview(posType, locationId, wanted, salesOrderId)
         .then((result) => {
           if (!cancelled) setDiscounts(result);
         })
@@ -66,7 +78,7 @@ export function useRoomPromotions(
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [hasPromotions, itemsKey, locationId, posType]);
+  }, [hasPromotions, itemsKey, locationId, posType, salesOrderId]);
 
   const nameById = useMemo(
     () => Object.fromEntries(running.map((promotion) => [promotion.id, promotion.name])),

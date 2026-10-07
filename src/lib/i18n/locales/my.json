@@ -1518,7 +1518,9 @@
     "roomCharges": "အခန်းခ",
     "roomChargeAuto": "အလိုအလျောက် ထည့်ထားသည်",
     "roomChargeBlock": "{{minutes}} မိနစ်",
-    "roomChargeClock": "{{name}}: သုံးသည့်အချိန်ကို ကုသမှု ပြီးသည့်အခါ ဘေလ်ထဲ ထည့်ပါမည်။"
+    "roomChargeClock": "{{name}}: သုံးသည့်အချိန်ကို ကုသမှု ပြီးသည့်အခါ ဘေလ်ထဲ ထည့်ပါမည်။",
+    "freePackageAdded": "+{{count}} {{package}} အခမဲ့ · {{name}}",
+    "roomChargeFree": "{{count}} အခမဲ့"
   },
   "statusBadge": {
     "verified": "အတည်ပြုပြီး",

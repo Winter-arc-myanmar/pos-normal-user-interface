@@ -1,4 +1,6 @@
 export type PosType = "SPA" | "KTV" | "BAR";
+/** The groups an "everything" promotion can be narrowed to. */
+export type PromotionGroup = "FOOD_DRINK" | "HOSTESS" | "SPA_PACKAGE" | "ROOM_TIME";
 
 /** A promotion running now, as the till shows it. The server applies it by itself. */
 export interface RunningPromotion {
@@ -10,6 +12,8 @@ export interface RunningPromotion {
   buyUnits: number | null;
   freeUnits: number | null;
   appliesTo: "ALL_ITEMS" | "CATEGORIES" | "ITEMS";
+  /** ALL_ITEMS: only these groups; empty means everything. */
+  productGroups: PromotionGroup[];
   variantIds: string[];
   priorityLevel: number;
 }
