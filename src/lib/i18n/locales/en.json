@@ -1548,7 +1548,6 @@
     "startedOnBill": "Started. Everything goes on the bill and is paid at the end.",
     "addToBillShort": "Add to bill",
     "addedToBillNotice": "Added to the bill.",
-    "memberCardOnly": "This business takes member cards only for room bills.",
     "payOtherTitle": "Or pay another way",
     "paidWith": "Paid {{amount}} by {{method}}",
     "payOtherHint": "The room is closed first, then {{amount}} is paid in full.",

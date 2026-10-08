@@ -225,7 +225,6 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const cashMethod = paymentMethods.find(
     (method) => String(method.kind || "").toUpperCase() === "CASH"
   );
-  const allowOtherPayments = atEnd && !venue.roomCardOnly;
   // Customer credit needs a named customer, which a room bill does not take here.
   const otherMethods = paymentMethods.filter(
     (method) =>
@@ -233,7 +232,6 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       method.id !== LOCAL_MEMBER_CARD_METHOD_ID &&
       !["GUEST_CARD", "CUSTOMER_CREDIT"].includes(String(method.kind || "").toUpperCase())
   );
-  const payOtherEachTime = !venue.roomCardOnly && otherMethods.length > 0;
   const [otherMethodId, setOtherMethodId] = useState("");
   const tipValue = Math.max(0, Number(tip) || 0);
   const cashValue = splitCash ? Math.max(0, Number(cashAmount) || 0) : 0;
@@ -1301,7 +1299,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       return;
     }
     // When other methods are allowed, the cashier chooses on the pay screen first.
-    if (allowOtherPayments) setStep("pay");
+    if (atEnd && otherMethods.length > 0) setStep("pay");
     else requestCard("pay");
   };
 
@@ -1818,18 +1816,16 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                   className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2"
                 />
               </label>
-              {atEnd && venue.roomCardOnly ? (
-                <p className="text-xs text-slate-400">{tr("memberCardOnly")}</p>
-              ) : (
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={splitCash}
-                  onChange={(event) => setSplitCash(event.target.checked)}
-                />
-                {tr("splitCash")}
-              </label>
-              )}
+              {cashMethod ? (
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={splitCash}
+                    onChange={(event) => setSplitCash(event.target.checked)}
+                  />
+                  {tr("splitCash")}
+                </label>
+              ) : null}
               {splitCash ? (
                 <label className="block text-sm">
                   {tr("cashAmount")}
@@ -1853,7 +1849,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                   {billClosed ? tr("retryPay") : tr("confirmPay")}
                 </Button>
               </div>
-              {allowOtherPayments && otherMethods.length ? (
+              {atEnd && otherMethods.length ? (
                 <div className="space-y-2 border-t border-slate-800 pt-4">
                   <p className="text-sm font-semibold">{tr("payOtherTitle")}</p>
                   <p className="text-xs text-slate-400">
@@ -1910,7 +1906,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           isBusy={isCheckingCard}
           onCardRead={(uid) => void handleCardRead(uid)}
           onCancel={() => setCardPrompt(null)}
-          otherMethods={payOtherEachTime && cardPrompt !== "pay" ? otherMethods : []}
+          otherMethods={cardPrompt !== "pay" ? otherMethods : []}
           onPayWith={payWith}
         >
           {cardPrompt === "add" ? (
