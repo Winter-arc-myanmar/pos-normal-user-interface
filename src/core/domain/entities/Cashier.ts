@@ -1,4 +1,5 @@
 import { OrderStatus, ServiceType } from "../../application/dtos/CashierDTO";
+import type { ReceiptCashier } from "@/lib/printing/cashier";
 
 export class InventoryLocation {
   id!: string;
@@ -118,6 +119,8 @@ export class SalesOrder {
   grandTotal!: string;
   pickupNumber?: string;
   pickedUpAt?: string | null;
+  /** Who took the latest payment, as the server tells it; only on one order. */
+  cashier?: ReceiptCashier | null;
   discountReasonId?: string;
   customerName?: string;
   itemCount?: number;

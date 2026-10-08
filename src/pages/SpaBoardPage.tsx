@@ -68,6 +68,7 @@ import { SpaBillPanel } from "./spa/SpaBillPanel";
 import { PackagePicker } from "./spa/PackagePicker";
 import { SpaRoomTile } from "./spa/SpaRoomTile";
 import { modifierPrintText } from "@/lib/printing/modifierText";
+import { cashierLabel } from "@/lib/printing/cashier";
 
 type SpaStep = "rooms" | "sessions" | "menu" | "pay";
 type CardAction = "add" | "open" | "extend" | "pay";
@@ -924,7 +925,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           showLogo: true,
           showPrices: true,
           receiptId: session.salesOrderId,
-          cashier: user?.name,
+          cashier: cashierLabel(final.cashier, user),
           serviceType: kind === "ktv" ? "KTV" : "SPA",
           tableOrRoom: final.roomNumber || room?.roomNumber,
           paidAt: new Date().toLocaleString(),
@@ -1119,7 +1120,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         showLogo: true,
         showPrices: true,
         receiptId: result.orderNumber || session.salesOrderId,
-        cashier: user?.name,
+        cashier: cashierLabel(user),
         serviceType: kind === "ktv" ? "KTV" : "SPA",
         tableOrRoom: room?.roomNumber || quote?.roomNumber,
         paidAt: new Date().toLocaleString(),

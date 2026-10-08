@@ -69,6 +69,7 @@ import {
   buildCheckoutPayments,
   remainingReceivable,
 } from "@/lib/pos/splitPayments";
+import { cashierLabel } from "@/lib/printing/cashier";
 
 const BOARD_PAGE_SIZE = 15;
 const TABLE_STATUS_POLL_MS = 60_000;
@@ -478,7 +479,7 @@ export function CashierPage() {
     const session = selectedOrderSession || activeTableSession;
     return {
       outletName: outlet?.name,
-      cashier: user?.name,
+      cashier: cashierLabel(user),
       serviceType: service
         ? serviceLabel === serviceKey
           ? service.replaceAll("_", " ")

@@ -18,6 +18,7 @@ import {
   assertPaymentReference,
   paymentRequiresReference,
 } from "@/lib/pos/paymentReference";
+import { cashierLabel } from "@/lib/printing/cashier";
 
 const numpadRows = [
   ["1", "2", "3"],
@@ -245,6 +246,7 @@ export function CardsPage() {
         await printer.printReceipt({
           title: "CARD TOP UP",
           receiptId: printed.receiptId,
+          cashier: cashierLabel(user),
           lines: [{ name: `Card ${printed.cardNumber}`, quantity: "1" }],
           total: printed.amount,
           payments: [{ name: "Balance", amount: printed.balanceAfter }],
@@ -502,6 +504,7 @@ export function CardsPage() {
                         void printer.printReceipt({
                           title: "CARD TOP UP",
                           receiptId: receipt.receiptId,
+                          cashier: cashierLabel(user),
                           lines: [{ name: `Card ${receipt.cardNumber}`, quantity: "1" }],
                           total: receipt.amount,
                           payments: [{ name: "Balance", amount: receipt.balanceAfter }],

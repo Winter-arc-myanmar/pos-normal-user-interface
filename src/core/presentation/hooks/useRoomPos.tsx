@@ -80,6 +80,7 @@ const fromKtvQuote = (quote: KtvSessionQuote): SpaSessionQuote =>
     paidTotal: quote.paidTotal,
     paymentTiming: quote.paymentTiming,
     amountDue: quote.amountDue,
+    cashier: quote.cashier,
   });
 
 const fromKtvCharge = (result: KtvChargeResultDTO): SpaChargeResultDTO => ({
