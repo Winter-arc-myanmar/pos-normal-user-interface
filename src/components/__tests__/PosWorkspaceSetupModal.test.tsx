@@ -9,6 +9,10 @@ vi.mock("@/components/shift/shiftApi", () => ({
   errorText: (_: unknown, fallback: string) => fallback,
 }));
 
+vi.mock("@/components/shift/useShiftPrinter", () => ({
+  useShiftPrinter: () => vi.fn(),
+}));
+
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, values?: Record<string, unknown>) => (values?.name ? `${key}:${values.name}` : key),

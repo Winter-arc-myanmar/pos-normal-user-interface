@@ -71,6 +71,8 @@ export interface SaleReceipt extends PrintParty {
   // extraFee and tip are not print-template fields, so they stay off the voucher.
   // extraFee?: string;
   // tip?: string;
+  /** Labelled amounts above the total, such as a shift's sales and refunds. */
+  amounts?: Array<{ label: string; amount: string }>;
   totalLabel?: string;
   total: string;
   payments?: Array<{ name: string; amount: string }>;
@@ -86,6 +88,8 @@ export interface SaleReceipt extends PrintParty {
   paperWidth?: PrintPaperWidth;
   /** Totals print as 100,000 MMK or $ 100,000; plain numbers without it. */
   currency?: PriceCurrency;
+  /** The closing line; "Thank you!" on a customer's receipt when left out. */
+  footer?: string;
 }
 
 type Size = "normal" | "tall" | "wide" | "huge";
@@ -506,7 +510,10 @@ function receiptLayout(receipt: SaleReceipt): Layout {
         ["Rounding", settings?.bill.rounding ? receipt.rounding : undefined],
       ]
     : [];
-  const shownBreakdown = breakdown.filter(([, value]) => value && Number(value) !== 0);
+  const shownBreakdown = [
+    ...breakdown,
+    ...(receipt.amounts || []).map((row): [string, string] => [row.label, row.amount]),
+  ].filter(([, value]) => value && Number(value) !== 0);
   if (shownBreakdown.length || showTotal) layout.rule("-");
   const amount = (value?: string | number | null) => printAmount(value, receipt.currency);
   for (const [label, value] of shownBreakdown) {
@@ -530,7 +537,8 @@ function receiptLayout(receipt: SaleReceipt): Layout {
     layout.pair("Card balance", amount(receipt.balanceAfter), { bold: true });
   }
   layout.rule("=");
-  const footer = settings?.other.footerText || (finance ? "" : "Thank you!");
+  const footer =
+    receipt.footer ?? (settings?.other.footerText || (finance ? "" : "Thank you!"));
   layout.line(footer, { align: "center" });
   return layout;
 }
