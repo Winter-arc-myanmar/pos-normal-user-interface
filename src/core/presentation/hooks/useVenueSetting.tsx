@@ -7,7 +7,6 @@ import type {
 
 const PAY_WHEN_ORDERING: VenueSetting = {
   paymentTiming: "PAY_WHEN_ORDERING",
-  roomCardOnly: true,
   spaMenuOrdering: true,
   ktvMenuOrdering: true,
 };

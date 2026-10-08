@@ -30,12 +30,10 @@ const spaPackages: {
 
 let venueState: {
   paymentTiming: "PAY_WHEN_ORDERING" | "PAY_AT_END";
-  roomCardOnly: boolean;
   spaMenuOrdering?: boolean;
   ktvMenuOrdering?: boolean;
 } = {
   paymentTiming: "PAY_WHEN_ORDERING",
-  roomCardOnly: true,
 };
 
 const mocks = vi.hoisted(() => ({
@@ -276,7 +274,7 @@ const tapCard = async () => {
 describe("KtvBoardPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    venueState = { paymentTiming: "PAY_WHEN_ORDERING", roomCardOnly: true };
+    venueState = { paymentTiming: "PAY_WHEN_ORDERING" };
     rooms = [freeRoom];
     rentalsState = [];
     promotionState.running = [];
@@ -334,7 +332,7 @@ describe("KtvBoardPage", () => {
   });
 
   it("starts a room for the chosen hours on the bill when the business takes payment at the end", async () => {
-    venueState = { paymentTiming: "PAY_AT_END", roomCardOnly: true };
+    venueState = { paymentTiming: "PAY_AT_END" };
     mocks.openSession.mockResolvedValue({
       id: "ktv-session-1",
       roomId: "ktv-1",
