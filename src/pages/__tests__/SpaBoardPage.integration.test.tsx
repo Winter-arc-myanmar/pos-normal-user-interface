@@ -48,6 +48,8 @@ const mocks = vi.hoisted(() => ({
   getWallet: vi.fn(),
   requireCashierContext: vi.fn(),
   printReceipt: vi.fn(),
+  printTicket: vi.fn(),
+  listKdsTickets: vi.fn(),
   noop: vi.fn(),
 }));
 
@@ -228,6 +230,7 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
     fetchProducts: mocks.noop,
     fetchProductVariants: mocks.noop,
     fetchPaymentMethods: mocks.noop,
+    listKdsTickets: mocks.listKdsTickets,
   }),
 }));
 
@@ -262,6 +265,7 @@ vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
   usePrinterConnection: () => ({
     printReceipt: mocks.printReceipt,
     printKitchen: vi.fn(),
+    printTicket: mocks.printTicket,
     error: null,
   }),
 }));
@@ -327,6 +331,8 @@ describe("SpaBoardPage", () => {
       status: "COMPLETED",
     });
     mocks.printReceipt.mockResolvedValue(undefined);
+    mocks.printTicket.mockResolvedValue({ jobs: [], unrouted: [], missingPrinterRoutes: [] });
+    mocks.listKdsTickets.mockResolvedValue({ tickets: [] });
     promotionState = { running: [], discounts: {}, promotionName: () => undefined };
     spaPackages = [
       {
@@ -508,6 +514,45 @@ describe("SpaBoardPage", () => {
     expect(await screen.findByText("spa.focGiven")).toBeInTheDocument();
     expect(screen.queryByPlaceholderText("spa.cardUid")).not.toBeInTheDocument();
     expect(mocks.addOrderLine).not.toHaveBeenCalled();
+  });
+
+  it("prints the kitchen tickets the order just got", async () => {
+    const earlier = { id: "ticket-old", salesOrderId: "order-1" };
+    const fresh = { id: "ticket-new", salesOrderId: "order-1" };
+    mocks.listKdsTickets
+      .mockResolvedValueOnce({ tickets: [earlier] })
+      .mockResolvedValueOnce({ tickets: [earlier, fresh] });
+    mocks.giveFree.mockResolvedValue({ charged: "0", balanceAfter: "120000", quote });
+    await openRunningRoom();
+    fireEvent.click(screen.getByRole("button", { name: /Foot Scrub/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "spa.focToggle" }));
+    fireEvent.click(screen.getByRole("button", { name: "spa.giveFreeCount" }));
+    fireEvent.change(screen.getByLabelText("spa.focReason"), {
+      target: { value: "Birthday" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "spa.focConfirm" }));
+
+    await waitFor(() => expect(mocks.printTicket).toHaveBeenCalledWith(fresh));
+    expect(mocks.printTicket).toHaveBeenCalledTimes(1);
+    expect(mocks.listKdsTickets).toHaveBeenCalledWith({ salesOrderId: "order-1", limit: 100 });
+  });
+
+  it("says when the kitchen slip did not print", async () => {
+    mocks.listKdsTickets
+      .mockResolvedValueOnce({ tickets: [] })
+      .mockResolvedValueOnce({ tickets: [{ id: "ticket-new", salesOrderId: "order-1" }] });
+    mocks.printTicket.mockRejectedValue(new Error("No default printer is connected"));
+    mocks.giveFree.mockResolvedValue({ charged: "0", balanceAfter: "120000", quote });
+    await openRunningRoom();
+    fireEvent.click(screen.getByRole("button", { name: /Foot Scrub/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "spa.focToggle" }));
+    fireEvent.click(screen.getByRole("button", { name: "spa.giveFreeCount" }));
+    fireEvent.change(screen.getByLabelText("spa.focReason"), {
+      target: { value: "Birthday" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "spa.focConfirm" }));
+
+    expect(await screen.findByText("kds.printFailed")).toBeInTheDocument();
   });
 
   it("gives one of a round free and asks the card for the rest", async () => {

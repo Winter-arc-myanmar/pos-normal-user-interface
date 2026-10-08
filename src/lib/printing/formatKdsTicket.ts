@@ -1,5 +1,6 @@
 import { KdsTicket } from "@/core/domain/entities/Cashier";
 import { PrintTemplateSettings } from "@/core/domain/entities/PrintTemplate";
+import { cashierLabel } from "./cashier";
 
 const ESC = "\x1b";
 const GS = "\x1d";
@@ -71,6 +72,9 @@ export interface KitchenSlip extends PrintParty {
   stationId?: string;
   stationName?: string;
   orderRef?: string;
+  /** Where the food goes: "Table T12", "SPA room S1". */
+  place?: string;
+  sentBy?: string;
   lines?: PrintLine[];
   template?: PrintTemplateSettings;
 }
@@ -259,8 +263,10 @@ export function formatKitchenSlip(slip: KitchenSlip): string {
       `${ESC}!\x00`,
       slip.status ? `${slip.status}\n` : "",
       heading,
+      slip.place ? `${ESC}!\x30${slip.place}\n${ESC}!\x00` : "",
       `${ESC}a\x00`,
       "--------------------------------\n",
+      detail("Sent by", slip.sentBy),
       detail("Course", slip.courseType),
       detail("Fired", slip.firedAt),
       detail("Station", slip.stationName || slip.stationId),
@@ -360,6 +366,24 @@ export function kdsTicketPrintLines(ticket: KdsTicket): PrintLine[] {
   }));
 }
 
+/** The table, room or pickup a ticket is for, as the kitchen slip shows it. */
+export function kdsTicketPlace(ticket: KdsTicket): string | undefined {
+  const place = ticket.place;
+  const guests = place?.guestCount ? ` (${place.guestCount} guests)` : "";
+  if (place?.kind === "TABLE" && place.number) return `Table ${place.number}${guests}`;
+  if (place?.kind === "SPA_ROOM" && place.number) return `SPA room ${place.number}${guests}`;
+  if (place?.kind === "KTV_ROOM" && place.number) return `KTV room ${place.number}${guests}`;
+  if (ticket.pickupNumber) return `Pickup ${ticket.pickupNumber}`;
+  if (place?.kind === "COUNTER") return "Counter";
+  return undefined;
+}
+
+/** Who sent a ticket: the staff member, or the room tablet it came from. */
+export function kdsTicketSender(ticket: KdsTicket): string | undefined {
+  if (ticket.sentFrom === "TABLET") return ticket.deviceName || "Room tablet";
+  return cashierLabel(ticket.sentBy);
+}
+
 export function formatKdsTicket(ticket: KdsTicket): string {
   return formatKitchenSlip({
     title: ticket.ticketNumber || ticket.id,
@@ -368,7 +392,9 @@ export function formatKdsTicket(ticket: KdsTicket): string {
     firedAt: ticket.firedAt,
     stationId: ticket.stationId || ticket.station?.id,
     stationName: ticket.station?.name,
-    orderRef: ticket.salesOrderId,
+    orderRef: ticket.orderNumber || ticket.salesOrderId,
+    place: kdsTicketPlace(ticket),
+    sentBy: kdsTicketSender(ticket),
     lines: kdsTicketPrintLines(ticket),
   });
 }

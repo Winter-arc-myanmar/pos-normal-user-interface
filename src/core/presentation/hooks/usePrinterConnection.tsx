@@ -8,7 +8,9 @@ import { getPrinterClient } from "../../infrastructure/printing/getPrinterClient
 import type { IPrinterClient } from "../../infrastructure/printing/IPrinterClient";
 import { isBrowserPrinting } from "../../infrastructure/printing/PrinterClient";
 import {
+  kdsTicketPlace,
   kdsTicketPrintLines,
+  kdsTicketSender,
   KitchenSlip,
   PrintPlace,
   SaleReceipt,
@@ -365,7 +367,9 @@ export function usePrinterConnection(
           firedAt: ticket.firedAt,
           stationId,
           stationName: station?.name,
-          orderRef: ticket.salesOrderId,
+          orderRef: ticket.orderNumber || ticket.salesOrderId,
+          place: kdsTicketPlace(ticket),
+          sentBy: kdsTicketSender(ticket),
           lines: kdsTicketPrintLines(ticket),
         },
         station ? [station] : []
