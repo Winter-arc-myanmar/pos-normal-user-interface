@@ -26,6 +26,7 @@ import { isUnspendableWalletStatus } from "@/lib/pos/guestWalletAmounts";
 import { useDateFormatter } from "@/lib/i18n/formatters";
 import { lineDisplayName } from "@/lib/pos/orderListDisplay";
 import { toast } from "@/lib/toast";
+import { cashierLabel } from "@/lib/printing/cashier";
 
 export function KtvRoomPage() {
   const { t } = useTranslation();
@@ -350,7 +351,7 @@ export function KtvRoomPage() {
           showLogo: true,
           showPrices: true,
           receiptId: session.salesOrderId,
-          cashier: user?.name,
+          cashier: cashierLabel(user),
           serviceType: "KTV",
           tableOrRoom: room?.roomNumber,
           paidAt: new Date().toLocaleString(),

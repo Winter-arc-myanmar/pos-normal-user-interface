@@ -16,6 +16,7 @@ import { ISalesOrderRepository } from "../../domain/repositories/ISalesOrderRepo
 import { SalesOrder, SalesOrderLine } from "../../domain/entities/Cashier";
 import { HttpClient } from "../api/HttpClient";
 import { API_ENDPOINTS } from "../api/constants";
+import { parseCashier } from "@/lib/printing/cashier";
 
 interface ApiEnvelope<T> {
   success?: boolean;
@@ -227,6 +228,7 @@ const toSalesOrder = (item: Record<string, unknown>): SalesOrder => {
       ? String(item.discountReasonId)
       : undefined,
     customerName: resolveCustomerName(item),
+    cashier: parseCashier(item.cashier),
     itemCount: catalog.itemCount,
     itemSummary: catalog.itemSummary,
     createdAt: String(item.createdAt || ""),

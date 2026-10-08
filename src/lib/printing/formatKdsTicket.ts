@@ -194,7 +194,9 @@ const partyRows = (
   if (settings?.other.tableOrRoom && party.tableOrRoom) {
     rows.push(padRow("Table", party.tableOrRoom));
   }
-  if (settings?.other.cashier && party.cashier) rows.push(party.cashier);
+  if (settings?.other.cashier && party.cashier) {
+    rows.push(padRow("Cashier", party.cashier));
+  }
   if (settings?.other.pickupCode && party.pickupCode) rows.push(party.pickupCode);
   return rows;
 };

@@ -17,6 +17,7 @@ import {
   salesOrderStatusKey,
 } from "@/lib/pos/orderListDisplay";
 import { modifierPrintText } from "@/lib/printing/modifierText";
+import { cashierLabel } from "@/lib/printing/cashier";
 
 type StatusTab = "open" | "completed" | "voided";
 type ServiceFilter = "ALL" | "DINE_IN" | "TAKE_AWAY" | "DELIVERY" | "PICK_UP";
@@ -197,7 +198,7 @@ export function SalesOrdersPage() {
         showLogo: true,
         showPrices: true,
         receiptId: selectedOrder.orderNumber,
-        cashier: user?.name,
+        cashier: cashierLabel(selectedOrder.cashier, user),
         serviceType: t(salesOrderServiceTypeKey(selectedOrder.serviceType)),
         pickupCode: selectedOrder.pickupNumber,
         lines: orderLines.map((line) => {

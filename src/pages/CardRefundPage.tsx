@@ -25,6 +25,7 @@ import {
   type ManagerLogin,
 } from "@/lib/pos/managerLogin";
 import { shiftApi } from "@/components/shift/shiftApi";
+import { cashierLabel } from "@/lib/printing/cashier";
 
 const amountNumpadRows = [
   ["1", "2", "3"],
@@ -256,6 +257,7 @@ export function CardRefundPage() {
         await printer.printReceipt({
           title: "CARD REFUND",
           receiptId: printed.receiptId,
+          cashier: cashierLabel(user),
           lines: [{ name: `Card ${printed.cardNumber}`, quantity: "1" }],
           total: printed.amount,
           payments: [{ name: "Balance", amount: printed.balanceAfter }],
@@ -518,6 +520,7 @@ export function CardRefundPage() {
                         void printer.printReceipt({
                           title: "CARD REFUND",
                           receiptId: receipt.receiptId,
+                          cashier: cashierLabel(user),
                           lines: [{ name: `Card ${receipt.cardNumber}`, quantity: "1" }],
                           total: receipt.amount,
                           payments: [{ name: "Balance", amount: receipt.balanceAfter }],
