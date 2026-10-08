@@ -19,6 +19,7 @@ import {
   paymentRequiresReference,
 } from "@/lib/pos/paymentReference";
 import { cashierLabel } from "@/lib/printing/cashier";
+import { cardSlip } from "@/lib/printing/cardSlip";
 
 const numpadRows = [
   ["1", "2", "3"],
@@ -244,12 +245,8 @@ export function CardsPage() {
       });
       if (printed) {
         await printer.printReceipt({
-          title: "CARD TOP UP",
-          receiptId: printed.receiptId,
+          ...cardSlip("CARD TOP-UP", "Top-up", printed, selectedPaymentMethod?.name),
           cashier: cashierLabel(user),
-          lines: [{ name: `Card ${printed.cardNumber}`, quantity: "1" }],
-          total: printed.amount,
-          payments: [{ name: "Balance", amount: printed.balanceAfter }],
         });
       }
     } catch (caught) {
@@ -502,12 +499,8 @@ export function CardsPage() {
                       onClick={() => {
                         if (!receipt) return;
                         void printer.printReceipt({
-                          title: "CARD TOP UP",
-                          receiptId: receipt.receiptId,
+                          ...cardSlip("CARD TOP-UP", "Top-up", receipt, selectedPaymentMethod?.name),
                           cashier: cashierLabel(user),
-                          lines: [{ name: `Card ${receipt.cardNumber}`, quantity: "1" }],
-                          total: receipt.amount,
-                          payments: [{ name: "Balance", amount: receipt.balanceAfter }],
                         });
                       }}
                     >

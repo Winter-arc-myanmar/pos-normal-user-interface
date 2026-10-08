@@ -137,7 +137,7 @@ describe("CardsPage", () => {
         guestCardId: "card-1",
       });
       expect(mocks.printReceipt).toHaveBeenCalledWith(
-        expect.objectContaining({ title: "CARD TOP UP", total: "10000.0000" })
+        expect.objectContaining({ title: "CARD TOP-UP", total: "10000.0000" })
       );
     });
   });

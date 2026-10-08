@@ -5,6 +5,14 @@ export const isPrintTemplateType = (value: string): value is PrintTemplateType =
   (PRINT_TEMPLATE_TYPES as readonly string[]).includes(value);
 
 export type PrintPaperWidth = "MM58" | "MM80";
+
+/** The company a customer's receipt is from. */
+export interface PrintCompany {
+  name: string;
+  legalName?: string | null;
+  address?: string | null;
+  phone?: string | null;
+}
 export type PrintTemplateSource = "LOCATION" | "TENANT" | "BUILTIN";
 
 export interface PrintTemplateSettings {

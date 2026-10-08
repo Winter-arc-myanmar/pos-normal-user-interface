@@ -18,17 +18,17 @@ describe("the kitchen slip", () => {
       kdsTicketPlace(
         ticket({ place: { kind: "SPA_ROOM", number: "S1", name: null, guestCount: 2 } })
       )
-    ).toBe("SPA room S1 (2 guests)");
+    ).toBe("SPA S1");
     expect(
       kdsTicketPlace(
         ticket({ place: { kind: "KTV_ROOM", number: "K3", name: null, guestCount: null } })
       )
-    ).toBe("KTV room K3");
+    ).toBe("KTV K3");
     expect(
       kdsTicketPlace(
         ticket({ place: { kind: "TABLE", number: "T12", name: null, guestCount: 4 } })
       )
-    ).toBe("Table T12 (4 guests)");
+    ).toBe("Table T12");
     expect(
       kdsTicketPlace(
         ticket({
@@ -59,9 +59,9 @@ describe("the kitchen slip", () => {
         sentBy: { name: "Aung Aung", loginId: "SHW0001" },
       })
     );
-    expect(text).toContain("KTV room K3");
-    expect(text).toContain("Sent by: Aung Aung (ID: SHW0001)");
-    expect(text).toContain("Sales order: SO-0012");
-    expect(text).toContain("Fried rice");
+    expect(text).toContain("KTV K3");
+    expect(text).toContain("Sent by Aung Aung (ID: SHW0001)");
+    expect(text).toContain("Order SO-0012");
+    expect(text).toContain("1  FRIED RICE");
   });
 });

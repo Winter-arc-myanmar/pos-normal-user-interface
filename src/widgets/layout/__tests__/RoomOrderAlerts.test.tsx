@@ -67,7 +67,8 @@ describe("RoomOrderAlerts", () => {
     await waitFor(() => expect(printKitchen).toHaveBeenCalledTimes(1));
     expect(printKitchen).toHaveBeenCalledWith(
       expect.objectContaining({
-        title: "Room S2 · #3",
+        title: "Room order 3",
+        place: "Room S2",
         lines: [{ name: "Ginger tea", quantity: "2" }],
       })
     );

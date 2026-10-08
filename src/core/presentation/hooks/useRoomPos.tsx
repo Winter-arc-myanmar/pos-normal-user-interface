@@ -81,6 +81,7 @@ const fromKtvQuote = (quote: KtvSessionQuote): SpaSessionQuote =>
     paymentTiming: quote.paymentTiming,
     amountDue: quote.amountDue,
     cashier: quote.cashier,
+    orderNumber: quote.orderNumber,
   });
 
 const fromKtvCharge = (result: KtvChargeResultDTO): SpaChargeResultDTO => ({
