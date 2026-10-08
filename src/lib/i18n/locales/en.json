@@ -1673,7 +1673,24 @@
     "room": "Room {{room}}",
     "minutes": "{{count}} min",
     "start": "Start",
-    "ready": "Ready"
+    "ready": "Ready",
+    "table": "Table {{number}}",
+    "spaRoom": "SPA room {{number}}",
+    "ktvRoom": "KTV room {{number}}",
+    "counter": "Counter",
+    "pickup": "Pickup {{number}}",
+    "guests": "{{count}} guests",
+    "sentBy": "Sent by {{name}}",
+    "sentFromTablet": "Sent from {{device}}",
+    "roomTablet": "room tablet",
+    "seat": "Seat {{seat}}",
+    "service": {
+      "DINE_IN": "Dine in",
+      "TAKEAWAY": "Takeaway",
+      "TAKE_AWAY": "Takeaway",
+      "DELIVERY": "Delivery",
+      "PICKUP": "Pickup"
+    }
   },
   "roomOrders": {
     "newOrder": "New order · {{room}} · #{{number}}",
