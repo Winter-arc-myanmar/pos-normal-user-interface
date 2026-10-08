@@ -7,6 +7,7 @@ import {
   formatKitchenSlip,
   formatSaleReceipt,
   kdsTicketPlaceDetail,
+  printAmount,
   printMoney,
   wrapText,
 } from "../formatKdsTicket";
@@ -23,6 +24,37 @@ describe("receipt design", () => {
     expect(printMoney("50350.0000")).toBe("50,350");
     expect(printMoney("12.5")).toBe("12.50");
     expect(printMoney("")).toBe("");
+  });
+
+  it("writes amounts the way the business charges", () => {
+    expect(printAmount("100000.0000", "MMK")).toBe("100,000 MMK");
+    expect(printAmount("100000", "USD")).toBe("$ 100,000");
+    expect(printAmount("12.5", "USD")).toBe("$ 12.50");
+    expect(printAmount(-2825, "MMK")).toBe("-2,825 MMK");
+    expect(printAmount(-2825, "USD")).toBe("-$ 2,825");
+    expect(printAmount("100000")).toBe("100,000");
+  });
+
+  it("prints the totals, payments and change in the currency", () => {
+    const receipt = {
+      title: "Receipt",
+      lines: [{ name: "Beer", quantity: "2", unitPrice: "3000" }],
+      subtotal: "6000",
+      discount: "500",
+      total: "5500",
+      payments: [{ name: "Cash", amount: "10000" }],
+      change: "4500",
+    };
+    const kyat = buildSaleReceiptLines({ ...receipt, currency: "MMK" }).join("\n");
+    expect(kyat).toMatch(/2 x Beer\s+6,000\n/);
+    expect(kyat).toMatch(/Subtotal\s+6,000 MMK/);
+    expect(kyat).toMatch(/Discount\s+-500 MMK/);
+    expect(kyat).toMatch(/TOTAL\s+5,500 MMK/);
+    expect(kyat).toMatch(/Cash\s+10,000 MMK/);
+    expect(kyat).toMatch(/Change\s+4,500 MMK/);
+    const dollars = buildSaleReceiptLines({ ...receipt, currency: "USD" }).join("\n");
+    expect(dollars).toMatch(/TOTAL\s+\$ 5,500/);
+    expect(dollars).toMatch(/Discount\s+-\$ 500/);
   });
 
   it("wraps long words and lines to the paper", () => {

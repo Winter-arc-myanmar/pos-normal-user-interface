@@ -9,6 +9,7 @@ const PAY_WHEN_ORDERING: VenueSetting = {
   paymentTiming: "PAY_WHEN_ORDERING",
   spaMenuOrdering: true,
   ktvMenuOrdering: true,
+  currency: "MMK",
 };
 
 /**

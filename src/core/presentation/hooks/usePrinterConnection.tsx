@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { KdsTicket } from "../../domain/entities/Cashier";
 import { IKitchenPrinterService } from "../../domain/services/IKitchenPrinterService";
 import { IPrintTemplateService } from "../../domain/services/IPrintTemplateService";
-import { PrintCompany } from "../../domain/entities/PrintTemplate";
+import { PriceCurrency, PrintCompany } from "../../domain/entities/PrintTemplate";
+import type { ApiVenueSettingRepository } from "../../infrastructure/repositories/ApiVenueSettingRepository";
 import container from "../../infrastructure/di/container";
 import { browserPrinterClient } from "../../infrastructure/printing/BrowserPrinterClient";
 import { getPrinterClient } from "../../infrastructure/printing/getPrinterClient";
@@ -52,6 +53,25 @@ const companyFor = (tenantId: string) => {
     companies.set(tenantId, company);
   }
   return company;
+};
+
+/** The money receipts print amounts in, loaded once per signed-in company. */
+const currencies = new Map<string, Promise<PriceCurrency | undefined>>();
+
+const currencyFor = (tenantId: string) => {
+  let currency = currencies.get(tenantId);
+  if (!currency) {
+    currency = container
+      .resolve<ApiVenueSettingRepository>("venueSettingRepository")
+      .get()
+      .then((setting): PriceCurrency | undefined => setting.currency)
+      .catch(() => {
+        currencies.delete(tenantId);
+        return undefined;
+      });
+    currencies.set(tenantId, currency);
+  }
+  return currency;
 };
 
 const configureClient = async (
@@ -342,6 +362,7 @@ export function usePrinterConnection(
         receipt.company === undefined && place !== "FINANCE"
           ? await companyFor(tenantId)
           : receipt.company;
+      const currency = receipt.currency || (await currencyFor(tenantId));
       const failures: string[] = [];
       for (const target of targets) {
         try {
@@ -351,6 +372,7 @@ export function usePrinterConnection(
             template,
             paperWidth,
             company,
+            currency,
             showLogo: receipt.showLogo,
           });
         } catch (caught) {

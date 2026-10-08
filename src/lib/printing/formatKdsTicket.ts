@@ -1,5 +1,6 @@
 import { KdsTicket } from "@/core/domain/entities/Cashier";
 import {
+  PriceCurrency,
   PrintCompany,
   PrintPaperWidth,
   PrintTemplateSettings,
@@ -83,6 +84,8 @@ export interface SaleReceipt extends PrintParty {
   showPrices?: boolean;
   template?: PrintTemplateSettings;
   paperWidth?: PrintPaperWidth;
+  /** Totals print as 100,000 MMK or $ 100,000; plain numbers without it. */
+  currency?: PriceCurrency;
 }
 
 type Size = "normal" | "tall" | "wide" | "huge";
@@ -262,6 +265,18 @@ export function printMoney(value?: string | number | null): string {
     minimumFractionDigits: whole ? 0 : 2,
     maximumFractionDigits: 2,
   });
+}
+
+/** An amount in the business's money: "100,000 MMK", "$ 100,000", "-$ 2,825". */
+export function printAmount(
+  value?: string | number | null,
+  currency?: PriceCurrency
+): string {
+  const text = printMoney(value);
+  if (!text || !currency || !Number.isFinite(Number(value))) return text;
+  const sign = text.startsWith("-") ? "-" : "";
+  const digits = sign ? text.slice(1) : text;
+  return currency === "USD" ? `${sign}$ ${digits}` : `${sign}${digits} MMK`;
 }
 
 const quantityText = (value: string) => {
@@ -493,25 +508,26 @@ function receiptLayout(receipt: SaleReceipt): Layout {
     : [];
   const shownBreakdown = breakdown.filter(([, value]) => value && Number(value) !== 0);
   if (shownBreakdown.length || showTotal) layout.rule("-");
+  const amount = (value?: string | number | null) => printAmount(value, receipt.currency);
   for (const [label, value] of shownBreakdown) {
-    const amount = printMoney(value);
-    layout.pair(label, label === "Discount" && !amount.startsWith("-") ? `-${amount}` : amount);
+    const owed = label === "Discount" && Number(value) > 0 ? -Number(value) : value;
+    layout.pair(label, amount(owed));
   }
   if (showTotal) {
     if (shownBreakdown.length) layout.rule("-");
-    layout.pair(receipt.totalLabel || "TOTAL", printMoney(receipt.total), {
+    layout.pair(receipt.totalLabel || "TOTAL", amount(receipt.total), {
       size: "tall",
       bold: true,
     });
   }
   const payments = showPayments ? receipt.payments || [] : [];
   if (payments.length || receipt.change || receipt.balanceAfter) layout.rule("-");
-  for (const payment of payments) layout.field(payment.name, printMoney(payment.amount));
+  for (const payment of payments) layout.field(payment.name, amount(payment.amount));
   if (showPayments && receipt.change && Number(receipt.change) > 0) {
-    layout.pair("Change", printMoney(receipt.change), { bold: true });
+    layout.pair("Change", amount(receipt.change), { bold: true });
   }
   if (receipt.balanceAfter) {
-    layout.pair("Card balance", printMoney(receipt.balanceAfter), { bold: true });
+    layout.pair("Card balance", amount(receipt.balanceAfter), { bold: true });
   }
   layout.rule("=");
   const footer = settings?.other.footerText || (finance ? "" : "Thank you!");
