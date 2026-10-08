@@ -21,8 +21,9 @@ export type UpdateSpaRoomDTO = Partial<Omit<CreateSpaRoomDTO, "locationId">> & {
   status?: SpaRoomStatus;
 };
 
+/** Paid now: the tapped card, or a payment method alone for cash and the like. */
 export interface SpaCardChargeDTO {
-  guestCardId: string;
+  guestCardId?: string;
   paymentMethodId: string;
   posSessionId?: string;
   idempotencyKey?: string;

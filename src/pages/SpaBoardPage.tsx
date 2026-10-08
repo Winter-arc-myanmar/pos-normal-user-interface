@@ -13,7 +13,7 @@ import {
   findMemberCardPaymentMethod,
   LOCAL_MEMBER_CARD_METHOD_ID,
 } from "@/core/application/services/PosPaymentCatalog";
-import { Product, SalesOrderLine } from "@/core/domain/entities/Cashier";
+import { PaymentMethod, Product, SalesOrderLine } from "@/core/domain/entities/Cashier";
 import { GuestCard, GuestWallet } from "@/core/domain/entities/GuestWallet";
 import { SpaRoom, SpaSession } from "@/core/domain/entities/Spa";
 import { useCashier } from "@/core/presentation/hooks/useCashier";
@@ -226,12 +226,14 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     (method) => String(method.kind || "").toUpperCase() === "CASH"
   );
   const allowOtherPayments = atEnd && !venue.roomCardOnly;
+  // Customer credit needs a named customer, which a room bill does not take here.
   const otherMethods = paymentMethods.filter(
     (method) =>
       method.id !== cardMethod?.id &&
       method.id !== LOCAL_MEMBER_CARD_METHOD_ID &&
-      String(method.kind || "").toUpperCase() !== "GUEST_CARD"
+      !["GUEST_CARD", "CUSTOMER_CREDIT"].includes(String(method.kind || "").toUpperCase())
   );
+  const payOtherEachTime = !venue.roomCardOnly && otherMethods.length > 0;
   const [otherMethodId, setOtherMethodId] = useState("");
   const tipValue = Math.max(0, Number(tip) || 0);
   const cashValue = splitCash ? Math.max(0, Number(cashAmount) || 0) : 0;
@@ -600,8 +602,19 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     return tapKeys.current[action]!;
   };
 
-  const chargeFrom = async (action: CardAction, payerCard: GuestCard) => {
-    if (!cardMethod || cardMethod.id === LOCAL_MEMBER_CARD_METHOD_ID) {
+  const chargeFrom = async (action: CardAction, payerCard: GuestCard | null, method?: PaymentMethod) => {
+    if (method) {
+      const context = await requireCashierContext();
+      return {
+        context,
+        charge: {
+          paymentMethodId: method.id,
+          posSessionId: context.posSessionId,
+          idempotencyKey: keyFor(action),
+        },
+      };
+    }
+    if (!payerCard || !cardMethod || cardMethod.id === LOCAL_MEMBER_CARD_METHOD_ID) {
       throw new Error(tr("errors.paymentUnavailable"));
     }
     const context = await requireCashierContext();
@@ -616,21 +629,34 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     };
   };
 
-  const showCharged = (payer: GuestWallet, charged: string, balanceAfter: string) => {
+  const showCharged = (
+    payer: GuestWallet | null,
+    charged: string,
+    balanceAfter: string,
+    method?: PaymentMethod
+  ) => {
+    if (!payer) {
+      setNotice(tr("paidWith", { amount: money(charged), method: method?.name || "" }));
+      return;
+    }
     setWallet({ ...payer, balance: balanceAfter });
     setNotice(
       tr("charged", { amount: money(charged), balance: money(balanceAfter) })
     );
   };
 
-  const openTreatment = async (payer: GuestWallet, payerCard: GuestCard) => {
+  const openTreatment = async (
+    payer: GuestWallet | null,
+    payerCard: GuestCard | null,
+    method?: PaymentMethod
+  ) => {
     if (!room) return;
     setActionError(null);
     try {
-      const { context, charge } = await chargeFrom("open", payerCard);
+      const { context, charge } = await chargeFrom("open", payerCard, method);
       const created = await openSession({
         roomId: room.id,
-        guestWalletId: payer.id,
+        ...(payer ? { guestWalletId: payer.id } : {}),
         guestCount: Math.max(1, Number(guestCount) || 1),
         ...(isSpa
           ? {
@@ -646,7 +672,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       tapKeys.current.open = undefined;
       await fetchBoard();
       await selectSession(created);
-      setWallet(await getWallet(payer.id));
+      if (payer) setWallet(await getWallet(payer.id));
       setNotice(tr("treatmentStarted"));
     } catch (caught) {
       setActionError(caught instanceof Error ? caught.message : tr("errors.openSession"));
@@ -742,12 +768,16 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     else requestCard("add");
   };
 
-  const extendTreatment = async (payer: GuestWallet, payerCard: GuestCard) => {
+  const extendTreatment = async (
+    payer: GuestWallet | null,
+    payerCard: GuestCard | null,
+    method?: PaymentMethod
+  ) => {
     if (!session) return;
     setActionError(null);
     setIsAdding(true);
     try {
-      const { charge } = await chargeFrom("extend", payerCard);
+      const { charge } = await chargeFrom("extend", payerCard, method);
       const result = await extendSession(
         session.id,
         isSpa
@@ -765,7 +795,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             : (extendCount + (extendFreeTime?.units || 0)) * unitMinutes),
       });
       setExtendChoice({});
-      showCharged(payer, result.charged, result.balanceAfter);
+      showCharged(payer, result.charged, result.balanceAfter, method);
       await fetchBoard();
       await refreshBill(session);
     } catch (caught) {
@@ -775,15 +805,20 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     }
   };
 
-  const commitPending = async (payer: GuestWallet, payerCard: GuestCard, force = false) => {
+  const commitPending = async (
+    payer: GuestWallet | null,
+    payerCard: GuestCard | null,
+    force = false,
+    method?: PaymentMethod
+  ) => {
     const toPay = paidPending(pending);
     if (!session?.salesOrderId || billClosed || !toPay.length) return;
     const prepaid = Boolean(quote?.prepaid);
     const estimate = estimateCardCharge({
       runningTotal: (prepaid ? 0 : Number(quote?.runningTotal || 0)) + pendingDue,
-      discountBps: payer.discountBpsSnapshot,
+      discountBps: payer?.discountBpsSnapshot,
     });
-    if (!force && !cardCanCover(payer, estimate)) {
+    if (payer && !force && !cardCanCover(payer, estimate)) {
       setBalanceWarning(payer);
       return;
     }
@@ -792,14 +827,14 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     setIsAdding(true);
     if (prepaid) {
       try {
-        const { charge } = await chargeFrom("add", payerCard);
+        const { charge } = await chargeFrom("add", payerCard, method);
         const result = await chargeItems(session.id, {
           ...charge,
           items: pendingOrderItems(toPay),
         });
         tapKeys.current.add = undefined;
         setPending(focPending);
-        showCharged(payer, result.charged, result.balanceAfter);
+        showCharged(payer, result.charged, result.balanceAfter, method);
       } catch (caught) {
         setActionError(caught instanceof Error ? caught.message : tr("errors.editLine"));
       } finally {
@@ -870,6 +905,17 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     else if (action === "open") void openTreatment(payer, payerCard);
     else if (action === "extend") void extendTreatment(payer, payerCard);
     else setStep("pay");
+  };
+
+  /** Pays the prompt's order another way than the card: cash, a transfer, and so on. */
+  const payWith = (methodId: string) => {
+    const method = otherMethods.find((item) => item.id === methodId);
+    const action = cardPrompt;
+    if (!method || !action) return;
+    setCardPrompt(null);
+    if (action === "add") void commitPending(null, null, false, method);
+    else if (action === "open") void openTreatment(null, null, method);
+    else if (action === "extend") void extendTreatment(null, null, method);
   };
 
   const requestCard = (action: CardAction) => {
@@ -1864,6 +1910,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           isBusy={isCheckingCard}
           onCardRead={(uid) => void handleCardRead(uid)}
           onCancel={() => setCardPrompt(null)}
+          otherMethods={payOtherEachTime && cardPrompt !== "pay" ? otherMethods : []}
+          onPayWith={payWith}
         >
           {cardPrompt === "add" ? (
             <>

@@ -858,6 +858,38 @@ describe("SpaBoardPage", () => {
       expect(await screen.findByText("spa.charged")).toBeInTheDocument();
     });
 
+    it("takes cash for the tray instead of a card when the business allows it", async () => {
+      venueState = { ...venueState, roomCardOnly: false };
+      await openRunningRoom();
+      fireEvent.click(screen.getByRole("button", { name: /Foot Scrub/ }));
+      fireEvent.click(await screen.findByRole("button", { name: "spa.increaseNew" }));
+      fireEvent.click(screen.getByRole("button", { name: /spa.addToBill/ }));
+      fireEvent.click(await screen.findByRole("button", { name: "Cash" }));
+
+      await waitFor(() =>
+        expect(mocks.chargeItems).toHaveBeenCalledWith(
+          "session-1",
+          expect.objectContaining({
+            paymentMethodId: "cash-method",
+            items: [{ variantId: "variant-scrub", quantity: 2 }],
+          })
+        )
+      );
+      const [[, payload]] = mocks.chargeItems.mock.calls as [[string, Record<string, unknown>]];
+      expect(payload).not.toHaveProperty("guestCardId");
+      expect(await screen.findByText("spa.paidWith")).toBeInTheDocument();
+    });
+
+    it("offers only the card tap when the business takes member cards only", async () => {
+      await openRunningRoom();
+      fireEvent.click(screen.getByRole("button", { name: /Foot Scrub/ }));
+      fireEvent.click(await screen.findByRole("button", { name: "spa.increaseNew" }));
+      fireEvent.click(screen.getByRole("button", { name: /spa.addToBill/ }));
+
+      expect(await screen.findByText("spa.tapPrompt")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Cash" })).not.toBeInTheDocument();
+    });
+
     it("adds more sauna time to a running treatment from the room's charges", async () => {
       placeChargesState = [
         {

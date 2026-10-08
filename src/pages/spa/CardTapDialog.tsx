@@ -14,6 +14,8 @@ export function CardTapDialog({
   isBusy,
   onCardRead,
   onCancel,
+  otherMethods = [],
+  onPayWith,
 }: {
   kind?: RoomKind;
   title: string;
@@ -22,6 +24,8 @@ export function CardTapDialog({
   isBusy: boolean;
   onCardRead: (uid: string) => void;
   onCancel: () => void;
+  otherMethods?: { id: string; name: string }[];
+  onPayWith?: (methodId: string) => void;
 }) {
   const { t } = useTranslation();
   const tr = useRoomText(kind);
@@ -69,6 +73,24 @@ export function CardTapDialog({
             {tr("checkCard")}
           </Button>
         </div>
+        {otherMethods.length && onPayWith ? (
+          <div className="space-y-2 border-t border-slate-800 pt-3">
+            <p className="text-sm font-semibold">{tr("payOtherTitle")}</p>
+            <div className="grid grid-cols-2 gap-2">
+              {otherMethods.map((method) => (
+                <Button
+                  key={method.id}
+                  type="button"
+                  variant="secondary"
+                  disabled={isBusy}
+                  onClick={() => onPayWith(method.id)}
+                >
+                  {method.name}
+                </Button>
+              ))}
+            </div>
+          </div>
+        ) : null}
         {error ? (
           <p role="alert" className="text-sm text-red-300">
             {error}
