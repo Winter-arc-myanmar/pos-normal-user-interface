@@ -1,4 +1,5 @@
 import qz from "qz-tray";
+import { escPosHex } from "@/lib/printing/escPosBytes";
 import { KdsTicket } from "../../domain/entities/Cashier";
 import { PrinterBinding, PrinterTransport } from "@/lib/pos/printerBindingStorage";
 import {
@@ -34,11 +35,6 @@ const asList = <T>(value: T | T[] | null | undefined): T[] => {
   if (!value) return [];
   return Array.isArray(value) ? value : [value];
 };
-
-const escPosHex = (data: string) =>
-  Array.from(data, (char) => (char.charCodeAt(0) & 0xff).toString(16).padStart(2, "0")).join(
-    ""
-  );
 
 const qzUsbDevice = (device: UsbPrinterDevice) => ({
   vendorId: toQzUsbHex(device.vendorId),
@@ -364,7 +360,7 @@ export class QzTrayClient {
         for (const target of candidates) {
           try {
             await qz.print(this.config(target), [
-              { type: "raw", format: "command", data },
+              { type: "raw", format: "command", flavor: "hex", data: escPosHex(data) },
             ]);
             this.rememberUsbQueue(binding, target.deviceName);
             return;
@@ -376,7 +372,7 @@ export class QzTrayClient {
         throw lastError ?? new Error("USB printer is not connected. Plug it in and try again.");
       }
       await qz.print(this.config(binding), [
-        { type: "raw", format: "command", data },
+        { type: "raw", format: "command", flavor: "hex", data: escPosHex(data) },
       ]);
     } catch (caught) {
       const error = qzError(caught);

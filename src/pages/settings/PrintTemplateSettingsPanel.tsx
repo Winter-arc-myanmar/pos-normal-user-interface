@@ -21,6 +21,8 @@ import {
   kitchenSlipPreview,
   saleReceiptPreview,
 } from "@/lib/printing/formatKdsTicket";
+import type { PrintImage } from "@/lib/printing/printImage";
+import { printLogoFor } from "@/lib/printing/printLogo";
 import { shiftSlip } from "@/lib/printing/shiftSlip";
 import { templatesForType } from "@/lib/printing/selectPrintTemplate";
 
@@ -136,6 +138,7 @@ function TemplatePreview({
   outletName,
   company,
   currency,
+  logo,
 }: {
   settings: PrintTemplateSettings;
   paperWidth: PrintPaperWidth;
@@ -143,11 +146,13 @@ function TemplatePreview({
   outletName: string;
   company: PrintCompany | null;
   currency?: PriceCurrency;
+  logo: PrintImage | null;
 }) {
   const slip =
     type === "SHIFT"
       ? saleReceiptPreview({
           ...shiftSlip(SAMPLE_SHIFT),
+          logo,
           template: settings,
           paperWidth,
           company,
@@ -174,6 +179,7 @@ function TemplatePreview({
           receiptId: "SO-R01-0012",
           paidAt: sampleTime(14, 31),
           company,
+          logo,
           outletName,
           serviceType: "KTV",
           tableOrRoom: "K3",
@@ -200,6 +206,7 @@ export function PrintTemplateSettingsPanel() {
   const { user } = useAuth();
   const { currency } = useVenueSetting();
   const [company, setCompany] = useState<PrintCompany | null>(null);
+  const [logo, setLogo] = useState<PrintImage | null>(null);
   const {
     templates,
     isLoading,
@@ -227,6 +234,18 @@ export function PrintTemplateSettingsPanel() {
     };
   }, [user?.tenantId]);
 
+  const logoUrl = company?.logoUrl;
+  useEffect(() => {
+    if (!logoUrl) return;
+    let cancelled = false;
+    void printLogoFor(logoUrl, draft.paperWidth).then((found) => {
+      if (!cancelled) setLogo(found);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [logoUrl, draft.paperWidth]);
+
   const patchSettings = (settings: PrintTemplateSettings) =>
     setDraft((current) => ({ ...current, settings }));
 
@@ -242,7 +261,13 @@ export function PrintTemplateSettingsPanel() {
         settings.header.logo = false;
       }
       if (type === "SHIFT") {
-        settings.header = { logo: false, outletName: true, address: false, contact: false };
+        settings.header = {
+          logo: false,
+          outletName: true,
+          address: false,
+          contact: false,
+          email: false,
+        };
         settings.other = {
           ...settings.other,
           orderNumber: false,
@@ -358,7 +383,7 @@ export function PrintTemplateSettingsPanel() {
   const headerFields =
     draft.type === "KITCHEN"
       ? (["logo", "outletName"] as const)
-      : (["logo", "outletName", "address", "contact"] as const);
+      : (["logo", "outletName", "address", "contact", "email"] as const);
 
   return (
     <form onSubmit={(event) => void save(event)} className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
@@ -542,6 +567,9 @@ export function PrintTemplateSettingsPanel() {
 
         <section className="rounded-xl bg-white p-4 shadow-sm">
           <h3 className="font-semibold">{t("settings.printTemplate.header")}</h3>
+          {settings.header.logo && company && !company.logoUrl ? (
+            <p className="text-xs leading-5 text-amber-700">{t("settings.printTemplate.noLogo")}</p>
+          ) : null}
           {headerFields.map((field) => (
             <ToggleField
               key={field}
@@ -678,6 +706,7 @@ export function PrintTemplateSettingsPanel() {
           outletName={t("settings.printTemplate.previewOutlet")}
           company={company}
           currency={currency}
+          logo={logoUrl ? logo : null}
         />
         <p className="mt-3 text-xs text-slate-500">{t("settings.printTemplate.previewHint")}</p>
       </aside>

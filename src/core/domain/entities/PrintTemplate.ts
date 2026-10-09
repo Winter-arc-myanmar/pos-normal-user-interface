@@ -15,6 +15,8 @@ export interface PrintCompany {
   legalName?: string | null;
   address?: string | null;
   phone?: string | null;
+  email?: string | null;
+  logoUrl?: string | null;
 }
 export type PrintTemplateSource = "LOCATION" | "TENANT" | "BUILTIN";
 
@@ -25,7 +27,10 @@ export interface PrintTemplateSettings {
     logo: boolean;
     outletName: boolean;
     address: boolean;
+    /** The phone number, after a phone icon. */
     contact: boolean;
+    /** The email address, after an envelope icon. */
+    email: boolean;
   };
   item: {
     bilingual: boolean;
@@ -82,6 +87,7 @@ export const defaultPrintTemplateSettings = (): PrintTemplateSettings => ({
     outletName: true,
     address: true,
     contact: true,
+    email: true,
   },
   item: {
     bilingual: false,

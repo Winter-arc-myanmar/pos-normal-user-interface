@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import type { SlipPreview as Slip, SlipPreviewRow } from "@/lib/printing/formatKdsTicket";
+import { iconImage, imageRuns, PrintIcon, PrintImage } from "@/lib/printing/printImage";
 
 const LINE = 16;
 const FONT = 12;
@@ -37,6 +38,34 @@ function TextRow({ row }: { row: Extract<SlipPreviewRow, { kind: "text" }> }) {
   );
 }
 
+/** Dots drawn as they print: the picture's own image, or its runs as an SVG. */
+function Dots({ image, label, height }: { image: PrintImage; label: string; height?: number }) {
+  const size = height
+    ? { height, width: (height * image.width) / image.height }
+    : { width: "100%", height: "auto" };
+  if (image.src) {
+    return <img src={image.src} alt={label} style={{ ...size, imageRendering: "pixelated" }} />;
+  }
+  return (
+    <svg
+      role="img"
+      aria-label={label}
+      viewBox={`0 0 ${image.width} ${image.height}`}
+      style={size}
+      shapeRendering="crispEdges"
+    >
+      {imageRuns(image).map((run) => (
+        <rect key={`${run.x}-${run.y}`} x={run.x} y={run.y} width={run.width} height={1} />
+      ))}
+    </svg>
+  );
+}
+
+const iconLabel: Record<PrintIcon, string> = { phone: "Phone", email: "Email" };
+
+/** Dots across the paper, against which a picture's width is drawn. */
+const PAPER_DOTS: Record<number, number> = { 48: 576, 32: 384 };
+
 /** A slip drawn the way the thermal printer prints it, row for row. */
 export function SlipPreview({ slip }: { slip: Slip }) {
   return (
@@ -48,6 +77,20 @@ export function SlipPreview({ slip }: { slip: Slip }) {
       {slip.rows.map((row, index) =>
         row.kind === "gap" ? (
           <div key={index} style={{ height: LINE }} />
+        ) : row.kind === "image" ? (
+          <div key={index} data-testid="slip-logo" style={{ display: "flex", justifyContent: "center" }}>
+            <div style={{ width: `${(row.image.width / (PAPER_DOTS[slip.columns] || 576)) * 100}%` }}>
+              <Dots image={row.image} label="Logo" />
+            </div>
+          </div>
+        ) : row.kind === "contact" ? (
+          <div
+            key={index}
+            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, height: LINE }}
+          >
+            <Dots image={iconImage(row.icon)} label={iconLabel[row.icon]} height={LINE} />
+            <span style={{ whiteSpace: "pre", lineHeight: `${LINE}px` }}>{row.text}</span>
+          </div>
         ) : row.kind === "rule" ? (
           <div key={index} style={{ height: LINE, lineHeight: `${LINE}px`, whiteSpace: "pre" }}>
             {row.text}

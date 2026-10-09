@@ -25,7 +25,7 @@ const summary = {
 
 const shiftTemplate = () => {
   const settings = defaultPrintTemplateSettings();
-  settings.header = { logo: false, outletName: true, address: false, contact: false };
+  settings.header = { logo: false, outletName: true, address: false, contact: false, email: false };
   settings.other.footerText = "";
   return settings;
 };

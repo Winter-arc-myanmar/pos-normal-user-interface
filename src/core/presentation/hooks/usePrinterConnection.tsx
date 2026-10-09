@@ -27,6 +27,7 @@ import {
   PrinterJob,
   StationRoute,
 } from "@/lib/printing/routeKitchenPrint";
+import { printLogoFor } from "@/lib/printing/printLogo";
 import { printPlaceToTemplateType } from "@/lib/printing/selectPrintTemplate";
 import {
   PRINTER_BINDINGS_CHANGED,
@@ -369,6 +370,13 @@ export function usePrinterConnection(
           ? await printCompanyFor(tenantId)
           : receipt.company;
       const currency = receipt.currency || (await printCurrencyFor(tenantId));
+      const logoOn = template ? template.header.logo : place === "CHECKOUT";
+      const logo =
+        receipt.logo !== undefined
+          ? receipt.logo
+          : company?.logoUrl && logoOn && receipt.showLogo !== false
+            ? await printLogoFor(company.logoUrl, paperWidth)
+            : null;
       const failures: string[] = [];
       for (const target of targets) {
         try {
@@ -379,6 +387,7 @@ export function usePrinterConnection(
             paperWidth,
             company,
             currency,
+            logo,
             showLogo: receipt.showLogo,
           });
         } catch (caught) {
