@@ -7,6 +7,7 @@ import { ProductTrackingType } from "@/core/application/dtos/CashierDTO";
 import { Product, ProductVariant } from "@/core/domain/entities/Cashier";
 import { useAuth } from "@/core/presentation/hooks/useAuth";
 import { useProductManagement } from "@/core/presentation/hooks/useProductManagement";
+import { useVenueSetting } from "@/core/presentation/hooks/useVenueSetting";
 import { useNumberFormatter } from "@/lib/i18n/formatters";
 
 const TRACKING: ProductTrackingType[] = ["STANDARD", "SERIALIZED"];
@@ -160,6 +161,7 @@ export function ProductsPage() {
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState("ALL");
   const [trackingType, setTrackingType] = useState<"ALL" | ProductTrackingType>("ALL");
+  const { trackStock } = useVenueSetting();
   const [inStockOnly, setInStockOnly] = useState(false);
   const [locationId, setLocationId] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
@@ -390,15 +392,17 @@ export function ProductsPage() {
                 }}
               />
             ))}
-            <FilterChip
-              active={inStockOnly}
-              label={t("products.inStock")}
-              onClick={() => {
-                setCurrentPage(1);
-                setInStockOnly((current) => !current);
-              }}
-            />
-            {locations.length > 0 ? (
+            {trackStock ? (
+              <FilterChip
+                active={inStockOnly}
+                label={t("products.inStock")}
+                onClick={() => {
+                  setCurrentPage(1);
+                  setInStockOnly((current) => !current);
+                }}
+              />
+            ) : null}
+            {trackStock && locations.length > 0 ? (
               <select
                 className="min-h-8 rounded-full border border-slate-700 bg-slate-950 px-3 text-xs text-slate-200"
                 value={locationId}
@@ -454,9 +458,11 @@ export function ProductsPage() {
                         </span>
                         <span className="mt-1 flex flex-wrap items-center gap-1">
                           <span className="text-sm font-medium">{money(product.basePrice)}</span>
-                          <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[11px] text-slate-300">
-                            {t("products.onHand", { count: quantity(product.totalOnHand) })}
-                          </span>
+                          {trackStock ? (
+                            <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[11px] text-slate-300">
+                              {t("products.onHand", { count: quantity(product.totalOnHand) })}
+                            </span>
+                          ) : null}
                           <span
                             className={[
                               "rounded-full px-2 py-0.5 text-[11px]",

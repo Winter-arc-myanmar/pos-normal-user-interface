@@ -10,6 +10,8 @@ export interface VenueSetting {
   ktvMenuOrdering: boolean;
   /** The money customers pay in. */
   currency: PriceCurrency;
+  /** Sales check and deduct stock; off for a business without inventory. */
+  trackStock: boolean;
 }
 
 type RecordValue = Record<string, unknown>;
@@ -29,6 +31,7 @@ export class ApiVenueSettingRepository {
       spaMenuOrdering: data.spaMenuOrdering !== false,
       ktvMenuOrdering: data.ktvMenuOrdering !== false,
       currency: data.currency === "USD" ? "USD" : "MMK",
+      trackStock: data.trackStock !== false,
     };
   }
 }
