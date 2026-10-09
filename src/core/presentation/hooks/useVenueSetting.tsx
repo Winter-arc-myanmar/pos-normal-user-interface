@@ -10,6 +10,7 @@ const PAY_WHEN_ORDERING: VenueSetting = {
   spaMenuOrdering: true,
   ktvMenuOrdering: true,
   currency: "MMK",
+  trackStock: true,
 };
 
 /**
