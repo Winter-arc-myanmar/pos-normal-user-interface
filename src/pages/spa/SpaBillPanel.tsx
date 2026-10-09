@@ -31,6 +31,7 @@ export function SpaBillPanel({
   nowMs,
   isBusy,
   billClosed,
+  paid = false,
   onPrimary,
   primaryLabel,
   onTogglePause,
@@ -60,6 +61,7 @@ export function SpaBillPanel({
   nowMs: number;
   isBusy: boolean;
   billClosed: boolean;
+  paid?: boolean;
   onPrimary: () => void;
   primaryLabel: string;
   onTogglePause: () => void;
@@ -121,16 +123,20 @@ export function SpaBillPanel({
         </p>
         <span
           className={`shrink-0 rounded px-2 py-0.5 text-xs font-semibold ${
-            billClosed
-              ? "border border-amber-500/40 text-amber-200"
-              : isPaused
-                ? "border border-slate-700 text-slate-400"
-                : "border border-slate-600 text-slate-200"
+            paid
+              ? "border border-emerald-500/40 text-emerald-200"
+              : billClosed
+                ? "border border-amber-500/40 text-amber-200"
+                : isPaused
+                  ? "border border-slate-700 text-slate-400"
+                  : "border border-slate-600 text-slate-200"
           }`}
         >
-          {billClosed
-            ? tr("status.payment_pending")
-            : tr(`status.${session.sessionState.toLowerCase()}`)}
+          {paid
+            ? tr("status.paid")
+            : billClosed
+              ? tr("status.payment_pending")
+              : tr(`status.${session.sessionState.toLowerCase()}`)}
         </span>
       </div>
 
@@ -460,7 +466,7 @@ export function SpaBillPanel({
         </div>
       ) : (
         <p className="rounded border border-slate-700 bg-slate-900 p-2 text-xs text-slate-300">
-          {tr("billClosed")}
+          {paid ? tr("billPaid") : tr("billClosed")}
         </p>
       )}
     </aside>

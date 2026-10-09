@@ -1735,6 +1735,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             nowMs={nowMs}
             isBusy={isLoading || isPaying || isAdding}
             billClosed={billClosed}
+            paid={Boolean(paid)}
             primaryLabel={
               quote?.prepaid
                 ? tr("endTreatment")

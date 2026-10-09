@@ -1422,6 +1422,7 @@
       "open": "In treatment",
       "paused": "Paused",
       "payment_pending": "Awaiting payment",
+      "paid": "Paid",
       "closed": "Closed"
     },
     "steps": {
@@ -1453,6 +1454,7 @@
     "goToPay": "Close and pay",
     "addServices": "Add services",
     "billClosed": "Treatment closed. The bill is waiting for payment.",
+    "billPaid": "Paid. The room is free for the next guest.",
     "payTitle": "Close treatment and pay",
     "memberDiscount": "{{tier}} discount ({{percent}}%) is applied at payment.",
     "tip": "Tip",
@@ -1767,6 +1769,7 @@
       "active": "In use"
     },
     "billClosed": "Room closed. The bill is waiting for payment.",
+    "billPaid": "Paid. The lounge is free for the next guest.",
     "payTitle": "Close room and pay",
     "steps": {
       "sessions": "Choose hours",
