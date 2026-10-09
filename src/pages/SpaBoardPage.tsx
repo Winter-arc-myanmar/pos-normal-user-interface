@@ -104,7 +104,7 @@ const emptyRoomForm = {
 };
 
 /** The products behind room time and SPA packages, which are not on the menu. */
-const ROOM_CATEGORIES = ["Spa Packages", "Spa Rooms", "KTV Rooms"];
+const ROOM_CATEGORIES = ["Spa Packages", "Spa Rooms", "KTV Rooms", "Private VIP Lounges"];
 
 const money = (value: string | number | undefined) =>
   Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
