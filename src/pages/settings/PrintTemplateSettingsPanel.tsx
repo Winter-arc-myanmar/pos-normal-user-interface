@@ -14,18 +14,17 @@ import { useAuth } from "@/core/presentation/hooks/useAuth";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
 import { printCompanyFor } from "@/core/presentation/hooks/usePrinterConnection";
 import { useVenueSetting } from "@/core/presentation/hooks/useVenueSetting";
+import type { ShiftSummary } from "@/core/domain/entities/Shift";
 import { usePrintTemplateManagement } from "@/core/presentation/hooks/usePrintTemplateManagement";
 import {
   PrintLine,
-  PrintPlace,
   kitchenSlipPreview,
   saleReceiptPreview,
 } from "@/lib/printing/formatKdsTicket";
-import {
-  printPlaceToTemplateType,
-  templateTypeToPrintPlace,
-  templatesForPrintPlace,
-} from "@/lib/printing/selectPrintTemplate";
+import type { PrintImage } from "@/lib/printing/printImage";
+import { printLogoFor } from "@/lib/printing/printLogo";
+import { shiftSlip } from "@/lib/printing/shiftSlip";
+import { templatesForType } from "@/lib/printing/selectPrintTemplate";
 
 const fieldClass =
   "mt-1 min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500";
@@ -44,6 +43,7 @@ const DEFAULT_NAMES: Record<PrintTemplateType, string> = {
   RECEIPT: "Default receipt",
   KITCHEN: "Default kitchen",
   FINANCE: "Default finance",
+  SHIFT: "Shift report",
 };
 
 const emptyDraft = (): Draft => ({
@@ -107,6 +107,29 @@ const SAMPLE_LINES: PrintLine[] = [
   },
 ];
 
+const SAMPLE_SHIFT: ShiftSummary = {
+  sessionId: "sample",
+  registerName: "Front desk",
+  cashierName: "Aung Aung",
+  openedAt: sampleTime(8, 0),
+  closedAt: sampleTime(16, 0),
+  openingCashFloat: 0,
+  expectedClosingCash: 0,
+  actualClosingCash: null,
+  cashVariance: null,
+  totalSales: 70000,
+  totalRefunds: 5000,
+  netTotal: 65000,
+  salesCount: 4,
+  refundCount: 1,
+  nonSalesCashIn: 0,
+  nonSalesCashOut: 0,
+  paymentBreakdown: [
+    { methodName: "Cash", transactionCount: 3, totalAmount: 40000 },
+    { methodName: "KBZPay", transactionCount: 1, totalAmount: 30000 },
+  ],
+};
+
 /** A sample bill drawn by the same code that prints, so the preview is the paper. */
 function TemplatePreview({
   settings,
@@ -115,6 +138,7 @@ function TemplatePreview({
   outletName,
   company,
   currency,
+  logo,
 }: {
   settings: PrintTemplateSettings;
   paperWidth: PrintPaperWidth;
@@ -122,9 +146,20 @@ function TemplatePreview({
   outletName: string;
   company: PrintCompany | null;
   currency?: PriceCurrency;
+  logo: PrintImage | null;
 }) {
   const slip =
-    type === "KITCHEN"
+    type === "SHIFT"
+      ? saleReceiptPreview({
+          ...shiftSlip(SAMPLE_SHIFT),
+          logo,
+          template: settings,
+          paperWidth,
+          company,
+          outletName,
+          currency,
+        })
+      : type === "KITCHEN"
       ? kitchenSlipPreview({
           title: "0012",
           stationName: "Kitchen",
@@ -144,6 +179,7 @@ function TemplatePreview({
           receiptId: "SO-R01-0012",
           paidAt: sampleTime(14, 31),
           company,
+          logo,
           outletName,
           serviceType: "KTV",
           tableOrRoom: "K3",
@@ -170,6 +206,7 @@ export function PrintTemplateSettingsPanel() {
   const { user } = useAuth();
   const { currency } = useVenueSetting();
   const [company, setCompany] = useState<PrintCompany | null>(null);
+  const [logo, setLogo] = useState<PrintImage | null>(null);
   const {
     templates,
     isLoading,
@@ -197,6 +234,18 @@ export function PrintTemplateSettingsPanel() {
     };
   }, [user?.tenantId]);
 
+  const logoUrl = company?.logoUrl;
+  useEffect(() => {
+    if (!logoUrl) return;
+    let cancelled = false;
+    void printLogoFor(logoUrl, draft.paperWidth).then((found) => {
+      if (!cancelled) setLogo(found);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [logoUrl, draft.paperWidth]);
+
   const patchSettings = (settings: PrintTemplateSettings) =>
     setDraft((current) => ({ ...current, settings }));
 
@@ -211,6 +260,23 @@ export function PrintTemplateSettingsPanel() {
       if (type === "FINANCE") {
         settings.header.logo = false;
       }
+      if (type === "SHIFT") {
+        settings.header = {
+          logo: false,
+          outletName: true,
+          address: false,
+          contact: false,
+          email: false,
+        };
+        settings.other = {
+          ...settings.other,
+          orderNumber: false,
+          serviceType: false,
+          tableOrRoom: false,
+          pickupCode: false,
+          footerText: "",
+        };
+      }
       return {
         ...current,
         type,
@@ -221,20 +287,23 @@ export function PrintTemplateSettingsPanel() {
     });
   };
 
-  const place = templateTypeToPrintPlace(draft.type);
-  const places: PrintPlace[] = ["KDS", "CHECKOUT", "FINANCE"];
-  const placeCopy: Record<PrintPlace, { label: string; hint: string }> = {
-    KDS: {
+  const types: PrintTemplateType[] = ["KITCHEN", "RECEIPT", "FINANCE", "SHIFT"];
+  const typeCopy: Record<PrintTemplateType, { label: string; hint: string }> = {
+    KITCHEN: {
       label: t("settings.printTemplate.placeKds"),
       hint: t("settings.printTemplate.placeKdsHint"),
     },
-    CHECKOUT: {
+    RECEIPT: {
       label: t("settings.printTemplate.placeCheckout"),
       hint: t("settings.printTemplate.placeCheckoutHint"),
     },
     FINANCE: {
       label: t("settings.printTemplate.placeFinance"),
       hint: t("settings.printTemplate.placeFinanceHint"),
+    },
+    SHIFT: {
+      label: t("settings.printTemplate.placeShift"),
+      hint: t("settings.printTemplate.placeShiftHint"),
     },
   };
 
@@ -296,7 +365,9 @@ export function PrintTemplateSettingsPanel() {
 
   const { settings } = draft;
   const otherFields =
-    draft.type === "KITCHEN"
+    draft.type === "SHIFT"
+      ? (["cashier"] as const)
+      : draft.type === "KITCHEN"
       ? (["orderNumber"] as const)
       : ([
           "orderNumber",
@@ -305,7 +376,14 @@ export function PrintTemplateSettingsPanel() {
           "tableOrRoom",
           "pickupCode",
         ] as const);
-  const billFields = ["amountAfterDiscount", "totalPayment", "payTime"] as const;
+  const billFields =
+    draft.type === "SHIFT"
+      ? (["totalPayment"] as const)
+      : (["amountAfterDiscount", "totalPayment", "payTime"] as const);
+  const headerFields =
+    draft.type === "KITCHEN"
+      ? (["logo", "outletName"] as const)
+      : (["logo", "outletName", "address", "contact", "email"] as const);
 
   return (
     <form onSubmit={(event) => void save(event)} className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
@@ -317,18 +395,14 @@ export function PrintTemplateSettingsPanel() {
           <p className="mt-1 text-sm leading-6 text-slate-500">
             {t("settings.printTemplate.howBody")}
           </p>
-          <div className="mt-4 grid gap-2 sm:grid-cols-3">
-            {places.map((item) => {
-              const competing = templatesForPrintPlace(
-                item,
-                templates,
-                activeLocationId
-              );
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {types.map((item) => {
+              const competing = templatesForType(item, templates, activeLocationId);
               const active = competing.length === 1 ? competing[0] : undefined;
               const body = (
                 <>
                   <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    {placeCopy[item].label}
+                    {typeCopy[item].label}
                   </span>
                   <span className="mt-1 block text-sm font-semibold text-slate-900">
                     {active?.name ||
@@ -380,7 +454,7 @@ export function PrintTemplateSettingsPanel() {
                 <option value="">{t("settings.printTemplate.newTemplate")}</option>
                 {templates.map((template) => (
                   <option key={template.id} value={template.id}>
-                    {template.name} — {placeCopy[templateTypeToPrintPlace(template.type)].label}
+                    {template.name} — {typeCopy[template.type].label}
                   </option>
                 ))}
               </select>
@@ -399,16 +473,16 @@ export function PrintTemplateSettingsPanel() {
               <legend className="text-sm text-slate-600">
                 {t("settings.printTemplate.usedFor")}
               </legend>
-              <div className="mt-1 grid gap-2 sm:grid-cols-3">
-                {places.map((item) => {
-                  const selected = place === item;
+              <div className="mt-1 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                {types.map((item) => {
+                  const selected = draft.type === item;
                   return (
                     <button
                       key={item}
                       type="button"
                       aria-pressed={selected}
                       disabled={Boolean(draft.id) && !selected}
-                      onClick={() => applyType(printPlaceToTemplateType(item))}
+                      onClick={() => applyType(item)}
                       className={[
                         "rounded-lg border px-3 py-3 text-left disabled:cursor-not-allowed disabled:opacity-50",
                         selected
@@ -417,7 +491,7 @@ export function PrintTemplateSettingsPanel() {
                       ].join(" ")}
                     >
                       <span className="block text-sm font-semibold">
-                        {placeCopy[item].label}
+                        {typeCopy[item].label}
                       </span>
                       <span
                         className={[
@@ -425,7 +499,7 @@ export function PrintTemplateSettingsPanel() {
                           selected ? "text-blue-100" : "text-slate-500",
                         ].join(" ")}
                       >
-                        {placeCopy[item].hint}
+                        {typeCopy[item].hint}
                       </span>
                     </button>
                   );
@@ -493,22 +567,22 @@ export function PrintTemplateSettingsPanel() {
 
         <section className="rounded-xl bg-white p-4 shadow-sm">
           <h3 className="font-semibold">{t("settings.printTemplate.header")}</h3>
-          <ToggleField
-            label={t("settings.printTemplate.logo")}
-            checked={settings.header.logo}
-            onChange={(logo) =>
-              patchSettings({ ...settings, header: { ...settings.header, logo } })
-            }
-          />
-          <ToggleField
-            label={t("settings.printTemplate.outletName")}
-            checked={settings.header.outletName}
-            onChange={(outletName) =>
-              patchSettings({ ...settings, header: { ...settings.header, outletName } })
-            }
-          />
+          {settings.header.logo && company && !company.logoUrl ? (
+            <p className="text-xs leading-5 text-amber-700">{t("settings.printTemplate.noLogo")}</p>
+          ) : null}
+          {headerFields.map((field) => (
+            <ToggleField
+              key={field}
+              label={t(`settings.printTemplate.${field}`)}
+              checked={settings.header[field]}
+              onChange={(checked) =>
+                patchSettings({ ...settings, header: { ...settings.header, [field]: checked } })
+              }
+            />
+          ))}
         </section>
 
+        {draft.type === "SHIFT" ? null : (
         <section className="rounded-xl bg-white p-4 shadow-sm">
           <h3 className="font-semibold">{t("settings.printTemplate.item")}</h3>
           <label className="block py-2 text-sm text-slate-700">
@@ -553,6 +627,7 @@ export function PrintTemplateSettingsPanel() {
             />
           ))}
         </section>
+        )}
 
         {draft.type === "KITCHEN" ? null : (
         <section className="rounded-xl bg-white p-4 shadow-sm">
@@ -560,7 +635,11 @@ export function PrintTemplateSettingsPanel() {
           {billFields.map((field) => (
             <ToggleField
               key={field}
-              label={t(`settings.printTemplate.${field}`)}
+              label={t(
+                draft.type === "SHIFT"
+                  ? "settings.printTemplate.paymentsByMethod"
+                  : `settings.printTemplate.${field}`
+              )}
               checked={settings.bill[field]}
               onChange={(checked) =>
                 patchSettings({
@@ -627,6 +706,7 @@ export function PrintTemplateSettingsPanel() {
           outletName={t("settings.printTemplate.previewOutlet")}
           company={company}
           currency={currency}
+          logo={logoUrl ? logo : null}
         />
         <p className="mt-3 text-xs text-slate-500">{t("settings.printTemplate.previewHint")}</p>
       </aside>

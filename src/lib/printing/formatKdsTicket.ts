@@ -4,8 +4,10 @@ import {
   PrintCompany,
   PrintPaperWidth,
   PrintTemplateSettings,
+  PrintTemplateType,
 } from "@/core/domain/entities/PrintTemplate";
 import { cashierLabel } from "./cashier";
+import { inlineIconCommand, PrintIcon, PrintImage, rasterCommand } from "./printImage";
 
 const ESC = "\x1b";
 const GS = "\x1d";
@@ -29,7 +31,9 @@ export interface PrintParty {
   company?: PrintCompany | null;
   outletName?: string;
   address?: string;
+  /** The phone number, when it is not the company's. */
   contact?: string;
+  email?: string;
   cashier?: string;
   serviceType?: string;
   tableOrRoom?: string;
@@ -82,6 +86,10 @@ export interface SaleReceipt extends PrintParty {
   startTimeLabel?: string;
   endTimeLabel?: string;
   place?: PrintPlace;
+  /** The company logo as printer dots, printed at the top when the template shows it. */
+  logo?: PrintImage | null;
+  /** The template to print with, when it is not the one for `place`. */
+  templateType?: PrintTemplateType;
   showLogo?: boolean;
   showPrices?: boolean;
   template?: PrintTemplateSettings;
@@ -107,7 +115,9 @@ interface TextStyle {
 type Row =
   | ({ kind: "text"; text: string } & TextStyle)
   | { kind: "rule"; char: string }
-  | { kind: "gap" };
+  | { kind: "gap" }
+  | { kind: "image"; image: PrintImage }
+  | { kind: "contact"; icon: PrintIcon; text: string };
 
 const columnsFor = (paperWidth?: PrintPaperWidth) => (paperWidth === "MM80" ? 48 : 32);
 
@@ -201,6 +211,15 @@ class Layout {
     this.rows.push({ kind: "rule", char });
   }
 
+  image(image: PrintImage | null | undefined) {
+    if (image?.width && image.height) this.rows.push({ kind: "image", image });
+  }
+
+  /** A phone number or email after its icon, centred. */
+  contact(icon: PrintIcon, text: string | undefined | null) {
+    if (text?.trim()) this.rows.push({ kind: "contact", icon, text: text.trim() });
+  }
+
   gap() {
     if (this.rows.length && this.rows[this.rows.length - 1].kind !== "gap") {
       this.rows.push({ kind: "gap" });
@@ -233,6 +252,10 @@ const toEscPos = (layout: Layout) =>
     lineSpacing,
     ...layout.rows.map((row) => {
       if (row.kind === "gap") return "\n";
+      if (row.kind === "image") return `${ESC}a\x01${rasterCommand(row.image)}`;
+      if (row.kind === "contact") {
+        return `${ESC}a\x01${ESC}!\x00${inlineIconCommand(row.icon)} ${row.text}\n`;
+      }
       if (row.kind === "rule") {
         return `${ESC}a\x00${ESC}!\x00${row.char.repeat(layout.width)}\n`;
       }
@@ -251,8 +274,14 @@ const toEscPos = (layout: Layout) =>
     `${GS}V\x00`,
   ].join("");
 
+const contactLabel: Record<PrintIcon, string> = { phone: "Tel", email: "Email" };
+
 const toPlainLines = (layout: Layout) =>
-  layout.rows.map((row) => {
+  layout.rows.flatMap((row) => {
+    if (row.kind === "image") return [];
+    if (row.kind === "contact") {
+      return centered(`${contactLabel[row.icon]} ${row.text}`, layout.width).trimEnd();
+    }
     if (row.kind === "gap") return "";
     if (row.kind === "rule") return row.char.repeat(layout.width);
     if (row.invert) return centered(`*** ${row.text.trim()} ***`, layout.width);
@@ -265,7 +294,9 @@ const toPlainLines = (layout: Layout) =>
 export type SlipPreviewRow =
   | { kind: "text"; text: string; align: PrintAlign; size: PrintSize; bold: boolean; invert: boolean }
   | { kind: "rule"; text: string }
-  | { kind: "gap" };
+  | { kind: "gap" }
+  | { kind: "image"; image: PrintImage }
+  | { kind: "contact"; icon: PrintIcon; text: string };
 
 export interface SlipPreview {
   columns: number;
@@ -275,7 +306,7 @@ export interface SlipPreview {
 const toPreview = (layout: Layout): SlipPreview => ({
   columns: layout.width,
   rows: layout.rows.map((row): SlipPreviewRow => {
-    if (row.kind === "gap") return row;
+    if (row.kind === "gap" || row.kind === "image" || row.kind === "contact") return row;
     if (row.kind === "rule") return { kind: "rule", text: row.char.repeat(layout.width) };
     return {
       kind: "text",
@@ -440,19 +471,26 @@ const roomServices = new Set(["SPA", "KTV"]);
 function receiptLayout(receipt: SaleReceipt): Layout {
   const place = receipt.place || "CHECKOUT";
   const finance = place === "FINANCE";
+  const shift = receipt.templateType === "SHIFT";
   const settings = receipt.template;
   const shows = (flag?: boolean) => (settings ? Boolean(flag) : true);
+  // A shift report is for the office: its header shows only what its template asks for.
+  const headed = (flag?: boolean) => (shift ? Boolean(flag) : shows(flag));
   const showPrices = settings ? settings.item.price : receipt.showPrices !== false;
   const showBreakdown = settings ? settings.bill.amountAfterDiscount : !finance;
-  const showTotal = settings ? settings.bill.totalPayment : true;
+  const showTotal = shift || (settings ? settings.bill.totalPayment : true);
   const showPayments = settings ? settings.bill.totalPayment : !finance;
   const showOrderNumber = settings ? settings.other.orderNumber : !finance;
   const showModifiers = settings ? settings.item.modifiers : !finance;
   const qtyFirst = settings ? settings.item.qtyFirst : true;
   const itemSize: Size = settings?.item.fontSize === "LARGE" ? "tall" : "normal";
   const layout = new Layout(columnsFor(receipt.paperWidth));
-  const company = finance ? null : receipt.company;
+  const company = finance || (shift && !settings?.header.outletName) ? null : receipt.company;
 
+  if (receipt.showLogo !== false && (settings ? settings.header.logo : !finance && !shift)) {
+    layout.image(receipt.logo);
+    if (receipt.logo) layout.gap();
+  }
   if (company?.name) {
     layout.line(company.name.toUpperCase(), { align: "center", size: "wide", bold: true });
     if (company.legalName && company.legalName !== company.name) {
@@ -466,13 +504,11 @@ function receiptLayout(receipt: SaleReceipt): Layout {
   ) {
     layout.line(receipt.outletName, { align: "center", bold: !company?.name });
   }
-  if (shows(settings?.header.address)) {
+  if (headed(settings?.header.address)) {
     layout.line(receipt.address || company?.address, { align: "center" });
   }
-  const contact = receipt.contact || company?.phone;
-  if (shows(settings?.header.contact) && contact) {
-    layout.line(`Tel ${contact}`, { align: "center" });
-  }
+  if (headed(settings?.header.contact)) layout.contact("phone", receipt.contact || company?.phone);
+  if (headed(settings?.header.email)) layout.contact("email", receipt.email || company?.email);
   if (layout.rows.length) layout.rule("=");
 
   layout.line(receipt.title.toUpperCase(), { align: "center", size: "tall", bold: true });
@@ -567,7 +603,7 @@ function receiptLayout(receipt: SaleReceipt): Layout {
   }
   layout.rule("=");
   const footer =
-    receipt.footer ?? (settings?.other.footerText || (finance ? "" : "Thank you!"));
+    receipt.footer ?? (settings?.other.footerText || (finance || shift ? "" : "Thank you!"));
   layout.line(footer, { align: "center" });
   return layout;
 }

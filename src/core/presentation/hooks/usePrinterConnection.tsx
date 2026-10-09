@@ -2,7 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { KdsTicket } from "../../domain/entities/Cashier";
 import { IKitchenPrinterService } from "../../domain/services/IKitchenPrinterService";
 import { IPrintTemplateService } from "../../domain/services/IPrintTemplateService";
-import { PriceCurrency, PrintCompany } from "../../domain/entities/PrintTemplate";
+import {
+  PriceCurrency,
+  PrintCompany,
+  PrintTemplateType,
+} from "../../domain/entities/PrintTemplate";
 import type { ApiVenueSettingRepository } from "../../infrastructure/repositories/ApiVenueSettingRepository";
 import container from "../../infrastructure/di/container";
 import { browserPrinterClient } from "../../infrastructure/printing/BrowserPrinterClient";
@@ -23,6 +27,7 @@ import {
   PrinterJob,
   StationRoute,
 } from "@/lib/printing/routeKitchenPrint";
+import { printLogoFor } from "@/lib/printing/printLogo";
 import { printPlaceToTemplateType } from "@/lib/printing/selectPrintTemplate";
 import {
   PRINTER_BINDINGS_CHANGED,
@@ -249,11 +254,11 @@ export function usePrinterConnection(
   );
 
   const templateFor = useCallback(
-    async (place: PrintPlace) => {
+    async (place: PrintPlace, type: PrintTemplateType = printPlaceToTemplateType(place)) => {
       try {
         const service = container.resolve<IPrintTemplateService>("printTemplateService");
         const resolved = await service.resolve({
-          type: printPlaceToTemplateType(place),
+          type,
           ...(locationId ? { locationId } : {}),
         });
         return { settings: resolved.settings, paperWidth: resolved.paperWidth };
@@ -355,7 +360,9 @@ export function usePrinterConnection(
               : "No checkout printer is connected"
         );
       }
-      const resolved = receipt.template ? undefined : await templateFor(place);
+      const resolved = receipt.template
+        ? undefined
+        : await templateFor(place, receipt.templateType);
       const template = receipt.template || resolved?.settings;
       const paperWidth = receipt.paperWidth || resolved?.paperWidth;
       const company =
@@ -363,6 +370,13 @@ export function usePrinterConnection(
           ? await printCompanyFor(tenantId)
           : receipt.company;
       const currency = receipt.currency || (await printCurrencyFor(tenantId));
+      const logoOn = template ? template.header.logo : place === "CHECKOUT";
+      const logo =
+        receipt.logo !== undefined
+          ? receipt.logo
+          : company?.logoUrl && logoOn && receipt.showLogo !== false
+            ? await printLogoFor(company.logoUrl, paperWidth)
+            : null;
       const failures: string[] = [];
       for (const target of targets) {
         try {
@@ -373,6 +387,7 @@ export function usePrinterConnection(
             paperWidth,
             company,
             currency,
+            logo,
             showLogo: receipt.showLogo,
           });
         } catch (caught) {

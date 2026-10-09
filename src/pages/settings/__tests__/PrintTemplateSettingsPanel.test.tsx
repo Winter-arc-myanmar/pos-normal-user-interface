@@ -21,7 +21,8 @@ vi.mock("@/core/presentation/hooks/useVenueSetting", () => ({
 }));
 
 vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
-  printCompanyFor: () => Promise.resolve({ name: "Grand Spa" }),
+  printCompanyFor: () =>
+    Promise.resolve({ name: "Grand Spa", phone: "09 123", email: "hello@grandspa.com" }),
 }));
 
 vi.mock("@/core/presentation/hooks/usePrintTemplateManagement", () => ({
@@ -120,5 +121,39 @@ describe("PrintTemplateSettingsPanel", () => {
     expect(preview).toHaveTextContent("KTV K3");
     expect(preview).toHaveTextContent("FRIED RICE");
     expect(preview).not.toHaveTextContent("53,675");
+  });
+
+  it("previews the shift report for a shift template", async () => {
+    render(<PrintTemplateSettingsPanel />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /settings.printTemplate.placeShiftHint/ })
+    );
+    const preview = screen.getByTestId("slip-preview");
+    expect(preview).toHaveTextContent("SHIFT REPORT");
+    expect(preview).toHaveTextContent("NET 65,000 MMK");
+    expect(preview).toHaveTextContent("KBZPay (1) 30,000 MMK");
+    expect(screen.queryByLabelText("settings.printTemplate.fontSize")).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "settings.printTemplate.paymentsByMethod" })
+    );
+    expect(preview).not.toHaveTextContent("KBZPay");
+  });
+
+  it("prints phone and email after their icons, each with its own switch", async () => {
+    render(<PrintTemplateSettingsPanel />);
+    const preview = screen.getByTestId("slip-preview");
+    expect(await screen.findByRole("img", { name: "Email" })).toBeInTheDocument();
+    expect(preview).toHaveTextContent("hello@grandspa.com");
+    expect(screen.getByRole("img", { name: "Phone" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "settings.printTemplate.email" }));
+    expect(preview).not.toHaveTextContent("hello@grandspa.com");
+    expect(preview).toHaveTextContent("09 123");
+  });
+
+  it("says when the logo is on but the business has none", async () => {
+    render(<PrintTemplateSettingsPanel />);
+    expect(await screen.findByText("settings.printTemplate.noLogo")).toBeInTheDocument();
   });
 });

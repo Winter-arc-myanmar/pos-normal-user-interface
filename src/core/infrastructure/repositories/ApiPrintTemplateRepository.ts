@@ -60,6 +60,7 @@ const toSettings = (value: unknown): PrintTemplateSettings => {
       outletName: asBoolean(header.outletName, defaults.header.outletName),
       address: asBoolean(header.address, defaults.header.address),
       contact: asBoolean(header.contact, defaults.header.contact),
+      email: asBoolean(header.email, defaults.header.email),
     },
     item: {
       bilingual: asBoolean(item.bilingual, defaults.item.bilingual),
@@ -200,6 +201,8 @@ export class ApiPrintTemplateRepository implements IPrintTemplateRepository {
       legalName: text(item.legalName),
       address: address && city && !address.includes(city) ? `${address}, ${city}` : address || city,
       phone: text(item.phone),
+      email: text(item.email),
+      logoUrl: text(item.logoUrl),
     };
   }
 }
