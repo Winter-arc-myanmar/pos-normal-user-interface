@@ -92,8 +92,10 @@ export interface SaleReceipt extends PrintParty {
   footer?: string;
 }
 
-type Size = "normal" | "tall" | "wide" | "huge";
-type Align = "left" | "center" | "right";
+export type PrintSize = "normal" | "tall" | "wide" | "huge";
+export type PrintAlign = "left" | "center" | "right";
+type Size = PrintSize;
+type Align = PrintAlign;
 
 interface TextStyle {
   align?: Align;
@@ -258,6 +260,33 @@ const toPlainLines = (layout: Layout) =>
     if (row.align === "right") return row.text.padStart(layout.width);
     return row.text;
   });
+
+/** A slip as rows to draw on screen, styled as the printer would print them. */
+export type SlipPreviewRow =
+  | { kind: "text"; text: string; align: PrintAlign; size: PrintSize; bold: boolean; invert: boolean }
+  | { kind: "rule"; text: string }
+  | { kind: "gap" };
+
+export interface SlipPreview {
+  columns: number;
+  rows: SlipPreviewRow[];
+}
+
+const toPreview = (layout: Layout): SlipPreview => ({
+  columns: layout.width,
+  rows: layout.rows.map((row): SlipPreviewRow => {
+    if (row.kind === "gap") return row;
+    if (row.kind === "rule") return { kind: "rule", text: row.char.repeat(layout.width) };
+    return {
+      kind: "text",
+      text: row.invert ? row.text.trim() : row.text,
+      align: row.invert ? "center" : row.align || "left",
+      size: row.size || "normal",
+      bold: Boolean(row.bold),
+      invert: Boolean(row.invert),
+    };
+  }),
+});
 
 /** Money as a receipt shows it: 50350.0000 is "50,350", 12.5 is "12.50". */
 export function printMoney(value?: string | number | null): string {
@@ -549,6 +578,14 @@ export function formatKitchenSlip(slip: KitchenSlip): string {
 
 export function buildKitchenSlipLines(slip: KitchenSlip): string[] {
   return toPlainLines(kitchenLayout(slip));
+}
+
+export function kitchenSlipPreview(slip: KitchenSlip): SlipPreview {
+  return toPreview(kitchenLayout(slip));
+}
+
+export function saleReceiptPreview(receipt: SaleReceipt): SlipPreview {
+  return toPreview(receiptLayout(receipt));
 }
 
 export function formatSaleReceipt(receipt: SaleReceipt): string {

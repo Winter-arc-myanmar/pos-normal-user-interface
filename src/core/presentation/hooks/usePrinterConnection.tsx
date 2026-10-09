@@ -39,7 +39,7 @@ import {
 /** The company prints are headed with, loaded once per signed-in company. */
 const companies = new Map<string, Promise<PrintCompany | null>>();
 
-const companyFor = (tenantId: string) => {
+export const printCompanyFor = (tenantId: string) => {
   let company = companies.get(tenantId);
   if (!company) {
     company = container
@@ -58,7 +58,7 @@ const companyFor = (tenantId: string) => {
 /** The money receipts print amounts in, loaded once per signed-in company. */
 const currencies = new Map<string, Promise<PriceCurrency | undefined>>();
 
-const currencyFor = (tenantId: string) => {
+export const printCurrencyFor = (tenantId: string) => {
   let currency = currencies.get(tenantId);
   if (!currency) {
     currency = container
@@ -360,9 +360,9 @@ export function usePrinterConnection(
       const paperWidth = receipt.paperWidth || resolved?.paperWidth;
       const company =
         receipt.company === undefined && place !== "FINANCE"
-          ? await companyFor(tenantId)
+          ? await printCompanyFor(tenantId)
           : receipt.company;
-      const currency = receipt.currency || (await currencyFor(tenantId));
+      const currency = receipt.currency || (await printCurrencyFor(tenantId));
       const failures: string[] = [];
       for (const target of targets) {
         try {
