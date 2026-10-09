@@ -52,7 +52,7 @@ export interface KitchenSlip extends PrintParty {
   stationId?: string;
   stationName?: string;
   orderRef?: string;
-  /** Where the food goes, printed huge: "Table T12", "KTV K3". */
+  /** Where the food goes, printed huge: "Table T12", "VIP Lounge K3". */
   place?: string;
   /** Under the place: room name, service, guests. */
   placeDetail?: string;
@@ -502,7 +502,11 @@ function kitchenLayout(slip: KitchenSlip): Layout {
   return layout;
 }
 
-const roomServices = new Set(["SPA", "KTV"]);
+/** How a room service reads on paper, and what its place is called. */
+const ROOM_SERVICES: Record<string, { name: string; place: string }> = {
+  SPA: { name: "SPA", place: "Room" },
+  KTV: { name: "Private VIP Lounge", place: "Lounge" },
+};
 
 function receiptLayout(receipt: SaleReceipt): Layout {
   const place = receipt.place || "CHECKOUT";
@@ -558,10 +562,12 @@ function receiptLayout(receipt: SaleReceipt): Layout {
     receipt.paidAt ? formatReceiptDateTime(receipt.paidAt) || receipt.paidAt : formatPrintDate(new Date()),
     { size: other }
   );
-  if (shows(settings?.other.serviceType)) layout.field("Service", receipt.serviceType, { size: other });
+  const room = ROOM_SERVICES[String(receipt.serviceType).toUpperCase()];
+  if (shows(settings?.other.serviceType)) {
+    layout.field("Service", room?.name || receipt.serviceType, { size: other });
+  }
   if (shows(settings?.other.tableOrRoom) && receipt.tableOrRoom) {
-    const label = roomServices.has(String(receipt.serviceType).toUpperCase()) ? "Room" : "Table";
-    layout.field(label, receipt.tableOrRoom, { size: other });
+    layout.field(room?.place || "Table", receipt.tableOrRoom, { size: other });
   }
   if (shows(settings?.other.pickupCode)) layout.field("Pickup", receipt.pickupCode, { size: other });
   if (receipt.startTime) {
@@ -702,7 +708,7 @@ export function kdsTicketPlace(ticket: KdsTicket): string | undefined {
   const place = ticket.place;
   if (place?.kind === "TABLE" && place.number) return `Table ${place.number}`;
   if (place?.kind === "SPA_ROOM" && place.number) return `SPA ${place.number}`;
-  if (place?.kind === "KTV_ROOM" && place.number) return `KTV ${place.number}`;
+  if (place?.kind === "KTV_ROOM" && place.number) return `VIP Lounge ${place.number}`;
   if (ticket.pickupNumber) return `Pickup ${ticket.pickupNumber}`;
   if (place?.kind === "COUNTER") return "Counter";
   return undefined;

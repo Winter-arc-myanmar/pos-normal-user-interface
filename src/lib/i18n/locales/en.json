@@ -37,7 +37,7 @@
     "salesSummaryTitle": "POS summary",
     "cashierTitle": "Cashier",
     "cashierMeta": "POS mode",
-    "ktvTitle": "KTV Rooms",
+    "ktvTitle": "Private VIP Lounge",
     "spaTitle": "SPA Rooms",
     "counterOrdersTitle": "Counter orders",
     "salesOrdersTitle": "Sales orders",
@@ -181,7 +181,7 @@
   },
   "salesSummary": {
     "title": "POS sales summary",
-    "description": "POS totals, bills, bar categories, SPA menu, and KTV sessions.",
+    "description": "POS totals, bills, bar categories, SPA menu, and Private VIP Lounge sessions.",
     "posType": "POS type",
     "searchBills": "Search bill, room, or guest",
     "empty": "No sales in this range.",
@@ -222,11 +222,11 @@
       "posBills": "POS bills",
       "bar": "Bar by category",
       "spaMenu": "SPA by menu",
-      "ktv": "KTV sessions"
+      "ktv": "Private VIP Lounge sessions"
     },
     "posTypes": {
       "SPA": "SPA",
-      "KTV": "KTV",
+      "KTV": "Private VIP Lounge",
       "BAR": "Bar"
     }
   },
@@ -1315,9 +1315,9 @@
     "goToDashboard": "Go to dashboard"
   },
   "ktv": {
-    "boardTitle": "KTV Room Board",
+    "boardTitle": "Private VIP Lounge Board",
     "boardDescription": "Open rooms, monitor sessions, and manage room readiness.",
-    "loading": "Loading KTV rooms...",
+    "loading": "Loading Private VIP Lounges...",
     "addRoom": "Add room",
     "editRoom": "Edit room",
     "manageRoom": "Manage room",
@@ -1387,11 +1387,11 @@
       "walletUnavailable": "This guest wallet cannot be used.",
       "wrongSessionCard": "This card does not belong to the selected room session.",
       "openSession": "Unable to open the room session.",
-      "createRoom": "Unable to create the KTV room.",
+      "createRoom": "Unable to create the Private VIP Lounge.",
       "sessionRequired": "Select an active room session and card first.",
       "paymentUnavailable": "Guest card payment is not configured for this branch.",
       "checkout": "Unable to close and pay this room session.",
-      "roomNotFound": "KTV room not found.",
+      "roomNotFound": "Private VIP Lounge not found.",
       "noActiveSession": "This room has no active session."
     }
   },
@@ -1693,7 +1693,7 @@
     "ready": "Ready",
     "table": "Table {{number}}",
     "spaRoom": "SPA room {{number}}",
-    "ktvRoom": "KTV room {{number}}",
+    "ktvRoom": "VIP Lounge {{number}}",
     "counter": "Counter",
     "pickup": "Pickup {{number}}",
     "guests": "{{count}} guests",
@@ -1723,7 +1723,7 @@
     "started": "Started from tablet"
   },
   "ktvPos": {
-    "boardTitle": "KTV Room Board",
+    "boardTitle": "Private VIP Lounge Board",
     "sessions": "Hours",
     "newSession": "New party in {{room}}",
     "sessionsSummary": "{{minutes}} min in total",
@@ -1750,7 +1750,7 @@
     "minutesOfBooked": "{{count}}/{{booked}} min ({{sessions}} h)",
     "treatmentMinutes": "{{count}} min",
     "sessionOption": "Since {{time}} · {{count}} guests",
-    "noRooms": "No KTV rooms yet. Add a room to start.",
+    "noRooms": "No Private VIP Lounges yet. Add a lounge to start.",
     "errors": {
       "openSession": "Could not start the room",
       "sessionRequired": "Start the room first",
