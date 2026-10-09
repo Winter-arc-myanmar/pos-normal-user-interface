@@ -131,6 +131,7 @@ const toQuote = (value: unknown) => {
         : null,
     amountDue: String(item.amountDue || "0.0000"),
     cashier: parseCashier(item.cashier),
+    orderNumber: item.orderNumber ? String(item.orderNumber) : null,
   });
 };
 

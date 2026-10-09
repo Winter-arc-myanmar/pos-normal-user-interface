@@ -2,13 +2,15 @@ import { useCallback, useEffect, useState } from "react";
 import { KdsTicket } from "../../domain/entities/Cashier";
 import { IKitchenPrinterService } from "../../domain/services/IKitchenPrinterService";
 import { IPrintTemplateService } from "../../domain/services/IPrintTemplateService";
+import { PriceCurrency, PrintCompany } from "../../domain/entities/PrintTemplate";
+import type { ApiVenueSettingRepository } from "../../infrastructure/repositories/ApiVenueSettingRepository";
 import container from "../../infrastructure/di/container";
 import { browserPrinterClient } from "../../infrastructure/printing/BrowserPrinterClient";
 import { getPrinterClient } from "../../infrastructure/printing/getPrinterClient";
 import type { IPrinterClient } from "../../infrastructure/printing/IPrinterClient";
 import { isBrowserPrinting } from "../../infrastructure/printing/PrinterClient";
 import {
-  kdsTicketPrintLines,
+  kdsTicketSlip,
   KitchenSlip,
   PrintPlace,
   SaleReceipt,
@@ -33,6 +35,44 @@ import {
   savePrinterBinding,
   setDefaultPrinterBinding,
 } from "@/lib/pos/printerBindingStorage";
+
+/** The company prints are headed with, loaded once per signed-in company. */
+const companies = new Map<string, Promise<PrintCompany | null>>();
+
+const companyFor = (tenantId: string) => {
+  let company = companies.get(tenantId);
+  if (!company) {
+    company = container
+      .resolve<IPrintTemplateService>("printTemplateService")
+      .company()
+      .then((found) => (found.name ? found : null))
+      .catch(() => {
+        companies.delete(tenantId);
+        return null;
+      });
+    companies.set(tenantId, company);
+  }
+  return company;
+};
+
+/** The money receipts print amounts in, loaded once per signed-in company. */
+const currencies = new Map<string, Promise<PriceCurrency | undefined>>();
+
+const currencyFor = (tenantId: string) => {
+  let currency = currencies.get(tenantId);
+  if (!currency) {
+    currency = container
+      .resolve<ApiVenueSettingRepository>("venueSettingRepository")
+      .get()
+      .then((setting): PriceCurrency | undefined => setting.currency)
+      .catch(() => {
+        currencies.delete(tenantId);
+        return undefined;
+      });
+    currencies.set(tenantId, currency);
+  }
+  return currency;
+};
 
 const configureClient = async (
   tenantId: string,
@@ -216,7 +256,7 @@ export function usePrinterConnection(
           type: printPlaceToTemplateType(place),
           ...(locationId ? { locationId } : {}),
         });
-        return resolved.settings;
+        return { settings: resolved.settings, paperWidth: resolved.paperWidth };
       } catch {
         return undefined;
       }
@@ -232,7 +272,9 @@ export function usePrinterConnection(
     ): Promise<KitchenPrintPlan> => {
       const client = await configureClient(tenantId, registerId);
       const current = currentBindings();
-      const template = slip.template || (await templateFor("KDS"));
+      const resolved = slip.template ? undefined : await templateFor("KDS");
+      const template = slip.template || resolved?.settings;
+      const paperWidth = slip.paperWidth || resolved?.paperWidth;
       const plan = groupKitchenJobs(
         slip.lines || [],
         current.bindings,
@@ -272,6 +314,7 @@ export function usePrinterConnection(
           await client.printKitchen(job.binding, {
             ...slip,
             template,
+            paperWidth,
             lines: job.lines,
             stationId: job.station?.id || slip.stationId,
             stationName: job.station?.name || slip.stationName,
@@ -312,7 +355,14 @@ export function usePrinterConnection(
               : "No checkout printer is connected"
         );
       }
-      const template = receipt.template || (await templateFor(place));
+      const resolved = receipt.template ? undefined : await templateFor(place);
+      const template = receipt.template || resolved?.settings;
+      const paperWidth = receipt.paperWidth || resolved?.paperWidth;
+      const company =
+        receipt.company === undefined && place !== "FINANCE"
+          ? await companyFor(tenantId)
+          : receipt.company;
+      const currency = receipt.currency || (await currencyFor(tenantId));
       const failures: string[] = [];
       for (const target of targets) {
         try {
@@ -320,6 +370,9 @@ export function usePrinterConnection(
             ...receipt,
             place,
             template,
+            paperWidth,
+            company,
+            currency,
             showLogo: receipt.showLogo,
           });
         } catch (caught) {
@@ -358,16 +411,7 @@ export function usePrinterConnection(
             }
           : undefined;
       return printKitchen(
-        {
-          title: ticket.ticketNumber || ticket.id,
-          status: ticket.status,
-          courseType: ticket.courseType,
-          firedAt: ticket.firedAt,
-          stationId,
-          stationName: station?.name,
-          orderRef: ticket.salesOrderId,
-          lines: kdsTicketPrintLines(ticket),
-        },
+        { ...kdsTicketSlip(ticket), stationId, stationName: station?.name },
         station ? [station] : []
       );
     },

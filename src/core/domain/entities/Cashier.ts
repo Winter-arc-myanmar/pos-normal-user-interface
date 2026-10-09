@@ -332,6 +332,13 @@ export class TableSession {
   }
 }
 
+export interface KdsTicketPlace {
+  kind: "TABLE" | "SPA_ROOM" | "KTV_ROOM" | "COUNTER";
+  number: string | null;
+  name: string | null;
+  guestCount: number | null;
+}
+
 export class KdsTicket {
   id!: string;
   tenantId!: string;
@@ -352,6 +359,17 @@ export class KdsTicket {
   }>;
   kdsTicketLines?: KdsTicketLine[];
   station?: KdsStation;
+  /** Where the order is going: a table, a SPA or KTV room, or the counter. */
+  place?: KdsTicketPlace | null;
+  orderNumber?: string | null;
+  serviceType?: string | null;
+  posType?: string | null;
+  pickupNumber?: string | null;
+  /** Who sent the order to the kitchen. */
+  sentBy?: ReceiptCashier | null;
+  /** STAFF from a till, TABLET from a room tablet. */
+  sentFrom?: string | null;
+  deviceName?: string | null;
   createdAt!: string;
   updatedAt!: string;
 

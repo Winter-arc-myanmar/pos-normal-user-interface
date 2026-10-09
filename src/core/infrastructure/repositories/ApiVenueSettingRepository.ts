@@ -1,5 +1,6 @@
 import { HttpClient } from "../api/HttpClient";
 import { API_ENDPOINTS } from "../api/constants";
+import type { PriceCurrency } from "../../domain/entities/PrintTemplate";
 
 export interface VenueSetting {
   paymentTiming: "PAY_WHEN_ORDERING" | "PAY_AT_END";
@@ -7,6 +8,8 @@ export interface VenueSetting {
   spaMenuOrdering: boolean;
   /** Guests may order food and drinks in a KTV room. */
   ktvMenuOrdering: boolean;
+  /** The money customers pay in. */
+  currency: PriceCurrency;
 }
 
 type RecordValue = Record<string, unknown>;
@@ -25,6 +28,7 @@ export class ApiVenueSettingRepository {
       paymentTiming: data.paymentTiming === "PAY_AT_END" ? "PAY_AT_END" : "PAY_WHEN_ORDERING",
       spaMenuOrdering: data.spaMenuOrdering !== false,
       ktvMenuOrdering: data.ktvMenuOrdering !== false,
+      currency: data.currency === "USD" ? "USD" : "MMK",
     };
   }
 }

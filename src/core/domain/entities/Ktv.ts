@@ -101,6 +101,8 @@ export class KtvSessionQuote {
   amountDue?: string;
   /** Who took the latest payment on the bill. */
   cashier?: ReceiptCashier | null;
+  /** The bill's order number, printed as the receipt number. */
+  orderNumber?: string | null;
 
   constructor(data: Partial<KtvSessionQuote>) {
     Object.assign(this, { segments: [], ...data });

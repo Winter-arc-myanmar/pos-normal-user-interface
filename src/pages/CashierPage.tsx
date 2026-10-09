@@ -1497,6 +1497,11 @@ export function CashierPage() {
             )?.name || "Payment",
           amount: payment.amount,
         })),
+        change: Math.max(
+          0,
+          checkoutPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0) -
+            Number(orderTotal || 0)
+        ).toFixed(2),
       };
       const printPaidReceipt = async () => {
         try {

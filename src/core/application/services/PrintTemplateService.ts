@@ -7,6 +7,7 @@ import {
 } from "../dtos/PrintTemplateDTO";
 import {
   PRINT_TEMPLATE_TYPES,
+  PrintCompany,
   PrintTemplate,
 } from "../../domain/entities/PrintTemplate";
 import { IPrintTemplateRepository } from "../../domain/repositories/IPrintTemplateRepository";
@@ -51,5 +52,9 @@ export class PrintTemplateService implements IPrintTemplateService {
   delete(id: string): Promise<PrintTemplate> {
     if (!id.trim()) throw new Error("Print template ID is required");
     return this.repository.delete(id);
+  }
+
+  company(): Promise<PrintCompany> {
+    return this.repository.company();
   }
 }

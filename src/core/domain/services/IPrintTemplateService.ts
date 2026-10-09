@@ -5,7 +5,7 @@ import {
   ResolvePrintTemplateDTO,
   UpdatePrintTemplateDTO,
 } from "../../application/dtos/PrintTemplateDTO";
-import { PrintTemplate } from "../entities/PrintTemplate";
+import { PrintCompany, PrintTemplate } from "../entities/PrintTemplate";
 
 export interface IPrintTemplateService {
   list(params?: PrintTemplateFilterDTO): Promise<PrintTemplateListDTO>;
@@ -14,4 +14,6 @@ export interface IPrintTemplateService {
   create(payload: CreatePrintTemplateDTO): Promise<PrintTemplate>;
   update(id: string, payload: UpdatePrintTemplateDTO): Promise<PrintTemplate>;
   delete(id: string): Promise<PrintTemplate>;
+  /** The signed-in company, for the top of customer receipts. */
+  company(): Promise<PrintCompany>;
 }

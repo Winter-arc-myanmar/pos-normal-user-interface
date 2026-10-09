@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/Button";
 import type { ShiftSummary } from "@/core/domain/entities/Shift";
 import { ShiftReport } from "./ShiftReport";
 import { errorText, shiftApi } from "./shiftApi";
+import { useShiftPrinter } from "./useShiftPrinter";
 
 /** Ending a shift: what it sold so far, then closed, with the report ready to print. */
 export function CloseShiftDialog({
@@ -22,6 +23,8 @@ export function CloseShiftDialog({
   const [closed, setClosed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [printing, setPrinting] = useState(false);
+  const printShift = useShiftPrinter();
 
   useEffect(() => {
     let live = true;
@@ -44,6 +47,19 @@ export function CloseShiftDialog({
       setError(errorText(caught, t("cashier.errors.posSessionControl")));
     } finally {
       setBusy(false);
+    }
+  };
+
+  const print = async () => {
+    if (!report) return;
+    setPrinting(true);
+    setError(null);
+    try {
+      await printShift(report);
+    } catch (caught) {
+      setError(errorText(caught, t("receipt.printFailed")));
+    } finally {
+      setPrinting(false);
     }
   };
 
@@ -70,7 +86,13 @@ export function CloseShiftDialog({
         <div className="flex flex-wrap justify-end gap-2 print:hidden">
           {closed && report ? (
             <>
-              <Button type="button" variant="outline" onClick={() => window.print()}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void print()}
+                disabled={printing}
+                isLoading={printing}
+              >
                 {t("shift.print")}
               </Button>
               <Button type="button" onClick={() => onClosed(report)}>

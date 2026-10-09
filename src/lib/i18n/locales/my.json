@@ -1631,7 +1631,25 @@
     "room": "အခန်း {{room}}",
     "minutes": "{{count}} မိနစ်",
     "start": "စတင်မည်",
-    "ready": "အဆင်သင့်"
+    "ready": "အဆင်သင့်",
+    "table": "စားပွဲ {{number}}",
+    "spaRoom": "SPA အခန်း {{number}}",
+    "ktvRoom": "KTV အခန်း {{number}}",
+    "counter": "ကောင်တာ",
+    "pickup": "ယူမည့်နံပါတ် {{number}}",
+    "guests": "ဧည့်သည် {{count}} ဦး",
+    "sentBy": "ပို့သူ {{name}}",
+    "sentFromTablet": "{{device}} မှ ပို့သည်",
+    "printFailed": "မီးဖိုချောင်သို့ ပို့ပြီးပါပြီ၊ သို့သော် မီးဖိုချောင်စလစ် ပုံနှိပ်၍ မရပါ - {{error}}",
+    "roomTablet": "အခန်း တက်ဘလက်",
+    "seat": "ထိုင်ခုံ {{seat}}",
+    "service": {
+      "DINE_IN": "ဆိုင်တွင်စား",
+      "TAKEAWAY": "ပါဆယ်",
+      "TAKE_AWAY": "ပါဆယ်",
+      "DELIVERY": "ပို့ဆောင်",
+      "PICKUP": "လာယူ"
+    }
   },
   "roomOrders": {
     "newOrder": "မှာယူမှုအသစ် · {{room}} · #{{number}}",

@@ -357,6 +357,7 @@ export type KdsTicketStatus = "PENDING" | "PREPARING" | "READY" | "EXPEDITED";
 export interface KdsTicketFilterDTO extends PaginatedQueryDTO {
   stationId?: string;
   sessionId?: string;
+  salesOrderId?: string;
   status?: KdsTicketStatus;
   activeOnly?: boolean;
 }

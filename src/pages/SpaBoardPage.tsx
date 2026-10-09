@@ -144,6 +144,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     fetchProducts,
     fetchProductVariants,
     fetchPaymentMethods,
+    listKdsTickets,
   } = useCashier();
   const {
     orderLines,
@@ -644,6 +645,37 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     );
   };
 
+  /** The kitchen tickets an order has so far, or null when they cannot be read. */
+  const kitchenTicketIds = async (salesOrderId?: string | null) => {
+    if (!salesOrderId) return new Set<string>();
+    try {
+      const { tickets } = await listKdsTickets({ salesOrderId, limit: 100 });
+      return new Set(tickets.map((ticket) => ticket.id));
+    } catch {
+      return null;
+    }
+  };
+
+  /** Prints the kitchen tickets an order got since `before`. */
+  const printNewTickets = async (
+    salesOrderId: string | null | undefined,
+    before: Set<string> | null
+  ) => {
+    if (!salesOrderId || !before) return;
+    try {
+      const { tickets } = await listKdsTickets({ salesOrderId, limit: 100 });
+      for (const ticket of tickets.filter((item) => !before.has(item.id))) {
+        await printer.printTicket(ticket);
+      }
+    } catch (caught) {
+      setActionError(
+        t("kds.printFailed", {
+          error: caught instanceof Error ? caught.message : t("roomOrders.printFailed"),
+        })
+      );
+    }
+  };
+
   const openTreatment = async (
     payer: GuestWallet | null,
     payerCard: GuestCard | null,
@@ -669,6 +701,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         salesChannel: "POS",
       });
       tapKeys.current.open = undefined;
+      void printNewTickets(created.salesOrderId, new Set());
       await fetchBoard();
       await selectSession(created);
       if (payer) setWallet(await getWallet(payer.id));
@@ -698,6 +731,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         openedByPosSessionId: context.posSessionId,
         salesChannel: "POS",
       });
+      void printNewTickets(created.salesOrderId, new Set());
       await fetchBoard();
       await selectSession(created);
       setNotice(tr("startedOnBill"));
@@ -712,6 +746,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     setActionError(null);
     setIsAdding(true);
     try {
+      const before = await kitchenTicketIds(session.salesOrderId);
       await extendSession(
         session.id,
         isSpa
@@ -719,6 +754,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           : { sessions: extendCount, idempotencyKey: keyFor("extend") }
       );
       tapKeys.current.extend = undefined;
+      void printNewTickets(session.salesOrderId, before);
       setShowExtend(false);
       setSession({
         ...session,
@@ -746,11 +782,13 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     setActionError(null);
     setIsAdding(true);
     try {
+      const before = await kitchenTicketIds(session.salesOrderId);
       await chargeItems(session.id, {
         items: pendingOrderItems(toAdd),
         idempotencyKey: keyFor("add"),
       });
       tapKeys.current.add = undefined;
+      void printNewTickets(session.salesOrderId, before);
       setPending(focPending);
       setNotice(tr("itemsAdded", { count: toAdd.reduce((sum, item) => sum + item.quantity, 0) }));
     } catch (caught) {
@@ -777,6 +815,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     setIsAdding(true);
     try {
       const { charge } = await chargeFrom("extend", payerCard, method);
+      const before = await kitchenTicketIds(session.salesOrderId);
       const result = await extendSession(
         session.id,
         isSpa
@@ -784,6 +823,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           : { ...charge, sessions: extendCount }
       );
       tapKeys.current.extend = undefined;
+      void printNewTickets(session.salesOrderId, before);
       setShowExtend(false);
       setSession({
         ...session,
@@ -827,11 +867,13 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     if (prepaid) {
       try {
         const { charge } = await chargeFrom("add", payerCard, method);
+        const before = await kitchenTicketIds(session.salesOrderId);
         const result = await chargeItems(session.id, {
           ...charge,
           items: pendingOrderItems(toPay),
         });
         tapKeys.current.add = undefined;
+        void printNewTickets(session.salesOrderId, before);
         setPending(focPending);
         showCharged(payer, result.charged, result.balanceAfter, method);
       } catch (caught) {
@@ -881,10 +923,12 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     setActionError(null);
     setIsGivingFoc(true);
     try {
+      const before = await kitchenTicketIds(session.salesOrderId);
       await giveFree(session.id, {
         items: pendingOrderItems(free),
         reason: focReason.trim(),
       });
+      void printNewTickets(session.salesOrderId, before);
       const count = free.reduce((sum, item) => sum + item.quantity, 0);
       const rest = paidPending(pending);
       setPending(rest);
@@ -968,7 +1012,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           place: "CHECKOUT",
           showLogo: true,
           showPrices: true,
-          receiptId: session.salesOrderId,
+          receiptId: final.orderNumber || quote?.orderNumber || undefined,
           cashier: cashierLabel(final.cashier, user),
           serviceType: kind === "ktv" ? "KTV" : "SPA",
           tableOrRoom: final.roomNumber || room?.roomNumber,
@@ -1163,7 +1207,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         place: "CHECKOUT",
         showLogo: true,
         showPrices: true,
-        receiptId: result.orderNumber || session.salesOrderId,
+        receiptId: result.orderNumber || quote?.orderNumber || undefined,
         cashier: cashierLabel(user),
         serviceType: kind === "ktv" ? "KTV" : "SPA",
         tableOrRoom: room?.roomNumber || quote?.roomNumber,
