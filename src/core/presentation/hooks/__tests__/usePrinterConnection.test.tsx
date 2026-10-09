@@ -2,10 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { KitchenPrintPlan } from "@/lib/printing/routeKitchenPrint";
 import { savePrinterBinding } from "@/lib/pos/printerBindingStorage";
+import { defaultPrintTemplateSettings } from "@/core/domain/entities/PrintTemplate";
 
 const mocks = vi.hoisted(() => ({
   connect: vi.fn(),
   printKitchen: vi.fn(),
+  printReceipt: vi.fn(),
+  resolveTemplate: vi.fn(),
 }));
 
 vi.mock("@/core/infrastructure/printing/getPrinterClient", () => ({
@@ -17,7 +20,7 @@ vi.mock("@/core/infrastructure/printing/getPrinterClient", () => ({
     testPrint: vi.fn(),
     printKdsTicket: vi.fn(),
     printKitchen: mocks.printKitchen,
-    printReceipt: vi.fn(),
+    printReceipt: mocks.printReceipt,
   }),
 }));
 
@@ -25,7 +28,9 @@ vi.mock("@/core/infrastructure/di/container", () => ({
   default: {
     resolve: () => ({
       list: vi.fn().mockResolvedValue({ printers: [] }),
-      resolve: vi.fn().mockResolvedValue({ settings: undefined }),
+      resolve: mocks.resolveTemplate,
+      company: vi.fn().mockResolvedValue({ name: "" }),
+      get: vi.fn().mockResolvedValue({ currency: "MMK" }),
     }),
   },
 }));
@@ -49,6 +54,7 @@ const renderConnection = () =>
 describe("usePrinterConnection station routing", () => {
   beforeEach(() => {
     localStorage.clear();
+    mocks.resolveTemplate.mockResolvedValue({ settings: undefined });
     mocks.connect.mockReset();
     mocks.connect.mockResolvedValue(undefined);
     mocks.printKitchen.mockReset();
@@ -136,5 +142,80 @@ describe("usePrinterConnection station routing", () => {
     });
 
     expect(mocks.printKitchen).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("usePrinterConnection paid bill copies", () => {
+  const bind = (id: string, sectors: ("CHECKOUT" | "FINANCE")[]) =>
+    savePrinterBinding(
+      tenantId,
+      registerId,
+      {
+        id,
+        transport: "NETWORK",
+        displayName: id,
+        host: "10.0.0.1",
+        port: 9100,
+        sectors,
+        lastVerifiedAt: "",
+      },
+      false
+    );
+
+  const printed = () =>
+    mocks.printReceipt.mock.calls.map(([binding, slip]) => [
+      binding.displayName,
+      slip.title,
+      slip.place,
+    ]);
+
+  const sale = { title: "RECEIPT", sale: true, lines: [], total: "1000" };
+
+  beforeEach(() => {
+    localStorage.clear();
+    mocks.printReceipt.mockReset();
+    mocks.printReceipt.mockResolvedValue(undefined);
+    bind("Till", ["CHECKOUT"]);
+  });
+
+  const withCopies = (copies: string[]) => {
+    const settings = defaultPrintTemplateSettings();
+    settings.copies = copies;
+    mocks.resolveTemplate.mockResolvedValue({ settings, paperWidth: "MM80" });
+  };
+
+  it("prints the copies the template asks for, the guest's first", async () => {
+    withCopies(["FINANCE", "ORDER_RECEIPT", "CUSTOMER"]);
+    bind("Office", ["FINANCE"]);
+    const { result } = renderConnection();
+    await act(async () => {
+      await result.current.printReceipt(sale);
+    });
+    expect(printed()).toEqual([
+      ["Till", "RECEIPT", "CHECKOUT"],
+      ["Till", "Order receipt", "CHECKOUT"],
+      ["Office", "Finance copy", "FINANCE"],
+    ]);
+  });
+
+  it("sends the finance copy to the till when there is no finance printer", async () => {
+    withCopies(["CUSTOMER", "FINANCE"]);
+    const { result } = renderConnection();
+    await act(async () => {
+      await result.current.printReceipt(sale);
+    });
+    expect(printed()).toEqual([
+      ["Till", "RECEIPT", "CHECKOUT"],
+      ["Till", "Finance copy", "FINANCE"],
+    ]);
+  });
+
+  it("prints one slip for anything that is not a paid bill", async () => {
+    withCopies(["CUSTOMER", "ORDER_RECEIPT"]);
+    const { result } = renderConnection();
+    await act(async () => {
+      await result.current.printReceipt({ ...sale, sale: undefined, title: "Top-up" });
+    });
+    expect(printed()).toEqual([["Till", "Top-up", "CHECKOUT"]]);
   });
 });

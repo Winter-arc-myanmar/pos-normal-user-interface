@@ -86,6 +86,10 @@ export interface SaleReceipt extends PrintParty {
   startTimeLabel?: string;
   endTimeLabel?: string;
   place?: PrintPlace;
+  /** A paid bill: prints every copy its template asks for at checkout. */
+  sale?: boolean;
+  /** Which copy of a paid bill this is. */
+  copy?: "CUSTOMER" | "ORDER_RECEIPT" | "FINANCE";
   /** The company logo as printer dots, printed at the top when the template shows it. */
   logo?: PrintImage | null;
   /** The template to print with, when it is not the one for `place`. */
@@ -409,6 +413,37 @@ const kitchenPlace = (slip: KitchenSlip) =>
 const kitchenItemSize = (fontSize?: string): Size =>
   fontSize === "LARGE" ? "huge" : fontSize === "SMALL" ? "normal" : "tall";
 
+/** ESC/POS magnification, height then width: 2H1W is tall, 1H2W wide, 2H2W both. */
+const SCALE_SIZE: Record<string, Size> = {
+  "1H1W": "normal",
+  "2H1W": "tall",
+  "1H2W": "wide",
+  "2H2W": "huge",
+};
+
+/**
+ * How big items print. The text-size switch wins once it is moved off the
+ * type's starting value; until then the older font-size switch decides, so a
+ * template saved before keeps printing as it did.
+ */
+const itemSizeFor = (settings: PrintTemplateSettings | undefined, kitchen: boolean): Size => {
+  const startingScale = kitchen ? "2H2W" : "1H1W";
+  const scale = settings?.item.itemTextScale;
+  if (scale && scale !== startingScale && SCALE_SIZE[scale]) return SCALE_SIZE[scale];
+  if (kitchen) return kitchenItemSize(settings?.item.fontSize);
+  return settings?.item.fontSize === "LARGE" ? "tall" : "normal";
+};
+
+/** The text-size switch's value that prints items the size they print now. */
+export function itemTextScaleOf(settings: PrintTemplateSettings, kitchen: boolean): string {
+  const size = itemSizeFor(settings, kitchen);
+  return Object.keys(SCALE_SIZE).find((scale) => SCALE_SIZE[scale] === size) || "1H1W";
+}
+
+/** The size of everything that is not an item: who, where, when. */
+const otherSizeFor = (settings?: PrintTemplateSettings): Size =>
+  SCALE_SIZE[settings?.item.otherTextScale || ""] || "normal";
+
 function kitchenLayout(slip: KitchenSlip): Layout {
   const settings = slip.template;
   const showPrices = settings ? settings.item.price : false;
@@ -425,17 +460,18 @@ function kitchenLayout(slip: KitchenSlip): Layout {
     layout.gap();
     layout.line(place, { align: "center", size: "huge", bold: true });
   }
-  layout.line(slip.placeDetail || slip.serviceType, { align: "center" });
+  const other = otherSizeFor(settings);
+  layout.line(slip.placeDetail || slip.serviceType, { align: "center", size: other });
   layout.gap();
-  layout.pair(`#${slip.title}`, clockText(slip.firedAt), { bold: true });
+  layout.pair(`#${slip.title}`, clockText(slip.firedAt), { bold: true, size: other });
   if (showOrderNumber && slip.orderRef && slip.orderRef !== slip.title) {
-    layout.line(`Order ${slip.orderRef}`);
+    layout.line(`Order ${slip.orderRef}`, { size: other });
   }
-  if (slip.courseType) layout.line(`Course ${slip.courseType}`);
+  if (slip.courseType) layout.line(`Course ${slip.courseType}`, { size: other });
   layout.rule("=");
 
   const lines = slip.lines || [];
-  const size = kitchenItemSize(settings?.item.fontSize);
+  const size = itemSizeFor(settings, true);
   lines.forEach((item, index) => {
     if (index) layout.gap();
     const quantity = quantityText(item.quantity).padEnd(3);
@@ -456,9 +492,9 @@ function kitchenLayout(slip: KitchenSlip): Layout {
   if (lines.length) layout.rule("=");
 
   const count = lines.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
-  if (count) layout.line(`${count} ${count === 1 ? "item" : "items"}`, { bold: true });
+  if (count) layout.line(`${count} ${count === 1 ? "item" : "items"}`, { bold: true, size: other });
   const sender = slip.sentBy || slip.cashier;
-  if (sender) layout.line(`Sent by ${sender}`);
+  if (sender) layout.line(`Sent by ${sender}`, { size: other });
   if (settings?.other.footerText) {
     layout.gap();
     layout.line(settings.other.footerText, { align: "center" });
@@ -476,14 +512,17 @@ function receiptLayout(receipt: SaleReceipt): Layout {
   const shows = (flag?: boolean) => (settings ? Boolean(flag) : true);
   // A shift report is for the office: its header shows only what its template asks for.
   const headed = (flag?: boolean) => (shift ? Boolean(flag) : shows(flag));
-  const showPrices = settings ? settings.item.price : receipt.showPrices !== false;
-  const showBreakdown = settings ? settings.bill.amountAfterDiscount : !finance;
-  const showTotal = shift || (settings ? settings.bill.totalPayment : true);
-  const showPayments = settings ? settings.bill.totalPayment : !finance;
+  // The floor's copy of a bill, without money when the template says so.
+  const priceless = receipt.copy === "ORDER_RECEIPT" && Boolean(settings?.item.hidePriceOnOrderBill);
+  const showPrices = !priceless && (settings ? settings.item.price : receipt.showPrices !== false);
+  const showBreakdown = !priceless && (settings ? settings.bill.amountAfterDiscount : !finance);
+  const showTotal = !priceless && (shift || (settings ? settings.bill.totalPayment : true));
+  const showPayments = !priceless && (settings ? settings.bill.totalPayment : !finance);
   const showOrderNumber = settings ? settings.other.orderNumber : !finance;
   const showModifiers = settings ? settings.item.modifiers : !finance;
   const qtyFirst = settings ? settings.item.qtyFirst : true;
-  const itemSize: Size = settings?.item.fontSize === "LARGE" ? "tall" : "normal";
+  const itemSize = itemSizeFor(settings, false);
+  const other = otherSizeFor(settings);
   const layout = new Layout(columnsFor(receipt.paperWidth));
   const company = finance || (shift && !settings?.header.outletName) ? null : receipt.company;
 
@@ -513,21 +552,26 @@ function receiptLayout(receipt: SaleReceipt): Layout {
 
   layout.line(receipt.title.toUpperCase(), { align: "center", size: "tall", bold: true });
   layout.gap();
-  if (showOrderNumber && receipt.receiptId) layout.field("Receipt No", receipt.receiptId);
+  if (showOrderNumber && receipt.receiptId) layout.field("Receipt No", receipt.receiptId, { size: other });
   layout.field(
     "Date",
-    receipt.paidAt ? formatReceiptDateTime(receipt.paidAt) || receipt.paidAt : formatPrintDate(new Date())
+    receipt.paidAt ? formatReceiptDateTime(receipt.paidAt) || receipt.paidAt : formatPrintDate(new Date()),
+    { size: other }
   );
-  if (shows(settings?.other.serviceType)) layout.field("Service", receipt.serviceType);
+  if (shows(settings?.other.serviceType)) layout.field("Service", receipt.serviceType, { size: other });
   if (shows(settings?.other.tableOrRoom) && receipt.tableOrRoom) {
     const label = roomServices.has(String(receipt.serviceType).toUpperCase()) ? "Room" : "Table";
-    layout.field(label, receipt.tableOrRoom);
+    layout.field(label, receipt.tableOrRoom, { size: other });
   }
-  if (shows(settings?.other.pickupCode)) layout.field("Pickup", receipt.pickupCode);
-  if (receipt.startTime) layout.field(receipt.startTimeLabel || "Start", receipt.startTime);
-  if (receipt.endTime) layout.field(receipt.endTimeLabel || "End", receipt.endTime);
-  if (shows(settings?.other.cashier) && receipt.cashier) layout.field("Cashier", receipt.cashier);
-  for (const fact of receipt.facts || []) layout.field(fact.label, fact.value);
+  if (shows(settings?.other.pickupCode)) layout.field("Pickup", receipt.pickupCode, { size: other });
+  if (receipt.startTime) {
+    layout.field(receipt.startTimeLabel || "Start", receipt.startTime, { size: other });
+  }
+  if (receipt.endTime) layout.field(receipt.endTimeLabel || "End", receipt.endTime, { size: other });
+  if (shows(settings?.other.cashier) && receipt.cashier) {
+    layout.field("Cashier", receipt.cashier, { size: other });
+  }
+  for (const fact of receipt.facts || []) layout.field(fact.label, fact.value, { size: other });
 
   if (receipt.lines.length) {
     layout.rule("-");
@@ -598,12 +642,16 @@ function receiptLayout(receipt: SaleReceipt): Layout {
   if (showPayments && receipt.change && Number(receipt.change) > 0) {
     layout.pair("Change", amount(receipt.change), { bold: true });
   }
+  if (showPayments && settings?.bill.payTime && receipt.paidAt) {
+    layout.field("Paid at", formatReceiptDateTime(receipt.paidAt) || receipt.paidAt);
+  }
   if (receipt.balanceAfter) {
     layout.pair("Card balance", amount(receipt.balanceAfter), { bold: true });
   }
   layout.rule("=");
   const footer =
-    receipt.footer ?? (settings?.other.footerText || (finance || shift ? "" : "Thank you!"));
+    receipt.footer ??
+    (priceless ? "" : settings?.other.footerText || (finance || shift ? "" : "Thank you!"));
   layout.line(footer, { align: "center" });
   return layout;
 }

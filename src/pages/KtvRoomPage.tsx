@@ -347,6 +347,7 @@ export function KtvRoomPage() {
       try {
         await printer.printReceipt({
           title: "RECEIPT",
+          sale: true,
           place: "CHECKOUT",
           showLogo: true,
           showPrices: true,

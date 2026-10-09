@@ -28,6 +28,7 @@ import {
   StationRoute,
 } from "@/lib/printing/routeKitchenPrint";
 import { printLogoFor } from "@/lib/printing/printLogo";
+import { checkoutCopies, copySlip } from "@/lib/printing/receiptCopies";
 import { printPlaceToTemplateType } from "@/lib/printing/selectPrintTemplate";
 import {
   PRINTER_BINDINGS_CHANGED,
@@ -341,64 +342,67 @@ export function usePrinterConnection(
   const printReceipt = useCallback(
     async (receipt: SaleReceipt) => {
       const client = await configureClient(tenantId, registerId);
-      const current = currentBindings();
-      const place = receipt.place || "CHECKOUT";
-      const localTargets = resolveBindingsForPlace(
-        current.bindings,
-        current.defaultBinding,
-        place
-      );
-      const targets = localTargets.length
-        ? localTargets
-        : await backendTargets(place);
-      if (!targets.length) {
-        throw new Error(
-          place === "FINANCE"
-            ? "No finance printer is connected"
-            : place === "KDS"
-              ? "No KDS printer is connected"
-              : "No checkout printer is connected"
-        );
-      }
-      const resolved = receipt.template
-        ? undefined
-        : await templateFor(place, receipt.templateType);
-      const template = receipt.template || resolved?.settings;
-      const paperWidth = receipt.paperWidth || resolved?.paperWidth;
-      const company =
-        receipt.company === undefined && place !== "FINANCE"
-          ? await printCompanyFor(tenantId)
-          : receipt.company;
-      const currency = receipt.currency || (await printCurrencyFor(tenantId));
-      const logoOn = template ? template.header.logo : place === "CHECKOUT";
-      const logo =
-        receipt.logo !== undefined
-          ? receipt.logo
-          : company?.logoUrl && logoOn && receipt.showLogo !== false
-            ? await printLogoFor(company.logoUrl, paperWidth)
-            : null;
-      const failures: string[] = [];
-      for (const target of targets) {
-        try {
-          await client.printReceipt(target, {
-            ...receipt,
-            place,
-            template,
-            paperWidth,
-            company,
-            currency,
-            logo,
-            showLogo: receipt.showLogo,
-          });
-        } catch (caught) {
-          const message =
-            caught instanceof Error
-              ? caught.message
-              : "Printer communication failed";
-          failures.push(`${target.displayName}: ${message}`);
+      const targetsFor = async (place: PrintPlace) => {
+        const current = currentBindings();
+        const local = resolveBindingsForPlace(current.bindings, current.defaultBinding, place);
+        return local.length ? local : backendTargets(place);
+      };
+
+      const printOne = async (slip: SaleReceipt) => {
+        const place = slip.place || "CHECKOUT";
+        let targets = await targetsFor(place);
+        // The office copy goes to the till's own printer when there is no finance one.
+        if (!targets.length && slip.copy === "FINANCE") targets = await targetsFor("CHECKOUT");
+        if (!targets.length) {
+          throw new Error(
+            place === "FINANCE"
+              ? "No finance printer is connected"
+              : place === "KDS"
+                ? "No KDS printer is connected"
+                : "No checkout printer is connected"
+          );
         }
+        const resolved = slip.template ? undefined : await templateFor(place, slip.templateType);
+        const template = slip.template || resolved?.settings;
+        const paperWidth = slip.paperWidth || resolved?.paperWidth;
+        const company =
+          slip.company === undefined && place !== "FINANCE"
+            ? await printCompanyFor(tenantId)
+            : slip.company;
+        const currency = slip.currency || (await printCurrencyFor(tenantId));
+        const logoOn = template ? template.header.logo : place === "CHECKOUT";
+        const logo =
+          slip.logo !== undefined
+            ? slip.logo
+            : company?.logoUrl && logoOn && slip.showLogo !== false
+              ? await printLogoFor(company.logoUrl, paperWidth)
+              : null;
+        const ready = { ...slip, place, template, paperWidth, company, currency, logo };
+        const failures: string[] = [];
+        for (const target of targets) {
+          try {
+            await client.printReceipt(target, ready);
+          } catch (caught) {
+            const message =
+              caught instanceof Error ? caught.message : "Printer communication failed";
+            failures.push(`${target.displayName}: ${message}`);
+          }
+        }
+        if (failures.length) throw new Error(failures.join(" "));
+        return ready;
+      };
+
+      if (!receipt.sale || (receipt.place || "CHECKOUT") !== "CHECKOUT") {
+        await printOne(receipt);
+        return;
       }
-      if (failures.length) throw new Error(failures.join(" "));
+      // A paid bill: the guest's copy settles which template applies, then the rest follow it.
+      const resolved = receipt.template ? undefined : await templateFor("CHECKOUT");
+      const template = receipt.template || resolved?.settings;
+      const sale = { ...receipt, template, paperWidth: receipt.paperWidth || resolved?.paperWidth };
+      for (const copy of checkoutCopies(template)) {
+        await printOne(copySlip(sale, copy));
+      }
     },
     [backendTargets, currentBindings, registerId, templateFor, tenantId]
   );
