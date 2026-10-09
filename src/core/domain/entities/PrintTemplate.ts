@@ -1,4 +1,4 @@
-export const PRINT_TEMPLATE_TYPES = ["RECEIPT", "KITCHEN", "FINANCE"] as const;
+export const PRINT_TEMPLATE_TYPES = ["RECEIPT", "KITCHEN", "FINANCE", "SHIFT"] as const;
 export type PrintTemplateType = (typeof PRINT_TEMPLATE_TYPES)[number];
 
 export const isPrintTemplateType = (value: string): value is PrintTemplateType =>

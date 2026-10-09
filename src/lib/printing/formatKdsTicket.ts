@@ -4,6 +4,7 @@ import {
   PrintCompany,
   PrintPaperWidth,
   PrintTemplateSettings,
+  PrintTemplateType,
 } from "@/core/domain/entities/PrintTemplate";
 import { cashierLabel } from "./cashier";
 
@@ -82,6 +83,8 @@ export interface SaleReceipt extends PrintParty {
   startTimeLabel?: string;
   endTimeLabel?: string;
   place?: PrintPlace;
+  /** The template to print with, when it is not the one for `place`. */
+  templateType?: PrintTemplateType;
   showLogo?: boolean;
   showPrices?: boolean;
   template?: PrintTemplateSettings;
@@ -440,18 +443,21 @@ const roomServices = new Set(["SPA", "KTV"]);
 function receiptLayout(receipt: SaleReceipt): Layout {
   const place = receipt.place || "CHECKOUT";
   const finance = place === "FINANCE";
+  const shift = receipt.templateType === "SHIFT";
   const settings = receipt.template;
   const shows = (flag?: boolean) => (settings ? Boolean(flag) : true);
+  // A shift report is for the office: its header shows only what its template asks for.
+  const headed = (flag?: boolean) => (shift ? Boolean(flag) : shows(flag));
   const showPrices = settings ? settings.item.price : receipt.showPrices !== false;
   const showBreakdown = settings ? settings.bill.amountAfterDiscount : !finance;
-  const showTotal = settings ? settings.bill.totalPayment : true;
+  const showTotal = shift || (settings ? settings.bill.totalPayment : true);
   const showPayments = settings ? settings.bill.totalPayment : !finance;
   const showOrderNumber = settings ? settings.other.orderNumber : !finance;
   const showModifiers = settings ? settings.item.modifiers : !finance;
   const qtyFirst = settings ? settings.item.qtyFirst : true;
   const itemSize: Size = settings?.item.fontSize === "LARGE" ? "tall" : "normal";
   const layout = new Layout(columnsFor(receipt.paperWidth));
-  const company = finance ? null : receipt.company;
+  const company = finance || (shift && !settings?.header.outletName) ? null : receipt.company;
 
   if (company?.name) {
     layout.line(company.name.toUpperCase(), { align: "center", size: "wide", bold: true });
@@ -466,11 +472,11 @@ function receiptLayout(receipt: SaleReceipt): Layout {
   ) {
     layout.line(receipt.outletName, { align: "center", bold: !company?.name });
   }
-  if (shows(settings?.header.address)) {
+  if (headed(settings?.header.address)) {
     layout.line(receipt.address || company?.address, { align: "center" });
   }
   const contact = receipt.contact || company?.phone;
-  if (shows(settings?.header.contact) && contact) {
+  if (headed(settings?.header.contact) && contact) {
     layout.line(`Tel ${contact}`, { align: "center" });
   }
   if (layout.rows.length) layout.rule("=");
@@ -567,7 +573,7 @@ function receiptLayout(receipt: SaleReceipt): Layout {
   }
   layout.rule("=");
   const footer =
-    receipt.footer ?? (settings?.other.footerText || (finance ? "" : "Thank you!"));
+    receipt.footer ?? (settings?.other.footerText || (finance || shift ? "" : "Thank you!"));
   layout.line(footer, { align: "center" });
   return layout;
 }

@@ -121,4 +121,21 @@ describe("PrintTemplateSettingsPanel", () => {
     expect(preview).toHaveTextContent("FRIED RICE");
     expect(preview).not.toHaveTextContent("53,675");
   });
+
+  it("previews the shift report for a shift template", async () => {
+    render(<PrintTemplateSettingsPanel />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /settings.printTemplate.placeShiftHint/ })
+    );
+    const preview = screen.getByTestId("slip-preview");
+    expect(preview).toHaveTextContent("SHIFT REPORT");
+    expect(preview).toHaveTextContent("NET 65,000 MMK");
+    expect(preview).toHaveTextContent("KBZPay (1) 30,000 MMK");
+    expect(screen.queryByLabelText("settings.printTemplate.fontSize")).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "settings.printTemplate.paymentsByMethod" })
+    );
+    expect(preview).not.toHaveTextContent("KBZPay");
+  });
 });

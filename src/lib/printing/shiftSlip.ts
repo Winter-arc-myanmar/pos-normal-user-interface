@@ -6,11 +6,11 @@ export function shiftSlip(summary: ShiftSummary): SaleReceipt {
   return {
     title: "Shift report",
     place: "CHECKOUT",
-    company: null,
+    templateType: "SHIFT",
     paidAt: summary.closedAt || undefined,
+    cashier: summary.cashierName || undefined,
     facts: [
       { label: "POS device", value: summary.registerName },
-      { label: "Cashier", value: summary.cashierName || "" },
       { label: "Opened", value: formatPrintDate(summary.openedAt) },
       { label: "Closed", value: summary.closedAt ? formatPrintDate(summary.closedAt) : "Still open" },
       { label: "Sales", value: `${summary.salesCount} ${summary.salesCount === 1 ? "bill" : "bills"}` },
@@ -29,6 +29,5 @@ export function shiftSlip(summary: ShiftSummary): SaleReceipt {
       name: `${row.methodName} (${row.transactionCount})`,
       amount: String(row.totalAmount),
     })),
-    footer: "",
   };
 }

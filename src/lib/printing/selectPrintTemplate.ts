@@ -25,12 +25,11 @@ export function templateTypeToPrintPlace(type: PrintTemplateType): PrintPlace {
  * before the all-outlets one. A saved template that is not a default is
  * never used, however it is set up.
  */
-const scopedTemplates = (
-  place: PrintPlace,
+export function templatesForType(
+  type: PrintTemplateType,
   templates: PrintTemplate[],
   locationId?: string
-) => {
-  const type = printPlaceToTemplateType(place);
+): PrintTemplate[] {
   const defaults = templates.filter(
     (template) =>
       template.type === type &&
@@ -42,14 +41,14 @@ const scopedTemplates = (
     ? defaults.filter((template) => template.locationId === locationId)
     : [];
   return own.length ? own : defaults.filter((template) => !template.locationId);
-};
+}
 
 export function templatesForPrintPlace(
   place: PrintPlace,
   templates: PrintTemplate[],
   locationId?: string
 ): PrintTemplate[] {
-  return scopedTemplates(place, templates, locationId);
+  return templatesForType(printPlaceToTemplateType(place), templates, locationId);
 }
 
 export function pickPrintTemplate(
