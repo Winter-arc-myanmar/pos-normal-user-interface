@@ -18,6 +18,7 @@ import type { ShiftSummary } from "@/core/domain/entities/Shift";
 import { usePrintTemplateManagement } from "@/core/presentation/hooks/usePrintTemplateManagement";
 import {
   PrintLine,
+  itemTextScaleOf,
   kitchenSlipPreview,
   saleReceiptPreview,
 } from "@/lib/printing/formatKdsTicket";
@@ -79,6 +80,19 @@ function ToggleField({
     </label>
   );
 }
+
+const TEXT_SCALES = [
+  ["1H1W", "sizeNormal"],
+  ["2H1W", "sizeTall"],
+  ["1H2W", "sizeWide"],
+  ["2H2W", "sizeBig"],
+] as const;
+
+const COPIES = [
+  ["CUSTOMER", "copyCustomer"],
+  ["ORDER_RECEIPT", "copyOrder"],
+  ["FINANCE", "copyFinance"],
+] as const;
 
 const sampleTime = (hours: number, minutes: number) => {
   const date = new Date();
@@ -582,26 +596,82 @@ export function PrintTemplateSettingsPanel() {
           ))}
         </section>
 
+        {draft.type === "RECEIPT" ? (
+          <section className="rounded-xl bg-white p-4 shadow-sm">
+            <h3 className="font-semibold">{t("settings.printTemplate.copies")}</h3>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              {t("settings.printTemplate.copiesHint")}
+            </p>
+            {COPIES.map(([copy, label]) => (
+              <ToggleField
+                key={copy}
+                label={t(`settings.printTemplate.${label}`)}
+                checked={settings.copies.includes(copy)}
+                onChange={(checked) =>
+                  patchSettings({
+                    ...settings,
+                    copies: checked
+                      ? [...settings.copies.filter((item) => item !== copy), copy]
+                      : settings.copies.filter((item) => item !== copy),
+                  })
+                }
+              />
+            ))}
+            {settings.copies.includes("ORDER_RECEIPT") ? (
+              <ToggleField
+                label={t("settings.printTemplate.hidePriceOnOrderBill")}
+                checked={settings.item.hidePriceOnOrderBill}
+                onChange={(hidePriceOnOrderBill) =>
+                  patchSettings({
+                    ...settings,
+                    item: { ...settings.item, hidePriceOnOrderBill },
+                  })
+                }
+              />
+            ) : null}
+          </section>
+        ) : null}
+
         {draft.type === "SHIFT" ? null : (
         <section className="rounded-xl bg-white p-4 shadow-sm">
           <h3 className="font-semibold">{t("settings.printTemplate.item")}</h3>
-          <label className="block py-2 text-sm text-slate-700">
-            {t("settings.printTemplate.fontSize")}
-            <select
-              className={fieldClass}
-              value={settings.item.fontSize}
-              onChange={(event) =>
-                patchSettings({
-                  ...settings,
-                  item: { ...settings.item, fontSize: event.target.value },
-                })
-              }
-            >
-              <option value="SMALL">{t("settings.printTemplate.small")}</option>
-              <option value="MIDDLE">{t("settings.printTemplate.middle")}</option>
-              <option value="LARGE">{t("settings.printTemplate.large")}</option>
-            </select>
-          </label>
+          {(
+            [
+              ["itemTextScale", "itemTextSize"],
+              ["otherTextScale", "otherTextSize"],
+            ] as const
+          ).map(([field, label]) => (
+            <label key={field} className="block py-2 text-sm text-slate-700">
+              {t(`settings.printTemplate.${label}`)}
+              <select
+                className={fieldClass}
+                value={
+                  field === "itemTextScale"
+                    ? itemTextScaleOf(settings, draft.type === "KITCHEN")
+                    : settings.item.otherTextScale
+                }
+                onChange={(event) =>
+                  patchSettings({
+                    ...settings,
+                    item: {
+                      ...settings.item,
+                      [field]: event.target.value,
+                      // The size switch now decides; the older font size goes back to its start.
+                      ...(field === "itemTextScale"
+                        ? { fontSize: draft.type === "KITCHEN" ? "LARGE" : "MIDDLE" }
+                        : {}),
+                    },
+                  })
+                }
+              >
+                {TEXT_SCALES.map(([scale, name]) => (
+                  <option key={scale} value={scale}>
+                    {t(`settings.printTemplate.${name}`)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ))}
           {(
             [
               ["qtyFirst", "qtyFirst"],
@@ -620,7 +690,6 @@ export function PrintTemplateSettingsPanel() {
                   item: {
                     ...settings.item,
                     [field]: checked,
-                    ...(field === "price" ? { hidePriceOnOrderBill: !checked } : {}),
                   },
                 })
               }

@@ -1479,6 +1479,7 @@ export function CashierPage() {
 
       const paidReceipt = {
         title: "RECEIPT",
+        sale: true,
         place: "CHECKOUT" as const,
         showLogo: true,
         showPrices: true,

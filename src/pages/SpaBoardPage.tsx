@@ -1009,6 +1009,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       try {
         await printer.printReceipt({
           title: "RECEIPT",
+          sale: true,
           place: "CHECKOUT",
           showLogo: true,
           showPrices: true,
@@ -1204,6 +1205,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     try {
       await printer.printReceipt({
         title: "RECEIPT",
+        sale: true,
         place: "CHECKOUT",
         showLogo: true,
         showPrices: true,

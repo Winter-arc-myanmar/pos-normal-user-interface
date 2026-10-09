@@ -135,3 +135,76 @@ describe("the receipt header", () => {
     expect(rows).toContainEqual({ kind: "contact", icon: "email", text: "hello@grandspa.com" });
   });
 });
+
+describe("the template's other switches", () => {
+  const bill = (over: Partial<SaleReceipt> = {}): SaleReceipt => ({
+    title: "Receipt",
+    lines: [{ name: "Fried rice", quantity: "2", unitPrice: "6500" }],
+    subtotal: "13000",
+    total: "13000",
+    payments: [{ name: "Cash", amount: "15000" }],
+    change: "2000",
+    paidAt: "2026-10-09T14:31:00",
+    cashier: "Aung Aung",
+    template: defaultPrintTemplateSettings(),
+    ...over,
+  });
+  const text = (receipt: SaleReceipt) => buildSaleReceiptLines(receipt).join("\n");
+
+  it("leaves the money off the order receipt when told to", () => {
+    const template = defaultPrintTemplateSettings();
+    template.item.hidePriceOnOrderBill = true;
+    const floor = text(bill({ template, copy: "ORDER_RECEIPT", title: "Order receipt" }));
+    expect(floor).toContain("2 x Fried rice");
+    expect(floor).not.toContain("13,000");
+    expect(floor).not.toContain("TOTAL");
+    expect(floor).not.toMatch(/Cash\s+15,000/);
+    expect(text(bill({ template }))).toContain("13,000");
+  });
+
+  it("keeps prices on the order receipt unless told otherwise", () => {
+    expect(text(bill({ copy: "ORDER_RECEIPT" }))).toContain("13,000");
+  });
+
+  it("prints when it was paid when pay time is on", () => {
+    const template = defaultPrintTemplateSettings();
+    expect(text(bill({ template }))).not.toContain("Paid at");
+    template.bill.payTime = true;
+    expect(text(bill({ template }))).toMatch(/Paid at\s+09 Oct 2026 14:31/);
+  });
+
+  it("prints items and the rest at the sizes chosen", () => {
+    const template = defaultPrintTemplateSettings();
+    template.item.itemTextScale = "2H2W";
+    template.item.otherTextScale = "2H1W";
+    const rows = saleReceiptPreview(bill({ template })).rows.filter((row) => row.kind === "text");
+    // Big text halves the line, so the name wraps.
+    const item = rows.find((row) => row.kind === "text" && row.text.includes("Fried"));
+    const cashier = rows.find((row) => row.kind === "text" && row.text.includes("Aung Aung"));
+    expect(item).toMatchObject({ size: "huge" });
+    expect(cashier).toMatchObject({ size: "tall" });
+    expect(formatSaleReceipt(bill({ template }))).toContain(`${ESC}!\x302 x Fried`);
+  });
+
+  it("keeps an older template's large font printing tall", () => {
+    const template = defaultPrintTemplateSettings();
+    template.item.fontSize = "LARGE";
+    const rows = saleReceiptPreview(bill({ template })).rows;
+    expect(rows.find((row) => row.kind === "text" && row.text.includes("Fried rice"))).toMatchObject({
+      size: "tall",
+    });
+  });
+});
+
+describe("which copies a paid bill prints", () => {
+  it("prints the guest's copy alone unless the template asks for more", async () => {
+    const { checkoutCopies, copySlip } = await import("../receiptCopies");
+    const template = defaultPrintTemplateSettings();
+    template.copies = [];
+    expect(checkoutCopies(template)).toEqual(["CUSTOMER"]);
+    template.copies = ["FINANCE", "CUSTOMER", "ORDER_RECEIPT"];
+    expect(checkoutCopies(template)).toEqual(["CUSTOMER", "ORDER_RECEIPT", "FINANCE"]);
+    const finance = copySlip({ title: "Receipt", lines: [], total: "1", template }, "FINANCE");
+    expect(finance).toMatchObject({ title: "Finance copy", place: "FINANCE", template: undefined });
+  });
+});

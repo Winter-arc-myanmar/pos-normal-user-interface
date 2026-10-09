@@ -132,7 +132,7 @@ describe("PrintTemplateSettingsPanel", () => {
     expect(preview).toHaveTextContent("SHIFT REPORT");
     expect(preview).toHaveTextContent("NET 65,000 MMK");
     expect(preview).toHaveTextContent("KBZPay (1) 30,000 MMK");
-    expect(screen.queryByLabelText("settings.printTemplate.fontSize")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("settings.printTemplate.itemTextSize")).not.toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole("checkbox", { name: "settings.printTemplate.paymentsByMethod" })
@@ -155,5 +155,31 @@ describe("PrintTemplateSettingsPanel", () => {
   it("says when the logo is on but the business has none", async () => {
     render(<PrintTemplateSettingsPanel />);
     expect(await screen.findByText("settings.printTemplate.noLogo")).toBeInTheDocument();
+  });
+
+  it("chooses checkout copies, and hides order receipt prices only with that copy on", () => {
+    render(<PrintTemplateSettingsPanel />);
+    expect(
+      screen.queryByRole("checkbox", { name: "settings.printTemplate.hidePriceOnOrderBill" })
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("checkbox", { name: "settings.printTemplate.copyOrder" }));
+    expect(
+      screen.getByRole("checkbox", { name: "settings.printTemplate.hidePriceOnOrderBill" })
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /settings.printTemplate.placeKdsHint/ })
+    );
+    expect(
+      screen.queryByRole("checkbox", { name: "settings.printTemplate.copyOrder" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("sizes the preview's items with the item text size", () => {
+    render(<PrintTemplateSettingsPanel />);
+    const select = screen.getByLabelText("settings.printTemplate.itemTextSize");
+    expect(select).toHaveValue("1H1W");
+    fireEvent.change(select, { target: { value: "2H1W" } });
+    expect(select).toHaveValue("2H1W");
   });
 });
