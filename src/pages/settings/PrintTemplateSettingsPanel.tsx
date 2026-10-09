@@ -1,15 +1,26 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
+import { SlipPreview } from "@/components/printing/SlipPreview";
 import {
+  PriceCurrency,
+  PrintCompany,
   PrintPaperWidth,
   PrintTemplateSettings,
   PrintTemplateType,
   defaultPrintTemplateSettings,
 } from "@/core/domain/entities/PrintTemplate";
+import { useAuth } from "@/core/presentation/hooks/useAuth";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
+import { printCompanyFor } from "@/core/presentation/hooks/usePrinterConnection";
+import { useVenueSetting } from "@/core/presentation/hooks/useVenueSetting";
 import { usePrintTemplateManagement } from "@/core/presentation/hooks/usePrintTemplateManagement";
-import { PrintPlace } from "@/lib/printing/formatKdsTicket";
+import {
+  PrintLine,
+  PrintPlace,
+  kitchenSlipPreview,
+  saleReceiptPreview,
+} from "@/lib/printing/formatKdsTicket";
 import {
   printPlaceToTemplateType,
   templateTypeToPrintPlace,
@@ -69,98 +80,96 @@ function ToggleField({
   );
 }
 
-const itemFontClass: Record<string, string> = {
-  SMALL: "text-[10px]",
-  MIDDLE: "text-[13px]",
-  LARGE: "text-base",
+const sampleTime = (hours: number, minutes: number) => {
+  const date = new Date();
+  date.setHours(hours, minutes, 0, 0);
+  return date.toISOString();
 };
 
-function ReceiptPreview({
+const SAMPLE_LINES: PrintLine[] = [
+  {
+    name: "KTV room 2 hours",
+    altName: "KTV အခန်း ၂ နာရီ",
+    quantity: "2",
+    unitPrice: "25000",
+    categoryName: "Rooms",
+  },
+  {
+    name: "Fried rice",
+    altName: "ထမင်းကြော်",
+    quantity: "1",
+    unitPrice: "6500",
+    modifiers: "Extra egg",
+    modifierPrices: "500",
+    remarks: "No chili",
+    categoryName: "Food",
+    seat: "2",
+  },
+];
+
+/** A sample bill drawn by the same code that prints, so the preview is the paper. */
+function TemplatePreview({
   settings,
   paperWidth,
   type,
+  outletName,
+  company,
+  currency,
 }: {
   settings: PrintTemplateSettings;
   paperWidth: PrintPaperWidth;
   type: PrintTemplateType;
+  outletName: string;
+  company: PrintCompany | null;
+  currency?: PriceCurrency;
 }) {
-  const { t } = useTranslation();
-  const showItemPrice = settings.item.price;
-  const isKitchen = type === "KITCHEN";
-  const previewLabel =
+  const slip =
     type === "KITCHEN"
-      ? t("settings.printTemplate.kitchen")
-      : type === "FINANCE"
-        ? t("settings.printTemplate.finance")
-        : t("settings.printTemplate.receipt");
-  return (
-    <div
-      className={[
-        "mx-auto bg-white px-4 py-5 font-mono text-slate-900 shadow",
-        paperWidth === "MM58" ? "w-[180px]" : "w-[260px]",
-      ].join(" ")}
-    >
-      <p className="text-center text-[10px] uppercase tracking-wide text-slate-500">
-        {previewLabel}
-      </p>
-      {settings.header.outletName ? (
-        <p className="text-center text-sm font-bold">
-          {t("settings.printTemplate.previewOutlet")}
-        </p>
-      ) : null}
-      <p className="my-2 border-t border-dashed border-slate-400" />
-      {settings.other.orderNumber ? <p className="text-[11px]">No.001</p> : null}
-      {settings.other.serviceType ? <p className="text-[11px]">Dine in</p> : null}
-      {settings.other.tableOrRoom ? <p className="text-[11px]">Table 4</p> : null}
-      {settings.other.cashier ? <p className="text-[11px]">Cashier</p> : null}
-      {settings.other.pickupCode ? <p className="text-[11px]">Pickup 12</p> : null}
-      <p className="my-2 border-t border-dashed border-slate-400" />
-      <div
-        className={[
-          "flex justify-between font-bold",
-          itemFontClass[settings.item.fontSize] || itemFontClass.MIDDLE,
-        ].join(" ")}
-      >
-        {settings.item.qtyFirst ? <span>1</span> : null}
-        <span className="flex-1 px-2">
-          Coffee
-        </span>
-        {showItemPrice ? <span className="shrink-0">10.00</span> : null}
-      </div>
-      {settings.item.modifiers ? (
-        <p className="pl-4 text-[11px]">{showItemPrice ? "+ Large 2.00" : "+ Large"}</p>
-      ) : null}
-      {settings.item.categorySubtotal ? (
-        <p className="mt-1 text-right text-[11px]">Drinks 10.00</p>
-      ) : null}
-      {isKitchen ? null : (
-        <>
-          <p className="my-2 border-t border-dashed border-slate-400" />
-          {settings.bill.amountAfterDiscount ? (
-            <div className="flex justify-between text-[11px]">
-              <span>{t("settings.printTemplate.amountAfterDiscount")}</span>
-              <span>10.00</span>
-            </div>
-          ) : null}
-          {settings.bill.totalPayment ? (
-            <div className="flex justify-between text-[11px] font-bold">
-              <span>{t("settings.printTemplate.totalPayment")}</span>
-              <span>10.00</span>
-            </div>
-          ) : null}
-          {settings.bill.payTime ? <p className="text-[11px]">09:50</p> : null}
-        </>
-      )}
-      {settings.other.footerText ? (
-        <p className="mt-3 text-center text-[11px]">{settings.other.footerText}</p>
-      ) : null}
-    </div>
-  );
+      ? kitchenSlipPreview({
+          title: "0012",
+          stationName: "Kitchen",
+          place: "KTV K3",
+          placeDetail: "VIP - 4 guests",
+          orderRef: "SO-R01-0012",
+          firedAt: sampleTime(14, 5),
+          sentBy: "Aung Aung",
+          outletName,
+          lines: SAMPLE_LINES.slice(1).concat({ name: "Lime juice", quantity: "2", unitPrice: "2500" }),
+          template: settings,
+          paperWidth,
+        })
+      : saleReceiptPreview({
+          title: type === "FINANCE" ? "Finance copy" : "Receipt",
+          place: type === "FINANCE" ? "FINANCE" : "CHECKOUT",
+          receiptId: "SO-R01-0012",
+          paidAt: sampleTime(14, 31),
+          company,
+          outletName,
+          serviceType: "KTV",
+          tableOrRoom: "K3",
+          startTime: "13:00",
+          endTime: "14:30",
+          cashier: "Aung Aung",
+          pickupCode: "A12",
+          lines: SAMPLE_LINES,
+          subtotal: "56500",
+          discount: "2825",
+          total: "53675",
+          payments: [{ name: "Cash", amount: "60000" }],
+          change: "6325",
+          template: settings,
+          paperWidth,
+          currency,
+        });
+  return <SlipPreview slip={slip} />;
 }
 
 export function PrintTemplateSettingsPanel() {
   const { t } = useTranslation();
   const { activeLocationId } = usePosWorkspace();
+  const { user } = useAuth();
+  const { currency } = useVenueSetting();
+  const [company, setCompany] = useState<PrintCompany | null>(null);
   const {
     templates,
     isLoading,
@@ -176,6 +185,17 @@ export function PrintTemplateSettingsPanel() {
   useEffect(() => {
     void listTemplates({ page: 1, limit: 50 }).catch(() => undefined);
   }, [listTemplates]);
+
+  useEffect(() => {
+    if (!user?.tenantId) return;
+    let cancelled = false;
+    void printCompanyFor(user.tenantId).then((found) => {
+      if (!cancelled) setCompany(found);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.tenantId]);
 
   const patchSettings = (settings: PrintTemplateSettings) =>
     setDraft((current) => ({ ...current, settings }));
@@ -600,11 +620,15 @@ export function PrintTemplateSettingsPanel() {
         <p className="mb-3 text-sm font-semibold text-slate-600">
           {t("settings.printTemplate.previewTitle")}
         </p>
-        <ReceiptPreview
+        <TemplatePreview
           settings={settings}
           paperWidth={draft.paperWidth}
           type={draft.type}
+          outletName={t("settings.printTemplate.previewOutlet")}
+          company={company}
+          currency={currency}
         />
+        <p className="mt-3 text-xs text-slate-500">{t("settings.printTemplate.previewHint")}</p>
       </aside>
     </form>
   );
