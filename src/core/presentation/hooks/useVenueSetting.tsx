@@ -11,6 +11,7 @@ const PAY_WHEN_ORDERING: VenueSetting = {
   ktvMenuOrdering: true,
   currency: "MMK",
   trackStock: true,
+  defaultTaxRate: null,
 };
 
 /**

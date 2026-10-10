@@ -38,6 +38,7 @@ import { GuestCard, GuestWallet } from "@/core/domain/entities/GuestWallet";
 import { useCardCapture } from "@/core/presentation/hooks/useCardCapture";
 import { useGuestWalletManagement } from "@/core/presentation/hooks/useGuestWalletManagement";
 import { calcLineTotals } from "@/lib/pos/checkoutCalculations";
+import { useVenueSetting } from "@/core/presentation/hooks/useVenueSetting";
 import {
   allocateOrderDiscountToLines,
   isFocLine,
@@ -428,6 +429,7 @@ export function CashierPage() {
     );
   }, [variantsByProductId]);
 
+  const { defaultTaxRate } = useVenueSetting();
   const formatAmount = useCallback((value: number) => value.toFixed(4), []);
 
   const buildDirectLine = useCallback(
@@ -439,21 +441,26 @@ export function CashierPage() {
       const variantModifier = Number(variant?.priceModifier || 0);
       const basePrice = Number(product?.basePrice || line.unitPrice || 0);
       const unitPrice = basePrice + variantModifier;
+      const ownRateId = product?.taxRateId;
+      const fallback = ownRateId || variant?.taxRate ? null : defaultTaxRate;
       const lineTotals = calcLineTotals({
         quantity: line.quantity,
         unitPrice,
         lineDiscount: line.lineDiscount || "0.0000",
         isTaxable: variant?.isTaxable ?? product?.isTaxable,
-        taxRate: variant?.taxRate ?? product?.taxRate,
-        isPriceInclusive: variant?.isPriceInclusive ?? product?.isPriceInclusive,
+        taxRate: fallback ? fallback.rate : (variant?.taxRate ?? product?.taxRate),
+        isPriceInclusive: fallback
+          ? fallback.isPriceInclusive
+          : (variant?.isPriceInclusive ?? product?.isPriceInclusive),
       });
       return {
         ...line,
         unitPrice: formatAmount(unitPrice),
+        taxRateId: lineTotals.taxAmount > 0 ? (ownRateId ?? fallback?.id) : line.taxRateId,
         taxAmount: formatAmount(lineTotals.taxAmount),
       };
     },
-    [formatAmount]
+    [defaultTaxRate, formatAmount]
   );
 
   const normalizedDirectCartLines = useMemo(
