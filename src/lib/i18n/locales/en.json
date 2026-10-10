@@ -1099,7 +1099,8 @@
       "cancelOrderConfirmTable": "Cancel this order and release the assigned table?",
       "keepOrder": "Keep order",
       "confirmCancelOrder": "Cancel order",
-      "orderCancelled": "Order cancelled."
+      "orderCancelled": "Order cancelled.",
+      "paymentAtCashier": "The cashier takes payment for this order."
     },
     "errors": {
       "missingContext": "Missing tenant or inventory location context. Ensure your tenant has at least one inventory location configured.",
