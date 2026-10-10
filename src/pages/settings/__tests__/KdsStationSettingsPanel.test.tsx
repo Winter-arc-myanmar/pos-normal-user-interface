@@ -100,7 +100,7 @@ describe("KdsStationSettingsPanel", () => {
     );
   });
 
-  it("does not allow a category assigned to another station", () => {
+  it("lets a category another station has be picked too, and says where else it is", () => {
     mocks.stations = [
       {
         id: "station-bar",
@@ -112,12 +112,12 @@ describe("KdsStationSettingsPanel", () => {
 
     render(<KdsStationSettingsPanel />);
 
-    const drinkCategoryCheckbox = screen
+    const shared = screen
       .getAllByRole("checkbox")
-      .find((checkbox) => checkbox.hasAttribute("disabled"));
-    expect(drinkCategoryCheckbox).toBeDisabled();
-    expect(drinkCategoryCheckbox?.parentElement?.textContent).toContain(
-      "settings.kdsStation.assignedTo:Bar"
-    );
+      .find((checkbox) =>
+        checkbox.parentElement?.textContent?.includes("settings.kdsStation.assignedTo:Bar")
+      );
+    expect(shared).toBeDefined();
+    expect(shared).toBeEnabled();
   });
 });

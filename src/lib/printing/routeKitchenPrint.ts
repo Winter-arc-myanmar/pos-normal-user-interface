@@ -53,16 +53,19 @@ const planFromStations = (
   >();
 
   for (const line of lines) {
+    // Several stations may share a category (a kitchen line and an expo screen):
+    // each prints the item, but one printer shared by two of them prints it once.
     const matchingStations = stations.filter((item) =>
       item.categoryIds.includes(line.categoryId || "")
     );
-
-    if (matchingStations.length !== 1) {
-      unrouted.push(line);
-      continue;
+    const printedOn = new Set<string>();
+    for (const station of matchingStations) {
+      routeToStation(line, station, printedOn);
     }
+    if (!printedOn.size) unrouted.push(line);
+  }
 
-    const station = matchingStations[0];
+  function routeToStation(line: PrintLine, station: StationRoute, printedOn: Set<string>) {
     const stationBindings = bindingsForStation(station, bindings);
     const configuredIds = Array.from(new Set(station.printerIds));
     const locallyBoundIds = new Set(
@@ -80,12 +83,9 @@ const planFromStations = (
       });
     }
 
-    if (!stationBindings.length) {
-      unrouted.push(line);
-      continue;
-    }
-
     for (const binding of stationBindings) {
+      if (printedOn.has(binding.id)) continue;
+      printedOn.add(binding.id);
       const key = `${binding.id}:${station.id}`;
       const current = jobs.get(key) || { binding, lines: [], station };
       current.lines.push(line);

@@ -75,12 +75,12 @@ export function KdsStationSettingsPanel() {
     [categories]
   );
 
-  const categoryOwner = useMemo(() => {
-    const owners = new Map<string, string>();
+  const otherStations = useMemo(() => {
+    const owners = new Map<string, string[]>();
     for (const station of stations) {
       if (station.id === draft.id) continue;
       for (const categoryId of station.routingRules.categoryIds) {
-        owners.set(categoryId, station.name);
+        owners.set(categoryId, [...(owners.get(categoryId) ?? []), station.name]);
       }
     }
     return owners;
@@ -96,7 +96,6 @@ export function KdsStationSettingsPanel() {
   );
 
   const toggleCategory = (categoryId: string) => {
-    if (categoryOwner.has(categoryId)) return;
     setDraft((current) => ({
       ...current,
       categoryIds: current.categoryIds.includes(categoryId)
@@ -136,19 +135,6 @@ export function KdsStationSettingsPanel() {
     if (!activeLocationId || !user?.tenantId) return;
     setLocalError(null);
     setNotice(null);
-    const conflictingCategories = draft.categoryIds.filter((categoryId) =>
-      categoryOwner.has(categoryId)
-    );
-    if (conflictingCategories.length) {
-      setLocalError(
-        t("settings.kdsStation.categoryAlreadyAssigned", {
-          categories: conflictingCategories
-            .map((id) => categoryName.get(id) || id)
-            .join(", "),
-        })
-      );
-      return;
-    }
     const routingRules = { categoryIds: draft.categoryIds };
     try {
       if (draft.id) {
@@ -279,12 +265,11 @@ export function KdsStationSettingsPanel() {
                 type="checkbox"
                 checked={draft.categoryIds.includes(category.id)}
                 onChange={() => toggleCategory(category.id)}
-                disabled={categoryOwner.has(category.id)}
               />
               {category.name}
-              {categoryOwner.has(category.id)
+              {otherStations.has(category.id)
                 ? ` (${t("settings.kdsStation.assignedTo", {
-                    station: categoryOwner.get(category.id),
+                    station: otherStations.get(category.id)?.join(", "),
                   })})`
                 : ""}
             </label>

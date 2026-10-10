@@ -180,7 +180,7 @@ describe("station print routing", () => {
     ]);
   });
 
-  it("does not duplicate a category assigned to more than one station", () => {
+  it("prints a category shared by two stations at both", () => {
     const plan = groupKitchenJobs(
       [{ name: "Beer", quantity: "1", categoryId: "drink" }],
       [
@@ -205,10 +205,23 @@ describe("station print routing", () => {
       ]
     );
 
-    expect(plan.jobs).toEqual([]);
-    expect(plan.unrouted).toEqual([
-      expect.objectContaining({ name: "Beer" }),
-    ]);
+    expect(plan.unrouted).toEqual([]);
+    expect(plan.jobs.map((job) => job.station?.id).sort()).toEqual(["bar", "food"]);
+  });
+
+  it("prints a shared category once on a printer both stations use", () => {
+    const plan = groupKitchenJobs(
+      [{ name: "Beer", quantity: "1", categoryId: "drink" }],
+      [binding("one-printer", "printer-1")],
+      null,
+      undefined,
+      [
+        { id: "bar", name: "Bar", printerIds: ["printer-1"], categoryIds: ["drink"] },
+        { id: "expo", name: "Expo", printerIds: ["printer-1"], categoryIds: ["drink"] },
+      ]
+    );
+    expect(plan.jobs).toHaveLength(1);
+    expect(plan.unrouted).toEqual([]);
   });
 
   it("keeps prices off the KDS slip and the logo off the finance slip", () => {
