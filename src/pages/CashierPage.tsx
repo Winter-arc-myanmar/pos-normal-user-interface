@@ -39,6 +39,7 @@ import { useCardCapture } from "@/core/presentation/hooks/useCardCapture";
 import { useGuestWalletManagement } from "@/core/presentation/hooks/useGuestWalletManagement";
 import { calcLineTotals } from "@/lib/pos/checkoutCalculations";
 import { useVenueSetting } from "@/core/presentation/hooks/useVenueSetting";
+import { usePermissions } from "@/features/permissions/usePermissions";
 import {
   allocateOrderDiscountToLines,
   isFocLine,
@@ -430,6 +431,8 @@ export function CashierPage() {
   }, [variantsByProductId]);
 
   const { defaultTaxRate } = useVenueSetting();
+  const { hasPermission } = usePermissions();
+  const canTakePayment = hasPermission("sales:checkout:write");
   const formatAmount = useCallback((value: number) => value.toFixed(4), []);
 
   const buildDirectLine = useCallback(
@@ -2185,6 +2188,7 @@ export function CashierPage() {
         isPayView={activeView === "pay"}
         requiresTableAssignment={requiresTableAssignment}
         onOpenPay={handleOpenPay}
+        canTakePayment={canTakePayment}
         onCheckout={() => void handleCheckout()}
         onPrintFinance={() =>
           void printer.printReceipt({
