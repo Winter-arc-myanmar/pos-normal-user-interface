@@ -37,7 +37,7 @@ export function useKtvManagement() {
     try {
       return await operation();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "KTV request failed");
+      setError(caught instanceof Error ? caught.message : "Private VIP Lounge request failed");
       throw caught;
     } finally {
       setIsLoading(false);

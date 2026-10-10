@@ -17,6 +17,7 @@ import {
 import { ISpaRepository } from "../../domain/repositories/ISpaRepository";
 import { HttpClient } from "../api/HttpClient";
 import { API_ENDPOINTS } from "../api/constants";
+import { parseCashier } from "@/lib/printing/cashier";
 
 type RecordValue = Record<string, unknown>;
 
@@ -129,6 +130,8 @@ const toQuote = (value: unknown) => {
         ? item.paymentTiming
         : null,
     amountDue: String(item.amountDue || "0.0000"),
+    cashier: parseCashier(item.cashier),
+    orderNumber: item.orderNumber ? String(item.orderNumber) : null,
   });
 };
 

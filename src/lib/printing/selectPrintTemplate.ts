@@ -20,34 +20,35 @@ export function templateTypeToPrintPlace(type: PrintTemplateType): PrintPlace {
   return "CHECKOUT";
 }
 
-const scopedTemplates = (
-  place: PrintPlace,
+/**
+ * The templates the server would print with: only defaults, this outlet's
+ * before the all-outlets one. A saved template that is not a default is
+ * never used, however it is set up.
+ */
+export function templatesForType(
+  type: PrintTemplateType,
   templates: PrintTemplate[],
   locationId?: string
-) => {
-  const type = printPlaceToTemplateType(place);
-  const matching = templates.filter(
+): PrintTemplate[] {
+  const defaults = templates.filter(
     (template) =>
       template.type === type &&
+      template.isDefault &&
       !template.deletedAt &&
       PRINT_TEMPLATE_TYPES.includes(template.type)
   );
-  const locationTemplates = locationId
-    ? matching.filter((template) => template.locationId === locationId)
+  const own = locationId
+    ? defaults.filter((template) => template.locationId === locationId)
     : [];
-  const scoped = locationTemplates.length
-    ? locationTemplates
-    : matching.filter((template) => !template.locationId);
-  const defaults = scoped.filter((template) => template.isDefault);
-  return defaults.length ? defaults : scoped;
-};
+  return own.length ? own : defaults.filter((template) => !template.locationId);
+}
 
 export function templatesForPrintPlace(
   place: PrintPlace,
   templates: PrintTemplate[],
   locationId?: string
 ): PrintTemplate[] {
-  return scopedTemplates(place, templates, locationId);
+  return templatesForType(printPlaceToTemplateType(place), templates, locationId);
 }
 
 export function pickPrintTemplate(

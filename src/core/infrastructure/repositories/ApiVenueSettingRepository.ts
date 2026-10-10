@@ -1,19 +1,32 @@
 import { HttpClient } from "../api/HttpClient";
 import { API_ENDPOINTS } from "../api/constants";
+import type { PriceCurrency } from "../../domain/entities/PrintTemplate";
 
 export interface VenueSetting {
   paymentTiming: "PAY_WHEN_ORDERING" | "PAY_AT_END";
-  roomCardOnly: boolean;
   /** Guests may order food and drinks during a SPA treatment. */
   spaMenuOrdering: boolean;
   /** Guests may order food and drinks in a KTV room. */
   ktvMenuOrdering: boolean;
+  /** The money customers pay in. */
+  currency: PriceCurrency;
+  /** Sales check and deduct stock; off for a business without inventory. */
+  trackStock: boolean;
+  /** Taxes taxable products with no rate of their own; the rate is a fraction, 0.05 for 5%. */
+  defaultTaxRate: { id: string; rate: number; isPriceInclusive: boolean } | null;
 }
 
 type RecordValue = Record<string, unknown>;
 
 const asRecord = (value: unknown): RecordValue =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as RecordValue) : {};
+
+const toDefaultTaxRate = (value: unknown): VenueSetting["defaultTaxRate"] => {
+  const rate = asRecord(value);
+  const fraction = Number(rate.ratePercentage);
+  if (!rate.id || !Number.isFinite(fraction)) return null;
+  return { id: String(rate.id), rate: fraction, isPriceInclusive: rate.isPriceInclusive === true };
+};
 
 export class ApiVenueSettingRepository {
   constructor(private readonly httpClient: HttpClient) {}
@@ -24,9 +37,11 @@ export class ApiVenueSettingRepository {
     const data = asRecord("data" in response ? response.data : response);
     return {
       paymentTiming: data.paymentTiming === "PAY_AT_END" ? "PAY_AT_END" : "PAY_WHEN_ORDERING",
-      roomCardOnly: data.roomCardOnly !== false,
       spaMenuOrdering: data.spaMenuOrdering !== false,
       ktvMenuOrdering: data.ktvMenuOrdering !== false,
+      currency: data.currency === "USD" ? "USD" : "MMK",
+      trackStock: data.trackStock !== false,
+      defaultTaxRate: toDefaultTaxRate(data.defaultTaxRate),
     };
   }
 }

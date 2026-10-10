@@ -1,3 +1,4 @@
+import type { ReceiptCashier } from "@/lib/printing/cashier";
 export type KtvRoomStatus =
   | "AVAILABLE"
   | "OCCUPIED"
@@ -98,6 +99,10 @@ export class KtvSessionQuote {
   paymentTiming?: "PAY_WHEN_ORDERING" | "PAY_AT_END" | null;
   /** Still to pay, before any member-card discount. */
   amountDue?: string;
+  /** Who took the latest payment on the bill. */
+  cashier?: ReceiptCashier | null;
+  /** The bill's order number, printed as the receipt number. */
+  orderNumber?: string | null;
 
   constructor(data: Partial<KtvSessionQuote>) {
     Object.assign(this, { segments: [], ...data });

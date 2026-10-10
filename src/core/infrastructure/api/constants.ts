@@ -378,6 +378,8 @@ export const API_ENDPOINTS = {
     BY_ID: (id: string) => `/api/v1/print-templates/${id}`,
     UPDATE: (id: string) => `/api/v1/print-templates/${id}`,
     DELETE: (id: string) => `/api/v1/print-templates/${id}`,
+    /** The signed-in company, for the receipt header. */
+    COMPANY: "/api/v1/tenants/me",
   },
 
   TIP_POOLS: {

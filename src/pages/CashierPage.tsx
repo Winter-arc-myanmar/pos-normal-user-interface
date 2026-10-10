@@ -38,6 +38,8 @@ import { GuestCard, GuestWallet } from "@/core/domain/entities/GuestWallet";
 import { useCardCapture } from "@/core/presentation/hooks/useCardCapture";
 import { useGuestWalletManagement } from "@/core/presentation/hooks/useGuestWalletManagement";
 import { calcLineTotals } from "@/lib/pos/checkoutCalculations";
+import { useVenueSetting } from "@/core/presentation/hooks/useVenueSetting";
+import { usePermissions } from "@/features/permissions/usePermissions";
 import {
   allocateOrderDiscountToLines,
   isFocLine,
@@ -69,6 +71,7 @@ import {
   buildCheckoutPayments,
   remainingReceivable,
 } from "@/lib/pos/splitPayments";
+import { cashierLabel } from "@/lib/printing/cashier";
 
 const BOARD_PAGE_SIZE = 15;
 const TABLE_STATUS_POLL_MS = 60_000;
@@ -427,6 +430,9 @@ export function CashierPage() {
     );
   }, [variantsByProductId]);
 
+  const { defaultTaxRate } = useVenueSetting();
+  const { hasPermission } = usePermissions();
+  const canTakePayment = hasPermission("sales:checkout:write");
   const formatAmount = useCallback((value: number) => value.toFixed(4), []);
 
   const buildDirectLine = useCallback(
@@ -438,21 +444,26 @@ export function CashierPage() {
       const variantModifier = Number(variant?.priceModifier || 0);
       const basePrice = Number(product?.basePrice || line.unitPrice || 0);
       const unitPrice = basePrice + variantModifier;
+      const ownRateId = product?.taxRateId;
+      const fallback = ownRateId || variant?.taxRate ? null : defaultTaxRate;
       const lineTotals = calcLineTotals({
         quantity: line.quantity,
         unitPrice,
         lineDiscount: line.lineDiscount || "0.0000",
         isTaxable: variant?.isTaxable ?? product?.isTaxable,
-        taxRate: variant?.taxRate ?? product?.taxRate,
-        isPriceInclusive: variant?.isPriceInclusive ?? product?.isPriceInclusive,
+        taxRate: fallback ? fallback.rate : (variant?.taxRate ?? product?.taxRate),
+        isPriceInclusive: fallback
+          ? fallback.isPriceInclusive
+          : (variant?.isPriceInclusive ?? product?.isPriceInclusive),
       });
       return {
         ...line,
         unitPrice: formatAmount(unitPrice),
+        taxRateId: lineTotals.taxAmount > 0 ? (ownRateId ?? fallback?.id) : line.taxRateId,
         taxAmount: formatAmount(lineTotals.taxAmount),
       };
     },
-    [formatAmount]
+    [defaultTaxRate, formatAmount]
   );
 
   const normalizedDirectCartLines = useMemo(
@@ -478,7 +489,7 @@ export function CashierPage() {
     const session = selectedOrderSession || activeTableSession;
     return {
       outletName: outlet?.name,
-      cashier: user?.name,
+      cashier: cashierLabel(user),
       serviceType: service
         ? serviceLabel === serviceKey
           ? service.replaceAll("_", " ")
@@ -1478,6 +1489,7 @@ export function CashierPage() {
 
       const paidReceipt = {
         title: "RECEIPT",
+        sale: true,
         place: "CHECKOUT" as const,
         showLogo: true,
         showPrices: true,
@@ -1496,6 +1508,11 @@ export function CashierPage() {
             )?.name || "Payment",
           amount: payment.amount,
         })),
+        change: Math.max(
+          0,
+          checkoutPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0) -
+            Number(orderTotal || 0)
+        ).toFixed(2),
       };
       const printPaidReceipt = async () => {
         try {
@@ -2171,6 +2188,7 @@ export function CashierPage() {
         isPayView={activeView === "pay"}
         requiresTableAssignment={requiresTableAssignment}
         onOpenPay={handleOpenPay}
+        canTakePayment={canTakePayment}
         onCheckout={() => void handleCheckout()}
         onPrintFinance={() =>
           void printer.printReceipt({

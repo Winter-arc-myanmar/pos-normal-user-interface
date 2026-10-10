@@ -37,7 +37,7 @@
     "salesSummaryTitle": "POS summary",
     "cashierTitle": "Cashier",
     "cashierMeta": "POS mode",
-    "ktvTitle": "KTV Rooms",
+    "ktvTitle": "Private VIP Lounge",
     "spaTitle": "SPA Rooms",
     "counterOrdersTitle": "Counter orders",
     "salesOrdersTitle": "Sales orders",
@@ -181,7 +181,7 @@
   },
   "salesSummary": {
     "title": "POS sales summary",
-    "description": "POS totals, bills, bar categories, SPA menu, and KTV sessions.",
+    "description": "POS totals, bills, bar categories, SPA menu, and Private VIP Lounge sessions.",
     "posType": "POS type",
     "searchBills": "Search bill, room, or guest",
     "empty": "No sales in this range.",
@@ -222,11 +222,11 @@
       "posBills": "POS bills",
       "bar": "Bar by category",
       "spaMenu": "SPA by menu",
-      "ktv": "KTV sessions"
+      "ktv": "Private VIP Lounge sessions"
     },
     "posTypes": {
       "SPA": "SPA",
-      "KTV": "KTV",
+      "KTV": "Private VIP Lounge",
       "BAR": "Bar"
     }
   },
@@ -663,6 +663,17 @@
       "categoryFailed": "Unable to update category routing."
     },
     "printTemplate": {
+      "sizeBig": "Big (tall and wide)",
+      "sizeWide": "Wide",
+      "sizeTall": "Tall",
+      "sizeNormal": "Normal",
+      "otherTextSize": "Other text size",
+      "itemTextSize": "Item text size",
+      "copyFinance": "Finance copy (finance printer, or this one)",
+      "copyOrder": "Order receipt (for the floor)",
+      "copyCustomer": "Customer receipt",
+      "copiesHint": "What prints when a bill is paid. Each copy is titled with its name. With none ticked, the customer's copy prints.",
+      "copies": "Copies at checkout",
       "title": "Print Template",
       "name": "Template name",
       "paperWidth": "Paper width",
@@ -681,12 +692,15 @@
       "printingNow": "Printing now",
       "notSet": "Not set yet",
       "builtin": "Built-in layout",
-      "usingBuiltin": "Using the built-in layout until you save one",
+      "usingBuiltin": "Built-in layout. Tick Default on a saved template to use it.",
       "conflict": "More than one default is set here. Only “{{name}}” should print. Keep one default for this type.",
       "usedFor": "Used for",
       "placeKdsHint": "Kitchen ticket when the order is sent to the kitchen.",
       "placeCheckoutHint": "Receipt handed to the customer at checkout.",
       "placeFinanceHint": "Finance copy of the bill.",
+      "placeShift": "Shift report",
+      "placeShiftHint": "Printed when a shift ends: sales, refunds and money by payment type.",
+      "paymentsByMethod": "Payments by method",
       "lockedType": "Type is fixed after the first save. Create a new template for a different print job.",
       "lockedKitchen": "This saved template stays a kitchen ticket. Create a new template for a receipt.",
       "lockedReceipt": "This saved template stays a receipt.",
@@ -702,7 +716,9 @@
       "logo": "Logo",
       "outletName": "Outlet name",
       "address": "Address",
-      "contact": "Contact",
+      "contact": "Phone",
+      "email": "Email",
+      "noLogo": "This business has no logo yet. Add a Logo URL to the tenant in admin to print one.",
       "item": "Item",
       "fontSize": "Font size",
       "small": "Small",
@@ -714,7 +730,7 @@
       "productRemarks": "Product remarks",
       "bilingual": "Bilingual",
       "categorySubtotal": "Category subtotal",
-      "hidePriceOnOrderBill": "Hide price on order bill",
+      "hidePriceOnOrderBill": "Hide prices on the order receipt",
       "bill": "Bill",
       "amountAfterDiscount": "Amount after discount",
       "totalPayment": "Total payment",
@@ -728,7 +744,8 @@
       "pickupCode": "Pickup code",
       "footerText": "Footer text",
       "previewTitle": "Preview",
-      "previewOutlet": "Outlet",
+      "previewHint": "Drawn by the same code that prints: this is what comes out of the printer, with a sample bill.",
+      "previewOutlet": "Main branch",
       "previewAddress": "Address",
       "previewContact": "Contact",
       "save": "Save template",
@@ -743,10 +760,9 @@
       "printers": "Printers",
       "printersHint": "Only printers marked for KDS appear here. The same ticket prints on every selected printer.",
       "noKdsPrinters": "No KDS printers yet. Mark a printer for KDS in Printer settings first.",
-      "assignedTo": "assigned to {{station}}",
+      "assignedTo": "also on {{station}}",
       "categories": "Categories",
       "categoriesHint": "Items in these categories print at this station. Drink and alcohol can share the bar printer.",
-      "categoryAlreadyAssigned": "These categories are already assigned to another KDS station: {{categories}}.",
       "save": "Save station",
       "saveFailed": "Unable to save KDS station.",
       "saved": "KDS station saved.",
@@ -1082,7 +1098,8 @@
       "cancelOrderConfirmTable": "Cancel this order and release the assigned table?",
       "keepOrder": "Keep order",
       "confirmCancelOrder": "Cancel order",
-      "orderCancelled": "Order cancelled."
+      "orderCancelled": "Order cancelled.",
+      "paymentAtCashier": "The cashier takes payment for this order."
     },
     "errors": {
       "missingContext": "Missing tenant or inventory location context. Ensure your tenant has at least one inventory location configured.",
@@ -1298,9 +1315,9 @@
     "goToDashboard": "Go to dashboard"
   },
   "ktv": {
-    "boardTitle": "KTV Room Board",
+    "boardTitle": "Private VIP Lounge Board",
     "boardDescription": "Open rooms, monitor sessions, and manage room readiness.",
-    "loading": "Loading KTV rooms...",
+    "loading": "Loading Private VIP Lounges...",
     "addRoom": "Add room",
     "editRoom": "Edit room",
     "manageRoom": "Manage room",
@@ -1370,11 +1387,11 @@
       "walletUnavailable": "This guest wallet cannot be used.",
       "wrongSessionCard": "This card does not belong to the selected room session.",
       "openSession": "Unable to open the room session.",
-      "createRoom": "Unable to create the KTV room.",
+      "createRoom": "Unable to create the Private VIP Lounge.",
       "sessionRequired": "Select an active room session and card first.",
       "paymentUnavailable": "Guest card payment is not configured for this branch.",
       "checkout": "Unable to close and pay this room session.",
-      "roomNotFound": "KTV room not found.",
+      "roomNotFound": "Private VIP Lounge not found.",
       "noActiveSession": "This room has no active session."
     }
   },
@@ -1405,6 +1422,7 @@
       "open": "In treatment",
       "paused": "Paused",
       "payment_pending": "Awaiting payment",
+      "paid": "Paid",
       "closed": "Closed"
     },
     "steps": {
@@ -1436,6 +1454,7 @@
     "goToPay": "Close and pay",
     "addServices": "Add services",
     "billClosed": "Treatment closed. The bill is waiting for payment.",
+    "billPaid": "Paid. The room is free for the next guest.",
     "payTitle": "Close treatment and pay",
     "memberDiscount": "{{tier}} discount ({{percent}}%) is applied at payment.",
     "tip": "Tip",
@@ -1548,8 +1567,8 @@
     "startedOnBill": "Started. Everything goes on the bill and is paid at the end.",
     "addToBillShort": "Add to bill",
     "addedToBillNotice": "Added to the bill.",
-    "memberCardOnly": "This business takes member cards only for room bills.",
     "payOtherTitle": "Or pay another way",
+    "paidWith": "Paid {{amount}} by {{method}}",
     "payOtherHint": "The room is closed first, then {{amount}} is paid in full.",
     "payWith": "Close and pay with {{method}}",
     "menuOffTitle": "Food and drinks are off",
@@ -1673,7 +1692,25 @@
     "room": "Room {{room}}",
     "minutes": "{{count}} min",
     "start": "Start",
-    "ready": "Ready"
+    "ready": "Ready",
+    "table": "Table {{number}}",
+    "spaRoom": "SPA room {{number}}",
+    "ktvRoom": "VIP Lounge {{number}}",
+    "counter": "Counter",
+    "pickup": "Pickup {{number}}",
+    "guests": "{{count}} guests",
+    "sentBy": "Sent by {{name}}",
+    "sentFromTablet": "Sent from {{device}}",
+    "printFailed": "Sent to the kitchen, but the kitchen slip did not print: {{error}}",
+    "roomTablet": "room tablet",
+    "seat": "Seat {{seat}}",
+    "service": {
+      "DINE_IN": "Dine in",
+      "TAKEAWAY": "Takeaway",
+      "TAKE_AWAY": "Takeaway",
+      "DELIVERY": "Delivery",
+      "PICKUP": "Pickup"
+    }
   },
   "roomOrders": {
     "newOrder": "New order · {{room}} · #{{number}}",
@@ -1688,7 +1725,7 @@
     "started": "Started from tablet"
   },
   "ktvPos": {
-    "boardTitle": "KTV Room Board",
+    "boardTitle": "Private VIP Lounge Board",
     "sessions": "Hours",
     "newSession": "New party in {{room}}",
     "sessionsSummary": "{{minutes}} min in total",
@@ -1715,7 +1752,7 @@
     "minutesOfBooked": "{{count}}/{{booked}} min ({{sessions}} h)",
     "treatmentMinutes": "{{count}} min",
     "sessionOption": "Since {{time}} · {{count}} guests",
-    "noRooms": "No KTV rooms yet. Add a room to start.",
+    "noRooms": "No Private VIP Lounges yet. Add a lounge to start.",
     "errors": {
       "openSession": "Could not start the room",
       "sessionRequired": "Start the room first",
@@ -1732,6 +1769,7 @@
       "active": "In use"
     },
     "billClosed": "Room closed. The bill is waiting for payment.",
+    "billPaid": "Paid. The lounge is free for the next guest.",
     "payTitle": "Close room and pay",
     "steps": {
       "sessions": "Choose hours",
@@ -1818,6 +1856,7 @@
     "taxable": "Taxable",
     "taxRate": "Tax rate",
     "chooseTaxRate": "Choose a tax rate",
+    "shopDefaultTaxRate": "Shop default tax rate",
     "imageUrl": "Image address",
     "attributes": "Attributes",
     "attributeKey": "Attribute",

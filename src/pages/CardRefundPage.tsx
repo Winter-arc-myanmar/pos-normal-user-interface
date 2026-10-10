@@ -25,6 +25,8 @@ import {
   type ManagerLogin,
 } from "@/lib/pos/managerLogin";
 import { shiftApi } from "@/components/shift/shiftApi";
+import { cashierLabel } from "@/lib/printing/cashier";
+import { cardSlip } from "@/lib/printing/cardSlip";
 
 const amountNumpadRows = [
   ["1", "2", "3"],
@@ -254,11 +256,8 @@ export function CardRefundPage() {
       });
       if (printed) {
         await printer.printReceipt({
-          title: "CARD REFUND",
-          receiptId: printed.receiptId,
-          lines: [{ name: `Card ${printed.cardNumber}`, quantity: "1" }],
-          total: printed.amount,
-          payments: [{ name: "Balance", amount: printed.balanceAfter }],
+          ...cardSlip("CARD REFUND", "Refund", printed, selectedPaymentMethod?.name),
+          cashier: cashierLabel(user),
         });
       }
     } catch (caught) {
@@ -516,11 +515,8 @@ export function CardRefundPage() {
                       onClick={() => {
                         if (!receipt) return;
                         void printer.printReceipt({
-                          title: "CARD REFUND",
-                          receiptId: receipt.receiptId,
-                          lines: [{ name: `Card ${receipt.cardNumber}`, quantity: "1" }],
-                          total: receipt.amount,
-                          payments: [{ name: "Balance", amount: receipt.balanceAfter }],
+                          ...cardSlip("CARD REFUND", "Refund", receipt, selectedPaymentMethod?.name),
+                          cashier: cashierLabel(user),
                         });
                       }}
                     >

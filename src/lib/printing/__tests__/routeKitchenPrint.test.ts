@@ -180,7 +180,7 @@ describe("station print routing", () => {
     ]);
   });
 
-  it("does not duplicate a category assigned to more than one station", () => {
+  it("prints a category shared by two stations at both", () => {
     const plan = groupKitchenJobs(
       [{ name: "Beer", quantity: "1", categoryId: "drink" }],
       [
@@ -205,36 +205,49 @@ describe("station print routing", () => {
       ]
     );
 
-    expect(plan.jobs).toEqual([]);
-    expect(plan.unrouted).toEqual([
-      expect.objectContaining({ name: "Beer" }),
-    ]);
+    expect(plan.unrouted).toEqual([]);
+    expect(plan.jobs.map((job) => job.station?.id).sort()).toEqual(["bar", "food"]);
+  });
+
+  it("prints a shared category once on a printer both stations use", () => {
+    const plan = groupKitchenJobs(
+      [{ name: "Beer", quantity: "1", categoryId: "drink" }],
+      [binding("one-printer", "printer-1")],
+      null,
+      undefined,
+      [
+        { id: "bar", name: "Bar", printerIds: ["printer-1"], categoryIds: ["drink"] },
+        { id: "expo", name: "Expo", printerIds: ["printer-1"], categoryIds: ["drink"] },
+      ]
+    );
+    expect(plan.jobs).toHaveLength(1);
+    expect(plan.unrouted).toEqual([]);
   });
 
   it("keeps prices off the KDS slip and the logo off the finance slip", () => {
     const kitchen = formatKitchenSlip({
       title: "KDS",
-      lines: [{ name: "Beer", quantity: "1", unitPrice: "5.00" }],
+      lines: [{ name: "Beer", quantity: "1", unitPrice: "5000.00" }],
     });
     const finance = formatSaleReceipt({
       title: "FINANCE",
       place: "FINANCE",
-      lines: [{ name: "Beer", quantity: "1", unitPrice: "5.00" }],
-      total: "5.00",
+      lines: [{ name: "Beer", quantity: "1", unitPrice: "5000.00" }],
+      total: "5000.00",
     });
     const checkout = formatSaleReceipt({
       title: "RECEIPT",
       place: "CHECKOUT",
       showLogo: true,
-      lines: [{ name: "Beer", quantity: "1", unitPrice: "5.00" }],
-      total: "5.00",
+      lines: [{ name: "Beer", quantity: "1", unitPrice: "5000.00" }],
+      total: "5000.00",
     });
 
-    expect(kitchen).not.toContain("5.00");
+    expect(kitchen).not.toContain("5,000");
     expect(finance).not.toContain("LOGO");
-    expect(finance).toContain("5.00");
+    expect(finance).toContain("5,000");
     expect(checkout).not.toContain("LOGO");
-    expect(checkout).toContain("5.00");
+    expect(checkout).toContain("5,000");
   });
 
   it("prints ticket items and the station name from kdsTicketLines", () => {
@@ -259,10 +272,9 @@ describe("station print routing", () => {
       })
     );
 
-    expect(slip).toContain("Dish Soap");
-    expect(slip).toContain("2 × Dish Soap");
-    expect(slip).toContain("No ice");
-    expect(slip).toContain("Station: Hot line");
+    expect(slip).toContain("2  DISH SOAP");
+    expect(slip).toContain("+ No ice");
+    expect(slip).toContain("HOT LINE");
   });
 
   it("prints from the saved template for that section", () => {
@@ -304,12 +316,10 @@ describe("station print routing", () => {
       endTime: "30 Sep 2026, 9:00 PM",
     });
 
-    expect(slip).toContain("Start time: 30 Sep 2026, 7:00 PM");
-    expect(slip).toContain("End time: 30 Sep 2026, 9:00 PM");
-    expect(plain.join("\n")).toContain("Start time: 30 Sep 2026, 7:00 PM");
-    expect(plain.join("\n")).toContain("End time: 30 Sep 2026, 9:00 PM");
-    expect(slip).not.toContain("Start: 30 Sep 2026, 7:00 PM");
-    expect(plain.join("\n")).not.toContain("Start: 30 Sep 2026, 7:00 PM");
+    expect(slip).toMatch(/Start time\s+30 Sep 2026, 7:00 PM/);
+    expect(slip).toMatch(/End time\s+30 Sep 2026, 9:00 PM/);
+    expect(plain.join("\n")).toMatch(/Start\s+30 Sep 2026, 7:00 PM/);
+    expect(plain.join("\n")).toMatch(/End\s+30 Sep 2026, 9:00 PM/);
   });
 
   it("leaves a blank line between items on checkout, finance, and kitchen receipts", () => {
@@ -345,12 +355,12 @@ describe("station print routing", () => {
     const kitchenPlain = buildKitchenSlipLines({ title: "KDS", lines });
 
     for (const slip of [checkout, finance, kitchen]) {
-      expect(slip).toMatch(/Beer[^\n]*\n\x1b!\x00\n/);
-      expect(slip).toContain("Soup");
+      expect(slip).toMatch(/(Beer|BEER)[^\n]*\n\n/);
     }
-    for (const rows of [checkoutPlain, financePlain, kitchenPlain]) {
-      expect(rows.join("\n")).toMatch(/Beer[^\n]*\n\n1 × Soup/);
+    for (const rows of [checkoutPlain, financePlain]) {
+      expect(rows.join("\n")).toMatch(/Beer[^\n]*\n\n1 x Soup/);
     }
+    expect(kitchenPlain.join("\n")).toMatch(/BEER\n\n1  SOUP/);
   });
 
   it("prints every enabled template section for checkout, finance, and kitchen", () => {
@@ -433,7 +443,7 @@ describe("station print routing", () => {
     expect(finance).toContain("Finance copy");
 
     expect(kitchen).toContain("Main outlet");
-    expect(kitchen).toContain("Coffee");
+    expect(kitchen).toContain("COFFEE");
     expect(kitchen).not.toContain("10.00");
     expect(kitchen).toContain("Kitchen");
   });
@@ -506,16 +516,16 @@ describe("station print routing", () => {
         {
           name: "Coffee",
           quantity: "1",
-          unitPrice: "10.00",
+          unitPrice: "10000.00",
           modifiers: "Large",
-          modifierPrices: "2.00",
+          modifierPrices: "2000.00",
         },
       ],
-      total: "12.00",
+      total: "12000.00",
     });
 
-    expect(slip).toContain("10.00");
-    expect(slip).toContain("Large +2.00");
+    expect(slip).toContain("10,000");
+    expect(slip).toContain("+ Large (+2,000)");
   });
 
   it("reads modifier names and prices from order lines", () => {

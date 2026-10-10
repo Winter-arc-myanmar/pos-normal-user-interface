@@ -138,8 +138,11 @@ describe("QzTrayClient", () => {
     });
     expect(mocks.print).toHaveBeenCalledWith(
       { printer: { host: "192.168.1.50", port: 9100 } },
-      [expect.objectContaining({ type: "raw", format: "command" })]
+      [expect.objectContaining({ type: "raw", format: "command", flavor: "hex" })]
     );
+    const [[, [job]]] = mocks.print.mock.calls as [[unknown, [{ data: string }]]];
+    expect(job.data).toMatch(/^[0-9a-f]+$/);
+    expect(job.data.startsWith("1b40")).toBe(true);
   });
 
   it("sends a replaced USB printer to the plugged-in queue instead of the old one", async () => {

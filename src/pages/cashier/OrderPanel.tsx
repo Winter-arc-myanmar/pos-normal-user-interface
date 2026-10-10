@@ -70,6 +70,8 @@ interface OrderPanelProps {
   isPayView?: boolean;
   requiresTableAssignment?: boolean;
   onOpenPay?: () => void;
+  /** False for staff who take orders but not money, such as waiters. */
+  canTakePayment?: boolean;
   onCheckout: () => void;
   onPrintFinance?: () => void;
   onFireKds: () => void;
@@ -125,6 +127,7 @@ export function OrderPanel({
   isPayView = false,
   requiresTableAssignment = false,
   onOpenPay,
+  canTakePayment = true,
   onCheckout,
   onPrintFinance,
   onFireKds,
@@ -422,6 +425,11 @@ export function OrderPanel({
               <span />
             )}
           </div>
+          {!canTakePayment ? (
+            <p className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-center text-xs text-slate-600">
+              {t("cashier.orderPanel.paymentAtCashier")}
+            </p>
+          ) : (
           <Button
             fullWidth
             disabled={
@@ -447,6 +455,7 @@ export function OrderPanel({
           >
             {isPayView ? t("cashier.confirmPay") : t("cashier.payNow")}
           </Button>
+          )}
           {isPayView && onPrintFinance ? (
             <Button
               fullWidth

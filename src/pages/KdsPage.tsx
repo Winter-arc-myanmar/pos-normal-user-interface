@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/Button";
 import { KdsTicket } from "@/core/domain/entities/Cashier";
 import { useKdsBoard } from "@/core/presentation/hooks/useKdsBoard";
 import { useKdsStationManagement } from "@/core/presentation/hooks/useKdsStationManagement";
-import { useSpaManagement } from "@/core/presentation/hooks/useSpaManagement";
+import { cashierLabel } from "@/lib/printing/cashier";
 
 const STATION_KEY = "kds-station";
 const POLL_MS = 5000;
@@ -26,7 +26,6 @@ export function KdsPage() {
   const navigate = useNavigate();
   const { tickets, error, refresh, start, ready } = useKdsBoard();
   const { stations, listStations } = useKdsStationManagement();
-  const { rooms, fetchBoard } = useSpaManagement();
   const [stationId, setStationId] = useState(readStation);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [busyId, setBusyId] = useState("");
@@ -40,22 +39,36 @@ export function KdsPage() {
       setNowMs(Date.now());
       if (document.visibilityState !== "visible") return;
       void refresh(stationId || undefined);
-      void fetchBoard().catch(() => undefined);
     };
     tick();
     const timer = window.setInterval(tick, POLL_MS);
     return () => window.clearInterval(timer);
-  }, [fetchBoard, refresh, stationId]);
+  }, [refresh, stationId]);
 
-  const roomByOrder = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const room of rooms) {
-      for (const session of room.sessions) {
-        if (session.salesOrderId) map[session.salesOrderId] = room.roomNumber;
-      }
-    }
-    return map;
-  }, [rooms]);
+  /** The big line on a ticket: the table or room, or the pickup at the counter. */
+  const placeTitle = (ticket: KdsTicket) => {
+    const place = ticket.place;
+    if (place?.kind === "TABLE" && place.number) return t("kds.table", { number: place.number });
+    if (place?.kind === "SPA_ROOM" && place.number) return t("kds.spaRoom", { number: place.number });
+    if (place?.kind === "KTV_ROOM" && place.number) return t("kds.ktvRoom", { number: place.number });
+    if (ticket.pickupNumber) return t("kds.pickup", { number: ticket.pickupNumber });
+    if (place?.kind === "COUNTER") return t("kds.counter");
+    return ticket.ticketNumber;
+  };
+
+  const serviceLabel = (service?: string | null) => {
+    if (!service) return "";
+    const key = `kds.service.${service}`;
+    const label = t(key);
+    return label === key ? service.replaceAll("_", " ") : label;
+  };
+
+  const sender = (ticket: KdsTicket) =>
+    ticket.sentFrom === "TABLET"
+      ? t("kds.sentFromTablet", { device: ticket.deviceName || t("kds.roomTablet") })
+      : cashierLabel(ticket.sentBy)
+        ? t("kds.sentBy", { name: cashierLabel(ticket.sentBy) })
+        : "";
 
   const chooseStation = (value: string) => {
     setStationId(value);
@@ -132,7 +145,14 @@ export function KdsPage() {
                 ) : (
                   list.map((ticket) => {
                     const age = minutesSince(ticket.firedAt, nowMs);
-                    const room = roomByOrder[ticket.salesOrderId];
+                    const sentBy = sender(ticket);
+                    const details = [
+                      ticket.place?.name,
+                      ticket.place?.guestCount
+                        ? t("kds.guests", { count: ticket.place.guestCount })
+                        : "",
+                      ticket.place?.kind === "COUNTER" ? serviceLabel(ticket.serviceType) : "",
+                    ].filter(Boolean);
                     return (
                       <article
                         key={ticket.id}
@@ -146,13 +166,18 @@ export function KdsPage() {
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <p className="break-words text-lg font-bold">
-                              {room ? t("kds.room", { room }) : ticket.ticketNumber}
-                            </p>
+                            <p className="break-words text-xl font-bold">{placeTitle(ticket)}</p>
+                            {details.length ? (
+                              <p className="break-words text-sm text-slate-300">{details.join(" · ")}</p>
+                            ) : null}
                             <p className="break-words text-xs text-slate-400">
-                              {ticket.ticketNumber}
-                              {ticket.courseType ? ` · ${ticket.courseType}` : ""}
+                              {[ticket.ticketNumber, ticket.orderNumber, ticket.courseType]
+                                .filter(Boolean)
+                                .join(" · ")}
                             </p>
+                            {sentBy ? (
+                              <p className="mt-1 break-words text-xs font-medium text-sky-300">{sentBy}</p>
+                            ) : null}
                           </div>
                           <span className="shrink-0 text-sm font-semibold">
                             {t("kds.minutes", { count: age })}
@@ -164,16 +189,32 @@ export function KdsPage() {
                                 key: line.id,
                                 name: line.productName,
                                 quantity: line.quantity,
+                                modifiers: line.kitchenModifiers,
+                                seat: line.seatNumber,
                               }))
                             : (ticket.lines || []).map((line, index) => ({
                                 key: `${ticket.id}-${index}`,
                                 name: line.name,
                                 quantity: line.quantity,
+                                modifiers: line.modifiers,
+                                seat: undefined,
                               }))
                           ).map((line) => (
-                            <li key={line.key} className="flex items-start justify-between gap-3 text-base">
-                              <span className="min-w-0 break-words">{line.name}</span>
-                              <span className="shrink-0 font-bold">× {Number(line.quantity)}</span>
+                            <li key={line.key} className="text-base">
+                              <div className="flex items-start justify-between gap-3">
+                                <span className="min-w-0 break-words">
+                                  {line.name}
+                                  {line.seat ? (
+                                    <span className="ml-2 text-xs text-slate-400">
+                                      {t("kds.seat", { seat: line.seat })}
+                                    </span>
+                                  ) : null}
+                                </span>
+                                <span className="shrink-0 font-bold">× {Number(line.quantity)}</span>
+                              </div>
+                              {line.modifiers ? (
+                                <p className="break-words text-sm text-amber-300">{line.modifiers}</p>
+                              ) : null}
                             </li>
                           ))}
                         </ul>

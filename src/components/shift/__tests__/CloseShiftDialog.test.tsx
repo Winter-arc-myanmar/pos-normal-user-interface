@@ -5,6 +5,11 @@ import { CloseShiftDialog } from "../CloseShiftDialog";
 const mocks = vi.hoisted(() => ({
   summary: vi.fn(),
   close: vi.fn(),
+  printShift: vi.fn(),
+}));
+
+vi.mock("../useShiftPrinter", () => ({
+  useShiftPrinter: () => mocks.printShift,
 }));
 
 vi.mock("../shiftApi", () => ({
@@ -14,9 +19,10 @@ vi.mock("../shiftApi", () => ({
     caught instanceof Error ? caught.message : fallback,
 }));
 
-vi.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
-}));
+vi.mock("react-i18next", () => {
+  const t = (key: string) => key;
+  return { useTranslation: () => ({ t }) };
+});
 
 const summary = (over: Record<string, unknown> = {}) => ({
   sessionId: "shift-1",
@@ -84,5 +90,32 @@ describe("CloseShiftDialog", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("This shift is closed.");
     expect(onClosed).not.toHaveBeenCalled();
+  });
+
+  it("prints the report on the till's printer, not the browser's", async () => {
+    const closed = summary({ closedAt: "2026-10-07T16:00:00Z" });
+    mocks.close.mockResolvedValue(closed);
+    mocks.printShift.mockResolvedValue(undefined);
+    const browserPrint = vi.spyOn(window, "print").mockImplementation(() => undefined);
+    render(<CloseShiftDialog sessionId="shift-1" title="shift.endShift" onClosed={onClosed} />);
+
+    await screen.findByText("Ma Aye");
+    fireEvent.click(screen.getByRole("button", { name: "shift.endShift" }));
+    fireEvent.click(await screen.findByRole("button", { name: "shift.print" }));
+
+    await waitFor(() => expect(mocks.printShift).toHaveBeenCalledWith(closed));
+    expect(browserPrint).not.toHaveBeenCalled();
+  });
+
+  it("says when the printer could not print the report", async () => {
+    mocks.close.mockResolvedValue(summary({ closedAt: "2026-10-07T16:00:00Z" }));
+    mocks.printShift.mockRejectedValue(new Error("No checkout printer is connected"));
+    render(<CloseShiftDialog sessionId="shift-1" title="shift.endShift" onClosed={onClosed} />);
+
+    await screen.findByText("Ma Aye");
+    fireEvent.click(screen.getByRole("button", { name: "shift.endShift" }));
+    fireEvent.click(await screen.findByRole("button", { name: "shift.print" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("No checkout printer is connected");
   });
 });

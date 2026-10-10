@@ -2,13 +2,19 @@ import { useCallback, useEffect, useState } from "react";
 import { KdsTicket } from "../../domain/entities/Cashier";
 import { IKitchenPrinterService } from "../../domain/services/IKitchenPrinterService";
 import { IPrintTemplateService } from "../../domain/services/IPrintTemplateService";
+import {
+  PriceCurrency,
+  PrintCompany,
+  PrintTemplateType,
+} from "../../domain/entities/PrintTemplate";
+import type { ApiVenueSettingRepository } from "../../infrastructure/repositories/ApiVenueSettingRepository";
 import container from "../../infrastructure/di/container";
 import { browserPrinterClient } from "../../infrastructure/printing/BrowserPrinterClient";
 import { getPrinterClient } from "../../infrastructure/printing/getPrinterClient";
 import type { IPrinterClient } from "../../infrastructure/printing/IPrinterClient";
 import { isBrowserPrinting } from "../../infrastructure/printing/PrinterClient";
 import {
-  kdsTicketPrintLines,
+  kdsTicketSlip,
   KitchenSlip,
   PrintPlace,
   SaleReceipt,
@@ -21,6 +27,8 @@ import {
   PrinterJob,
   StationRoute,
 } from "@/lib/printing/routeKitchenPrint";
+import { printLogoFor } from "@/lib/printing/printLogo";
+import { checkoutCopies, copySlip } from "@/lib/printing/receiptCopies";
 import { printPlaceToTemplateType } from "@/lib/printing/selectPrintTemplate";
 import {
   PRINTER_BINDINGS_CHANGED,
@@ -33,6 +41,44 @@ import {
   savePrinterBinding,
   setDefaultPrinterBinding,
 } from "@/lib/pos/printerBindingStorage";
+
+/** The company prints are headed with, loaded once per signed-in company. */
+const companies = new Map<string, Promise<PrintCompany | null>>();
+
+export const printCompanyFor = (tenantId: string) => {
+  let company = companies.get(tenantId);
+  if (!company) {
+    company = container
+      .resolve<IPrintTemplateService>("printTemplateService")
+      .company()
+      .then((found) => (found.name ? found : null))
+      .catch(() => {
+        companies.delete(tenantId);
+        return null;
+      });
+    companies.set(tenantId, company);
+  }
+  return company;
+};
+
+/** The money receipts print amounts in, loaded once per signed-in company. */
+const currencies = new Map<string, Promise<PriceCurrency | undefined>>();
+
+export const printCurrencyFor = (tenantId: string) => {
+  let currency = currencies.get(tenantId);
+  if (!currency) {
+    currency = container
+      .resolve<ApiVenueSettingRepository>("venueSettingRepository")
+      .get()
+      .then((setting): PriceCurrency | undefined => setting.currency)
+      .catch(() => {
+        currencies.delete(tenantId);
+        return undefined;
+      });
+    currencies.set(tenantId, currency);
+  }
+  return currency;
+};
 
 const configureClient = async (
   tenantId: string,
@@ -209,14 +255,14 @@ export function usePrinterConnection(
   );
 
   const templateFor = useCallback(
-    async (place: PrintPlace) => {
+    async (place: PrintPlace, type: PrintTemplateType = printPlaceToTemplateType(place)) => {
       try {
         const service = container.resolve<IPrintTemplateService>("printTemplateService");
         const resolved = await service.resolve({
-          type: printPlaceToTemplateType(place),
+          type,
           ...(locationId ? { locationId } : {}),
         });
-        return resolved.settings;
+        return { settings: resolved.settings, paperWidth: resolved.paperWidth };
       } catch {
         return undefined;
       }
@@ -232,7 +278,9 @@ export function usePrinterConnection(
     ): Promise<KitchenPrintPlan> => {
       const client = await configureClient(tenantId, registerId);
       const current = currentBindings();
-      const template = slip.template || (await templateFor("KDS"));
+      const resolved = slip.template ? undefined : await templateFor("KDS");
+      const template = slip.template || resolved?.settings;
+      const paperWidth = slip.paperWidth || resolved?.paperWidth;
       const plan = groupKitchenJobs(
         slip.lines || [],
         current.bindings,
@@ -272,6 +320,7 @@ export function usePrinterConnection(
           await client.printKitchen(job.binding, {
             ...slip,
             template,
+            paperWidth,
             lines: job.lines,
             stationId: job.station?.id || slip.stationId,
             stationName: job.station?.name || slip.stationName,
@@ -293,44 +342,67 @@ export function usePrinterConnection(
   const printReceipt = useCallback(
     async (receipt: SaleReceipt) => {
       const client = await configureClient(tenantId, registerId);
-      const current = currentBindings();
-      const place = receipt.place || "CHECKOUT";
-      const localTargets = resolveBindingsForPlace(
-        current.bindings,
-        current.defaultBinding,
-        place
-      );
-      const targets = localTargets.length
-        ? localTargets
-        : await backendTargets(place);
-      if (!targets.length) {
-        throw new Error(
-          place === "FINANCE"
-            ? "No finance printer is connected"
-            : place === "KDS"
-              ? "No KDS printer is connected"
-              : "No checkout printer is connected"
-        );
-      }
-      const template = receipt.template || (await templateFor(place));
-      const failures: string[] = [];
-      for (const target of targets) {
-        try {
-          await client.printReceipt(target, {
-            ...receipt,
-            place,
-            template,
-            showLogo: receipt.showLogo,
-          });
-        } catch (caught) {
-          const message =
-            caught instanceof Error
-              ? caught.message
-              : "Printer communication failed";
-          failures.push(`${target.displayName}: ${message}`);
+      const targetsFor = async (place: PrintPlace) => {
+        const current = currentBindings();
+        const local = resolveBindingsForPlace(current.bindings, current.defaultBinding, place);
+        return local.length ? local : backendTargets(place);
+      };
+
+      const printOne = async (slip: SaleReceipt) => {
+        const place = slip.place || "CHECKOUT";
+        let targets = await targetsFor(place);
+        // The office copy goes to the till's own printer when there is no finance one.
+        if (!targets.length && slip.copy === "FINANCE") targets = await targetsFor("CHECKOUT");
+        if (!targets.length) {
+          throw new Error(
+            place === "FINANCE"
+              ? "No finance printer is connected"
+              : place === "KDS"
+                ? "No KDS printer is connected"
+                : "No checkout printer is connected"
+          );
         }
+        const resolved = slip.template ? undefined : await templateFor(place, slip.templateType);
+        const template = slip.template || resolved?.settings;
+        const paperWidth = slip.paperWidth || resolved?.paperWidth;
+        const company =
+          slip.company === undefined && place !== "FINANCE"
+            ? await printCompanyFor(tenantId)
+            : slip.company;
+        const currency = slip.currency || (await printCurrencyFor(tenantId));
+        const logoOn = template ? template.header.logo : place === "CHECKOUT";
+        const logo =
+          slip.logo !== undefined
+            ? slip.logo
+            : company?.logoUrl && logoOn && slip.showLogo !== false
+              ? await printLogoFor(company.logoUrl, paperWidth)
+              : null;
+        const ready = { ...slip, place, template, paperWidth, company, currency, logo };
+        const failures: string[] = [];
+        for (const target of targets) {
+          try {
+            await client.printReceipt(target, ready);
+          } catch (caught) {
+            const message =
+              caught instanceof Error ? caught.message : "Printer communication failed";
+            failures.push(`${target.displayName}: ${message}`);
+          }
+        }
+        if (failures.length) throw new Error(failures.join(" "));
+        return ready;
+      };
+
+      if (!receipt.sale || (receipt.place || "CHECKOUT") !== "CHECKOUT") {
+        await printOne(receipt);
+        return;
       }
-      if (failures.length) throw new Error(failures.join(" "));
+      // A paid bill: the guest's copy settles which template applies, then the rest follow it.
+      const resolved = receipt.template ? undefined : await templateFor("CHECKOUT");
+      const template = receipt.template || resolved?.settings;
+      const sale = { ...receipt, template, paperWidth: receipt.paperWidth || resolved?.paperWidth };
+      for (const copy of checkoutCopies(template)) {
+        await printOne(copySlip(sale, copy));
+      }
     },
     [backendTargets, currentBindings, registerId, templateFor, tenantId]
   );
@@ -358,16 +430,7 @@ export function usePrinterConnection(
             }
           : undefined;
       return printKitchen(
-        {
-          title: ticket.ticketNumber || ticket.id,
-          status: ticket.status,
-          courseType: ticket.courseType,
-          firedAt: ticket.firedAt,
-          stationId,
-          stationName: station?.name,
-          orderRef: ticket.salesOrderId,
-          lines: kdsTicketPrintLines(ticket),
-        },
+        { ...kdsTicketSlip(ticket), stationId, stationName: station?.name },
         station ? [station] : []
       );
     },

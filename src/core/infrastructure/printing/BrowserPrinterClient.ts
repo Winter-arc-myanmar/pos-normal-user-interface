@@ -6,7 +6,7 @@ import {
   buildPrinterTestLines,
   buildSaleReceiptLines,
   formatKitchenSlip,
-  kdsTicketPrintLines,
+  kdsTicketSlip,
   formatPrinterTest,
   formatSaleReceipt,
   KitchenSlip,
@@ -138,16 +138,7 @@ export class BrowserPrinterClient implements IPrinterClient {
   }
 
   printKdsTicket(binding: PrinterBinding, ticket: KdsTicket): Promise<void> {
-    return this.printKitchen(binding, {
-      title: ticket.ticketNumber || ticket.id,
-      status: ticket.status,
-      courseType: ticket.courseType,
-      firedAt: ticket.firedAt,
-      stationId: ticket.stationId || ticket.station?.id,
-      stationName: ticket.station?.name,
-      orderRef: ticket.salesOrderId,
-      lines: kdsTicketPrintLines(ticket),
-    });
+    return this.printKitchen(binding, kdsTicketSlip(ticket));
   }
 
   printKitchen(binding: PrinterBinding, slip: KitchenSlip): Promise<void> {

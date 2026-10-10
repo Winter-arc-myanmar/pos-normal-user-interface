@@ -51,6 +51,7 @@ import {
   InventoryLocation,
   KdsTicket,
   KdsTicketLine,
+  KdsTicketPlace,
   KdsStation,
   OrderPayment,
   PaymentMethod,
@@ -69,6 +70,7 @@ import {
 } from "../../domain/entities/Cashier";
 import { HttpClient } from "../api/HttpClient";
 import { API_ENDPOINTS, resolveMediaUrl } from "../api/constants";
+import { parseCashier } from "@/lib/printing/cashier";
 
 interface ApiEnvelope<T> {
   data: T;
@@ -510,6 +512,20 @@ const toCounterOrderPayment = (value: unknown) => {
   });
 };
 
+const PLACE_KINDS = ["TABLE", "SPA_ROOM", "KTV_ROOM", "COUNTER"] as const;
+
+const toTicketPlace = (value: unknown): KdsTicketPlace | null => {
+  const place = asRecord(value);
+  if (!place) return null;
+  const kind = PLACE_KINDS.find((item) => item === place.kind) ?? "COUNTER";
+  return {
+    kind,
+    number: place.number ? String(place.number) : null,
+    name: place.name ? String(place.name) : null,
+    guestCount: toNumber(place.guestCount) ?? null,
+  };
+};
+
 const toKdsTicket = (item: Record<string, unknown>) =>
   new KdsTicket({
     id: String(item.id || ""),
@@ -523,6 +539,14 @@ const toKdsTicket = (item: Record<string, unknown>) =>
     startedAt: item.startedAt ? String(item.startedAt) : null,
     bumpedAt: item.bumpedAt ? String(item.bumpedAt) : null,
     status: String(item.status || "PENDING") as KdsTicket["status"],
+    place: toTicketPlace(item.place),
+    orderNumber: item.orderNumber ? String(item.orderNumber) : null,
+    serviceType: item.serviceType ? String(item.serviceType) : null,
+    posType: item.posType ? String(item.posType) : null,
+    pickupNumber: item.pickupNumber ? String(item.pickupNumber) : null,
+    sentBy: parseCashier(item.sentBy),
+    sentFrom: item.sentFrom ? String(item.sentFrom) : null,
+    deviceName: item.deviceName ? String(item.deviceName) : null,
     lines: toTicketLines(item),
     kdsTicketLines: Array.isArray(item.kdsTicketLines)
       ? item.kdsTicketLines.map((value) => {

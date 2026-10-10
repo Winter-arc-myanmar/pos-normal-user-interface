@@ -1,10 +1,23 @@
-export const PRINT_TEMPLATE_TYPES = ["RECEIPT", "KITCHEN", "FINANCE"] as const;
+export const PRINT_TEMPLATE_TYPES = ["RECEIPT", "KITCHEN", "FINANCE", "SHIFT"] as const;
 export type PrintTemplateType = (typeof PRINT_TEMPLATE_TYPES)[number];
 
 export const isPrintTemplateType = (value: string): value is PrintTemplateType =>
   (PRINT_TEMPLATE_TYPES as readonly string[]).includes(value);
 
 export type PrintPaperWidth = "MM58" | "MM80";
+
+/** The money a business charges in: 100,000 MMK or $ 100,000. */
+export type PriceCurrency = "MMK" | "USD";
+
+/** The company a customer's receipt is from. */
+export interface PrintCompany {
+  name: string;
+  legalName?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  logoUrl?: string | null;
+}
 export type PrintTemplateSource = "LOCATION" | "TENANT" | "BUILTIN";
 
 export interface PrintTemplateSettings {
@@ -14,7 +27,10 @@ export interface PrintTemplateSettings {
     logo: boolean;
     outletName: boolean;
     address: boolean;
+    /** The phone number, after a phone icon. */
     contact: boolean;
+    /** The email address, after an envelope icon. */
+    email: boolean;
   };
   item: {
     bilingual: boolean;
@@ -71,6 +87,7 @@ export const defaultPrintTemplateSettings = (): PrintTemplateSettings => ({
     outletName: true,
     address: true,
     contact: true,
+    email: true,
   },
   item: {
     bilingual: false,
