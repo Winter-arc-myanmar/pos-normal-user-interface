@@ -1856,6 +1856,7 @@
     "taxable": "Taxable",
     "taxRate": "Tax rate",
     "chooseTaxRate": "Choose a tax rate",
+    "shopDefaultTaxRate": "Shop default tax rate",
     "imageUrl": "Image address",
     "attributes": "Attributes",
     "attributeKey": "Attribute",

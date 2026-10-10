@@ -1814,6 +1814,7 @@
     "taxable": "အခွန်ကောက်သည်",
     "taxRate": "အခွန်နှုန်း",
     "chooseTaxRate": "အခွန်နှုန်းရွေးပါ",
+    "shopDefaultTaxRate": "ဆိုင်၏ မူလ အခွန်နှုန်း",
     "imageUrl": "ပုံလိပ်စာ",
     "attributes": "ဂုဏ်သတ္တိများ",
     "attributeKey": "ဂုဏ်သတ္တိ",

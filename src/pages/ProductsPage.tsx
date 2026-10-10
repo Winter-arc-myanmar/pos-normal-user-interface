@@ -161,7 +161,7 @@ export function ProductsPage() {
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState("ALL");
   const [trackingType, setTrackingType] = useState<"ALL" | ProductTrackingType>("ALL");
-  const { trackStock } = useVenueSetting();
+  const { trackStock, defaultTaxRate } = useVenueSetting();
   const [inStockOnly, setInStockOnly] = useState(false);
   const [locationId, setLocationId] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
@@ -650,10 +650,10 @@ export function ProductsPage() {
                     setDraft((current) => ({ ...current, taxRateId: event.target.value }))
                   }
                 >
-                  <option value="">{t("products.chooseTaxRate")}</option>
+                  <option value="">{t(defaultTaxRate ? "products.shopDefaultTaxRate" : "products.chooseTaxRate")}</option>
                   {taxRates.map((rate) => (
                     <option key={rate.id} value={rate.id}>
-                      {rate.name} · {quantity(rate.ratePercentage)}%
+                      {rate.name} · {quantity(String(Number(rate.ratePercentage) * 100))}%
                     </option>
                   ))}
                 </select>
