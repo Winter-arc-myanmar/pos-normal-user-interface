@@ -40,6 +40,7 @@ import {
   cardCanCover,
   estimateCardCharge,
 } from "@/lib/spa/payment";
+import { withOrderTipOnFirstPayment } from "@/lib/pos/checkoutAdjustments";
 import { freeTimeFor } from "@/lib/spa/freeTime";
 import { estimateRoomCharges } from "@/lib/spa/roomCharges";
 import type { Hostess } from "@/core/domain/entities/Hostess";
@@ -1260,7 +1261,10 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       const result =
         due > 0
           ? await settleOrder(session.salesOrderId, {
-              payments: [{ paymentMethodId: method.id, amount: (due + tipValue).toFixed(4) }],
+              payments: withOrderTipOnFirstPayment(
+                [{ paymentMethodId: method.id, amount: (due + tipValue).toFixed(4) }],
+                tipValue
+              ),
               posSessionId: context.posSessionId,
               ...(tipValue > 0 ? { tipAmount: tipValue.toFixed(4) } : {}),
               idempotencyKey: spaSettleKey(session.id),
@@ -1319,12 +1323,15 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         setSession({ ...session, sessionState: "CLOSED" });
       }
       const result = await settleOrder(session.salesOrderId, {
-        payments: buildSpaSettlePayments({
-          cardMethodId: cardMethod.id,
-          guestCardId: card.id,
-          cashMethodId: cashMethod?.id,
-          cashAmount: cashValue,
-        }),
+        payments: withOrderTipOnFirstPayment(
+          buildSpaSettlePayments({
+            cardMethodId: cardMethod.id,
+            guestCardId: card.id,
+            cashMethodId: cashMethod?.id,
+            cashAmount: cashValue,
+          }),
+          tipValue
+        ),
         posSessionId: context.posSessionId,
         ...(tipValue > 0 ? { tipAmount: tipValue.toFixed(4) } : {}),
         idempotencyKey: spaSettleKey(session.id),
