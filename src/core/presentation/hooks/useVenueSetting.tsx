@@ -12,6 +12,9 @@ const PAY_WHEN_ORDERING: VenueSetting = {
   currency: "MMK",
   trackStock: true,
   defaultTaxRate: null,
+  serviceChargeBps: 0,
+  serviceChargeOn: { BAR: true, SPA: true, KTV: true },
+  serviceChargeTaxRate: 0,
 };
 
 /**

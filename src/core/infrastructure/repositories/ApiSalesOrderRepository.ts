@@ -263,6 +263,7 @@ const toSalesOrderLine = (
     lineDiscount: item.lineDiscount ? String(item.lineDiscount) : undefined,
     taxRateId: item.taxRateId ? String(item.taxRateId) : undefined,
     taxAmount: item.taxAmount ? String(item.taxAmount) : undefined,
+    taxInclusive: item.taxInclusive === true,
     appliedPromotionId: item.appliedPromotionId
       ? String(item.appliedPromotionId)
       : undefined,

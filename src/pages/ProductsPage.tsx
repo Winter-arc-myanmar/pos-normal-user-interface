@@ -28,6 +28,8 @@ type ProductDraft = {
   isTaxable: boolean;
   isAvailable: boolean;
   taxRateId: string;
+  /** The taxes it had when opened; with several, they are changed in the admin. */
+  ownTaxRateIds: string[];
   imageUrl: string;
   attributes: Pair[];
 };
@@ -86,6 +88,7 @@ const emptyProduct = (): ProductDraft => ({
   isTaxable: true,
   isAvailable: true,
   taxRateId: "",
+  ownTaxRateIds: [],
   imageUrl: "",
   attributes: emptyPairs(),
 });
@@ -111,6 +114,7 @@ const draftFromProduct = (product: Product): ProductDraft => ({
   isTaxable: product.isTaxable !== false,
   isAvailable: product.isAvailable !== false,
   taxRateId: product.taxRateId || "",
+  ownTaxRateIds: product.taxRateIds ?? [],
   imageUrl: product.sourceImageUrl || "",
   attributes: pairsFrom(product.globalAttributes),
 });
@@ -251,7 +255,11 @@ export function ProductsPage() {
       trackingType: draft.trackingType,
       isAvailable: draft.isAvailable,
       isTaxable: draft.isTaxable,
-      taxRateId: draft.isTaxable && draft.taxRateId ? draft.taxRateId : undefined,
+      // Sent only when picked here, so saving keeps taxes set in the admin.
+      taxRateId:
+        draft.isTaxable && draft.taxRateId && draft.taxRateId !== draft.ownTaxRateIds[0]
+          ? draft.taxRateId
+          : undefined,
     };
     try {
       const saved = draft.id
@@ -640,7 +648,11 @@ export function ProductsPage() {
                 setDraft((current) => ({ ...current, isTaxable: !current.isTaxable }))
               }
             />
-            {draft.isTaxable ? (
+            {draft.isTaxable && draft.ownTaxRateIds.length > 1 ? (
+              <p className="min-w-0 flex-1 text-xs text-slate-400">
+                {t("products.severalTaxes", { count: draft.ownTaxRateIds.length })}
+              </p>
+            ) : draft.isTaxable ? (
               <label className="min-w-0 flex-1 text-xs text-slate-400">
                 {t("products.taxRate")}
                 <select

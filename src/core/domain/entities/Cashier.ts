@@ -28,7 +28,10 @@ export class Product {
   totalOnHand?: string;
   isAvailable?: boolean;
   isTaxable?: boolean;
+  /** Its own taxes; empty means the shop's default taxes. taxRateId is the first. */
+  taxRateIds?: string[];
   taxRateId?: string;
+  /** All of its own taxes added up, as a fraction. */
   taxRate?: number;
   isPriceInclusive?: boolean;
   trackingType?: string;
@@ -142,6 +145,8 @@ export class SalesOrderLine {
   lineDiscount?: string;
   taxRateId?: string;
   taxAmount?: string;
+  /** Whether taxAmount is already inside the price rather than added on top. */
+  taxInclusive?: boolean;
   appliedPromotionId?: string;
   status?: string;
   firedAt?: string;

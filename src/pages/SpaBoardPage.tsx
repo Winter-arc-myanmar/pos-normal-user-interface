@@ -238,7 +238,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const tipValue = Math.max(0, Number(tip) || 0);
   const cashValue = splitCash ? Math.max(0, Number(cashAmount) || 0) : 0;
   const estimatedCard = estimateCardCharge({
-    runningTotal: quote?.runningTotal || 0,
+    // A bill paid at the end comes due with its tax and service charge.
+    runningTotal: Number(quote?.amountDue) > 0 ? quote!.amountDue! : quote?.runningTotal || 0,
     discountBps: wallet?.discountBpsSnapshot,
     tip: tipValue,
     cash: cashValue,
@@ -1304,7 +1305,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       if (!billClosed) {
         const latest = await getQuote(session.id);
         const estimate = estimateCardCharge({
-          runningTotal: latest.runningTotal,
+          runningTotal: Number(latest.amountDue) > 0 ? latest.amountDue! : latest.runningTotal,
           discountBps: wallet.discountBpsSnapshot,
           tip: tipValue,
           cash: cashValue,

@@ -475,6 +475,7 @@ const toCounterOrderLine = (value: unknown) => {
     lineDiscount: String(item.lineDiscount || "0.0000"),
     taxRateId: item.taxRateId ? String(item.taxRateId) : undefined,
     taxAmount: item.taxAmount ? String(item.taxAmount) : undefined,
+    taxInclusive: item.taxInclusive === true,
     appliedPromotionId: item.appliedPromotionId
       ? String(item.appliedPromotionId)
       : undefined,
@@ -895,8 +896,27 @@ const toVariantPayload = (payload: CreateProductVariantDTO | UpdateProductVarian
   return body;
 };
 
+/**
+ * A product's own taxes as one rate. They are all inside the price or all on
+ * top, so the fractions add up; the first says which.
+ */
+const ownTaxes = (item: Record<string, unknown>) => {
+  const rates = Array.isArray(item.taxRates)
+    ? (item.taxRates as unknown[])
+        .map(asRecord)
+        .filter((rate): rate is Record<string, unknown> => Boolean(rate?.id))
+    : [];
+  if (!rates.length) return null;
+  return {
+    ids: rates.map((rate) => String(rate.id)),
+    rate: rates.reduce((sum, rate) => sum + (toNumber(rate.ratePercentage) ?? 0), 0),
+    isPriceInclusive: rates[0].isPriceInclusive === true,
+  };
+};
+
 const toProduct = (item: Record<string, unknown>) => {
   const taxRate = asRecord(item.taxRate);
+  const own = ownTaxes(item);
   const category = readProductCategory(item);
   const rawImage = item.imageUrl ? String(item.imageUrl) : undefined;
   return new Product({
@@ -918,18 +938,23 @@ const toProduct = (item: Record<string, unknown>) => {
         : String(item.totalOnHand),
     isAvailable: toBoolean(item.isAvailable) ?? true,
     isTaxable: toBoolean(item.isTaxable),
-    taxRateId: item.taxRateId
-      ? String(item.taxRateId)
-      : taxRate?.id
-        ? String(taxRate.id)
-        : undefined,
+    taxRateIds: own?.ids ?? [],
+    taxRateId: own
+      ? own.ids[0]
+      : item.taxRateId
+        ? String(item.taxRateId)
+        : taxRate?.id
+          ? String(taxRate.id)
+          : undefined,
     taxRate:
+      own?.rate ??
       toNumber(item.taxRateRatePercentage) ??
       toNumber(item.taxRatePercentage) ??
       toNumber(item.ratePercentage) ??
       toNumber(taxRate?.ratePercentage) ??
       toNumber(item.taxRate),
     isPriceInclusive:
+      own?.isPriceInclusive ??
       toBoolean(item.taxRateIsPriceInclusive) ??
       toBoolean(item.isPriceInclusive) ??
       toBoolean(item.priceInclusive) ??
@@ -1247,6 +1272,7 @@ export class ApiCashierRepository implements ICashierRepository {
       unitPrice: String(item.unitPrice || payload.unitPrice),
       lineDiscount: item.lineDiscount ? String(item.lineDiscount) : undefined,
       taxAmount: item.taxAmount ? String(item.taxAmount) : undefined,
+      taxInclusive: item.taxInclusive === true,
       status: item.status ? String(item.status) : undefined,
       seatNumber:
         typeof item.seatNumber === "number" ? item.seatNumber : payload.seatNumber,
@@ -1302,6 +1328,7 @@ export class ApiCashierRepository implements ICashierRepository {
         unitPrice: String(item.unitPrice || "0"),
         lineDiscount: item.lineDiscount ? String(item.lineDiscount) : undefined,
         taxAmount: item.taxAmount ? String(item.taxAmount) : undefined,
+        taxInclusive: item.taxInclusive === true,
         status: item.status ? String(item.status) : undefined,
         seatNumber: typeof item.seatNumber === "number" ? item.seatNumber : undefined,
         createdAt: item.createdAt ? String(item.createdAt) : undefined,

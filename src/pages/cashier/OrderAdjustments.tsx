@@ -17,7 +17,6 @@ interface OrderAdjustmentsProps {
   onDiscountAmountChange: (value: string) => void;
   onDiscountReasonChange: (value: string) => void;
   onRemoveDiscount: () => void;
-  onServiceChargeChange: (value: string) => void;
   onTipAmountChange: (value: string) => void;
   onMemberCardUidChange: (value: string) => void;
   onLookupMemberCard: () => void;
@@ -37,7 +36,6 @@ export function OrderAdjustments({
   onDiscountAmountChange,
   onDiscountReasonChange,
   onRemoveDiscount,
-  onServiceChargeChange,
   onTipAmountChange,
   onMemberCardUidChange,
   onLookupMemberCard,
@@ -106,19 +104,12 @@ export function OrderAdjustments({
           {t("cashier.orderPanel.removeDiscount")}
         </Button>
       ) : null}
-      <label className="block space-y-1">
-        <span className="text-xs text-slate-600">
-          {t("cashier.orderPanel.extraFee")}
-        </span>
-        <input
-          inputMode="decimal"
-          value={serviceCharge}
-          disabled={disabled}
-          aria-label={t("cashier.orderPanel.extraFee")}
-          onChange={(event) => onServiceChargeChange(event.target.value)}
-          className="min-h-9 w-full rounded border border-slate-300 px-2 text-sm focus:border-blue-500 focus:outline-none"
-        />
-      </label>
+      {Number(serviceCharge) > 0 ? (
+        <div className="flex items-center justify-between text-xs text-slate-600">
+          <span>{t("cashier.orderPanel.serviceCharge")}</span>
+          <span className="font-medium text-slate-800">{serviceCharge}</span>
+        </div>
+      ) : null}
       <label className="block space-y-1">
         <span className="text-xs text-slate-600">
           {t("cashier.orderPanel.tip")}
