@@ -8,25 +8,92 @@ import { useAuth } from "@/core/presentation/hooks/useAuth";
  */
 const FULL_ACCESS_ROLE = "ROOT_ADMIN";
 
+// A menu/item is shown only when the user holds at least one of its permissions
+// (`canAccess` uses `.some`). List every action (read/write/delete) for the
+// module:subject so read-only users are not hidden, and no-permission users are.
 export const PAGE_PERMISSIONS = {
+  // Reports
   dashboard: ["reports:report:read"],
   salesSummary: ["reports:report:read"],
-  users: ["iam:user:write"],
-  customers: ["sales:customer:read"],
-  cards: ["guestcard:card:read"],
-  cashier: [] as string[],
-  ktv: ["hospitality:ktv-session:read"],
-  spa: ["hospitality:spa-session:read"],
-  tablet: ["hospitality:room-tablet:write"],
-  kds: ["hospitality:kds-ticket:read"],
-  waitlist: [] as string[],
-  diningTables: [] as string[],
-  products: [] as string[],
-  categories: [] as string[],
-  tipPools: ["hospitality:tip-pool:read"],
-  counterOrders: [] as string[],
-  salesOrders: [] as string[],
+
+  // IAM
+  users: ["iam:user:read", "iam:user:write", "iam:user:delete"],
+
+  // Sales
+  cashier: [
+    "sales:checkout:read",
+    "sales:checkout:write",
+    "sales:checkout:delete",
+    "pos:session:read",
+    "pos:session:write",
+  ],
+  salesOrders: [
+    "sales:sales-order:read",
+    "sales:sales-order:write",
+    "sales:sales-order:delete",
+  ],
+  counterOrders: [
+    "hospitality:kds-ticket:read",
+    "hospitality:kds-ticket:write",
+    "sales:sales-order:read",
+    "sales:sales-order:write",
+  ],
   refunds: ["sales:refund:read", "sales:refund:write"],
+  customers: [
+    "sales:customer:read",
+    "sales:customer:write",
+    "sales:customer:delete",
+  ],
+  cards: [
+    "guestcard:card:read",
+    "guestcard:card:write",
+    "guestcard:card:delete",
+    "guestcard:wallet:read",
+    "guestcard:wallet:write",
+  ],
+
+  // Hospitality
+  ktv: [
+    "hospitality:ktv-session:read",
+    "hospitality:ktv-session:write",
+    "hospitality:ktv-room:read",
+    "hospitality:ktv-room:write",
+    "hospitality:ktv-room:delete",
+  ],
+  spa: [
+    "hospitality:spa-session:read",
+    "hospitality:spa-session:write",
+    "hospitality:spa-room:read",
+    "hospitality:spa-room:write",
+    "hospitality:spa-room:delete",
+  ],
+  tablet: ["hospitality:room-tablet:read"],
+  kds: ["hospitality:kds-ticket:read", "hospitality:kds-ticket:write"],
+  waitlist: ["hospitality:waitlist:read", "hospitality:waitlist:write"],
+  diningTables: [
+    "hospitality:dining-table:read",
+    "hospitality:dining-table:write",
+    "hospitality:dining-table:delete",
+  ],
+  tipPools: [
+    "hospitality:tip-pool:read",
+    "hospitality:tip-pool:write",
+    "hospitality:tip-pool:delete",
+  ],
+
+  // Catalog
+  products: [
+    "inventory:product:read",
+    "inventory:product:write",
+    "inventory:product:delete",
+  ],
+  categories: [
+    "inventory:category:read",
+    "inventory:category:write",
+    "inventory:category:delete",
+  ],
+
+  // System: settings holds the profile → logout path, so it stays open.
   sync: [] as string[],
   settings: [] as string[],
 } as const;
@@ -89,7 +156,7 @@ export function usePermissions() {
 
   const isTabletAccount =
     !isFullAccess &&
-    hasPermission("hospitality:room-tablet:write") &&
+    hasPermission("hospitality:room-tablet:read") &&
     !hasPermission("hospitality:spa-session:read");
 
   return {
