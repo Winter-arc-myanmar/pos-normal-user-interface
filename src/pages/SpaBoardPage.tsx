@@ -40,6 +40,7 @@ import {
   cardCanCover,
   estimateCardCharge,
 } from "@/lib/spa/payment";
+import { withOrderTipOnFirstPayment } from "@/lib/pos/checkoutAdjustments";
 import { freeTimeFor } from "@/lib/spa/freeTime";
 import { estimateRoomCharges } from "@/lib/spa/roomCharges";
 import type { Hostess } from "@/core/domain/entities/Hostess";
@@ -238,7 +239,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const tipValue = Math.max(0, Number(tip) || 0);
   const cashValue = splitCash ? Math.max(0, Number(cashAmount) || 0) : 0;
   const estimatedCard = estimateCardCharge({
-    runningTotal: quote?.runningTotal || 0,
+    // A bill paid at the end comes due with its tax and service charge.
+    runningTotal: Number(quote?.amountDue) > 0 ? quote!.amountDue! : quote?.runningTotal || 0,
     discountBps: wallet?.discountBpsSnapshot,
     tip: tipValue,
     cash: cashValue,
@@ -1259,7 +1261,10 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       const result =
         due > 0
           ? await settleOrder(session.salesOrderId, {
-              payments: [{ paymentMethodId: method.id, amount: (due + tipValue).toFixed(4) }],
+              payments: withOrderTipOnFirstPayment(
+                [{ paymentMethodId: method.id, amount: (due + tipValue).toFixed(4) }],
+                tipValue
+              ),
               posSessionId: context.posSessionId,
               ...(tipValue > 0 ? { tipAmount: tipValue.toFixed(4) } : {}),
               idempotencyKey: spaSettleKey(session.id),
@@ -1304,7 +1309,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       if (!billClosed) {
         const latest = await getQuote(session.id);
         const estimate = estimateCardCharge({
-          runningTotal: latest.runningTotal,
+          runningTotal: Number(latest.amountDue) > 0 ? latest.amountDue! : latest.runningTotal,
           discountBps: wallet.discountBpsSnapshot,
           tip: tipValue,
           cash: cashValue,
@@ -1318,12 +1323,15 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         setSession({ ...session, sessionState: "CLOSED" });
       }
       const result = await settleOrder(session.salesOrderId, {
-        payments: buildSpaSettlePayments({
-          cardMethodId: cardMethod.id,
-          guestCardId: card.id,
-          cashMethodId: cashMethod?.id,
-          cashAmount: cashValue,
-        }),
+        payments: withOrderTipOnFirstPayment(
+          buildSpaSettlePayments({
+            cardMethodId: cardMethod.id,
+            guestCardId: card.id,
+            cashMethodId: cashMethod?.id,
+            cashAmount: cashValue,
+          }),
+          tipValue
+        ),
         posSessionId: context.posSessionId,
         ...(tipValue > 0 ? { tipAmount: tipValue.toFixed(4) } : {}),
         idempotencyKey: spaSettleKey(session.id),

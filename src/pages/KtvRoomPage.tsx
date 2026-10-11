@@ -27,6 +27,7 @@ import { useDateFormatter } from "@/lib/i18n/formatters";
 import { lineDisplayName } from "@/lib/pos/orderListDisplay";
 import { toast } from "@/lib/toast";
 import { cashierLabel } from "@/lib/printing/cashier";
+import { toMoney, withOrderTipOnFirstPayment } from "@/lib/pos/checkoutAdjustments";
 
 export function KtvRoomPage() {
   const { t } = useTranslation();
@@ -328,20 +329,22 @@ export function KtvRoomPage() {
         salesChannel: "POS",
         serviceType: "DINE_IN",
         idempotencyKey: `ktv-${session.id}-${Date.now()}`,
-        ...(Number(tipAmount) > 0 ? { tipAmount } : {}),
+        ...(Number(tipAmount) > 0 ? { tipAmount: toMoney(tipAmount) } : {}),
         items: result.lines.map((line) => ({
           variantId: line.variantId,
           quantity: line.quantity,
           lineDiscount: line.lineDiscount || "0.0000",
         })),
-        payments: [
-          {
-            paymentMethodId: paymentMethod.id,
-            amount: finalTotal.toFixed(4),
-            guestCardId: card.id,
-            ...(Number(tipAmount) > 0 ? { tipAmount } : {}),
-          },
-        ],
+        payments: withOrderTipOnFirstPayment(
+          [
+            {
+              paymentMethodId: paymentMethod.id,
+              amount: finalTotal.toFixed(4),
+              guestCardId: card.id,
+            },
+          ],
+          tipAmount
+        ),
       });
       const endAt = finalQuote.asOf || closedAt;
       try {

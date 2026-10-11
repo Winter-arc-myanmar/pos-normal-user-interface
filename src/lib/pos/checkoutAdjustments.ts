@@ -1,5 +1,3 @@
-import { CheckoutPaymentEntryDTO } from "@/core/application/dtos/CashierDTO";
-
 const toAmount = (value: unknown): number => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -71,13 +69,14 @@ export function allocateOrderDiscountToLines<
   });
 }
 
-export function withOrderTipOnFirstPayment(
-  payments: CheckoutPaymentEntryDTO[],
-  tipAmount?: string | number
-): CheckoutPaymentEntryDTO[] {
+/** Puts the order tip on the first payment, for any settle/checkout payment shape. */
+export function withOrderTipOnFirstPayment<
+  T extends { paymentMethodId: string; tipAmount?: string },
+>(payments: T[], tipAmount?: string | number): T[] {
   const tip = toAmount(tipAmount);
   if (tip <= 0) return payments;
+  const tipMoney = toMoney(tip);
   return payments.map((payment, index) =>
-    index === 0 ? { ...payment, tipAmount: toMoney(tip) } : payment
+    index === 0 ? ({ ...payment, tipAmount: tipMoney } as T) : payment
   );
 }
