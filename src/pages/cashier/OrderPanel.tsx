@@ -58,7 +58,6 @@ interface OrderPanelProps {
   onDiscountAmountChange?: (value: string) => void;
   onDiscountReasonChange?: (value: string) => void;
   onRemoveDiscount?: () => void;
-  onServiceChargeChange?: (value: string) => void;
   onTipAmountChange?: (value: string) => void;
   onMemberCardUidChange?: (value: string) => void;
   onLookupMemberCard?: () => void;
@@ -117,7 +116,6 @@ export function OrderPanel({
   onDiscountAmountChange,
   onDiscountReasonChange,
   onRemoveDiscount,
-  onServiceChargeChange,
   onTipAmountChange,
   onMemberCardUidChange,
   onLookupMemberCard,
@@ -297,7 +295,7 @@ export function OrderPanel({
             <span>{t("cashier.total")}</span>
             <span>{total}</span>
           </div>
-          {onDiscountAmountChange && onTipAmountChange && onServiceChargeChange ? (
+          {onDiscountAmountChange && onTipAmountChange ? (
             <OrderAdjustments
               discountAmount={discountAmount}
               discountReasonId={discountReasonId}
@@ -312,7 +310,6 @@ export function OrderPanel({
               onDiscountAmountChange={onDiscountAmountChange}
               onDiscountReasonChange={onDiscountReasonChange || (() => undefined)}
               onRemoveDiscount={onRemoveDiscount || (() => undefined)}
-              onServiceChargeChange={onServiceChargeChange}
               onTipAmountChange={onTipAmountChange}
               onMemberCardUidChange={onMemberCardUidChange || (() => undefined)}
               onLookupMemberCard={onLookupMemberCard || (() => undefined)}

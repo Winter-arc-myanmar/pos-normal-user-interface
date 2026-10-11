@@ -179,7 +179,6 @@ export function CashierPage() {
   const [discountAmount, setDiscountAmount] = useState("0.0000");
   const [discountReasonId, setDiscountReasonId] = useState("");
   const [tipAmount, setTipAmount] = useState("0.0000");
-  const [serviceCharge, setServiceCharge] = useState("0.0000");
   const [nowMs, setNowMs] = useState(() => Date.now());
   const paymentInputRef = useRef<HTMLInputElement>(null);
   const payReturnViewRef = useRef("menu");
@@ -262,7 +261,6 @@ export function CashierPage() {
       setDiscountAmount("0.0000");
       setDiscountReasonId("");
       setTipAmount("0.0000");
-      setServiceCharge("0.0000");
       setLocalError(null);
       setNotice(message);
       setSearchParams({ view: "orders" });
@@ -430,7 +428,8 @@ export function CashierPage() {
     );
   }, [variantsByProductId]);
 
-  const { defaultTaxRate } = useVenueSetting();
+  const { defaultTaxRate, serviceChargeBps, serviceChargeOn, serviceChargeTaxRate } =
+    useVenueSetting();
   const { hasPermission } = usePermissions();
   const canTakePayment = hasPermission("sales:checkout:write");
   const formatAmount = useCallback((value: number) => value.toFixed(4), []);
@@ -446,18 +445,20 @@ export function CashierPage() {
       const unitPrice = basePrice + variantModifier;
       const ownRateId = product?.taxRateId;
       const fallback = ownRateId || variant?.taxRate ? null : defaultTaxRate;
+      const isPriceInclusive = fallback
+        ? fallback.isPriceInclusive
+        : (variant?.isPriceInclusive ?? product?.isPriceInclusive);
       const lineTotals = calcLineTotals({
         quantity: line.quantity,
         unitPrice,
         lineDiscount: line.lineDiscount || "0.0000",
         isTaxable: variant?.isTaxable ?? product?.isTaxable,
         taxRate: fallback ? fallback.rate : (variant?.taxRate ?? product?.taxRate),
-        isPriceInclusive: fallback
-          ? fallback.isPriceInclusive
-          : (variant?.isPriceInclusive ?? product?.isPriceInclusive),
+        isPriceInclusive,
       });
       return {
         ...line,
+        taxInclusive: Boolean(isPriceInclusive),
         unitPrice: formatAmount(unitPrice),
         taxRateId: lineTotals.taxAmount > 0 ? (ownRateId ?? fallback?.id) : line.taxRateId,
         taxAmount: formatAmount(lineTotals.taxAmount),
@@ -566,7 +567,7 @@ export function CashierPage() {
       const quantity = Number(line.quantity || 0);
       const unitPrice = Number(line.unitPrice || 0);
       const discount = Number(line.lineDiscount || 0);
-      const tax = Number(line.taxAmount || 0);
+      const tax = line.taxInclusive ? 0 : Number(line.taxAmount || 0);
       return sum + quantity * unitPrice - discount + tax;
     }, 0);
     if (!isDirectCheckoutMode && backendTotal > 0) {
@@ -580,15 +581,43 @@ export function CashierPage() {
     selectedOrder?.grandTotal,
   ]);
 
+  // The shop's service charge, as the server will add it: on the items after
+  // discounts and before tax, with the default taxes set to apply to it.
+  const { serviceCharge, serviceChargeTax } = useMemo(() => {
+    if (!serviceChargeBps || !serviceChargeOn.BAR) {
+      return { serviceCharge: 0, serviceChargeTax: 0 };
+    }
+    const lines = isDirectCheckoutMode ? activeOrderLines : displayOrderLines;
+    const preTax =
+      lines.reduce(
+        (sum, line) =>
+          sum +
+          Number(line.quantity || 0) * Number(line.unitPrice || 0) -
+          Number(line.lineDiscount || 0) -
+          (line.taxInclusive ? Number(line.taxAmount || 0) : 0),
+        0
+      ) - Math.max(0, Number(discountAmount) || 0);
+    const charge = (Math.max(0, preTax) * serviceChargeBps) / 10000;
+    return { serviceCharge: charge, serviceChargeTax: charge * serviceChargeTaxRate };
+  }, [
+    activeOrderLines,
+    discountAmount,
+    displayOrderLines,
+    isDirectCheckoutMode,
+    serviceChargeBps,
+    serviceChargeOn.BAR,
+    serviceChargeTaxRate,
+  ]);
+
   const orderTotal = useMemo(
     () =>
       payableTotal({
         lineTotal: lineSubtotal,
         orderDiscount: Number(discountAmount),
-        serviceCharge: Number(serviceCharge),
+        serviceCharge: serviceCharge + serviceChargeTax,
         tipAmount: Number(tipAmount),
       }).toFixed(4),
-    [discountAmount, lineSubtotal, serviceCharge, tipAmount]
+    [discountAmount, lineSubtotal, serviceCharge, serviceChargeTax, tipAmount]
   );
 
   const orderTax = useMemo(
@@ -699,7 +728,6 @@ export function CashierPage() {
       setDiscountAmount("0.0000");
       setDiscountReasonId("");
       setTipAmount("0.0000");
-      setServiceCharge("0.0000");
     }
     previousOrderIdRef.current = nextId;
   }, [selectedOrder?.id]);
@@ -1426,7 +1454,6 @@ export function CashierPage() {
 
       const orderDiscount = Math.max(0, Number(discountAmount) || 0);
       const tip = Math.max(0, Number(tipAmount) || 0);
-      const extraFee = Math.max(0, Number(serviceCharge) || 0);
       if (orderDiscount > lineSubtotal + 0.009) {
         throw new Error(t("cashier.errors.discountTooLarge"));
       }
@@ -1498,8 +1525,11 @@ export function CashierPage() {
         lines: printableLines(displayOrderLines),
         subtotal: lineSubtotal.toFixed(4),
         discount: orderDiscount > 0 ? toMoney(orderDiscount) : undefined,
-        tax: Number(orderTax) > 0 ? toMoney(Number(orderTax)) : undefined,
-        serviceCharge: extraFee > 0 ? toMoney(extraFee) : undefined,
+        tax:
+          Number(orderTax) + serviceChargeTax > 0
+            ? toMoney(Number(orderTax) + serviceChargeTax)
+            : undefined,
+        serviceCharge: serviceCharge > 0 ? toMoney(serviceCharge) : undefined,
         total: orderTotal,
         payments: checkoutPayments.map((payment) => ({
           name:
@@ -1527,7 +1557,6 @@ export function CashierPage() {
         await checkoutTableSession(selectedOrderSession.id, {
           payments: checkoutPayments,
           ...(tip > 0 ? { tipAmount: tip } : {}),
-          ...(extraFee > 0 ? { serviceCharge: extraFee } : {}),
           ...(discountReasonId ? { discountReasonId } : {}),
           ...(orderDiscount > 0 ? { totalDiscount: orderDiscount } : {}),
         });
@@ -1555,7 +1584,6 @@ export function CashierPage() {
           idempotencyKey: `checkout-${selectedOrder?.id || "direct"}-${Date.now()}`,
           ...(discountReasonId ? { discountReasonId } : {}),
           ...(tip > 0 ? { tipAmount: toMoney(tip) } : {}),
-          ...(extraFee > 0 ? { serviceCharge: toMoney(extraFee) } : {}),
           items: allocateOrderDiscountToLines(activeOrderLines, orderDiscount),
           payments: checkoutPayments,
         });
@@ -2078,7 +2106,6 @@ export function CashierPage() {
     setDiscountAmount("0.0000");
     setDiscountReasonId("");
     setTipAmount("0.0000");
-    setServiceCharge("0.0000");
     setLocalError(null);
     setNotice(null);
     setSearchParams({ view: "orders" });
@@ -2155,7 +2182,7 @@ export function CashierPage() {
         discountAmount={discountAmount}
         discountReasonId={discountReasonId}
         discountReasons={discountReasons}
-        serviceCharge={serviceCharge}
+        serviceCharge={toMoney(serviceCharge + serviceChargeTax)}
         tipAmount={tipAmount}
         memberCardUid={memberCardUid}
         memberPointsLabel={
@@ -2173,7 +2200,6 @@ export function CashierPage() {
           setDiscountAmount("0.0000");
           setDiscountReasonId("");
         }}
-        onServiceChargeChange={setServiceCharge}
         onTipAmountChange={setTipAmount}
         onMemberCardUidChange={setMemberCardUid}
         onLookupMemberCard={() => void handleLookupMemberCard()}
@@ -2204,9 +2230,11 @@ export function CashierPage() {
               Number(discountAmount) > 0
                 ? toMoney(Number(discountAmount))
                 : undefined,
-            tax: Number(orderTax) > 0 ? toMoney(Number(orderTax)) : undefined,
-            serviceCharge:
-              Number(serviceCharge) > 0 ? toMoney(Number(serviceCharge)) : undefined,
+            tax:
+              Number(orderTax) + serviceChargeTax > 0
+                ? toMoney(Number(orderTax) + serviceChargeTax)
+                : undefined,
+            serviceCharge: serviceCharge > 0 ? toMoney(serviceCharge) : undefined,
             total: orderTotal,
           })
         }
