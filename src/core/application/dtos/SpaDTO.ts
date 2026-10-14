@@ -84,6 +84,13 @@ export interface SpaChargeResultDTO {
   quote: SpaSessionQuote;
 }
 
+/** A tip as a room paid as it goes ends: from its card, or by cash and the like. */
+export interface RoomTipDTO extends RoomOrderCardDTO {
+  amount: string;
+  paymentMethodId: string;
+}
+
 export interface CloseSpaSessionDTO {
   closedAt?: string;
+  tip?: RoomTipDTO;
 }

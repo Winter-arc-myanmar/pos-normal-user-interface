@@ -30,6 +30,7 @@ export function SpaBillPanel({
   itemNames,
   nowMs,
   isBusy,
+  tip = 0,
   billClosed,
   paid = false,
   onPrimary,
@@ -60,6 +61,7 @@ export function SpaBillPanel({
   itemNames: Record<string, string>;
   nowMs: number;
   isBusy: boolean;
+  tip?: number;
   billClosed: boolean;
   paid?: boolean;
   onPrimary: () => void;
@@ -439,11 +441,17 @@ export function SpaBillPanel({
             <span>−{money(discount)}</span>
           </p>
         ) : null}
+        {!prepaid && tip > 0 ? (
+          <p className="flex justify-between text-slate-300">
+            <span>{tr("tip")}</span>
+            <span>{money(tip)}</span>
+          </p>
+        ) : null}
         {!prepaid ? (
           <>
             <p className="flex justify-between pt-1 text-base font-bold">
               <span>{tr("estimatedTotal")}</span>
-              <span>{money(estimateCardCharge({ runningTotal, discountBps }))}</span>
+              <span>{money(estimateCardCharge({ runningTotal, discountBps, tip }))}</span>
             </p>
             <p className="text-[11px] text-slate-500">{tr("taxNote")}</p>
           </>
