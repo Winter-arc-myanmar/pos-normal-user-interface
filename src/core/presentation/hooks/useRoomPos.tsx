@@ -170,6 +170,7 @@ export function useRoomPos(kind: RoomKind) {
         fromKtvQuote(
           await ktvCloseSession(id, {
             closedAt: payload.closedAt || new Date().toISOString(),
+            ...(payload.tip ? { tip: payload.tip } : {}),
           })
         ),
       extendSession: async (id: string, payload: ExtendSpaSessionDTO) => {
