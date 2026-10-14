@@ -237,6 +237,14 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   );
   const [otherMethodId, setOtherMethodId] = useState("");
   const tipValue = Math.max(0, Number(tip) || 0);
+  // A tip on a room paid as it goes: from its card, or by cash and the like.
+  const tipMethods = [
+    ...(card && cardMethod && cardMethod.id !== LOCAL_MEMBER_CARD_METHOD_ID ? [cardMethod] : []),
+    ...otherMethods,
+  ];
+  const [tipMethodId, setTipMethodId] = useState("");
+  const tipMethod = tipMethods.find((method) => method.id === tipMethodId) || tipMethods[0];
+  const tipReceiptRow = tipValue > 0 ? [{ label: tr("tip"), amount: tipValue.toFixed(4) }] : [];
   const cashValue = splitCash ? Math.max(0, Number(cashAmount) || 0) : 0;
   const estimatedCard = estimateCardCharge({
     // A bill paid at the end comes due with its tax and service charge.
@@ -571,6 +579,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     setPending([]);
     setPaid(null);
     setTip("");
+    setTipMethodId("");
     setCashAmount("");
     setSplitCash(false);
     await loadBill(next);
@@ -1002,10 +1011,24 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       setActionError(tr("errors.pendingItems"));
       return;
     }
+    if (tipValue > 0 && !tipMethod) {
+      setActionError(tr("errors.tipMethod"));
+      return;
+    }
     setActionError(null);
     setIsPaying(true);
     try {
-      const final = await closeSession(session.id, {});
+      const tipPayment =
+        tipValue > 0 && tipMethod
+          ? {
+              amount: tipValue.toFixed(4),
+              paymentMethodId: tipMethod.id,
+              ...(tipMethod.id === cardMethod?.id && card ? { guestCardId: card.id } : {}),
+              posSessionId: (await requireCashierContext()).posSessionId,
+              idempotencyKey: `${kind}-tip-${session.id}`,
+            }
+          : undefined;
+      const final = await closeSession(session.id, tipPayment ? { tip: tipPayment } : {});
       writeResume(kind, null);
       await fetchBoard();
       try {
@@ -1036,6 +1059,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                 modifierPrices: modifiers.prices,
               };
             }),
+          amounts: tipReceiptRow,
           total: String(final.paidTotal || final.runningTotal || "0"),
         });
       } catch (printError) {
@@ -1232,6 +1256,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               modifierPrices: modifiers.prices,
             };
           }),
+        amounts: tipReceiptRow,
         total: result.grandTotal,
         payments: [{ name: methodName, amount: result.totalPaid || result.grandTotal }],
       });
@@ -1742,6 +1767,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             itemNames={itemNames}
             nowMs={nowMs}
             isBusy={isLoading || isPaying || isAdding}
+            tip={tipValue}
             billClosed={billClosed}
             paid={Boolean(paid)}
             primaryLabel={
@@ -2220,6 +2246,41 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             <p className="text-sm text-slate-300">
               {tr("endDescription", { amount: money(quote?.paidTotal) })}
             </p>
+            <label className="block text-sm">
+              {tr("tip")}
+              <input
+                type="number"
+                min={0}
+                value={tip}
+                onChange={(event) => setTip(event.target.value)}
+                className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2"
+              />
+            </label>
+            {tipValue > 0 ? (
+              <div className="space-y-2">
+                <p className="text-sm">{tr("tipPaidWith")}</p>
+                <div className="flex flex-wrap gap-2">
+                  {tipMethods.map((method) => (
+                    <button
+                      key={method.id}
+                      type="button"
+                      aria-pressed={tipMethod?.id === method.id}
+                      onClick={() => setTipMethodId(method.id)}
+                      className={`rounded border px-3 py-1.5 text-sm ${
+                        tipMethod?.id === method.id
+                          ? "border-emerald-500 bg-emerald-500/15"
+                          : "border-slate-700"
+                      }`}
+                    >
+                      {method.name}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-sm font-semibold">
+                  {tr("totalWithTip", { amount: money(Number(quote?.paidTotal || 0) + tipValue) })}
+                </p>
+              </div>
+            ) : null}
             <div className="grid grid-cols-2 gap-2">
               <Button variant="secondary" onClick={() => setConfirmEnd(false)}>
                 {t("common.cancel")}

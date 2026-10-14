@@ -2,6 +2,7 @@ import { createRef, type ComponentProps } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { DiningTable, PaymentMethod, SalesOrder, SalesOrderLine } from "@/core/domain/entities/Cashier";
+import type { RunningPromotion } from "@/core/domain/entities/Promotion";
 import { OrderPanel } from "../OrderPanel";
 
 vi.mock("react-i18next", () => ({
@@ -57,6 +58,19 @@ const defaultProps: ComponentProps<typeof OrderPanel> = {
   onPickup: vi.fn(),
   onTableStatusChange: vi.fn(),
   onSessionStateChange: vi.fn(),
+};
+
+const promotion: RunningPromotion = {
+  id: "promo-1",
+  name: "Special Menu",
+  discountType: "PERCENT_OFF",
+  discountValue: 10,
+  buyUnits: null,
+  freeUnits: null,
+  appliesTo: "ALL_ITEMS",
+  productGroups: [],
+  variantIds: [],
+  priorityLevel: 0,
 };
 
 describe("OrderPanel", () => {
@@ -201,5 +215,53 @@ describe("OrderPanel", () => {
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByLabelText("cashier.orderPanel.discount")).toBeInTheDocument();
+  });
+
+  it("shows the promotions running and the discount the server already took", () => {
+    render(
+      <OrderPanel
+        {...defaultProps}
+        selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
+        selectedOrderLines={[
+          new SalesOrderLine({
+            ...line,
+            appliedPromotionId: "promo-1",
+            lineDiscount: "1.0000",
+          }),
+        ]}
+        promotions={[promotion]}
+        promotionName={(id) => (id === "promo-1" ? "Special Menu" : undefined)}
+      />
+    );
+
+    expect(screen.getByText("cashier.orderPanel.promotionsNow")).toBeInTheDocument();
+    expect(screen.getByText("Special Menu (10%)")).toBeInTheDocument();
+    expect(screen.getByText("cashier.orderPanel.promo")).toBeInTheDocument();
+    expect(screen.getByText("cashier.orderPanel.promoSaving")).toBeInTheDocument();
+    expect(screen.getByText("cashier.orderPanel.promotionDiscount")).toBeInTheDocument();
+    expect(screen.getByText("−1")).toBeInTheDocument();
+    // The promotion is inside the line: 10.00 charged, 1.00 off.
+    expect(screen.getByText("9.00")).toBeInTheDocument();
+  });
+
+  it("previews the saving on a line the server has not priced yet", () => {
+    render(
+      <OrderPanel
+        {...defaultProps}
+        selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
+        selectedOrderLines={[line]}
+        promotions={[promotion]}
+        promotionDiscounts={{ "variant-1": { discount: 1, names: ["Special Menu"] } }}
+      />
+    );
+
+    expect(screen.getByText("cashier.orderPanel.promo")).toBeInTheDocument();
+    expect(screen.getByText("cashier.orderPanel.promoSaving")).toBeInTheDocument();
+    // 10.00 on the line, 1.00 of promotion still to come off.
+    expect(screen.getByText("9.00")).toBeInTheDocument();
+    // Nothing is on the bill yet, so the total carries no discount row.
+    expect(
+      screen.queryByText("cashier.orderPanel.promotionDiscount")
+    ).not.toBeInTheDocument();
   });
 });

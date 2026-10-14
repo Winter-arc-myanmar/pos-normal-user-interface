@@ -1099,7 +1099,12 @@
       "keepOrder": "Keep order",
       "confirmCancelOrder": "Cancel order",
       "orderCancelled": "Order cancelled.",
-      "paymentAtCashier": "The cashier takes payment for this order."
+      "paymentAtCashier": "The cashier takes payment for this order.",
+      "promotionsNow": "Promotions now:",
+      "promo": "PROMO",
+      "promoFreeTime": "buy {{buy}}, get {{free}} free",
+      "promoSaving": "{{name}} −{{amount}}",
+      "promotionDiscount": "Promotion discount"
     },
     "errors": {
       "missingContext": "Missing tenant or inventory location context. Ensure your tenant has at least one inventory location configured.",
@@ -1483,7 +1488,8 @@
       "pendingItems": "Add or clear the new items before paying.",
       "extend": "Unable to extend this treatment.",
       "foc": "Could not give the items free",
-      "packages": "Couldn't load the service packages: {{message}}"
+      "packages": "Couldn't load the service packages: {{message}}",
+      "tipMethod": "Choose how the tip is paid"
     },
     "item": "Item",
     "treatmentSoFar": "Treatment so far",
@@ -1531,7 +1537,7 @@
     "confirmExtendTitle": "Pay for {{count}} more sessions",
     "endTreatment": "End treatment",
     "endTitle": "End treatment in {{room}}?",
-    "endDescription": "Paid so far {{amount}}. Nothing more will be charged, and the room goes for cleaning.",
+    "endDescription": "Paid so far {{amount}}. Add a tip below if the guest gives one; nothing else is charged, and the room goes for cleaning.",
     "treatmentEnded": "Treatment in {{room}} ended · paid {{amount}}.",
     "refundLine": "Refund to card",
     "sessionPriceLabel": "Room price per session",
@@ -1581,7 +1587,9 @@
     "roomChargeBlock": "{{minutes}} min",
     "roomChargeClock": "{{name}}: the time used is added to the bill when the treatment ends.",
     "freePackageAdded": "+{{count}} free {{package}} · {{name}}",
-    "roomChargeFree": "{{count}} free"
+    "roomChargeFree": "{{count}} free",
+    "tipPaidWith": "Tip paid with",
+    "totalWithTip": "Total with tip {{amount}}"
   },
   "statusBadge": {
     "verified": "Verified",

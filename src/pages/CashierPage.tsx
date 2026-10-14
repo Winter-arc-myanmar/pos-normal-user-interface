@@ -17,6 +17,7 @@ import {
 import { useAuth } from "@/core/presentation/hooks/useAuth";
 import { useCashier } from "@/core/presentation/hooks/useCashier";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
+import { usePromotions } from "@/core/presentation/hooks/usePromotions";
 import { useKdsStationManagement } from "@/core/presentation/hooks/useKdsStationManagement";
 import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
 import { modifierPrintText } from "@/lib/printing/modifierText";
@@ -50,6 +51,7 @@ import {
 } from "@/lib/pos/checkoutAdjustments";
 import { isUnspendableWalletStatus } from "@/lib/pos/guestWalletAmounts";
 import { isSettledSalesOrder } from "@/lib/pos/orderStatus";
+import { promotionPreviewItems } from "@/lib/pos/promotions";
 import {
   findOpenTableSession,
   isOpenTableSession,
@@ -549,6 +551,15 @@ export function CashierPage() {
     selectedOrderLines,
     variantById,
   ]);
+
+  // Promotions for the shop's own menu (the BAR area), shown the same way the room
+  // tills show them. The server applies them itself; this only shows the saving.
+  const promotions = usePromotions(
+    "BAR",
+    locationId || undefined,
+    () => promotionPreviewItems(displayOrderLines),
+    selectedOrder?.id
+  );
 
   const orderedProductQuantities = useMemo(() => {
     return displayOrderLines.reduce<Record<string, number>>((quantities, line) => {
@@ -2179,6 +2190,9 @@ export function CashierPage() {
         onDecreaseLineQuantity={(line) => void handleDecreaseLineQuantity(line)}
         onRemoveLine={(line) => void handleRemoveLine(line)}
         onToggleFoc={(line) => void handleToggleFoc(line)}
+        promotions={promotions.running}
+        promotionDiscounts={promotions.discounts}
+        promotionName={promotions.promotionName}
         discountAmount={discountAmount}
         discountReasonId={discountReasonId}
         discountReasons={discountReasons}
