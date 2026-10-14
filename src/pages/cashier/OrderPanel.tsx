@@ -19,6 +19,15 @@ import { OrderTabs } from "./OrderTabs";
 import { OrderAdjustments } from "./OrderAdjustments";
 import { isSettledSalesOrder } from "@/lib/pos/orderStatus";
 import { isFocLine } from "@/lib/pos/checkoutAdjustments";
+import type {
+  PromotionDiscount,
+  RunningPromotion,
+} from "@/core/domain/entities/Promotion";
+import {
+  appliedPromotionDiscount,
+  linePromotionSaving,
+  promotionSummary,
+} from "@/lib/pos/promotions";
 
 interface OrderPanelProps {
   selectedOrder: SalesOrder | null;
@@ -46,6 +55,12 @@ interface OrderPanelProps {
   onDecreaseLineQuantity: (line: SalesOrderLine) => void;
   onRemoveLine: (line: SalesOrderLine) => void;
   onToggleFoc?: (line: SalesOrderLine) => void;
+  /** Promotions running at this till, as the server tells them. */
+  promotions?: RunningPromotion[];
+  /** What the running promotions take off the lines they have not priced yet. */
+  promotionDiscounts?: Record<string, PromotionDiscount>;
+  /** The name of a promotion already applied to a line, when it still exists. */
+  promotionName?: (id: string | undefined) => string | undefined;
   discountAmount?: string;
   discountReasonId?: string;
   discountReasons?: AdjustmentReason[];
@@ -104,6 +119,9 @@ export function OrderPanel({
   onDecreaseLineQuantity,
   onRemoveLine,
   onToggleFoc,
+  promotions = [],
+  promotionDiscounts = {},
+  promotionName = () => undefined,
   discountAmount = "0.0000",
   discountReasonId = "",
   discountReasons = [],
@@ -142,6 +160,10 @@ export function OrderPanel({
   const checkoutReady = isSplitMode
     ? splitTenderCount > 0 && splitRemaining <= 0.009
     : Boolean(paymentMethodId) && Number(paymentAmount) > 0;
+  const money = (value: number) =>
+    value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  /** The savings the server already credited, so they are inside the total. */
+  const promotionDiscount = appliedPromotionDiscount(selectedOrderLines);
 
   useEffect(() => {
     if (!hasActiveOrder) setConfirmCancelOrder(false);
@@ -191,6 +213,23 @@ export function OrderPanel({
               </span>
             </div>
 
+            {promotions.length ? (
+              <p className="mt-2 rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs text-emerald-800">
+                <span className="font-semibold">
+                  {t("cashier.orderPanel.promotionsNow")}
+                </span>{" "}
+                {promotions
+                  .map((promotion) =>
+                    promotionSummary(promotion, {
+                      freeTime: (buy, free) =>
+                        t("cashier.orderPanel.promoFreeTime", { buy, free }),
+                      money,
+                    })
+                  )
+                  .join(" · ")}
+              </p>
+            ) : null}
+
             <div className="space-y-2 py-3">
               {selectedOrderLines.map((line) => {
                 const lineTotal =
@@ -202,22 +241,53 @@ export function OrderPanel({
                   Number.isFinite(quantity) && quantity % 1 === 0
                     ? String(Math.round(quantity))
                     : String(line.quantity || "0");
+                // What the promotions take off this line: what the server already
+                // credited it, or what the running rules would take off it.
+                const saving = linePromotionSaving(line, promotionDiscounts);
+                const promoLabel =
+                  (line.appliedPromotionId
+                    ? promotionName(line.appliedPromotionId)
+                    : undefined) ||
+                  saving?.names.join(", ") ||
+                  (saving ? t("cashier.orderPanel.promo") : "");
+                // A previewed saving is not on the bill yet, so take it off here.
+                const lineDue =
+                  lineTotal - (saving && !line.appliedPromotionId ? saving.amount : 0);
                 return (
                   <div
                     key={line.id}
                     className="rounded border border-slate-200 bg-slate-50 p-2"
                   >
                     <div className="flex items-baseline justify-between gap-2">
-                      <span className="min-w-0 truncate text-sm font-medium">
-                        {resolveLineName(line)}
+                      <span className="flex min-w-0 items-baseline gap-1.5 text-sm font-medium">
+                        {saving ? (
+                          <span
+                            className="shrink-0 rounded border border-emerald-600 px-1 text-[10px] font-semibold tracking-wide text-emerald-700"
+                            title={promoLabel}
+                          >
+                            {t("cashier.orderPanel.promo")}
+                          </span>
+                        ) : null}
+                        <span className="min-w-0 truncate">{resolveLineName(line)}</span>
                       </span>
                       <span className="shrink-0 text-sm tabular-nums">
-                        {lineTotal.toFixed(2)}
+                        {lineDue.toFixed(2)}
                       </span>
                     </div>
                     <p className="mt-0.5 text-xs tabular-nums text-slate-600">
-                      {line.unitPrice ?? "0.0000"}
+                      <span className={saving ? "text-slate-400 line-through" : ""}>
+                        {line.unitPrice ?? "0.0000"}
+                      </span>
+                      {saving && promoLabel ? ` · ${promoLabel}` : ""}
                     </p>
+                    {saving ? (
+                      <p className="mt-0.5 text-xs font-medium text-emerald-700">
+                        {t("cashier.orderPanel.promoSaving", {
+                          name: promoLabel,
+                          amount: money(saving.amount),
+                        })}
+                      </p>
+                    ) : null}
                     <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
                       <button
                         type="button"
@@ -291,6 +361,12 @@ export function OrderPanel({
 
       {hasActiveOrder ? (
         <div className="max-h-[48vh] shrink-0 space-y-2 overflow-y-auto border-t border-slate-200 pt-3">
+          {promotionDiscount > 0 ? (
+            <p className="flex items-center justify-between text-sm text-emerald-700">
+              <span>{t("cashier.orderPanel.promotionDiscount")}</span>
+              <span className="tabular-nums">−{money(promotionDiscount)}</span>
+            </p>
+          ) : null}
           <div className="flex items-center justify-between font-semibold">
             <span>{t("cashier.total")}</span>
             <span>{total}</span>

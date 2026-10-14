@@ -1099,7 +1099,12 @@
       "keepOrder": "Keep order",
       "confirmCancelOrder": "Cancel order",
       "orderCancelled": "Order cancelled.",
-      "paymentAtCashier": "The cashier takes payment for this order."
+      "paymentAtCashier": "The cashier takes payment for this order.",
+      "promotionsNow": "Promotions now:",
+      "promo": "PROMO",
+      "promoFreeTime": "buy {{buy}}, get {{free}} free",
+      "promoSaving": "{{name}} −{{amount}}",
+      "promotionDiscount": "Promotion discount"
     },
     "errors": {
       "missingContext": "Missing tenant or inventory location context. Ensure your tenant has at least one inventory location configured.",
