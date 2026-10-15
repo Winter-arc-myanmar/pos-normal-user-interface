@@ -272,7 +272,7 @@ describe("station print routing", () => {
       })
     );
 
-    expect(slip).toContain("2  DISH SOAP");
+    expect(slip).toContain("2 x DISH SOAP");
     expect(slip).toContain("+ No ice");
     expect(slip).toContain("HOT LINE");
   });
@@ -360,7 +360,7 @@ describe("station print routing", () => {
     for (const rows of [checkoutPlain, financePlain]) {
       expect(rows.join("\n")).toMatch(/Beer[^\n]*\n\n1 x Soup/);
     }
-    expect(kitchenPlain.join("\n")).toMatch(/BEER\n\n1  SOUP/);
+    expect(kitchenPlain.join("\n")).toMatch(/BEER\n\n1 x SOUP/);
   });
 
   it("prints every enabled template section for checkout, finance, and kitchen", () => {

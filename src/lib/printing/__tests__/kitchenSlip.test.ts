@@ -62,6 +62,6 @@ describe("the kitchen slip", () => {
     expect(text).toContain("VIP Lounge K3");
     expect(text).toContain("Sent by Aung Aung (ID: SHW0001)");
     expect(text).toContain("Order SO-0012");
-    expect(text).toContain("1  FRIED RICE");
+    expect(text).toContain("1 x FRIED RICE");
   });
 });
