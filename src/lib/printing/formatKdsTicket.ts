@@ -474,12 +474,13 @@ function kitchenLayout(slip: KitchenSlip): Layout {
   const size = itemSizeFor(settings, true);
   lines.forEach((item, index) => {
     if (index) layout.gap();
-    const quantity = quantityText(item.quantity).padEnd(3);
-    const columns = layout.columns(size) - quantity.length;
+    // The quantity leads the name with an "x" after it, as the receipt prints it.
+    const lead = `${quantityText(item.quantity)} x `;
+    const columns = layout.columns(size) - lead.length;
     const [first, ...rest] = wrapText(item.name.toUpperCase(), columns);
-    layout.rows.push({ kind: "text", text: `${quantity}${first}`, size, bold: true });
+    layout.rows.push({ kind: "text", text: `${lead}${first}`, size, bold: true });
     for (const part of rest) {
-      layout.rows.push({ kind: "text", text: `${" ".repeat(quantity.length)}${part}`, size, bold: true });
+      layout.rows.push({ kind: "text", text: `${" ".repeat(lead.length)}${part}`, size, bold: true });
     }
     if (settings?.item.bilingual) layout.indented(3, item.altName);
     if (showPrices && item.unitPrice) layout.indented(3, `@ ${printMoney(item.unitPrice)}`);

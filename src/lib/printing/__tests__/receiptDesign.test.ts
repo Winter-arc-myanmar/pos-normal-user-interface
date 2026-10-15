@@ -173,7 +173,7 @@ describe("kitchen slip design", () => {
     });
     expect(printed).toContain("\x1dB\x01");
     expect(printed).toContain("\x1b!\x38VIP Lounge K3");
-    expect(printed).toContain("\x1b!\x182  BEER");
+    expect(printed).toContain("\x1b!\x182 x BEER");
   });
 
   it("shows the time sent, notes, seat and how many items", () => {
