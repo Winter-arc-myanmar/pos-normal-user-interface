@@ -59,3 +59,37 @@ export function lineDisplayName(line: {
   if (isHumanDisplayName(line.sku)) return line.sku.trim();
   return "";
 }
+
+/** An order's lines by id, so a refund can show an item's name instead of its line id. */
+export function orderLineLabelsById(
+  lines: Array<{
+    id?: string;
+    productName?: string;
+    variantName?: string;
+    sku?: string;
+  }>
+): Map<string, string> {
+  const labels = new Map<string, string>();
+  for (const line of lines) {
+    const id = String(line.id || "").trim();
+    const name = id ? lineDisplayName(line) : "";
+    if (id && name) labels.set(id, name);
+  }
+  return labels;
+}
+
+/** The name of the item a refund line gives back, when the order's lines are loaded. */
+export function refundLineName(
+  line: { salesOrderLineId?: string },
+  labels: Map<string, string>
+): string | undefined {
+  return labels.get(String(line.salesOrderLineId || "").trim());
+}
+
+/** A refund line's title: the item's name, or its sales order line id when it cannot be resolved. */
+export function refundLineLabel(
+  line: { salesOrderLineId?: string },
+  labels: Map<string, string>
+): string {
+  return refundLineName(line, labels) || String(line.salesOrderLineId || "");
+}

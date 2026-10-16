@@ -1790,6 +1790,21 @@
   "Item": {
     "my": "ပစ္စည်း"
   },
+  "Select item": {
+    "my": "ပစ္စည်း ရွေးပါ"
+  },
+  "No items on this sales order to refund.": {
+    "my": "ဤအရောင်းအော်ဒါတွင် ပြန်အမ်းရန် ပစ္စည်း မရှိပါ။"
+  },
+  "Loading items...": {
+    "my": "ပစ္စည်းများ ဖွင့်နေသည်..."
+  },
+  "Enter a sales order to load its items.": {
+    "my": "ပစ္စည်းများ ဖွင့်ရန် အရောင်းအော်ဒါ ထည့်ပါ။"
+  },
+  "Could not load the order's items.": {
+    "my": "အော်ဒါ၏ ပစ္စည်းများကို ဖွင့်၍ မရပါ။"
+  },
   "Walk-in": {
     "my": "တိုက်ရိုက်လာ"
   },
