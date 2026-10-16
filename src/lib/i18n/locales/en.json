@@ -2,7 +2,8 @@
   "receipt": {
     "startTime": "Start time",
     "endTime": "End time",
-    "printFailed": "Receipt print failed"
+    "printFailed": "Receipt print failed",
+    "tip": "Tip"
   },
   "common": {
     "refresh": "Refresh",

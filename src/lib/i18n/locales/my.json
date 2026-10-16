@@ -2,7 +2,8 @@
   "receipt": {
     "startTime": "စတင်ချိန်",
     "endTime": "ပြီးဆုံးချိန်",
-    "printFailed": "ပြေစာ ပုံနှိပ်၍ မရပါ"
+    "printFailed": "ပြေစာ ပုံနှိပ်၍ မရပါ",
+    "tip": "တိပ်"
   },
   "common": {
     "refresh": "ပြန်လည်စစ်မည်",

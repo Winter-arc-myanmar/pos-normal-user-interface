@@ -71,6 +71,7 @@ export function PosWorkspaceSetupModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-8"
       role="dialog"
       aria-modal="true"
+      aria-busy={isLoading}
       aria-labelledby="pos-workspace-setup-title"
     >
       <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900">
@@ -133,6 +134,12 @@ export function PosWorkspaceSetupModal({
             </select>
           </div>
 
+          {isLoading ? (
+            <p role="status" className="text-xs text-slate-500 dark:text-slate-400">
+              {t("common.loading")}
+            </p>
+          ) : null}
+
           {activePosRegisterId && shift ? (
             <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
               {shift.shiftRule === "DAILY" ? t("shift.dailyShift") : t("shift.perLoginShift")}
@@ -143,7 +150,12 @@ export function PosWorkspaceSetupModal({
             <div className="space-y-2 rounded-lg border border-red-900/60 bg-red-950/40 p-3">
               <p className="font-medium text-red-200">{t("shift.dayOver")}</p>
               <p className="text-sm text-red-300">{t("shift.dayOverHint")}</p>
-              <Button type="button" variant="destructive" onClick={() => setClosingId(activePosSessionId)}>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={isLoading}
+                onClick={() => setClosingId(activePosSessionId)}
+              >
                 {t("shift.closeDay")}
               </Button>
             </div>
@@ -155,7 +167,12 @@ export function PosWorkspaceSetupModal({
                 {t("shift.openBy", { name: someoneElses.cashierName ?? "—" })}
               </p>
               <p className="text-sm text-amber-300/90">{t("shift.openByHint")}</p>
-              <Button type="button" variant="secondary" onClick={() => setClosingId(someoneElses.id)}>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={isLoading}
+                onClick={() => setClosingId(someoneElses.id)}
+              >
                 {t("shift.closeTheirs")}
               </Button>
             </div>
@@ -179,6 +196,7 @@ export function PosWorkspaceSetupModal({
             <Button
               type="button"
               variant="secondary"
+              isLoading={isLoading}
               disabled={
                 isLoading || !activePosRegisterId || Boolean(activePosSessionId || someoneElses)
               }
@@ -198,8 +216,9 @@ export function PosWorkspaceSetupModal({
           {onLogout ? (
             <button
               type="button"
+              disabled={isLoading}
               onClick={onLogout}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               {t("shell.logout")}
             </button>

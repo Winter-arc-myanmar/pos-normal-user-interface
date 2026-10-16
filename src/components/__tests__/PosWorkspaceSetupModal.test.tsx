@@ -104,4 +104,14 @@ describe("PosWorkspaceSetupModal shifts", () => {
     expect(labels.some((label) => /\(R\d+\)/.test(label))).toBe(false);
     expect(labels.indexOf("Bar counter")).toBeLessThan(labels.indexOf("Front desk"));
   });
+
+  it("locks the dialog and says it is loading while the workspace resolves", () => {
+    renderModal({ isLoading: true });
+
+    expect(screen.getByRole("status")).toHaveTextContent("common.loading");
+    expect(screen.getByLabelText("cashier.location")).toBeDisabled();
+    expect(screen.getByLabelText("cashier.pos.register")).toBeDisabled();
+    expect(screen.getByText("shift.openButton").closest("button")).toBeDisabled();
+    expect(screen.getByText("cashier.pos.continue").closest("button")).toBeDisabled();
+  });
 });

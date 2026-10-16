@@ -39,6 +39,8 @@ export interface ShiftSummary {
   refundCount: number;
   nonSalesCashIn: number;
   nonSalesCashOut: number;
+  /** The tips taken on this shift, when the summary reports them. */
+  tipAmount?: number;
   paymentBreakdown: { methodName: string; transactionCount: number; totalAmount: number }[];
 }
 

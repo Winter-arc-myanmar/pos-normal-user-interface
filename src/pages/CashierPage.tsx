@@ -1543,6 +1543,10 @@ export function CashierPage() {
             ? toMoney(Number(orderTax) + serviceChargeTax)
             : undefined,
         serviceCharge: serviceCharge > 0 ? toMoney(serviceCharge) : undefined,
+        // The tip is inside the total below, so the slip says so.
+        ...(tip > 0
+          ? { amounts: [{ label: t("receipt.tip"), amount: toMoney(tip) }] }
+          : {}),
         total: orderTotal,
         payments: checkoutPayments.map((payment) => ({
           name:
@@ -2251,6 +2255,9 @@ export function CashierPage() {
                 ? toMoney(Number(orderTax) + serviceChargeTax)
                 : undefined,
             serviceCharge: serviceCharge > 0 ? toMoney(serviceCharge) : undefined,
+            ...(Number(tipAmount) > 0
+              ? { amounts: [{ label: t("receipt.tip"), amount: toMoney(Number(tipAmount)) }] }
+              : {}),
             total: orderTotal,
           })
         }
