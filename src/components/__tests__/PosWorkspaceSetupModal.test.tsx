@@ -87,4 +87,21 @@ describe("PosWorkspaceSetupModal shifts", () => {
     fireEvent.click(screen.getByText("cashier.pos.continue"));
     expect(onContinue).not.toHaveBeenCalled();
   });
+
+  it("lists tills by name only, in name order", () => {
+    renderModal({
+      posRegisters: [
+        { id: "reg-2", name: "Bar counter", code: "R02" },
+        { id: "reg-1", name: "Front desk", code: "R01" },
+      ] as never,
+    });
+
+    const labels = screen.getAllByRole("option").map((option) => option.textContent ?? "");
+
+    expect(labels).toContain("Front desk");
+    expect(labels).toContain("Bar counter");
+    expect(screen.queryByText("Front desk (R01)")).toBeNull();
+    expect(labels.some((label) => /\(R\d+\)/.test(label))).toBe(false);
+    expect(labels.indexOf("Bar counter")).toBeLessThan(labels.indexOf("Front desk"));
+  });
 });
