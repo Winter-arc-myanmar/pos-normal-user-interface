@@ -6,6 +6,7 @@ import { SplitPaymentTenderDTO } from "@/core/application/dtos/CashierDTO";
 import { PaymentMethod } from "@/core/domain/entities/Cashier";
 import { isMemberCardPaymentMethod } from "@/lib/pos/paymentMethods";
 import { remainingReceivable } from "@/lib/pos/splitPayments";
+import { formatPosMoney } from "@/lib/pos/orderListDisplay";
 
 interface MemberCardLookupProps {
   cardUid: string;
@@ -100,9 +101,8 @@ function CloseSplitIcon() {
   );
 }
 
-function formatMoney(value: number): string {
-  return (Number.isFinite(value) ? value : 0).toFixed(2);
-}
+/** Amounts on the pay screen read the same way as the cart's: two decimals. */
+const formatMoney = (value: number): string => formatPosMoney(value);
 
 /** Overlay the card lookup on phones and any portrait POS, not just <768px. */
 const CARD_LOOKUP_SHEET_MQ = "(max-width: 1023px), (orientation: portrait)";

@@ -8,6 +8,16 @@ export function formatPosQuantity(value: unknown): string {
   }).format(parsed);
 }
 
+/** Money as the till shows it: two decimals, however exact the API's figures are. */
+export function formatPosMoney(value: string | number | null | undefined): string {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return "0.00";
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(parsed);
+}
+
 export function salesOrderServiceTypeKey(serviceType?: string): string {
   switch (String(serviceType || "").toUpperCase()) {
     case "TABLE":
@@ -92,4 +102,27 @@ export function refundLineLabel(
   labels: Map<string, string>
 ): string {
   return refundLineName(line, labels) || String(line.salesOrderLineId || "");
+}
+
+/**
+ * A variant as the till names it: the name the order saved it with, else the
+ * catalogue's readable options ("Large / Black"), else its SKU. A line whose
+ * variant is unknown reads as an empty string, so callers can hide the row.
+ */
+export function variantDisplayName(variant: {
+  variantName?: string;
+  name?: string;
+  sku?: string;
+  variantSku?: string;
+  matrixOptions?: Record<string, unknown>;
+}): string {
+  const named = [variant.variantName, variant.name].find(isHumanDisplayName);
+  if (named) return String(named).trim();
+  const options = Object.values(variant.matrixOptions || {})
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean)
+    .join(" / ");
+  if (options) return options;
+  const code = [variant.variantSku, variant.sku].find(isHumanDisplayName);
+  return code ? String(code).trim() : "";
 }

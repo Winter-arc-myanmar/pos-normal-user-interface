@@ -389,6 +389,51 @@ const ticketLineName = (row: Record<string, unknown>) => {
   );
 };
 
+const UUID_LIKE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** A value the till can show as a name: not blank, and not a raw id. */
+const asName = (value: unknown): string | undefined => {
+  if (value === null || value === undefined) return undefined;
+  const text = String(value).trim();
+  return text && !UUID_LIKE.test(text) ? text : undefined;
+};
+
+const nestedAsName = (value: unknown, keys: string[]): string | undefined => {
+  const record = asRecord(value);
+  if (!record) return undefined;
+  for (const key of keys) {
+    const name = asName(record[key]);
+    if (name) return name;
+  }
+  return undefined;
+};
+
+/**
+ * What an order line's item is called, wherever the API puts it: on the line, or
+ * on the product and variant it belongs to. Without these names the till has to
+ * look the variant up in the menu it happens to have loaded, so a line read back
+ * after a refresh shows its SKU, or a slice of its id, instead of the item's name.
+ */
+const readSalesOrderLineNames = (item: Record<string, unknown>) => {
+  const salesOrderLine = asRecord(item.salesOrderLine);
+  const product = asRecord(item.product) || asRecord(salesOrderLine?.product);
+  const variant = asRecord(item.variant) || asRecord(salesOrderLine?.variant);
+  return {
+    productName:
+      asName(item.productName) ||
+      asName(item.name) ||
+      nestedAsName(product, ["name", "productName"]) ||
+      nestedAsName(variant?.product, ["name"]),
+    variantName:
+      asName(item.variantName) ||
+      nestedAsName(variant, ["name", "variantName", "variantSku"]),
+    sku:
+      asName(item.sku) ||
+      asName(item.variantSku) ||
+      nestedAsName(variant, ["variantSku", "sku"]),
+  };
+};
+
 const ticketLineCategoryId = (row: Record<string, unknown>) => {
   const salesOrderLine = asRecord(row.salesOrderLine);
   const product =
@@ -1319,8 +1364,9 @@ export class ApiCashierRepository implements ICashierRepository {
       API_ENDPOINTS.SALES_ORDERS.LINES(salesOrderId).LIST
     );
     const data = asList<Record<string, unknown>>(response);
-    return data.map((item) =>
-      new SalesOrderLine({
+    return data.map((item) => {
+      const names = readSalesOrderLineNames(item);
+      return new SalesOrderLine({
         id: String(item.id || ""),
         salesOrderId: String(item.salesOrderId || salesOrderId),
         variantId: String(item.variantId || ""),
@@ -1332,8 +1378,10 @@ export class ApiCashierRepository implements ICashierRepository {
         status: item.status ? String(item.status) : undefined,
         seatNumber: typeof item.seatNumber === "number" ? item.seatNumber : undefined,
         createdAt: item.createdAt ? String(item.createdAt) : undefined,
-      })
-    );
+        categoryName: asName(item.categoryName) || asName(asRecord(item.product)?.categoryName),
+        ...names,
+      });
+    });
   }
 
   async createOrderPayment(

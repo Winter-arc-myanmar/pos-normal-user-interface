@@ -28,6 +28,11 @@ import {
   linePromotionSaving,
   promotionSummary,
 } from "@/lib/pos/promotions";
+import {
+  formatPosMoney,
+  lineDisplayName,
+  variantDisplayName,
+} from "@/lib/pos/orderListDisplay";
 
 interface OrderPanelProps {
   selectedOrder: SalesOrder | null;
@@ -160,8 +165,6 @@ export function OrderPanel({
   const checkoutReady = isSplitMode
     ? splitTenderCount > 0 && splitRemaining <= 0.009
     : Boolean(paymentMethodId) && Number(paymentAmount) > 0;
-  const money = (value: number) =>
-    value.toLocaleString(undefined, { maximumFractionDigits: 2 });
   /** The savings the server already credited, so they are inside the total. */
   const promotionDiscount = appliedPromotionDiscount(selectedOrderLines);
 
@@ -174,7 +177,20 @@ export function OrderPanel({
     const product = variant
       ? products.find((item) => item.id === variant.productId)
       : undefined;
-    return product?.name || variant?.variantSku || line.variantId.slice(0, 8);
+    // The name the order was saved with survives a refresh; the loaded menu is
+    // only a fallback for lines built in this session, which carry no name yet.
+    return (
+      lineDisplayName(line) ||
+      product?.name ||
+      variant?.variantSku ||
+      line.variantId.slice(0, 8)
+    );
+  };
+
+  /** Under the name: which variant of the item this line is. */
+  const resolveLineVariant = (line: SalesOrderLine) => {
+    const variant = variants.find((item) => item.id === line.variantId);
+    return variantDisplayName(line) || variantDisplayName(variant ?? {});
   };
 
   return (
@@ -223,7 +239,7 @@ export function OrderPanel({
                     promotionSummary(promotion, {
                       freeTime: (buy, free) =>
                         t("cashier.orderPanel.promoFreeTime", { buy, free }),
-                      money,
+                      money: formatPosMoney,
                     })
                   )
                   .join(" · ")}
@@ -232,6 +248,8 @@ export function OrderPanel({
 
             <div className="space-y-2 py-3">
               {selectedOrderLines.map((line) => {
+                const lineName = resolveLineName(line);
+                const lineVariant = resolveLineVariant(line);
                 const lineTotal =
                   Number(line.quantity || 0) * Number(line.unitPrice || 0) -
                   Number(line.lineDiscount || 0) +
@@ -268,15 +286,20 @@ export function OrderPanel({
                             {t("cashier.orderPanel.promo")}
                           </span>
                         ) : null}
-                        <span className="min-w-0 truncate">{resolveLineName(line)}</span>
+                        <span className="min-w-0 truncate">{lineName}</span>
                       </span>
                       <span className="shrink-0 text-sm tabular-nums">
-                        {lineDue.toFixed(2)}
+                        {formatPosMoney(lineDue)}
                       </span>
                     </div>
+                    {lineVariant && lineVariant !== lineName ? (
+                      <p className="mt-0.5 break-words text-xs text-slate-500">
+                        {lineVariant}
+                      </p>
+                    ) : null}
                     <p className="mt-0.5 text-xs tabular-nums text-slate-600">
                       <span className={saving ? "text-slate-400 line-through" : ""}>
-                        {line.unitPrice ?? "0.0000"}
+                        {formatPosMoney(line.unitPrice)}
                       </span>
                       {saving && promoLabel ? ` · ${promoLabel}` : ""}
                     </p>
@@ -284,7 +307,7 @@ export function OrderPanel({
                       <p className="mt-0.5 text-xs font-medium text-emerald-700">
                         {t("cashier.orderPanel.promoSaving", {
                           name: promoLabel,
-                          amount: money(saving.amount),
+                          amount: formatPosMoney(saving.amount),
                         })}
                       </p>
                     ) : null}
@@ -364,12 +387,12 @@ export function OrderPanel({
           {promotionDiscount > 0 ? (
             <p className="flex items-center justify-between text-sm text-emerald-700">
               <span>{t("cashier.orderPanel.promotionDiscount")}</span>
-              <span className="tabular-nums">−{money(promotionDiscount)}</span>
+              <span className="tabular-nums">−{formatPosMoney(promotionDiscount)}</span>
             </p>
           ) : null}
           <div className="flex items-center justify-between font-semibold">
             <span>{t("cashier.total")}</span>
-            <span>{total}</span>
+            <span className="tabular-nums">{formatPosMoney(total)}</span>
           </div>
           {onDiscountAmountChange && onTipAmountChange ? (
             <OrderAdjustments

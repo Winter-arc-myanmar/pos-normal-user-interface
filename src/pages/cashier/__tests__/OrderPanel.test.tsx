@@ -239,7 +239,7 @@ describe("OrderPanel", () => {
     expect(screen.getByText("cashier.orderPanel.promo")).toBeInTheDocument();
     expect(screen.getByText("cashier.orderPanel.promoSaving")).toBeInTheDocument();
     expect(screen.getByText("cashier.orderPanel.promotionDiscount")).toBeInTheDocument();
-    expect(screen.getByText("−1")).toBeInTheDocument();
+    expect(screen.getByText("−1.00")).toBeInTheDocument();
     // The promotion is inside the line: 10.00 charged, 1.00 off.
     expect(screen.getByText("9.00")).toBeInTheDocument();
   });
@@ -263,5 +263,81 @@ describe("OrderPanel", () => {
     expect(
       screen.queryByText("cashier.orderPanel.promotionDiscount")
     ).not.toBeInTheDocument();
+  });
+
+  it("names a line from the order itself, not from the menu it has loaded", () => {
+    render(
+      <OrderPanel
+        {...defaultProps}
+        selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
+        selectedOrderLines={[
+          new SalesOrderLine({
+            ...line,
+            variantId: "variant-not-loaded",
+            productName: "Fish Ball Stick",
+          }),
+        ]}
+      />
+    );
+
+    expect(screen.getByText("Fish Ball Stick")).toBeInTheDocument();
+  });
+
+  it("shows the line's variant under the product name", () => {
+    render(
+      <OrderPanel
+        {...defaultProps}
+        selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
+        selectedOrderLines={[
+          new SalesOrderLine({
+            ...line,
+            productName: "Coffee",
+            variantName: "Large",
+          }),
+        ]}
+      />
+    );
+
+    expect(screen.getByText("Coffee")).toBeInTheDocument();
+    expect(screen.getByText("Large")).toBeInTheDocument();
+  });
+
+  it("shows money with two decimals", () => {
+    render(
+      <OrderPanel
+        {...defaultProps}
+        selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
+        total="2600.0000"
+        selectedOrderLines={[
+          new SalesOrderLine({ ...line, unitPrice: "2600.0000", quantity: "1.0000" }),
+        ]}
+      />
+    );
+
+    // The line price, what the line costs and the total, never four decimals.
+    expect(screen.getAllByText("2,600.00").length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByText("2600.0000")).not.toBeInTheDocument();
+  });
+
+  it("names the variant from the menu when the line carries only an id", () => {
+    render(
+      <OrderPanel
+        {...defaultProps}
+        selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
+        products={[]}
+        variantsByProductId={{
+          "product-1": [
+            {
+              id: "variant-1",
+              productId: "product-1",
+              variantSku: "COFFEE-LARGE",
+              matrixOptions: { size: "Large" },
+            } as never,
+          ],
+        }}
+      />
+    );
+
+    expect(screen.getByText("Large")).toBeInTheDocument();
   });
 });

@@ -32,6 +32,8 @@ const linesByOrderId = {
       variantId: "variant-1",
       quantity: "1.0000",
       unitPrice: "10.0000",
+      productName: "Fish Ball Stick",
+      variantName: "Large",
     },
   ],
   "order-2": [],
@@ -83,5 +85,9 @@ describe("MultiOrderingView", () => {
       })[0]
     );
     expect(onOpenOrder).toHaveBeenCalledWith("order-1");
+
+    // Each line reads as its item, with the variant under it.
+    expect(screen.getByText("Fish Ball Stick")).toBeInTheDocument();
+    expect(screen.getByText("Large")).toBeInTheDocument();
   });
 });

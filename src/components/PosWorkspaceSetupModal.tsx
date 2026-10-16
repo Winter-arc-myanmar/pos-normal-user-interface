@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { CloseShiftDialog } from "@/components/shift/CloseShiftDialog";
@@ -7,6 +7,13 @@ import type { CurrentShift } from "@/core/domain/entities/Shift";
 
 const inputClassName =
   "w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-900/10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100";
+
+/** Registers read best in name order; the code only breaks ties. */
+const sortRegistersByName = (registers: PosRegister[]): PosRegister[] =>
+  [...registers].sort(
+    (left, right) =>
+      left.name.localeCompare(right.name) || left.code.localeCompare(right.code)
+  );
 
 interface PosWorkspaceSetupModalProps {
   open: boolean;
@@ -48,6 +55,7 @@ export function PosWorkspaceSetupModal({
 }: PosWorkspaceSetupModalProps) {
   const { t } = useTranslation();
   const [closingId, setClosingId] = useState<string | null>(null);
+  const registers = useMemo(() => sortRegistersByName(posRegisters), [posRegisters]);
 
   if (!open) return null;
 
@@ -117,9 +125,9 @@ export function PosWorkspaceSetupModal({
               disabled={isLoading || !activeLocationId}
             >
               <option value="">{t("cashier.pos.selectRegister")}</option>
-              {posRegisters.map((register) => (
+              {registers.map((register) => (
                 <option key={register.id} value={register.id}>
-                  {register.name} ({register.code})
+                  {register.name}
                 </option>
               ))}
             </select>
