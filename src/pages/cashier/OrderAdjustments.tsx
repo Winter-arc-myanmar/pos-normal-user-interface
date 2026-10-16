@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { AdjustmentReason } from "@/core/domain/entities/Cashier";
+import { formatPosMoney } from "@/lib/pos/orderListDisplay";
 
 interface OrderAdjustmentsProps {
   discountAmount: string;
@@ -107,7 +108,7 @@ export function OrderAdjustments({
       {Number(serviceCharge) > 0 ? (
         <div className="flex items-center justify-between text-xs text-slate-600">
           <span>{t("cashier.orderPanel.serviceCharge")}</span>
-          <span className="font-medium text-slate-800">{serviceCharge}</span>
+          <span className="font-medium text-slate-800">{formatPosMoney(serviceCharge)}</span>
         </div>
       ) : null}
       <label className="block space-y-1">

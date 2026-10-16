@@ -8,6 +8,16 @@ export function formatPosQuantity(value: unknown): string {
   }).format(parsed);
 }
 
+/** Money as the till shows it: two decimals, however exact the API's figures are. */
+export function formatPosMoney(value: string | number | null | undefined): string {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return "0.00";
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(parsed);
+}
+
 export function salesOrderServiceTypeKey(serviceType?: string): string {
   switch (String(serviceType || "").toUpperCase()) {
     case "TABLE":

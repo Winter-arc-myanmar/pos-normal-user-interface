@@ -239,7 +239,7 @@ describe("OrderPanel", () => {
     expect(screen.getByText("cashier.orderPanel.promo")).toBeInTheDocument();
     expect(screen.getByText("cashier.orderPanel.promoSaving")).toBeInTheDocument();
     expect(screen.getByText("cashier.orderPanel.promotionDiscount")).toBeInTheDocument();
-    expect(screen.getByText("−1")).toBeInTheDocument();
+    expect(screen.getByText("−1.00")).toBeInTheDocument();
     // The promotion is inside the line: 10.00 charged, 1.00 off.
     expect(screen.getByText("9.00")).toBeInTheDocument();
   });
@@ -300,6 +300,23 @@ describe("OrderPanel", () => {
 
     expect(screen.getByText("Coffee")).toBeInTheDocument();
     expect(screen.getByText("Large")).toBeInTheDocument();
+  });
+
+  it("shows money with two decimals", () => {
+    render(
+      <OrderPanel
+        {...defaultProps}
+        selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
+        total="2600.0000"
+        selectedOrderLines={[
+          new SalesOrderLine({ ...line, unitPrice: "2600.0000", quantity: "1.0000" }),
+        ]}
+      />
+    );
+
+    // The line price, what the line costs and the total, never four decimals.
+    expect(screen.getAllByText("2,600.00").length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByText("2600.0000")).not.toBeInTheDocument();
   });
 
   it("names the variant from the menu when the line carries only an id", () => {
