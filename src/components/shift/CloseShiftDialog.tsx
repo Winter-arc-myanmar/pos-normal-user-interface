@@ -75,7 +75,13 @@ export function CloseShiftDialog({
           {closed ? t("shift.doneTitle") : title}
         </h2>
 
-        {report ? <ShiftReport summary={report} /> : null}
+        {report ? (
+          <ShiftReport summary={report} />
+        ) : error ? null : (
+          <p role="status" className="text-sm text-slate-400">
+            {t("common.loading")}
+          </p>
+        )}
 
         {error ? (
           <p role="alert" className="rounded-lg border border-red-900/60 bg-red-950/50 px-3 py-2 text-sm text-red-300">

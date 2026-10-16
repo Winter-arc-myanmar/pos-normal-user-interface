@@ -302,9 +302,9 @@ export function KtvRoomPage() {
     }
     setLocalError(null);
     try {
+      const tipValue = Math.max(0, Number(tipAmount) || 0);
       const latestQuote = await getQuote(session.id);
-      const total = Number(latestQuote.runningTotal || 0) +
-        Math.max(0, Number(tipAmount) || 0);
+      const total = Number(latestQuote.runningTotal || 0) + tipValue;
       if (!hasSufficientWalletBalance(wallet.balance, total)) {
         setShowInsufficient(true);
         return;
@@ -319,9 +319,7 @@ export function KtvRoomPage() {
         limit: 200,
       });
       const context = await requireCashierContext();
-      const finalTotal =
-        Number(finalQuote.runningTotal || total) +
-        Math.max(0, Number(tipAmount) || 0);
+      const finalTotal = Number(finalQuote.runningTotal || total) + tipValue;
       await processCheckout({
         tenantId: context.tenantId,
         locationId: context.locationId,
@@ -329,7 +327,7 @@ export function KtvRoomPage() {
         salesChannel: "POS",
         serviceType: "DINE_IN",
         idempotencyKey: `ktv-${session.id}-${Date.now()}`,
-        ...(Number(tipAmount) > 0 ? { tipAmount: toMoney(tipAmount) } : {}),
+        ...(tipValue > 0 ? { tipAmount: toMoney(tipValue) } : {}),
         items: result.lines.map((line) => ({
           variantId: line.variantId,
           quantity: line.quantity,
@@ -343,7 +341,7 @@ export function KtvRoomPage() {
               guestCardId: card.id,
             },
           ],
-          tipAmount
+          tipValue
         ),
       });
       const endAt = finalQuote.asOf || closedAt;
@@ -376,6 +374,10 @@ export function KtvRoomPage() {
               };
             }),
           subtotal: finalQuote.runningTotal,
+          // The tip is inside the total below, so the slip says so.
+          ...(tipValue > 0
+            ? { amounts: [{ label: t("receipt.tip"), amount: tipValue.toFixed(4) }] }
+            : {}),
           total: finalTotal.toFixed(4),
           payments: [
             {

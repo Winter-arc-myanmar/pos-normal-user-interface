@@ -22,6 +22,9 @@ export function shiftSlip(summary: ShiftSummary): SaleReceipt {
     amounts: [
       { label: "Sales", amount: String(summary.totalSales) },
       { label: "Refunds", amount: String(-Math.abs(summary.totalRefunds)) },
+      ...(summary.tipAmount
+        ? [{ label: "Tips", amount: String(summary.tipAmount) }]
+        : []),
     ],
     totalLabel: "NET",
     total: String(summary.netTotal),

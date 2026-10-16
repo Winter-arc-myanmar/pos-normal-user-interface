@@ -50,6 +50,7 @@ const toCurrent = (response: unknown): CurrentShift => {
 
 const toSummary = (response: unknown): ShiftSummary => {
   const body = unwrap(response, "sessionId");
+  const totals = asRecord(body.totals);
   const breakdown = Array.isArray(body.paymentBreakdown) ? body.paymentBreakdown : [];
   return {
     sessionId: String(body.sessionId || ""),
@@ -68,6 +69,8 @@ const toSummary = (response: unknown): ShiftSummary => {
     refundCount: Number(body.refundCount || 0),
     nonSalesCashIn: money(body.nonSalesCashIn),
     nonSalesCashOut: money(body.nonSalesCashOut),
+    // Whatever the endpoint calls it: a top-level figure, or one inside totals.
+    tipAmount: money(body.tipAmount ?? totals.tipAmount),
     paymentBreakdown: breakdown.map((row) => {
       const item = asRecord(row);
       return {

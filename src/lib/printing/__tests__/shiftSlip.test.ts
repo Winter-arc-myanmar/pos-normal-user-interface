@@ -101,4 +101,19 @@ describe("the shift report slip", () => {
     expect(text).toMatch(/Cash \(3\)\s+40,000 MMK/);
     expect(text).not.toContain("Thank you!");
   });
+
+  it("prints the shift's tips when it took any", () => {
+    const withTips = buildSaleReceiptLines({
+      ...shiftSlip({ ...summary, tipAmount: 3000 }),
+      currency: "MMK",
+    }).join("\n");
+    expect(withTips).toMatch(/Tips\s+3,000 MMK/);
+
+    // A shift with no tips says nothing about them.
+    const withoutTips = buildSaleReceiptLines({
+      ...shiftSlip(summary),
+      currency: "MMK",
+    }).join("\n");
+    expect(withoutTips).not.toContain("Tips");
+  });
 });
