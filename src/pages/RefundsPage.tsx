@@ -1,12 +1,21 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiLoadingState } from "@/components/ApiLoadingState";
 import { Button } from "@/components/ui/Button";
+import { SalesOrderLine } from "@/core/domain/entities/Cashier";
 import { SalesRefund } from "@/core/domain/entities/SalesRefund";
 import { useAuth } from "@/core/presentation/hooks/useAuth";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
 import { useRefundManagement } from "@/core/presentation/hooks/useRefundManagement";
+import { useSalesOrderManagement } from "@/core/presentation/hooks/useSalesOrderManagement";
 import { useDateFormatter, useNumberFormatter } from "@/lib/i18n/formatters";
+import {
+  formatPosQuantity,
+  lineDisplayName,
+  orderLineLabelsById,
+  refundLineLabel,
+  refundLineName,
+} from "@/lib/pos/orderListDisplay";
 
 const fieldClass =
   "mt-1 min-h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-[#1a9bff]";
@@ -26,7 +35,13 @@ const newItem = (): DraftItem => ({
   returnedQuantity: "1",
 });
 
-function RefundDetails({ refund }: { refund: SalesRefund }) {
+function RefundDetails({
+  refund,
+  lineLabels,
+}: {
+  refund: SalesRefund;
+  lineLabels: Map<string, string>;
+}) {
   const { t } = useTranslation();
   const { formatCurrency } = useNumberFormatter();
   const { formatDateTime } = useDateFormatter();
@@ -99,17 +114,25 @@ function RefundDetails({ refund }: { refund: SalesRefund }) {
       <div>
         <h3 className="text-sm font-semibold">{t("refunds.items")}</h3>
         <ul className="mt-2 divide-y divide-slate-200">
-          {refund.lines.map((line) => (
-            <li key={line.id || line.salesOrderLineId} className="py-3 text-sm">
-              <p className="break-all font-medium">{line.salesOrderLineId}</p>
-              <p className="mt-1 text-xs text-slate-500">
-                {t("refunds.returnedQty")} {line.returnedQuantity} · {t("refunds.unitPrice")}{" "}
-                {money(line.unitPrice)} · {t("refunds.lineDiscount")} {money(line.lineDiscount)} ·{" "}
-                {t("refunds.taxAmount")} {money(line.taxAmount)}
-              </p>
-              <p className="mt-1 font-semibold">{money(line.lineRefund)}</p>
-            </li>
-          ))}
+          {refund.lines.map((line) => {
+            const name = refundLineName(line, lineLabels);
+            return (
+              <li key={line.id || line.salesOrderLineId} className="py-3 text-sm">
+                <p className="break-words font-medium">{refundLineLabel(line, lineLabels)}</p>
+                {name ? (
+                  <p className="mt-0.5 break-all text-[11px] text-slate-400">
+                    {t("refunds.lineId")} {line.salesOrderLineId}
+                  </p>
+                ) : null}
+                <p className="mt-1 text-xs text-slate-500">
+                  {t("refunds.returnedQty")} {line.returnedQuantity} · {t("refunds.unitPrice")}{" "}
+                  {money(line.unitPrice)} · {t("refunds.lineDiscount")} {money(line.lineDiscount)} ·{" "}
+                  {t("refunds.taxAmount")} {money(line.taxAmount)}
+                </p>
+                <p className="mt-1 font-semibold">{money(line.lineRefund)}</p>
+              </li>
+            );
+          })}
         </ul>
       </div>
     </div>
@@ -131,6 +154,8 @@ export function RefundsPage() {
     createRefund,
     clearSelection,
   } = useRefundManagement();
+  const { orderLines, fetchOrderLines, isLoading: isLoadingOrderLines } =
+    useSalesOrderManagement();
 
   const [salesOrderId, setSalesOrderId] = useState("");
   const [loadedOrderId, setLoadedOrderId] = useState("");
@@ -144,8 +169,40 @@ export function RefundsPage() {
   const [items, setItems] = useState<DraftItem[]>([newItem()]);
   const [notice, setNotice] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [itemsError, setItemsError] = useState<string | null>(null);
+  /** The order whose items are loaded, so the picker is not fetched twice. */
+  const [linesOrderId, setLinesOrderId] = useState("");
 
   const tenantId = String(user?.tenantId || "");
+  // The order's items, so a refund reads as a product name instead of a line id.
+  const lineLabels = useMemo(() => orderLineLabelsById(orderLines), [orderLines]);
+  const itemOptionLabel = (line: SalesOrderLine) => {
+    const name = lineDisplayName(line) || t("refunds.item");
+    const quantity = formatPosQuantity(line.quantity);
+    const price = line.unitPrice?.trim() ? formatCurrency(Number(line.unitPrice)) : "";
+    return `${name} — ${quantity}${price ? ` × ${price}` : ""}`;
+  };
+  const updateItem = (key: string, patch: Partial<DraftItem>) =>
+    setItems((current) =>
+      current.map((row) => (row.key === key ? { ...row, ...patch } : row))
+    );
+
+  /**
+   * The order's items fill the refund picker. They are loaded on their own, so a
+   * refunds call that fails or finds no refunds yet never leaves the picker empty
+   * without saying why.
+   */
+  const loadOrderItems = async (id: string) => {
+    const orderId = id.trim();
+    if (!orderId || orderId === linesOrderId) return;
+    setItemsError(null);
+    try {
+      await fetchOrderLines(orderId, { page: 1, limit: 50 });
+      setLinesOrderId(orderId);
+    } catch {
+      setItemsError(t("refunds.errors.itemsFailed"));
+    }
+  };
 
   const loadRefunds = async (nextPage = 1, orderId = salesOrderId) => {
     const id = orderId.trim();
@@ -154,6 +211,7 @@ export function RefundsPage() {
       return;
     }
     setLocalError(null);
+    await loadOrderItems(id);
     try {
       const result = await listRefundsForOrder(id, {
         page: nextPage,
@@ -375,7 +433,10 @@ export function RefundsPage() {
                   onChange={(event) => {
                     setSalesOrderId(event.target.value);
                     setLoadedOrderId("");
+                    setLinesOrderId("");
+                    setItems([newItem()]);
                   }}
+                  onBlur={(event) => void loadOrderItems(event.target.value)}
                 />
               </label>
               <label className="block text-sm font-medium">
@@ -415,59 +476,79 @@ export function RefundsPage() {
                   </button>
                 </div>
                 <ul className="mt-2 space-y-3">
-                  {items.map((item) => (
-                    <li key={item.key} className="rounded-md border border-slate-200 p-3">
-                      <label className="block text-xs font-medium text-slate-600">
-                        {t("refunds.lineId")}
-                        <input
-                          aria-label={t("refunds.lineId")}
-                          className={fieldClass}
-                          value={item.salesOrderLineId}
-                          onChange={(event) =>
-                            setItems((current) =>
-                              current.map((row) =>
-                                row.key === item.key
-                                  ? { ...row, salesOrderLineId: event.target.value }
-                                  : row
-                              )
-                            )
-                          }
-                        />
-                      </label>
-                      <div className="mt-2 flex items-end gap-2">
-                        <label className="block flex-1 text-xs font-medium text-slate-600">
-                          {t("refunds.returnedQty")}
-                          <input
-                            aria-label={t("refunds.returnedQty")}
+                  {items.map((item) => {
+                    const knownLine = orderLines.some(
+                      (line) => String(line.id) === item.salesOrderLineId
+                    );
+                    return (
+                      <li key={item.key} className="rounded-md border border-slate-200 p-3">
+                        <label className="block text-xs font-medium text-slate-600">
+                          {t("refunds.item")}
+                          <select
+                            aria-label={t("refunds.item")}
                             className={fieldClass}
-                            value={item.returnedQuantity}
+                            value={item.salesOrderLineId}
                             onChange={(event) =>
+                              updateItem(item.key, { salesOrderLineId: event.target.value })
+                            }
+                          >
+                            <option value="">{t("refunds.selectItem")}</option>
+                            {item.salesOrderLineId && !knownLine ? (
+                              <option value={item.salesOrderLineId}>
+                                {item.salesOrderLineId}
+                              </option>
+                            ) : null}
+                            {orderLines.map((line) => (
+                              <option key={line.id} value={line.id}>
+                                {itemOptionLabel(line)}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        {itemsError ? (
+                          <p role="alert" className="mt-1 text-xs text-red-600">
+                            {itemsError}
+                          </p>
+                        ) : isLoadingOrderLines ? (
+                          <p className="mt-1 text-xs text-slate-500">
+                            {t("refunds.loadingItems")}
+                          </p>
+                        ) : orderLines.length === 0 ? (
+                          <p className="mt-1 text-xs text-amber-600">
+                            {linesOrderId
+                              ? t("refunds.noOrderLines")
+                              : t("refunds.enterOrderForItems")}
+                          </p>
+                        ) : null}
+                        <div className="mt-2 flex items-end gap-2">
+                          <label className="block flex-1 text-xs font-medium text-slate-600">
+                            {t("refunds.returnedQty")}
+                            <input
+                              aria-label={t("refunds.returnedQty")}
+                              className={fieldClass}
+                              value={item.returnedQuantity}
+                              onChange={(event) =>
+                                updateItem(item.key, { returnedQuantity: event.target.value })
+                              }
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            className="mb-2 text-sm font-medium text-red-600"
+                            onClick={() =>
                               setItems((current) =>
-                                current.map((row) =>
-                                  row.key === item.key
-                                    ? { ...row, returnedQuantity: event.target.value }
-                                    : row
-                                )
+                                current.length === 1
+                                  ? [newItem()]
+                                  : current.filter((row) => row.key !== item.key)
                               )
                             }
-                          />
-                        </label>
-                        <button
-                          type="button"
-                          className="mb-2 text-sm font-medium text-red-600"
-                          onClick={() =>
-                            setItems((current) =>
-                              current.length === 1
-                                ? [newItem()]
-                                : current.filter((row) => row.key !== item.key)
-                            )
-                          }
-                        >
-                          {t("refunds.remove")}
-                        </button>
-                      </div>
-                    </li>
-                  ))}
+                          >
+                            {t("refunds.remove")}
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
               <Button
@@ -480,7 +561,7 @@ export function RefundsPage() {
               </Button>
             </div>
           ) : selectedRefund ? (
-            <RefundDetails refund={selectedRefund} />
+            <RefundDetails refund={selectedRefund} lineLabels={lineLabels} />
           ) : (
             <div className="flex h-full min-h-64 items-center justify-center text-center text-sm text-slate-500">
               {t("refunds.enterOrder")}

@@ -1226,6 +1226,11 @@
     "total": "Total refund",
     "createdAt": "Created",
     "items": "Items",
+    "item": "Item",
+    "selectItem": "Select item",
+    "noOrderLines": "No items on this sales order to refund.",
+    "loadingItems": "Loading items...",
+    "enterOrderForItems": "Enter a sales order to load its items.",
     "lineId": "Sales order line",
     "returnedQty": "Returned qty",
     "unitPrice": "Unit price",
@@ -1245,7 +1250,8 @@
       "missingOrder": "Enter a sales order.",
       "missingSession": "Enter a POS session.",
       "missingReason": "Enter a reason for the refund.",
-      "missingItems": "Add a sales order line and a quantity."
+      "missingItems": "Add a sales order line and a quantity.",
+      "itemsFailed": "Could not load the order's items."
     }
   },
   "router": {
