@@ -264,4 +264,63 @@ describe("OrderPanel", () => {
       screen.queryByText("cashier.orderPanel.promotionDiscount")
     ).not.toBeInTheDocument();
   });
+
+  it("names a line from the order itself, not from the menu it has loaded", () => {
+    render(
+      <OrderPanel
+        {...defaultProps}
+        selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
+        selectedOrderLines={[
+          new SalesOrderLine({
+            ...line,
+            variantId: "variant-not-loaded",
+            productName: "Fish Ball Stick",
+          }),
+        ]}
+      />
+    );
+
+    expect(screen.getByText("Fish Ball Stick")).toBeInTheDocument();
+  });
+
+  it("shows the line's variant under the product name", () => {
+    render(
+      <OrderPanel
+        {...defaultProps}
+        selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
+        selectedOrderLines={[
+          new SalesOrderLine({
+            ...line,
+            productName: "Coffee",
+            variantName: "Large",
+          }),
+        ]}
+      />
+    );
+
+    expect(screen.getByText("Coffee")).toBeInTheDocument();
+    expect(screen.getByText("Large")).toBeInTheDocument();
+  });
+
+  it("names the variant from the menu when the line carries only an id", () => {
+    render(
+      <OrderPanel
+        {...defaultProps}
+        selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
+        products={[]}
+        variantsByProductId={{
+          "product-1": [
+            {
+              id: "variant-1",
+              productId: "product-1",
+              variantSku: "COFFEE-LARGE",
+              matrixOptions: { size: "Large" },
+            } as never,
+          ],
+        }}
+      />
+    );
+
+    expect(screen.getByText("Large")).toBeInTheDocument();
+  });
 });

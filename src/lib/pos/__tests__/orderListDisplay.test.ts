@@ -4,6 +4,7 @@ import {
   lineDisplayName,
   salesOrderServiceTypeKey,
   salesOrderStatusKey,
+  variantDisplayName,
 } from "../orderListDisplay";
 
 describe("orderListDisplay", () => {
@@ -31,5 +32,15 @@ describe("orderListDisplay", () => {
         productName: "3f2a0d1c-7b4e-4c2a-9f11-aaaaaaaaaaaa",
       })
     ).toBe("");
+  });
+
+  it("names a line's variant: its name, else its options, else its SKU", () => {
+    expect(variantDisplayName({ variantName: "Large" })).toBe("Large");
+    expect(
+      variantDisplayName({ matrixOptions: { size: "Large", color: "Black" } })
+    ).toBe("Large / Black");
+    expect(variantDisplayName({ variantSku: "COFFEE-LARGE" })).toBe("COFFEE-LARGE");
+    expect(variantDisplayName({ sku: "LEO-01" })).toBe("LEO-01");
+    expect(variantDisplayName({})).toBe("");
   });
 });

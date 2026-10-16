@@ -28,6 +28,7 @@ import {
   linePromotionSaving,
   promotionSummary,
 } from "@/lib/pos/promotions";
+import { lineDisplayName, variantDisplayName } from "@/lib/pos/orderListDisplay";
 
 interface OrderPanelProps {
   selectedOrder: SalesOrder | null;
@@ -174,7 +175,20 @@ export function OrderPanel({
     const product = variant
       ? products.find((item) => item.id === variant.productId)
       : undefined;
-    return product?.name || variant?.variantSku || line.variantId.slice(0, 8);
+    // The name the order was saved with survives a refresh; the loaded menu is
+    // only a fallback for lines built in this session, which carry no name yet.
+    return (
+      lineDisplayName(line) ||
+      product?.name ||
+      variant?.variantSku ||
+      line.variantId.slice(0, 8)
+    );
+  };
+
+  /** Under the name: which variant of the item this line is. */
+  const resolveLineVariant = (line: SalesOrderLine) => {
+    const variant = variants.find((item) => item.id === line.variantId);
+    return variantDisplayName(line) || variantDisplayName(variant ?? {});
   };
 
   return (
@@ -232,6 +246,8 @@ export function OrderPanel({
 
             <div className="space-y-2 py-3">
               {selectedOrderLines.map((line) => {
+                const lineName = resolveLineName(line);
+                const lineVariant = resolveLineVariant(line);
                 const lineTotal =
                   Number(line.quantity || 0) * Number(line.unitPrice || 0) -
                   Number(line.lineDiscount || 0) +
@@ -268,12 +284,17 @@ export function OrderPanel({
                             {t("cashier.orderPanel.promo")}
                           </span>
                         ) : null}
-                        <span className="min-w-0 truncate">{resolveLineName(line)}</span>
+                        <span className="min-w-0 truncate">{lineName}</span>
                       </span>
                       <span className="shrink-0 text-sm tabular-nums">
                         {lineDue.toFixed(2)}
                       </span>
                     </div>
+                    {lineVariant && lineVariant !== lineName ? (
+                      <p className="mt-0.5 break-words text-xs text-slate-500">
+                        {lineVariant}
+                      </p>
+                    ) : null}
                     <p className="mt-0.5 text-xs tabular-nums text-slate-600">
                       <span className={saving ? "text-slate-400 line-through" : ""}>
                         {line.unitPrice ?? "0.0000"}

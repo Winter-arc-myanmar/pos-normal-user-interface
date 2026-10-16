@@ -5,6 +5,7 @@ import {
   SalesOrder,
   SalesOrderLine,
 } from "@/core/domain/entities/Cashier";
+import { lineDisplayName, variantDisplayName } from "@/lib/pos/orderListDisplay";
 
 interface MultiOrderingViewProps {
   tableLabel: string;
@@ -172,25 +173,38 @@ export function MultiOrderingView({
             </label>
           </div>
           <div className="mt-2 flex max-h-28 flex-wrap gap-2 overflow-y-auto">
-            {sourceLines.map((line) => (
-              <label
-                key={line.id}
-                className="flex items-center gap-2 rounded border border-white/10 bg-black/30 px-2 py-1 text-xs"
-              >
-                <input
-                  type="checkbox"
-                  checked={splitLineIds.includes(line.id)}
-                  onChange={() =>
-                    setSplitLineIds((current) =>
-                      current.includes(line.id)
-                        ? current.filter((id) => id !== line.id)
-                        : [...current, line.id]
-                    )
-                  }
-                />
-                {line.variantId.slice(0, 8)} × {Number(line.quantity)}
-              </label>
-            ))}
+            {sourceLines.map((line) => {
+              const lineName = lineDisplayName(line) || line.variantId.slice(0, 8);
+              const lineVariant = variantDisplayName(line);
+              return (
+                <label
+                  key={line.id}
+                  className="flex items-center gap-2 rounded border border-white/10 bg-black/30 px-2 py-1 text-xs"
+                >
+                  <input
+                    type="checkbox"
+                    checked={splitLineIds.includes(line.id)}
+                    onChange={() =>
+                      setSplitLineIds((current) =>
+                        current.includes(line.id)
+                          ? current.filter((id) => id !== line.id)
+                          : [...current, line.id]
+                      )
+                    }
+                  />
+                  <span className="min-w-0">
+                    <span className="block truncate">
+                      {lineName} × {Number(line.quantity)}
+                    </span>
+                    {lineVariant && lineVariant !== lineName ? (
+                      <span className="block truncate text-[10px] text-slate-400">
+                        {lineVariant}
+                      </span>
+                    ) : null}
+                  </span>
+                </label>
+              );
+            })}
             {!sourceLines.length ? (
               <p className="text-xs text-slate-500">
                 {t("cashier.multiOrder.noItems")}
@@ -251,17 +265,26 @@ export function MultiOrderingView({
                 ) : null}
               </header>
               <div className="min-h-0 flex-1 overflow-y-auto p-2 text-xs">
-                {lines.slice(0, 4).map((line) => (
-                  <div
-                    key={line.id}
-                    className="flex justify-between gap-2 py-0.5"
-                  >
-                    <span className="truncate">
-                      {line.variantId.slice(0, 8)}
-                    </span>
-                    <span>× {Number(line.quantity)}</span>
-                  </div>
-                ))}
+                {lines.slice(0, 4).map((line) => {
+                  const lineName = lineDisplayName(line) || line.variantId.slice(0, 8);
+                  const lineVariant = variantDisplayName(line);
+                  return (
+                    <div
+                      key={line.id}
+                      className="flex justify-between gap-2 py-0.5"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate">{lineName}</span>
+                        {lineVariant && lineVariant !== lineName ? (
+                          <span className="block truncate text-[10px] text-slate-500">
+                            {lineVariant}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="shrink-0">× {Number(line.quantity)}</span>
+                    </div>
+                  );
+                })}
                 {!lines.length ? (
                   <p className="text-slate-400">
                     {t("cashier.multiOrder.emptyOrder")}

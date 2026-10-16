@@ -22,6 +22,7 @@ import { useKdsStationManagement } from "@/core/presentation/hooks/useKdsStation
 import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
 import { modifierPrintText } from "@/lib/printing/modifierText";
 import { sessionPrintTimes } from "@/lib/printing/formatKdsTicket";
+import { menuProductFilter } from "@/lib/pos/menuProducts";
 import { useSalesOrderManagement } from "@/core/presentation/hooks/useSalesOrderManagement";
 import { CashierBoard } from "./cashier/CashierBoard";
 import { MultiOrderingView } from "./cashier/MultiOrderingView";
@@ -196,18 +197,18 @@ export function CashierPage() {
 
   const loadData = useCallback(async () => {
     clearError();
-    await Promise.allSettled([
-      fetchProducts({
-        page: 1,
-        limit: 100,
-        inStockOnly: true,
-        locationId: locationId || undefined,
-      }),
+    const tasks: Promise<unknown>[] = [
       fetchSalesOrders({ page: 1, limit: 100 }),
       fetchPaymentMethods(),
       fetchDiningZones(),
       fetchDiscountReasons(),
-    ]);
+    ];
+    // The menu is branch-scoped: fetching it before the workspace resolves the
+    // branch returns a different menu that can land after the scoped one, which
+    // is what made the items change on refresh.
+    const menuFilter = menuProductFilter(locationId);
+    if (menuFilter) tasks.push(fetchProducts(menuFilter));
+    await Promise.allSettled(tasks);
     // Table list and sessions share a strict rate limit. Load them after the
     // rest of the board, and never in the same burst.
     try {
@@ -460,6 +461,7 @@ export function CashierPage() {
       });
       return {
         ...line,
+        productName: line.productName || product?.name,
         taxInclusive: Boolean(isPriceInclusive),
         unitPrice: formatAmount(unitPrice),
         taxRateId: lineTotals.taxAmount > 0 ? (ownRateId ?? fallback?.id) : line.taxRateId,

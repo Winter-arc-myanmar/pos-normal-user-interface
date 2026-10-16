@@ -93,3 +93,26 @@ export function refundLineLabel(
 ): string {
   return refundLineName(line, labels) || String(line.salesOrderLineId || "");
 }
+
+/**
+ * A variant as the till names it: the name the order saved it with, else the
+ * catalogue's readable options ("Large / Black"), else its SKU. A line whose
+ * variant is unknown reads as an empty string, so callers can hide the row.
+ */
+export function variantDisplayName(variant: {
+  variantName?: string;
+  name?: string;
+  sku?: string;
+  variantSku?: string;
+  matrixOptions?: Record<string, unknown>;
+}): string {
+  const named = [variant.variantName, variant.name].find(isHumanDisplayName);
+  if (named) return String(named).trim();
+  const options = Object.values(variant.matrixOptions || {})
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean)
+    .join(" / ");
+  if (options) return options;
+  const code = [variant.variantSku, variant.sku].find(isHumanDisplayName);
+  return code ? String(code).trim() : "";
+}

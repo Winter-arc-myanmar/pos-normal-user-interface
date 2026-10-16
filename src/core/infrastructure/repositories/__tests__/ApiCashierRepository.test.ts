@@ -3,6 +3,62 @@ import { HttpClient } from "../../api/HttpClient";
 import { ApiCashierRepository } from "../ApiCashierRepository";
 
 describe("ApiCashierRepository", () => {
+  it("names an order line's item, however the API nests the name", async () => {
+    const httpClient = {
+      get: vi.fn().mockResolvedValue({
+        success: true,
+        data: [
+          {
+            id: "line-1",
+            salesOrderId: "order-1",
+            variantId: "variant-1",
+            quantity: "2.0000",
+            unitPrice: "10000.0000",
+            product: { name: "Fish Ball Stick" },
+            variant: { variantSku: "FBS-01" },
+          },
+          {
+            id: "line-2",
+            salesOrderId: "order-1",
+            variantId: "variant-2",
+            quantity: "1.0000",
+            unitPrice: "30000.0000",
+            name: "Wine",
+          },
+          {
+            id: "line-3",
+            salesOrderId: "order-1",
+            variantId: "variant-3",
+            quantity: "1.0000",
+            unitPrice: "8000.0000",
+            variant: { variantSku: "LEO-01" },
+          },
+          {
+            id: "line-4",
+            salesOrderId: "order-1",
+            variantId: "variant-4",
+            quantity: "1.0000",
+            unitPrice: "9000.0000",
+            productName: "3f2a0d1c-7b4e-4c2a-9f11-aaaaaaaaaaaa",
+            variant: { variantSku: "GUINNESS-01" },
+          },
+        ],
+      }),
+    };
+    const repository = new ApiCashierRepository(
+      httpClient as unknown as HttpClient
+    );
+
+    const lines = await repository.getSalesOrderLines("order-1");
+
+    expect(lines[0]).toMatchObject({ productName: "Fish Ball Stick", sku: "FBS-01" });
+    expect(lines[1].productName).toBe("Wine");
+    expect(lines[2].productName).toBeUndefined();
+    expect(lines[2].sku).toBe("LEO-01");
+    expect(lines[3].productName).toBeUndefined();
+    expect(lines[3].sku).toBe("GUINNESS-01");
+  });
+
   it("normalizes nested paginated list responses", async () => {
     const httpClient = {
       get: vi.fn().mockResolvedValue({
