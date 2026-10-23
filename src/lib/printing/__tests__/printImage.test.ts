@@ -75,6 +75,7 @@ describe("printer dots", () => {
   });
 
   it("rasterizes Myanmar instead of sending unsupported UTF-8 text bytes", () => {
+    vi.stubGlobal("CanvasRenderingContext2D", class CanvasRenderingContext2D {});
     const fillText = vi.fn();
     const getContext = vi
       .spyOn(HTMLCanvasElement.prototype, "getContext")
@@ -107,6 +108,7 @@ describe("printer dots", () => {
       expect(text).not.toContain("ကြက်သားဟင်း");
     } finally {
       getContext.mockRestore();
+      vi.unstubAllGlobals();
     }
   });
 

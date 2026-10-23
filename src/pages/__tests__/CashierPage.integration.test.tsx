@@ -97,6 +97,20 @@ const table = {
   status: "OCCUPIED",
 };
 
+const orderLine = {
+  id: "line-1",
+  salesOrderId: "order-1",
+  variantId: "variant-1",
+  quantity: "1.0000",
+  unitPrice: "10.0000",
+  lineDiscount: "0.0000",
+  taxAmount: "0.0000",
+};
+
+let selectedOrderLinesState: Array<
+  typeof orderLine & { status?: string; firedAt?: string }
+> = [orderLine];
+
 vi.mock("react-i18next", () => ({
   initReactI18next: { type: "3rdParty", init: () => undefined },
   useTranslation: () => ({ t: (key: string) => key }),
@@ -175,17 +189,7 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
     variantsByProductId: { "product-1": [variant] },
     salesOrders: [order],
     selectedOrder: order,
-    selectedOrderLines: [
-      {
-        id: "line-1",
-        salesOrderId: "order-1",
-        variantId: "variant-1",
-        quantity: "1.0000",
-        unitPrice: "10.0000",
-        lineDiscount: "0.0000",
-        taxAmount: "0.0000",
-      },
-    ],
+    selectedOrderLines: selectedOrderLinesState,
     paymentMethods: [
       { id: "cash", tenantId: "tenant-1", name: "Cash" },
     ],
@@ -259,6 +263,7 @@ vi.mock("@/core/presentation/hooks/useGuestWalletManagement", () => ({
 describe("CashierPage integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    selectedOrderLinesState = [orderLine];
     tableChargesState = { offered: [], running: [] };
     mocks.addTableCharge.mockResolvedValue({ offered: [], running: [] });
     mocks.stopTableCharges.mockResolvedValue({ offered: [], running: [] });
@@ -429,6 +434,31 @@ describe("CashierPage integration", () => {
         "AVAILABLE"
       );
     });
+  });
+
+  it("does not send or print order lines which were already sent to KDS", async () => {
+    selectedOrderLinesState = [
+      {
+        ...orderLine,
+        status: "FIRED",
+        firedAt: "2026-10-23T10:00:00.000Z",
+      },
+    ];
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=menu"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "cashier.orderPanel.sendKds" })
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText("cashier.errors.kdsNothingNew")).toBeInTheDocument()
+    );
+    expect(mocks.fireToKds).not.toHaveBeenCalled();
+    expect(mocks.printKitchen).not.toHaveBeenCalled();
   });
 
   it("refetches table status on an interval without waiting for a click", async () => {

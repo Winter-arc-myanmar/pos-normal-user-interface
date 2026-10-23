@@ -1136,6 +1136,7 @@
       "emptyOrder": "Add at least one item before sending to KDS.",
       "kdsTargetMissing": "Create or select an order before sending to KDS.",
       "kdsFailed": "Failed to send order to KDS.",
+      "kdsNothingNew": "All items have already been sent to KDS.",
       "kdsUnrouted": "No station for: {{items}}",
       "kdsPrinterUnavailable": "No connected printer is configured for: {{stations}}.",
       "tooManyRequests": "Too many requests. Wait a moment and try again.",

@@ -1183,7 +1183,16 @@ export function useCashier(): UseCashierReturn {
       setIsLoading(true);
       clearError();
       try {
-        return await cashierService.fireToKds(payload);
+        const result = await cashierService.fireToKds(payload);
+        const orderId =
+          payload.salesOrderId ||
+          tableSessions.find((session) => session.id === payload.sessionId)
+            ?.salesOrderId;
+        if (orderId && selectedOrder?.id === orderId) {
+          const lines = await cashierService.getSalesOrderLines(orderId);
+          setSelectedOrderLines(lines);
+        }
+        return result;
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to fire to KDS";
         setError(message);
@@ -1192,7 +1201,7 @@ export function useCashier(): UseCashierReturn {
         setIsLoading(false);
       }
     },
-    [cashierService, clearError]
+    [cashierService, clearError, selectedOrder?.id, tableSessions]
   );
 
   const getLatestSessionByTableId = useCallback(

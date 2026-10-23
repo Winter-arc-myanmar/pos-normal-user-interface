@@ -52,6 +52,7 @@ import {
 } from "@/lib/pos/checkoutAdjustments";
 import { isUnspendableWalletStatus } from "@/lib/pos/guestWalletAmounts";
 import { isSettledSalesOrder } from "@/lib/pos/orderStatus";
+import { isPendingKdsLine, pendingKdsLines } from "@/lib/pos/kdsLines";
 import { promotionPreviewItems } from "@/lib/pos/promotions";
 import {
   findOpenTableSession,
@@ -1372,7 +1373,7 @@ export function CashierPage() {
 
     const existingLine = !startFreshCart
       ? activeOrderLinesRef.current.find(
-          (line) => line.variantId === variantId && !line.voidedAt
+          (line) => line.variantId === variantId && isPendingKdsLine(line)
         )
       : undefined;
 
@@ -2032,7 +2033,11 @@ export function CashierPage() {
         throw new Error(t("cashier.errors.kdsTargetMissing"));
       }
 
-      const kitchenLines = printableLines(displayOrderLines);
+      const unsentOrderLines = pendingKdsLines(displayOrderLines);
+      if (!unsentOrderLines.length) {
+        throw new Error(t("cashier.errors.kdsNothingNew"));
+      }
+      const kitchenLines = printableLines(unsentOrderLines);
 
       await fireToKds(
         sessionId ? { sessionId } : { salesOrderId: salesOrderId! }
@@ -2046,7 +2051,7 @@ export function CashierPage() {
         const printPlan = await printer.printKitchen(
           {
             title: selectedOrder?.orderNumber || "KITCHEN",
-            courseType: displayOrderLines.find((line) => line.courseType)?.courseType,
+            courseType: unsentOrderLines.find((line) => line.courseType)?.courseType,
             firedAt: new Date().toISOString(),
             orderRef: selectedOrder?.orderNumber || salesOrderId || sessionId,
             lines: kitchenLines,
