@@ -52,6 +52,7 @@ import {
 } from "@/lib/pos/checkoutAdjustments";
 import { isUnspendableWalletStatus } from "@/lib/pos/guestWalletAmounts";
 import { isSettledSalesOrder } from "@/lib/pos/orderStatus";
+import { isPendingKdsLine, pendingKdsLines } from "@/lib/pos/kdsLines";
 import { promotionPreviewItems } from "@/lib/pos/promotions";
 import {
   findOpenTableSession,
@@ -1372,9 +1373,21 @@ export function CashierPage() {
 
     const existingLine = !startFreshCart
       ? activeOrderLinesRef.current.find(
-          (line) => line.variantId === variantId && !line.voidedAt
+          (line) => line.variantId === variantId && isPendingKdsLine(line)
         )
       : undefined;
+
+    const rememberAddedLine = (line: SalesOrderLine) => {
+      const index = activeOrderLinesRef.current.findIndex(
+        (item) => item.id === line.id
+      );
+      activeOrderLinesRef.current =
+        index >= 0
+          ? activeOrderLinesRef.current.map((item, itemIndex) =>
+              itemIndex === index ? line : item
+            )
+          : [...activeOrderLinesRef.current, line];
+    };
 
     if (existingLine && selectedOrder) {
       const nextQuantity =
@@ -1412,6 +1425,7 @@ export function CashierPage() {
         quantity,
         tableOrderIds.length > 1 ? selectedOrder?.id : undefined
       );
+      rememberAddedLine(line);
       if (selectedOrderSession.sessionState === "SEATED") {
         await updateTableSessionState(selectedOrderSession.id, {
           sessionState: "ORDERING",
@@ -1435,12 +1449,13 @@ export function CashierPage() {
         });
       }
     } else if (selectedOrder && !startFreshCart) {
-      await addProductToOrder(
+      const line = await addProductToOrder(
         selectedOrder.id,
         product,
         variantId,
         quantity
       );
+      rememberAddedLine(line);
     } else if (!requiresTableSelection || isDirectCheckoutMode || startFreshCart) {
       setIsDirectCheckoutMode(true);
       setDirectCartLines((current) => {
@@ -2032,7 +2047,11 @@ export function CashierPage() {
         throw new Error(t("cashier.errors.kdsTargetMissing"));
       }
 
-      const kitchenLines = printableLines(displayOrderLines);
+      const unsentOrderLines = pendingKdsLines(displayOrderLines);
+      if (!unsentOrderLines.length) {
+        throw new Error(t("cashier.errors.kdsNothingNew"));
+      }
+      const kitchenLines = printableLines(unsentOrderLines);
 
       await fireToKds(
         sessionId ? { sessionId } : { salesOrderId: salesOrderId! }
@@ -2046,7 +2065,7 @@ export function CashierPage() {
         const printPlan = await printer.printKitchen(
           {
             title: selectedOrder?.orderNumber || "KITCHEN",
-            courseType: displayOrderLines.find((line) => line.courseType)?.courseType,
+            courseType: unsentOrderLines.find((line) => line.courseType)?.courseType,
             firedAt: new Date().toISOString(),
             orderRef: selectedOrder?.orderNumber || salesOrderId || sessionId,
             lines: kitchenLines,

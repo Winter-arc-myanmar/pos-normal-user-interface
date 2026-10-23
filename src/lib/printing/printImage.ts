@@ -148,7 +148,12 @@ export function textToImage(
   text: string,
   options: TextImageOptions
 ): PrintImage | null {
-  if (typeof document === "undefined") return null;
+  if (
+    typeof document === "undefined" ||
+    typeof CanvasRenderingContext2D === "undefined"
+  ) {
+    return null;
+  }
   const canvas = document.createElement("canvas");
   const doubledHeight = options.size === "tall" || options.size === "huge";
   const doubledWidth = options.size === "wide" || options.size === "huge";
