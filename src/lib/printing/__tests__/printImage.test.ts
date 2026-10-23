@@ -104,6 +104,7 @@ describe("printer dots", () => {
       expect(needsUnicodeRaster("ကြက်သားဟင်း")).toBe(true);
       expect(needsUnicodeRaster("Chicken curry")).toBe(false);
       expect(fillText).toHaveBeenCalledWith(expect.stringContaining("ကြက်သားဟင်း"), 3, 17);
+      expect(fillText).toHaveBeenCalledWith("5,000", 381, 17);
       expect(text).toContain(`${GS}v0\x00`);
       expect(text).not.toContain("ကြက်သားဟင်း");
     } finally {

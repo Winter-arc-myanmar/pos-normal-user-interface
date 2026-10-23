@@ -136,6 +136,8 @@ export interface TextImageOptions {
   invert?: boolean;
 }
 
+export type TextPairImageOptions = Omit<TextImageOptions, "align">;
+
 /** ESC/POS code pages cannot shape Myanmar (or most other Unicode scripts). */
 export const needsUnicodeRaster = (text: string): boolean =>
   Array.from(text).some((char) => (char.codePointAt(0) || 0) > 0xff);
@@ -183,6 +185,55 @@ export function textToImage(
   context.save();
   context.scale(scaleX, 1);
   context.fillText(text, x / scaleX, height / 2);
+  context.restore();
+
+  return ditherToImage(
+    context.getImageData(0, 0, canvas.width, canvas.height).data,
+    canvas.width,
+    canvas.height
+  );
+}
+
+/**
+ * Draws a Unicode label and its value at opposite edges of one printer row.
+ * Keeping the value separate avoids proportional Myanmar-font spaces pulling
+ * receipt amounts away from the right edge.
+ */
+export function textPairToImage(
+  left: string,
+  right: string,
+  options: TextPairImageOptions
+): PrintImage | null {
+  if (
+    typeof document === "undefined" ||
+    typeof CanvasRenderingContext2D === "undefined"
+  ) {
+    return null;
+  }
+  const canvas = document.createElement("canvas");
+  const doubledHeight = options.size === "tall" || options.size === "huge";
+  const doubledWidth = options.size === "wide" || options.size === "huge";
+  const fontSize = doubledHeight ? 42 : 22;
+  const height = doubledHeight ? 58 : 34;
+  canvas.width = options.width;
+  canvas.height = height;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) return null;
+
+  context.fillStyle = options.invert ? "#000" : "#fff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = options.invert ? "#fff" : "#000";
+  context.textBaseline = "middle";
+  context.font = `${options.bold ? 700 : 500} ${fontSize}px "Myanmar Text", "Noto Sans Myanmar", "Noto Sans", sans-serif`;
+
+  const scaleX = doubledWidth ? 2 : 1;
+  const padding = 3;
+  context.save();
+  context.scale(scaleX, 1);
+  context.textAlign = "left";
+  context.fillText(left, padding / scaleX, height / 2);
+  context.textAlign = "right";
+  context.fillText(right, (canvas.width - padding) / scaleX, height / 2);
   context.restore();
 
   return ditherToImage(

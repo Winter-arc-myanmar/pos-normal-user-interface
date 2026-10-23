@@ -13,6 +13,7 @@ import {
   PrintIcon,
   PrintImage,
   rasterCommand,
+  textPairToImage,
   textToImage,
 } from "./printImage";
 
@@ -125,6 +126,7 @@ interface TextStyle {
 
 type Row =
   | ({ kind: "text"; text: string } & TextStyle)
+  | ({ kind: "pair"; left: string; right: string } & TextStyle)
   | { kind: "rule"; char: string }
   | { kind: "gap" }
   | { kind: "image"; image: PrintImage }
@@ -214,8 +216,7 @@ class Layout {
     const leftWidth = textWidth(left);
     const valueWidth = textWidth(value);
     if (leftWidth + 1 + valueWidth <= columns) {
-      const gap = " ".repeat(columns - leftWidth - valueWidth);
-      this.rows.push({ kind: "text", text: `${left}${gap}${value}`, ...style });
+      this.rows.push({ kind: "pair", left, right: value, ...style });
       return;
     }
     const room = columns - valueWidth - 1;
@@ -225,11 +226,7 @@ class Layout {
       return;
     }
     const [first, ...rest] = wrapText(left, room);
-    this.rows.push({
-      kind: "text",
-      text: `${first}${" ".repeat(columns - textWidth(first) - valueWidth)}${value}`,
-      ...style,
-    });
+    this.rows.push({ kind: "pair", left: first, right: value, ...style });
     for (const part of rest) this.rows.push({ kind: "text", text: part, ...style });
   }
 
@@ -290,6 +287,20 @@ const unicodeRow = (text: string, style: TextStyle, columns: number) => {
   return image ? `${ESC}a\x00${ESC}!\x00${GS}B\x00${rasterCommand(image)}` : null;
 };
 
+const pairText = (left: string, right: string, columns: number) =>
+  `${left}${" ".repeat(Math.max(1, columns - textWidth(left) - textWidth(right)))}${right}`;
+
+const unicodePairRow = (left: string, right: string, style: TextStyle, columns: number) => {
+  if (!needsUnicodeRaster(left) && !needsUnicodeRaster(right)) return null;
+  const image = textPairToImage(left, right, {
+    width: columns * 12,
+    size: style.size,
+    bold: style.bold,
+    invert: style.invert,
+  });
+  return image ? `${ESC}a\x00${ESC}!\x00${GS}B\x00${rasterCommand(image)}` : null;
+};
+
 const toEscPos = (layout: Layout) =>
   [
     `${ESC}@`,
@@ -308,6 +319,17 @@ const toEscPos = (layout: Layout) =>
       }
       if (row.kind === "rule") {
         return `${ESC}a\x00${ESC}!\x00${row.char.repeat(layout.width)}\n`;
+      }
+      if (row.kind === "pair") {
+        const columns = layout.columns(row.size);
+        const unicode = unicodePairRow(row.left, row.right, row, layout.width);
+        if (unicode) return unicode;
+        return [
+          `${ESC}a${alignCode.left}`,
+          `${ESC}!${printMode(row)}`,
+          pairText(row.left, row.right, columns),
+          "\n",
+        ].join("");
       }
       const text = row.invert ? centered(row.text, layout.columns(row.size)) : row.text;
       const unicode = unicodeRow(text, row, layout.width);
@@ -334,6 +356,9 @@ const toPlainLines = (layout: Layout) =>
     }
     if (row.kind === "gap") return "";
     if (row.kind === "rule") return row.char.repeat(layout.width);
+    if (row.kind === "pair") {
+      return pairText(row.left, row.right, layout.columns(row.size));
+    }
     if (row.invert) return centered(`*** ${row.text.trim()} ***`, layout.width);
     if (row.align === "center") return centered(row.text, layout.width).trimEnd();
     if (row.align === "right") return row.text.padStart(layout.width);
@@ -358,6 +383,16 @@ const toPreview = (layout: Layout): SlipPreview => ({
   rows: layout.rows.map((row): SlipPreviewRow => {
     if (row.kind === "gap" || row.kind === "image" || row.kind === "contact") return row;
     if (row.kind === "rule") return { kind: "rule", text: row.char.repeat(layout.width) };
+    if (row.kind === "pair") {
+      return {
+        kind: "text",
+        text: pairText(row.left, row.right, layout.columns(row.size)),
+        align: "left",
+        size: row.size || "normal",
+        bold: Boolean(row.bold),
+        invert: Boolean(row.invert),
+      };
+    }
     return {
       kind: "text",
       text: row.invert ? row.text.trim() : row.text,
