@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   addTableCharge: vi.fn(),
   stopTableCharges: vi.fn(),
   addProductToTableSession: vi.fn(),
+  updateOrderLine: vi.fn(),
   checkoutTableSession: vi.fn(),
   closePosSession: vi.fn(),
   createPosRegister: vi.fn(),
@@ -97,6 +98,7 @@ const table = {
 };
 
 vi.mock("react-i18next", () => ({
+  initReactI18next: { type: "3rdParty", init: () => undefined },
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
@@ -222,7 +224,7 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
     selectOrderById: mocks.selectOrderById,
     createOrder: vi.fn(),
     addProductToOrder: vi.fn(),
-    updateOrderLine: vi.fn(),
+    updateOrderLine: mocks.updateOrderLine,
     removeOrderLine: vi.fn(),
     addProductToTableSession: mocks.addProductToTableSession,
     getCounterOrderById: mocks.getCounterOrderById,
@@ -345,7 +347,7 @@ describe("CashierPage integration", () => {
     mocks.openTableSession.mockResolvedValue(session);
   });
 
-  it("loads variants and adds a product to a table session", async () => {
+  it("increments an existing product line instead of adding a duplicate", async () => {
     render(
       <MemoryRouter initialEntries={["/cashier?view=menu"]}>
         <CashierPage />
@@ -355,14 +357,16 @@ describe("CashierPage integration", () => {
     fireEvent.click(screen.getByRole("button", { name: /Coffee/ }));
 
     await waitFor(() =>
-      expect(mocks.addProductToTableSession).toHaveBeenCalledWith(
-        "session-1",
-        product,
-        "variant-1",
-        1,
-        undefined
-      )
+      expect(mocks.updateOrderLine).toHaveBeenCalledWith("order-1", "line-1", {
+        variantId: "variant-1",
+        quantity: "2.0000",
+        unitPrice: "10.0000",
+        lineDiscount: "0.0000",
+        taxAmount: "0.0000",
+        seatNumber: undefined,
+      })
     );
+    expect(mocks.addProductToTableSession).not.toHaveBeenCalled();
     expect(mocks.updateTableSessionState).toHaveBeenCalledWith("session-1", {
       sessionState: "ORDERING",
     });

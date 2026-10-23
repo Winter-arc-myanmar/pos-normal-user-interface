@@ -7,7 +7,14 @@ import {
   PrintTemplateType,
 } from "@/core/domain/entities/PrintTemplate";
 import { cashierLabel } from "./cashier";
-import { inlineIconCommand, PrintIcon, PrintImage, rasterCommand } from "./printImage";
+import {
+  inlineIconCommand,
+  needsUnicodeRaster,
+  PrintIcon,
+  PrintImage,
+  rasterCommand,
+  textToImage,
+} from "./printImage";
 
 const ESC = "\x1b";
 const GS = "\x1d";
@@ -127,6 +134,23 @@ const columnsFor = (paperWidth?: PrintPaperWidth) => (paperWidth === "MM80" ? 48
 
 const isWide = (size?: Size) => size === "wide" || size === "huge";
 
+const graphemes = (text: string): string[] => {
+  const Segmenter = (
+    Intl as typeof Intl & {
+      Segmenter?: new (
+        locale?: string,
+        options?: { granularity: "grapheme" }
+      ) => { segment(value: string): Iterable<{ segment: string }> };
+    }
+  ).Segmenter;
+  if (!Segmenter) return Array.from(text);
+  return Array.from(new Segmenter(undefined, { granularity: "grapheme" }).segment(text),
+    (part) => part.segment
+  );
+};
+
+const textWidth = (text: string) => graphemes(text).length;
+
 /** Splits text into lines no wider than `width`, breaking between words. */
 export function wrapText(text: string, width: number): string[] {
   const limit = Math.max(1, width);
@@ -134,20 +158,21 @@ export function wrapText(text: string, width: number): string[] {
   for (const paragraph of text.split("\n")) {
     let current = "";
     for (const word of paragraph.split(/\s+/).filter(Boolean)) {
-      let rest = word;
+      let rest = graphemes(word);
       while (rest.length > limit) {
         if (current) {
           lines.push(current);
           current = "";
         }
-        lines.push(rest.slice(0, limit));
+        lines.push(rest.slice(0, limit).join(""));
         rest = rest.slice(limit);
       }
-      if (!current) current = rest;
-      else if (current.length + 1 + rest.length <= limit) current += ` ${rest}`;
+      const remaining = rest.join("");
+      if (!current) current = remaining;
+      else if (textWidth(current) + 1 + rest.length <= limit) current += ` ${remaining}`;
       else {
         lines.push(current);
-        current = rest;
+        current = remaining;
       }
     }
     lines.push(current);
@@ -186,12 +211,14 @@ class Layout {
     const columns = this.columns(style.size);
     const value = right?.trim() || "";
     if (!value) return this.line(left, style);
-    if (left.length + 1 + value.length <= columns) {
-      const gap = " ".repeat(columns - left.length - value.length);
+    const leftWidth = textWidth(left);
+    const valueWidth = textWidth(value);
+    if (leftWidth + 1 + valueWidth <= columns) {
+      const gap = " ".repeat(columns - leftWidth - valueWidth);
       this.rows.push({ kind: "text", text: `${left}${gap}${value}`, ...style });
       return;
     }
-    const room = columns - value.length - 1;
+    const room = columns - valueWidth - 1;
     if (room < 8) {
       this.line(left, style);
       this.line(value, { ...style, align: "right" });
@@ -200,7 +227,7 @@ class Layout {
     const [first, ...rest] = wrapText(left, room);
     this.rows.push({
       kind: "text",
-      text: `${first}${" ".repeat(columns - first.length - value.length)}${value}`,
+      text: `${first}${" ".repeat(columns - textWidth(first) - valueWidth)}${value}`,
       ...style,
     });
     for (const part of rest) this.rows.push({ kind: "text", text: part, ...style });
@@ -241,7 +268,7 @@ const printMode = (style: TextStyle) =>
   );
 
 const centered = (text: string, columns: number) => {
-  const space = Math.max(0, columns - text.length);
+  const space = Math.max(0, columns - textWidth(text));
   const left = Math.floor(space / 2);
   return `${" ".repeat(left)}${text}${" ".repeat(space - left)}`;
 };
@@ -249,6 +276,19 @@ const centered = (text: string, columns: number) => {
 // 48-dot line spacing is taller than the 24-dot font, so glyphs are not clipped.
 const lineSpacing = `${ESC}3\x30`;
 const bottomMargin = "\n".repeat(6);
+const contactLabel: Record<PrintIcon, string> = { phone: "Tel", email: "Email" };
+
+const unicodeRow = (text: string, style: TextStyle, columns: number) => {
+  if (!needsUnicodeRaster(text)) return null;
+  const image = textToImage(text, {
+    width: columns * 12,
+    align: style.invert ? "center" : style.align || "left",
+    size: style.size,
+    bold: style.bold,
+    invert: style.invert,
+  });
+  return image ? `${ESC}a\x00${ESC}!\x00${GS}B\x00${rasterCommand(image)}` : null;
+};
 
 const toEscPos = (layout: Layout) =>
   [
@@ -258,12 +298,20 @@ const toEscPos = (layout: Layout) =>
       if (row.kind === "gap") return "\n";
       if (row.kind === "image") return `${ESC}a\x01${rasterCommand(row.image)}`;
       if (row.kind === "contact") {
+        const unicode = unicodeRow(
+          `${contactLabel[row.icon]} ${row.text}`,
+          { align: "center" },
+          layout.width
+        );
+        if (unicode) return unicode;
         return `${ESC}a\x01${ESC}!\x00${inlineIconCommand(row.icon)} ${row.text}\n`;
       }
       if (row.kind === "rule") {
         return `${ESC}a\x00${ESC}!\x00${row.char.repeat(layout.width)}\n`;
       }
       const text = row.invert ? centered(row.text, layout.columns(row.size)) : row.text;
+      const unicode = unicodeRow(text, row, layout.width);
+      if (unicode) return unicode;
       return [
         `${ESC}a${alignCode[row.invert ? "left" : row.align || "left"]}`,
         `${ESC}!${printMode(row)}`,
@@ -277,8 +325,6 @@ const toEscPos = (layout: Layout) =>
     bottomMargin,
     `${GS}V\x00`,
   ].join("");
-
-const contactLabel: Record<PrintIcon, string> = { phone: "Tel", email: "Email" };
 
 const toPlainLines = (layout: Layout) =>
   layout.rows.flatMap((row) => {

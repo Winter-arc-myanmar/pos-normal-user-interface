@@ -186,6 +186,7 @@ export function CashierPage() {
   const paymentInputRef = useRef<HTMLInputElement>(null);
   const payReturnViewRef = useRef("menu");
   const pendingMemberDetectRef = useRef(false);
+  const productAddQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   const locationId = activeLocationId;
   const activeView = searchParams.get("view") || "orders";
@@ -485,6 +486,8 @@ export function CashierPage() {
     () => (isDirectCheckoutMode ? normalizedDirectCartLines : selectedOrderLines),
     [isDirectCheckoutMode, normalizedDirectCartLines, selectedOrderLines]
   );
+  const activeOrderLinesRef = useRef(activeOrderLines);
+  activeOrderLinesRef.current = activeOrderLines;
 
   const receiptParty = (includePaidAt = false) => {
     const outlet = inventoryLocations.find((location) => location.id === locationId);
@@ -1349,7 +1352,7 @@ export function CashierPage() {
     ]
   );
 
-  const handleAddProduct = async (
+  const addProductToCart = async (
     product: (typeof products)[number],
     variantId: string,
     quantity: number
@@ -1366,6 +1369,40 @@ export function CashierPage() {
     const shouldUseTableSession = Boolean(
       !startFreshCart && selectedOrderSession && isPrimaryTableOrder
     );
+
+    const existingLine = !startFreshCart
+      ? activeOrderLinesRef.current.find(
+          (line) => line.variantId === variantId && !line.voidedAt
+        )
+      : undefined;
+
+    if (existingLine && selectedOrder) {
+      const nextQuantity =
+        Number(existingLine.quantity || 0) + Math.max(1, quantity);
+      await updateOrderLine(selectedOrder.id, existingLine.id, {
+        variantId: existingLine.variantId,
+        quantity: nextQuantity.toFixed(4),
+        unitPrice: existingLine.unitPrice || "0.0000",
+        lineDiscount: existingLine.lineDiscount || "0.0000",
+        taxAmount: existingLine.taxAmount || "0.0000",
+        seatNumber: existingLine.seatNumber,
+      });
+      activeOrderLinesRef.current = activeOrderLinesRef.current.map((line) =>
+        line.id === existingLine.id
+          ? { ...line, quantity: nextQuantity.toFixed(4) }
+          : line
+      );
+
+      if (
+        shouldUseTableSession &&
+        selectedOrderSession?.sessionState === "SEATED"
+      ) {
+        await updateTableSessionState(selectedOrderSession.id, {
+          sessionState: "ORDERING",
+        });
+      }
+      return;
+    }
 
     if (shouldUseTableSession && selectedOrderSession) {
       const line = await addProductToTableSession(
@@ -1445,6 +1482,18 @@ export function CashierPage() {
     } else {
       throw new Error(t("cashier.errors.selectOrder"));
     }
+  };
+
+  const handleAddProduct = (
+    product: (typeof products)[number],
+    variantId: string,
+    quantity: number
+  ) => {
+    const pendingAdd = productAddQueueRef.current.then(() =>
+      addProductToCart(product, variantId, quantity)
+    );
+    productAddQueueRef.current = pendingAdd.catch(() => undefined);
+    return pendingAdd;
   };
 
   const handleCheckout = async () => {

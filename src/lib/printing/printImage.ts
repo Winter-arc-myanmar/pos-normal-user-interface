@@ -128,6 +128,65 @@ export function ditherToImage(
   return { width, height, bits };
 }
 
+export interface TextImageOptions {
+  width: number;
+  align?: "left" | "center" | "right";
+  size?: "normal" | "tall" | "wide" | "huge";
+  bold?: boolean;
+  invert?: boolean;
+}
+
+/** ESC/POS code pages cannot shape Myanmar (or most other Unicode scripts). */
+export const needsUnicodeRaster = (text: string): boolean =>
+  Array.from(text).some((char) => (char.codePointAt(0) || 0) > 0xff);
+
+/**
+ * Draws a Unicode line with the browser's shaping engine, then converts it to
+ * ESC/POS dots. This keeps Myanmar glyphs intact on code-page-only printers.
+ */
+export function textToImage(
+  text: string,
+  options: TextImageOptions
+): PrintImage | null {
+  if (typeof document === "undefined") return null;
+  const canvas = document.createElement("canvas");
+  const doubledHeight = options.size === "tall" || options.size === "huge";
+  const doubledWidth = options.size === "wide" || options.size === "huge";
+  const fontSize = doubledHeight ? 42 : 22;
+  const height = doubledHeight ? 58 : 34;
+  canvas.width = options.width;
+  canvas.height = height;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) return null;
+
+  context.fillStyle = options.invert ? "#000" : "#fff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = options.invert ? "#fff" : "#000";
+  context.textBaseline = "middle";
+  context.font = `${options.bold ? 700 : 500} ${fontSize}px "Myanmar Text", "Noto Sans Myanmar", "Noto Sans", sans-serif`;
+
+  const scaleX = doubledWidth ? 2 : 1;
+  const drawnWidth = context.measureText(text).width * scaleX;
+  const padding = 3;
+  const x =
+    options.align === "center"
+      ? Math.max(padding, (canvas.width - drawnWidth) / 2)
+      : options.align === "right"
+        ? Math.max(padding, canvas.width - drawnWidth - padding)
+        : padding;
+
+  context.save();
+  context.scale(scaleX, 1);
+  context.fillText(text, x / scaleX, height / 2);
+  context.restore();
+
+  return ditherToImage(
+    context.getImageData(0, 0, canvas.width, canvas.height).data,
+    canvas.width,
+    canvas.height
+  );
+}
+
 const byteText = (bytes: ArrayLike<number>) => {
   let text = "";
   for (let i = 0; i < bytes.length; i += 1) text += String.fromCharCode(bytes[i]);
