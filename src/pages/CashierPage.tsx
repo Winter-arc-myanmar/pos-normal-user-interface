@@ -1377,6 +1377,18 @@ export function CashierPage() {
         )
       : undefined;
 
+    const rememberAddedLine = (line: SalesOrderLine) => {
+      const index = activeOrderLinesRef.current.findIndex(
+        (item) => item.id === line.id
+      );
+      activeOrderLinesRef.current =
+        index >= 0
+          ? activeOrderLinesRef.current.map((item, itemIndex) =>
+              itemIndex === index ? line : item
+            )
+          : [...activeOrderLinesRef.current, line];
+    };
+
     if (existingLine && selectedOrder) {
       const nextQuantity =
         Number(existingLine.quantity || 0) + Math.max(1, quantity);
@@ -1413,6 +1425,7 @@ export function CashierPage() {
         quantity,
         tableOrderIds.length > 1 ? selectedOrder?.id : undefined
       );
+      rememberAddedLine(line);
       if (selectedOrderSession.sessionState === "SEATED") {
         await updateTableSessionState(selectedOrderSession.id, {
           sessionState: "ORDERING",
@@ -1436,12 +1449,13 @@ export function CashierPage() {
         });
       }
     } else if (selectedOrder && !startFreshCart) {
-      await addProductToOrder(
+      const line = await addProductToOrder(
         selectedOrder.id,
         product,
         variantId,
         quantity
       );
+      rememberAddedLine(line);
     } else if (!requiresTableSelection || isDirectCheckoutMode || startFreshCart) {
       setIsDirectCheckoutMode(true);
       setDirectCartLines((current) => {

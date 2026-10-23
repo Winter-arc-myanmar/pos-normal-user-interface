@@ -377,6 +377,40 @@ describe("CashierPage integration", () => {
     });
   });
 
+  it("merges rapid repeated product taps into the newly created line", async () => {
+    selectedOrderLinesState = [];
+    mocks.addProductToTableSession.mockResolvedValue({
+      ...orderLine,
+      id: "line-new",
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=menu"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    const productButton = screen.getByRole("button", { name: /Coffee/ });
+    fireEvent.click(productButton);
+    fireEvent.click(productButton);
+
+    await waitFor(() =>
+      expect(mocks.updateOrderLine).toHaveBeenCalledWith(
+        "order-1",
+        "line-new",
+        {
+          variantId: "variant-1",
+          quantity: "2.0000",
+          unitPrice: "10.0000",
+          lineDiscount: "0.0000",
+          taxAmount: "0.0000",
+          seatNumber: undefined,
+        }
+      )
+    );
+    expect(mocks.addProductToTableSession).toHaveBeenCalledTimes(1);
+  });
+
   it("shows menu categories in the menu session and filters products", () => {
     render(
       <MemoryRouter initialEntries={["/cashier?view=menu"]}>

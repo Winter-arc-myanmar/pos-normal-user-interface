@@ -156,7 +156,7 @@ interface UseCashierReturn {
     variantId?: string,
     quantity?: number,
     options?: { refreshLines?: boolean }
-  ) => Promise<void>;
+  ) => Promise<SalesOrderLine>;
   updateOrderLine: (
     orderId: string,
     lineId: string,
@@ -404,7 +404,7 @@ export function useCashier(): UseCashierReturn {
         const variantModifier = Number(selectedVariant?.priceModifier || 0);
         const unitPrice = Number(product.basePrice || 0) + variantModifier;
 
-        await cashierService.addSalesOrderLine(orderId, {
+        const createdLine = await cashierService.addSalesOrderLine(orderId, {
           variantId: selectedVariant.id,
           quantity: Math.max(1, quantity).toFixed(4),
           unitPrice: unitPrice.toFixed(4),
@@ -413,7 +413,9 @@ export function useCashier(): UseCashierReturn {
         if (options?.refreshLines !== false) {
           const lines = await cashierService.getSalesOrderLines(orderId);
           setSelectedOrderLines(lines);
+          return lines.find((line) => line.id === createdLine.id) || createdLine;
         }
+        return createdLine;
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to add product";
         setError(message);
