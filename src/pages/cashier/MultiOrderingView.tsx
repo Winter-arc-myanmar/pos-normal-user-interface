@@ -230,7 +230,7 @@ export function MultiOrderingView({
         </div>
       ) : null}
 
-      <div className="grid min-h-0 flex-1 auto-rows-[11rem] grid-cols-1 gap-1 overflow-y-auto p-1 sm:grid-cols-2 min-[1050px]:grid-cols-3">
+      <div className="grid min-h-0 flex-1 auto-rows-[11rem] grid-cols-1 gap-1 overflow-y-auto p-1 min-[640px]:grid-cols-2 min-[1050px]:grid-cols-3">
         {orderIds.map((orderId, index) => {
           const order = orderById[orderId];
           const lines = linesByOrderId[orderId] || [];
