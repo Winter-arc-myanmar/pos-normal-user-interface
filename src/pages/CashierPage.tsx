@@ -1636,6 +1636,7 @@ export function CashierPage() {
 
       if (selectedOrderSession && isPrimaryTableOrder && selectedOrder) {
         await checkoutTableSession(selectedOrderSession.id, {
+          posSessionId: context.posSessionId,
           payments: checkoutPayments,
           ...(tip > 0 ? { tipAmount: tip } : {}),
           ...(discountReasonId ? { discountReasonId } : {}),

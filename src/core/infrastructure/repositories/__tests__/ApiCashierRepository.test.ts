@@ -303,12 +303,14 @@ describe("ApiCashierRepository", () => {
     );
 
     await repository.checkoutTableSession("session-1", {
+      posSessionId: "pos-session-current",
       payments: [{ paymentMethodId: "cash", amount: "10.5000" }],
     });
 
     expect(post).toHaveBeenCalledWith(
       "/api/v1/table-sessions/session-1/checkout",
       {
+        posSessionId: "pos-session-current",
         payments: [{ paymentMethodId: "cash", amount: 10.5 }],
       }
     );
