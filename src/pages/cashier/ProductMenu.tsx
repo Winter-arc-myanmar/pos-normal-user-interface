@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { Product, ProductVariant } from "@/core/domain/entities/Cashier";
@@ -15,6 +15,8 @@ interface ProductMenuProps {
   ) => Promise<void>;
   onClose: () => void;
   groupByCategory?: boolean;
+  /** Shown under the search, e.g. category filters the page owns. */
+  toolbar?: ReactNode;
 }
 
 const variantLabel = (variant: ProductVariant): string =>
@@ -40,7 +42,7 @@ function ProductCardImage({
   const [failed, setFailed] = useState(false);
   if (!src || failed) {
     return (
-      <span className="flex h-24 items-center justify-center bg-slate-800 text-lg font-semibold uppercase text-slate-500">
+      <span className="flex h-14 items-center justify-center bg-slate-800 [@media(min-height:640px)]:h-24 text-lg font-semibold uppercase text-slate-500">
         {name.trim().slice(0, 1) || "?"}
       </span>
     );
@@ -50,7 +52,7 @@ function ProductCardImage({
     <img
       src={src}
       alt=""
-      className="h-24 w-full object-cover"
+      className="h-14 w-full object-cover [@media(min-height:640px)]:h-24"
       onError={() => setFailed(true)}
     />
   );
@@ -64,6 +66,7 @@ export function ProductMenu({
   onAdd,
   onClose,
   groupByCategory = false,
+  toolbar,
 }: ProductMenuProps) {
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
@@ -205,6 +208,8 @@ export function ProductMenu({
         </Button>
       </header>
 
+      {toolbar}
+
       {groupByCategory && categories.length > 1 ? (
         <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
           {["", ...categories].map((name) => (
@@ -261,7 +266,7 @@ export function ProductMenu({
                   </span>
                 ) : null}
                 <span className="block px-3 py-2">
-                  <span className="block truncate text-sm font-semibold">
+                  <span className="line-clamp-2 break-words text-sm font-semibold leading-snug">
                     {product.name}
                   </span>
                   <span className="mt-1 block font-semibold text-blue-400">

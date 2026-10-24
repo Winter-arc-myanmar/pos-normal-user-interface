@@ -2423,8 +2423,8 @@ export function CashierPage() {
       className={[
         "pos-split grid h-full min-h-0 min-w-0 grid-cols-1 grid-rows-[minmax(24rem,1fr)_minmax(24rem,1fr)] overflow-y-auto bg-[#070707] text-white md:grid-rows-1 md:overflow-hidden",
         activeView === "multi-order" || activeView === "pay"
-          ? "min-[768px]:grid-cols-[13rem_minmax(0,1fr)] min-[1100px]:grid-cols-[18rem_minmax(0,1fr)]"
-          : "min-[768px]:grid-cols-[11rem_minmax(0,1fr)] min-[1100px]:grid-cols-[minmax(0,18rem)_minmax(0,1fr)_minmax(0,8rem)]",
+          ? "min-[768px]:grid-cols-[14rem_minmax(0,1fr)] min-[1100px]:grid-cols-[18rem_minmax(0,1fr)]"
+          : "min-[768px]:grid-cols-[14rem_minmax(0,1fr)] min-[1100px]:grid-cols-[minmax(0,18rem)_minmax(0,1fr)_minmax(0,8rem)]",
       ].join(" ")}
     >
       <OrderPanel
@@ -2556,6 +2556,29 @@ export function CashierPage() {
                 onLoadVariants={fetchProductVariants}
                 onAdd={handleAddProduct}
                 onClose={handleCloseMenu}
+                toolbar={
+                  menuCategories.length ? (
+                    <div className="mt-2 flex shrink-0 gap-1.5 overflow-x-auto pb-1 min-[1100px]:hidden">
+                      {[
+                        { id: "ALL", name: t("cashier.productMenu.allCategories") },
+                        ...menuCategories,
+                      ].map((category) => (
+                        <button
+                          key={category.id}
+                          type="button"
+                          aria-pressed={menuCategoryId === category.id}
+                          onClick={() => setMenuCategoryId(category.id)}
+                          className={[
+                            "min-h-9 shrink-0 whitespace-nowrap rounded px-3 text-xs font-medium",
+                            menuCategoryId === category.id ? "bg-blue-600" : "bg-slate-600",
+                          ].join(" ")}
+                        >
+                          {category.name}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null
+                }
               />
             </div>
           </div>

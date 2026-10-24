@@ -422,15 +422,16 @@ describe("CashierPage integration", () => {
       </MemoryRouter>
     );
 
+    // The side list on wide screens and the strip over the menu on narrower ones.
     expect(
-      screen.getByRole("button", { name: "cashier.productMenu.allCategories" })
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Drinks" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Main" })).toBeInTheDocument();
+      screen.getAllByRole("button", { name: "cashier.productMenu.allCategories" })
+    ).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Drinks" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Main" })).toHaveLength(2);
     expect(screen.getByRole("button", { name: /Coffee/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Deli Soup/ })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Main" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Main" })[0]);
 
     expect(screen.queryByRole("button", { name: /Coffee/ })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Deli Soup/ })).toBeInTheDocument();
