@@ -2677,7 +2677,7 @@ export function CashierPage() {
             >
               {t("cashier.productMenu.allCategories")}
             </button>
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="pos-scroll-hint min-h-0 flex-1 overflow-y-auto">
               {menuCategories.map((category) => (
                 <button
                   key={category.id}

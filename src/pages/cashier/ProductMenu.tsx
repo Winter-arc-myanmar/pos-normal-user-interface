@@ -230,7 +230,7 @@ export function ProductMenu({
         </div>
       ) : null}
 
-      <div className="mt-2 min-h-0 flex-1 overflow-y-auto">
+      <div className="pos-scroll-hint mt-2 min-h-0 flex-1 overflow-y-auto">
         <div className="grid content-start grid-cols-[repeat(auto-fill,minmax(min(9.5rem,calc(50%_-_0.25rem)),1fr))] gap-2">
           {visibleProducts.map((product) => {
             const orderedQty = Number(orderedProductQuantities[product.id] || 0);
