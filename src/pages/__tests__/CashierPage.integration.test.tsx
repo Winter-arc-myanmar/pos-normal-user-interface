@@ -731,8 +731,15 @@ describe("CashierPage integration", () => {
 
       await waitFor(() => expect(mocks.checkoutTableSession).toHaveBeenCalled());
       expect(await screen.findByText("cashier.errors.billUpdated")).toBeInTheDocument();
-      await waitFor(() =>
-        expect(mocks.selectOrderById).toHaveBeenCalledTimes(2)
+
+      fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+
+      await waitFor(() => expect(mocks.checkoutTableSession).toHaveBeenCalledTimes(2));
+      expect(mocks.checkoutTableSession).toHaveBeenLastCalledWith(
+        "session-1",
+        expect.objectContaining({
+          payments: [{ paymentMethodId: "cash", amount: "12.2500" }],
+        })
       );
     });
 

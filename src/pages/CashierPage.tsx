@@ -160,6 +160,12 @@ export function CashierPage() {
   const [menuCategoryId, setMenuCategoryId] = useState("ALL");
   const [boardPage, setBoardPage] = useState(1);
   const [paymentAmount, setPaymentAmount] = useState("0.0000");
+  const [syncedPaymentTotal, setSyncedPaymentTotal] = useState<{
+    orderId: string;
+    discountAmount: string;
+    tipAmount: string;
+    total: number;
+  } | null>(null);
   const [paymentMethodId, setPaymentMethodId] = useState("");
   const [memberCardUid, setMemberCardUid] = useState("");
   const [memberCard, setMemberCard] = useState<GuestCard | null>(null);
@@ -685,6 +691,15 @@ export function CashierPage() {
   ]);
 
   const orderTotal = useMemo(() => {
+    if (
+      syncedPaymentTotal &&
+      syncedPaymentTotal.orderId === selectedOrder?.id &&
+      syncedPaymentTotal.discountAmount === discountAmount &&
+      syncedPaymentTotal.tipAmount === tipAmount
+    ) {
+      return syncedPaymentTotal.total.toFixed(4);
+    }
+
     const serverGrandTotal = !isDirectCheckoutMode
       ? Number(selectedOrder?.grandTotal || 0)
       : 0;
@@ -713,6 +728,7 @@ export function CashierPage() {
     selectedOrder?.grandTotal,
     serviceCharge,
     serviceChargeTax,
+    syncedPaymentTotal,
     tipAmount,
   ]);
 
@@ -1638,18 +1654,38 @@ export function CashierPage() {
         // tax and service charge. Adding the local service charge here again
         // inflated 358,050 to 509,850. Only pending checkout adjustments belong
         // on top of the refreshed authoritative total.
-        const refreshedTotal = serverGrandTotal > 0
+        const serverRefreshedTotal = serverGrandTotal > 0
           ? payableFromServerGrandTotal({
               serverGrandTotal,
               orderDiscount,
               tipAmount: tip,
             })
           : Number(orderTotal);
+        const checkoutRequiredTotal =
+          syncedPaymentTotal &&
+          syncedPaymentTotal.orderId === selectedOrder.id &&
+          syncedPaymentTotal.discountAmount === discountAmount &&
+          syncedPaymentTotal.tipAmount === tipAmount
+            ? syncedPaymentTotal.total
+            : 0;
+        // A checkout rejection is the strongest source of truth. The order GET
+        // endpoint can lag behind it briefly, so never downgrade to that stale
+        // grandTotal on the cashier's next confirmation attempt.
+        const refreshedTotal = Math.max(
+          serverRefreshedTotal,
+          checkoutRequiredTotal
+        );
 
         if (Math.abs(refreshedTotal - Number(orderTotal)) > 0.009) {
           setIsSplitMode(false);
           setSplitTenders([]);
           setPaymentAmount(refreshedTotal.toFixed(4));
+          setSyncedPaymentTotal({
+            orderId: selectedOrder.id,
+            discountAmount,
+            tipAmount,
+            total: refreshedTotal,
+          });
           setLocalError(
             t("cashier.errors.billUpdated", {
               amount: refreshedTotal.toLocaleString(undefined, {
@@ -1848,7 +1884,15 @@ export function CashierPage() {
         setSplitTenders([]);
         setPaymentAmount(requiredTotal.toFixed(4));
         if (selectedOrder) {
-          void selectOrderById(selectedOrder.id).catch(() => undefined);
+          setSyncedPaymentTotal({
+            orderId: selectedOrder.id,
+            discountAmount,
+            tipAmount,
+            total: requiredTotal,
+          });
+        }
+        if (selectedOrder) {
+          await selectOrderById(selectedOrder.id).catch(() => undefined);
         }
         setLocalError(
           t("cashier.errors.billUpdated", {
