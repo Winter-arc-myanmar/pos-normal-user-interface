@@ -231,7 +231,7 @@ export function ProductMenu({
       ) : null}
 
       <div className="mt-2 min-h-0 flex-1 overflow-y-auto">
-        <div className="grid content-start grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+        <div className="grid content-start grid-cols-[repeat(auto-fill,minmax(min(9.5rem,calc(50%_-_0.25rem)),1fr))] gap-2">
           {visibleProducts.map((product) => {
             const orderedQty = Number(orderedProductQuantities[product.id] || 0);
             const isSelected =
