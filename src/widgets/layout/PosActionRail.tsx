@@ -51,7 +51,7 @@ export function PosActionRail({
             </select>
           </label>
         ) : null}
-        <LanguageSwitcher />
+        <LanguageSwitcher compact />
         <div id="pos-tablet-print-settings" className="w-full" />
       </div>
 
