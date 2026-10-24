@@ -1052,7 +1052,7 @@ export function CustomersPage() {
                   : t("crm.closeCardTitle");
 
   return (
-    <section className="pos-split pos-member-split grid h-full min-h-0 grid-cols-1 grid-rows-[minmax(24rem,1fr)_minmax(32rem,1fr)] overflow-y-auto bg-slate-100 md:grid-cols-[minmax(0,0.7fr)_minmax(0,1.3fr)] md:grid-rows-1 md:overflow-hidden min-[1100px]:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]">
+    <section className="pos-split pos-member-split grid h-full min-h-0 grid-cols-1 grid-rows-[minmax(24rem,1fr)_minmax(32rem,1fr)] overflow-y-auto bg-slate-100 min-[768px]:grid-cols-[minmax(0,0.7fr)_minmax(0,1.3fr)] md:grid-rows-1 md:overflow-hidden min-[1100px]:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]">
       <aside className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-white">
         {(error || localError || walletError) && (
           <p className="m-4 rounded bg-red-50 p-3 text-sm text-red-700">
