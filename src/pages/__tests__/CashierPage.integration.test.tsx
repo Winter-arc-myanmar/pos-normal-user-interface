@@ -69,7 +69,7 @@ const order = {
   salesChannel: "POS",
   serviceType: "PICK_UP",
   status: "DRAFT",
-  grandTotal: "10.0000",
+  grandTotal: "10.5000",
   subtotal: "10.0000",
   totalTax: "0.0000",
   totalDiscount: "0.0000",
@@ -169,11 +169,13 @@ let tableChargesState: { offered: Record<string, unknown>[]; running: Record<str
   offered: [],
   running: [],
 };
+let tableChargesLoadedState = false;
 vi.mock("@/core/presentation/hooks/useTableCharges", () => ({
   useTableCharges: () => ({
     charges: tableChargesState,
     add: mocks.addTableCharge,
     stop: mocks.stopTableCharges,
+    isLoaded: tableChargesLoadedState,
     isBusy: false,
     error: null,
   }),
@@ -266,6 +268,7 @@ describe("CashierPage integration", () => {
     vi.clearAllMocks();
     selectedOrderLinesState = [orderLine];
     tableChargesState = { offered: [], running: [] };
+    tableChargesLoadedState = false;
     mocks.addTableCharge.mockResolvedValue({ offered: [], running: [] });
     mocks.stopTableCharges.mockResolvedValue({ offered: [], running: [] });
     mocks.fetchProductVariants.mockResolvedValue([variant]);
@@ -638,6 +641,106 @@ describe("CashierPage integration", () => {
 
       await waitFor(() => expect(mocks.stopTableCharges).toHaveBeenCalledWith());
       await waitFor(() => expect(mocks.selectOrderById).toHaveBeenCalledWith("order-1"));
+    });
+
+    it("syncs a running table charge when the pay route is opened directly", async () => {
+      tableChargesLoadedState = true;
+      tableChargesState = {
+        offered: [poolClock],
+        running: [
+          {
+            variantId: "variant-pool",
+            name: "Pool table",
+            startedAt: "2026-10-07T12:00:00Z",
+          },
+        ],
+      };
+      render(
+        <MemoryRouter initialEntries={["/cashier?view=pay"]}>
+          <CashierPage />
+        </MemoryRouter>
+      );
+
+      await waitFor(() => expect(mocks.stopTableCharges).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(mocks.selectOrderById).toHaveBeenCalledWith("order-1"));
+    });
+
+    it("refreshes table charges on confirm and does not submit a stale payment total", async () => {
+      tableChargesState = {
+        offered: [poolClock],
+        running: [
+          {
+            variantId: "variant-pool",
+            name: "Pool table",
+            startedAt: "2026-10-07T12:00:00Z",
+          },
+        ],
+      };
+      mocks.selectOrderById.mockResolvedValueOnce({
+        ...order,
+        grandTotal: "12.0000",
+      });
+      render(
+        <MemoryRouter initialEntries={["/cashier?view=pay"]}>
+          <CashierPage />
+        </MemoryRouter>
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+
+      await waitFor(() => expect(mocks.stopTableCharges).toHaveBeenCalledWith());
+      await waitFor(() => expect(mocks.selectOrderById).toHaveBeenCalledWith("order-1"));
+      expect(mocks.checkoutTableSession).not.toHaveBeenCalled();
+      expect(await screen.findByText("cashier.errors.billUpdated")).toBeInTheDocument();
+    });
+
+    it("does not add the local service charge to the refreshed server grand total again", async () => {
+      mocks.selectOrderById.mockResolvedValueOnce({
+        ...order,
+        grandTotal: "10.5000",
+      });
+      render(
+        <MemoryRouter initialEntries={["/cashier?view=pay"]}>
+          <CashierPage />
+        </MemoryRouter>
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+
+      await waitFor(() => expect(mocks.checkoutTableSession).toHaveBeenCalledWith(
+        "session-1",
+        expect.objectContaining({
+          payments: [{ paymentMethodId: "cash", amount: "10.5000" }],
+        })
+      ));
+      expect(mocks.stopTableCharges).not.toHaveBeenCalled();
+      expect(screen.queryByText("cashier.errors.billUpdated")).not.toBeInTheDocument();
+    });
+
+    it("uses the server-required total when checkout detects a later bill change", async () => {
+      mocks.checkoutTableSession.mockRejectedValueOnce(
+        new Error("Insufficient payment: required 12.2500, received 10.5000")
+      );
+      render(
+        <MemoryRouter initialEntries={["/cashier?view=pay"]}>
+          <CashierPage />
+        </MemoryRouter>
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+
+      await waitFor(() => expect(mocks.checkoutTableSession).toHaveBeenCalled());
+      expect(await screen.findByText("cashier.errors.billUpdated")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+
+      await waitFor(() => expect(mocks.checkoutTableSession).toHaveBeenCalledTimes(2));
+      expect(mocks.checkoutTableSession).toHaveBeenLastCalledWith(
+        "session-1",
+        expect.objectContaining({
+          payments: [{ paymentMethodId: "cash", amount: "12.2500" }],
+        })
+      );
     });
 
     it("keeps room charges and other areas' products off the restaurant menu", () => {

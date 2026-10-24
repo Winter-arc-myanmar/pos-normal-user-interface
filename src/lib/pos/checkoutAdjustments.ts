@@ -21,6 +21,19 @@ export function payableTotal(args: {
   );
 }
 
+/** Applies only still-pending adjustments to a server grand total, which already includes tax and service charge. */
+export function payableFromServerGrandTotal(args: {
+  serverGrandTotal: number;
+  orderDiscount?: number;
+  tipAmount?: number;
+}): number {
+  return payableTotal({
+    lineTotal: args.serverGrandTotal,
+    orderDiscount: args.orderDiscount,
+    tipAmount: args.tipAmount,
+  });
+}
+
 export function lineGrossAmount(line: {
   quantity?: string | number;
   unitPrice?: string | number;

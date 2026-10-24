@@ -3,6 +3,7 @@ import {
   allocateOrderDiscountToLines,
   isFocLine,
   lineFocDiscount,
+  payableFromServerGrandTotal,
   payableTotal,
   withOrderTipOnFirstPayment,
 } from "../checkoutAdjustments";
@@ -17,6 +18,14 @@ describe("checkoutAdjustments", () => {
         tipAmount: 5,
       })
     ).toBe(98);
+  });
+
+  it("does not add service charge again to a refreshed server grand total", () => {
+    expect(
+      payableFromServerGrandTotal({
+        serverGrandTotal: 358_050,
+      })
+    ).toBe(358_050);
   });
 
   it("allocates order discount onto remaining line value", () => {

@@ -16,6 +16,16 @@ describe("splitPayments", () => {
     ).toEqual([{ paymentMethodId: "cash", amount: "10.5000" }]);
   });
 
+  it("uses the latest total instead of a stale hidden amount for a normal payment", () => {
+    expect(
+      buildCheckoutPayments({
+        total: "358050.0000",
+        paymentMethodId: "cash",
+        paymentAmount: "93500.0000",
+      })
+    ).toEqual([{ paymentMethodId: "cash", amount: "358050.0000" }]);
+  });
+
   it("builds multiple tenders in split mode and tracks remaining", () => {
     const tenders = [
       { id: "1", paymentMethodId: "cash", amount: "4.0000" },
@@ -38,7 +48,7 @@ describe("splitPayments", () => {
         total: "10.5000",
         payments: [{ paymentMethodId: "cash", amount: "4.0000" }],
       })
-    ).toThrow(/equal the remaining receivable/i);
+    ).toThrow(/equal the total due/i);
   });
 
   it("attaches guestCardId only to member-card tenders", () => {

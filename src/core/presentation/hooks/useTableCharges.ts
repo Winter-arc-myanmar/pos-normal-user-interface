@@ -55,5 +55,6 @@ export function useTableCharges(sessionId: string | null) {
   const stop = useCallback((variantId?: string) => run((id) => repository().stop(id, variantId)), [run]);
 
   const charges = sessionId && loaded?.sessionId === sessionId ? loaded.charges : EMPTY;
-  return { charges, add, stop, isBusy, error };
+  const isLoaded = !sessionId || loaded?.sessionId === sessionId;
+  return { charges, add, stop, isLoaded, isBusy, error };
 }
