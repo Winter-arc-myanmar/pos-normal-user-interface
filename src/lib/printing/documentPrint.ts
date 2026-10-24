@@ -63,7 +63,46 @@ const isStandalonePwa = () =>
   (window.matchMedia?.("(display-mode: standalone)").matches === true ||
     Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone));
 
-/** Same-origin hidden iframe. Android PWAs block window.open; this is how the Thuta POS prints. */
+type FileShareNavigator = Navigator & {
+  canShare?: (data?: ShareData) => boolean;
+  share?: (data?: ShareData) => Promise<void>;
+};
+
+const shareReceiptPdf = async (
+  lines: string[],
+  title: string,
+  paperWidthMm: number
+): Promise<boolean> => {
+  if (!isMobileDevice() || typeof File === "undefined") return false;
+  const shareNavigator = navigator as FileShareNavigator;
+  if (typeof shareNavigator.share !== "function") return false;
+
+  const doc = buildReceiptPdf(lines, paperWidthMm);
+  const file = new File(
+    [doc.output("blob")],
+    `${sanitizeFilename(title)}.pdf`,
+    { type: "application/pdf" }
+  );
+  const shareData: ShareData = { files: [file], title };
+  if (
+    typeof shareNavigator.canShare === "function" &&
+    !shareNavigator.canShare(shareData)
+  ) {
+    return false;
+  }
+
+  try {
+    await shareNavigator.share(shareData);
+    return true;
+  } catch (caught) {
+    // Cancelling the Android share sheet is a completed user choice; opening a
+    // second, blank print dialog afterwards would be surprising.
+    if (caught instanceof DOMException && caught.name === "AbortError") return true;
+    return false;
+  }
+};
+
+/** Same-origin fallback when a desktop popup or standalone PWA window is blocked. */
 const createHiddenPrintFrame = () => {
   const frame = document.createElement("iframe");
   frame.className = "pos-print-frame";
@@ -120,6 +159,16 @@ export async function printLinesWithBrowserDialog(
 ): Promise<void> {
   if (typeof window === "undefined") {
     throw new Error("Browser printing is only available in the browser");
+  }
+
+  // Android WebView frequently renders a hidden iframe as a blank print page.
+  // Share an actual PDF file to RawBT/XPrinter/the chosen print app instead.
+  // If file sharing is unavailable, open/download the PDF so Android's viewer
+  // can hand it to an installed print service.
+  if (isMobileDevice()) {
+    if (await shareReceiptPdf(lines, title, paperWidthMm)) return;
+    await printLinesAsPdf(lines, title, paperWidthMm);
+    return;
   }
 
   const printWindow = resolvePrintWindow();
