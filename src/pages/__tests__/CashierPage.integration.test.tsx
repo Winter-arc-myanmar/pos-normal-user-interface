@@ -122,6 +122,7 @@ vi.mock("@/core/presentation/hooks/useAuth", () => ({
       id: "cashier-1",
       tenantId: "tenant-1",
       activeBranchId: "branch-1",
+      permissions: ["sales:checkout:write"],
     },
   }),
 }));
@@ -458,6 +459,7 @@ describe("CashierPage integration", () => {
       expect(mocks.getCounterOrderById).toHaveBeenCalledWith("order-1");
       expect(mocks.pickupCounterOrder).toHaveBeenCalledWith("order-1");
       expect(mocks.checkoutTableSession).toHaveBeenCalledWith("session-1", {
+        posSessionId: "pos-session-1",
         payments: [{ paymentMethodId: "cash", amount: "10.5000" }],
       });
       expect(mocks.updateTableSessionState).toHaveBeenCalledWith("session-1", {

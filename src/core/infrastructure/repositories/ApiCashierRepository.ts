@@ -244,6 +244,7 @@ const normalizePaymentEntriesAsDecimals = (
 const normalizeTableSessionCheckoutPayload = (
   payload: TableSessionCheckoutDTO
 ): Record<string, unknown> => ({
+  posSessionId: payload.posSessionId,
   payments: normalizePaymentEntriesAsNumbers(payload.payments),
   ...(payload.tipAmount !== undefined ? { tipAmount: payload.tipAmount } : {}),
   ...(payload.serviceCharge !== undefined

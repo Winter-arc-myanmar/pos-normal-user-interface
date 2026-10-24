@@ -408,6 +408,7 @@ export class CashierService implements ICashierService {
     payload: TableSessionCheckoutDTO
   ): Promise<TableSession> {
     if (!sessionId?.trim()) throw new Error("Session ID is required");
+    if (!payload.posSessionId?.trim()) throw new Error("POS session is required");
     if (!payload.payments.length) {
       throw new Error("At least one payment is required");
     }
