@@ -245,7 +245,7 @@ export function ProductMenu({
                 disabled={unavailable}
                 onClick={() => void selectProduct(product)}
                 className={[
-                  "relative overflow-hidden rounded border bg-[#181818] text-left",
+                  "relative flex flex-col overflow-hidden rounded border bg-[#181818] text-left",
                   unavailable ? "cursor-not-allowed opacity-50" : "",
                   isSelected
                     ? "border-blue-500 ring-2 ring-blue-400 ring-offset-1 ring-offset-[#070707]"
@@ -265,7 +265,7 @@ export function ProductMenu({
                     {orderedQty}
                   </span>
                 ) : null}
-                <span className="block px-3 py-2">
+                <span className="block flex-1 px-3 py-2">
                   <span className="line-clamp-2 break-words text-sm font-semibold leading-snug">
                     {product.name}
                   </span>
