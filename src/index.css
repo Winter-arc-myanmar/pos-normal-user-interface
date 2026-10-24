@@ -38,6 +38,23 @@
   height: 0;
 }
 
+/* Long lists show a thin bar, so it is clear there is more below. */
+.pos-scroll-hint {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(100 116 139) transparent;
+}
+
+.pos-scroll-hint::-webkit-scrollbar {
+  display: block;
+  width: 6px;
+  height: 6px;
+}
+
+.pos-scroll-hint::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: rgb(100 116 139);
+}
+
 @layer base {
   html {
     @apply antialiased;
