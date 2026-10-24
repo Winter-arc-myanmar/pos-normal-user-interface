@@ -46,6 +46,7 @@ import {
   allocateOrderDiscountToLines,
   isFocLine,
   lineFocDiscount,
+  payableFromServerGrandTotal,
   payableTotal,
   toMoney,
   withOrderTipOnFirstPayment,
@@ -188,6 +189,7 @@ export function CashierPage() {
   const payReturnViewRef = useRef("menu");
   const pendingMemberDetectRef = useRef(false);
   const productAddQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const payTableSyncRef = useRef<string | null>(null);
 
   const locationId = activeLocationId;
   const activeView = searchParams.get("view") || "orders";
@@ -341,6 +343,62 @@ export function CashierPage() {
   );
   // The table's own charges: a pool table clock, a VIP room fee, a service charge.
   const tableCharges = useTableCharges(selectedOrderSession?.id ?? null);
+
+  // Opening the pay screen directly (for example from the right-hand Pay tab)
+  // bypasses handleOpenPay. Finalize a running table clock and reload the order
+  // here so the amount on screen is current before Confirm pay is pressed.
+  useEffect(() => {
+    if (activeView !== "pay") {
+      payTableSyncRef.current = null;
+      return;
+    }
+    if (
+      !selectedOrderSession ||
+      !selectedOrder ||
+      !tableCharges.isLoaded
+    ) {
+      return;
+    }
+
+    const syncKey = `${selectedOrderSession.id}:${selectedOrder.id}`;
+    if (payTableSyncRef.current === syncKey) return;
+    payTableSyncRef.current = syncKey;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        if (tableCharges.charges.running.length > 0) {
+          const finalizedCharges = await tableCharges.stop();
+          if (!finalizedCharges) {
+            throw new Error(t("cashier.errors.tableChargesFinalize"));
+          }
+        }
+        await selectOrderById(selectedOrder.id);
+      } catch (caught) {
+        if (!cancelled) {
+          payTableSyncRef.current = null;
+          setLocalError(
+            caught instanceof Error
+              ? caught.message
+              : t("cashier.errors.tableChargesFinalize")
+          );
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeView,
+    selectOrderById,
+    selectedOrder,
+    selectedOrderSession,
+    tableCharges.charges.running.length,
+    tableCharges.isLoaded,
+    tableCharges.stop,
+    t,
+  ]);
 
   /** Bills every running clock (a pool table) so the time used is on the bill. */
   const stopTableClocks = async () => {
@@ -626,16 +684,37 @@ export function CashierPage() {
     serviceChargeTaxRate,
   ]);
 
-  const orderTotal = useMemo(
-    () =>
-      payableTotal({
-        lineTotal: lineSubtotal,
+  const orderTotal = useMemo(() => {
+    const serverGrandTotal = !isDirectCheckoutMode
+      ? Number(selectedOrder?.grandTotal || 0)
+      : 0;
+
+    // Persisted orders already include their server-calculated tax and service
+    // charge in grandTotal. Applying the local service charge again made the
+    // amount jump every time an overdue table was refreshed before payment.
+    if (serverGrandTotal > 0) {
+      return payableFromServerGrandTotal({
+        serverGrandTotal,
         orderDiscount: Number(discountAmount),
-        serviceCharge: serviceCharge + serviceChargeTax,
         tipAmount: Number(tipAmount),
-      }).toFixed(4),
-    [discountAmount, lineSubtotal, serviceCharge, serviceChargeTax, tipAmount]
-  );
+      }).toFixed(4);
+    }
+
+    return payableTotal({
+      lineTotal: lineSubtotal,
+      orderDiscount: Number(discountAmount),
+      serviceCharge: serviceCharge + serviceChargeTax,
+      tipAmount: Number(tipAmount),
+    }).toFixed(4);
+  }, [
+    discountAmount,
+    isDirectCheckoutMode,
+    lineSubtotal,
+    selectedOrder?.grandTotal,
+    serviceCharge,
+    serviceChargeTax,
+    tipAmount,
+  ]);
 
   const orderTax = useMemo(
     () =>
@@ -1538,6 +1617,51 @@ export function CashierPage() {
         throw new Error(t("cashier.errors.discountReasonRequired"));
       }
 
+      // A table clock can gain another billing block after the pay screen was
+      // opened, and a directly opened ?view=pay route never ran handleOpenPay.
+      // Finalize the server-side charges and refresh the order before accepting
+      // money. If the bill changed, show the new amount and require a second
+      // confirmation so the cashier never charges more than the amount shown.
+      if (selectedOrderSession && isPrimaryTableOrder && selectedOrder) {
+        // The stop endpoint finalizes billable time. Calling it again after all
+        // clocks are stopped can duplicate charges on non-idempotent backends.
+        if (tableCharges.charges.running.length > 0) {
+          const finalizedCharges = await tableCharges.stop();
+          if (!finalizedCharges) {
+            throw new Error(t("cashier.errors.tableChargesFinalize"));
+          }
+        }
+
+        const refreshedOrder = await selectOrderById(selectedOrder.id);
+        const serverGrandTotal = Number(refreshedOrder.grandTotal || 0);
+        // grandTotal is already the server's final bill, including persisted
+        // tax and service charge. Adding the local service charge here again
+        // inflated 358,050 to 509,850. Only pending checkout adjustments belong
+        // on top of the refreshed authoritative total.
+        const refreshedTotal = serverGrandTotal > 0
+          ? payableFromServerGrandTotal({
+              serverGrandTotal,
+              orderDiscount,
+              tipAmount: tip,
+            })
+          : Number(orderTotal);
+
+        if (Math.abs(refreshedTotal - Number(orderTotal)) > 0.009) {
+          setIsSplitMode(false);
+          setSplitTenders([]);
+          setPaymentAmount(refreshedTotal.toFixed(4));
+          setLocalError(
+            t("cashier.errors.billUpdated", {
+              amount: refreshedTotal.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              }),
+            })
+          );
+          return;
+        }
+      }
+
       const checkoutPayments = withOrderTipOnFirstPayment(
         attachGuestCardIdToMemberPayments(
           buildCheckoutPayments({
@@ -1713,6 +1837,29 @@ export function CashierPage() {
     } catch (caught) {
       const message =
         caught instanceof Error ? caught.message : t("cashier.errors.checkout");
+      const insufficient = message.match(
+        /insufficient payment:\s*required\s+([\d,.]+),\s*received\s+[\d,.]+/i
+      );
+      const requiredTotal = insufficient
+        ? Number(insufficient[1].replaceAll(",", ""))
+        : Number.NaN;
+      if (Number.isFinite(requiredTotal) && requiredTotal > 0) {
+        setIsSplitMode(false);
+        setSplitTenders([]);
+        setPaymentAmount(requiredTotal.toFixed(4));
+        if (selectedOrder) {
+          void selectOrderById(selectedOrder.id).catch(() => undefined);
+        }
+        setLocalError(
+          t("cashier.errors.billUpdated", {
+            amount: requiredTotal.toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            }),
+          })
+        );
+        return;
+      }
       setLocalError(message);
     }
   };

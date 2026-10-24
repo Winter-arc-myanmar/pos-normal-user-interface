@@ -1142,7 +1142,9 @@
       "tooManyRequests": "Too many requests. Wait a moment and try again.",
       "orderAlreadyPaid": "This order is already paid and cannot be charged again.",
       "discountReasonRequired": "Choose a discount reason before applying a discount.",
-      "discountTooLarge": "Discount cannot be greater than the order subtotal."
+      "discountTooLarge": "Discount cannot be greater than the order subtotal.",
+      "tableChargesFinalize": "Unable to finalize table charges. Refresh and try again.",
+      "billUpdated": "The table bill changed to {{amount}} after finalizing its charges. Review the new total, then confirm payment again."
     },
     "tableCharges": {
       "title": "Table charges",
