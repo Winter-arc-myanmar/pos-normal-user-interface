@@ -198,7 +198,7 @@ export function ProductMenu({
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder={t("cashier.productMenu.search")}
-          className="min-h-10 flex-1 rounded border border-slate-700 bg-slate-900 px-3 text-sm text-white outline-none focus:border-blue-500"
+          className="min-h-10 min-w-0 flex-1 rounded border border-slate-700 bg-slate-900 px-3 text-sm text-white outline-none focus:border-blue-500"
         />
         <Button variant="outline" onClick={onClose}>
           {t("cashier.productMenu.close")}
@@ -291,7 +291,7 @@ export function ProductMenu({
           onClick={closeVariantModal}
         >
           <div
-            className="w-full max-w-md rounded-2xl border border-slate-700 bg-[#181818] p-5 text-white shadow-xl"
+            className="max-h-[calc(100dvh-4rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-slate-700 bg-[#181818] p-5 text-white shadow-xl"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">

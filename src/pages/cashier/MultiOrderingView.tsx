@@ -129,7 +129,7 @@ export function MultiOrderingView({
       </header>
 
       {isSplitOpen ? (
-        <div className="border-b border-white/10 bg-[#171717] p-3">
+        <div className="max-h-[55%] shrink-0 overflow-y-auto border-b border-white/10 bg-[#171717] p-3">
           <div className="grid grid-cols-2 gap-2">
             <label className="text-xs text-slate-300">
               {t("cashier.multiOrder.sourceOrder")}
@@ -230,7 +230,7 @@ export function MultiOrderingView({
         </div>
       ) : null}
 
-      <div className="grid min-h-0 flex-1 auto-rows-[11rem] grid-cols-2 gap-1 overflow-y-auto p-1 min-[1050px]:grid-cols-3">
+      <div className="grid min-h-0 flex-1 auto-rows-[11rem] grid-cols-1 gap-1 overflow-y-auto p-1 sm:grid-cols-2 min-[1050px]:grid-cols-3">
         {orderIds.map((orderId, index) => {
           const order = orderById[orderId];
           const lines = linesByOrderId[orderId] || [];

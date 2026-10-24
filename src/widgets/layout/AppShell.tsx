@@ -470,7 +470,7 @@ export function AppShell() {
     <>
     <div
       className={[
-        "pos-app-shell pos-touch-scroll grid h-[100dvh] min-h-0 min-w-0 overflow-x-hidden overflow-y-hidden bg-black transition-[grid-template-columns] duration-200 ease-out",
+        "pos-app-shell pos-touch-scroll grid min-h-0 min-w-0 overflow-x-hidden overflow-y-hidden bg-black transition-[grid-template-columns] duration-200 ease-out",
         gridCols,
       ].join(" ")}
       data-nav={navMode}

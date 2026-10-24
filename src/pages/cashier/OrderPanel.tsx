@@ -194,7 +194,7 @@ export function OrderPanel({
   };
 
   return (
-    <aside className="flex min-h-0 flex-col border-r border-slate-200 bg-white p-3 text-slate-900 min-[1100px]:p-4">
+    <aside className="flex min-h-0 min-w-0 flex-col overflow-y-auto border-r border-slate-200 bg-white p-3 text-slate-900 min-[1100px]:p-4">
       {tableOrderIds.length && onSelectTableOrder && onAddTableOrder && onManageTableOrders ? (
         <OrderTabs
           orderIds={tableOrderIds}
@@ -383,7 +383,7 @@ export function OrderPanel({
       </div>
 
       {hasActiveOrder ? (
-        <div className="max-h-[48vh] shrink-0 space-y-2 overflow-y-auto border-t border-slate-200 pt-3">
+        <div className="max-h-[48%] shrink-0 space-y-2 overflow-y-auto border-t border-slate-200 pt-3">
           {promotionDiscount > 0 ? (
             <p className="flex items-center justify-between text-sm text-emerald-700">
               <span>{t("cashier.orderPanel.promotionDiscount")}</span>

@@ -319,13 +319,13 @@ export function CardRefundPage() {
 
       <div
         className={[
-          "grid min-h-0 flex-1 gap-3 overflow-hidden p-3 sm:p-4 lg:gap-4 lg:p-6",
+          "grid min-h-0 flex-1 gap-3 overflow-y-auto p-3 sm:p-4 md:overflow-hidden lg:gap-4 lg:p-6",
           step === "detect" || step === "amount"
-            ? "grid-cols-[minmax(0,1fr)_7rem] sm:grid-cols-[minmax(0,1fr)_9rem] lg:grid-cols-[minmax(0,1fr)_320px]"
+            ? "grid-cols-1 grid-rows-[minmax(24rem,1fr)_auto] md:grid-cols-[minmax(0,1fr)_9rem] md:grid-rows-1 lg:grid-cols-[minmax(0,1fr)_320px]"
             : "grid-cols-1",
         ].join(" ")}
       >
-        <section className="min-h-0 overflow-y-auto rounded-xl border border-slate-800 bg-[#151821] p-5">
+        <section className="min-h-0 min-w-0 overflow-y-auto rounded-xl border border-slate-800 bg-[#151821] p-3 sm:p-5">
           {step === "detect" ? (
             <div className="mx-auto flex max-w-xl flex-col gap-4">
               <div>

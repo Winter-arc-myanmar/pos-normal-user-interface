@@ -289,7 +289,7 @@ export function TipPoolsPage() {
   };
 
   return (
-    <section className="pos-split grid h-full min-h-0 grid-cols-[16rem_minmax(0,1fr)] overflow-hidden bg-slate-100">
+    <section className="pos-split grid h-full min-h-0 grid-cols-1 grid-rows-[16rem_auto] overflow-y-auto bg-slate-100 lg:grid-cols-[16rem_minmax(0,1fr)] lg:grid-rows-1 lg:overflow-hidden">
       <aside className="flex min-h-0 flex-col border-r border-slate-200 bg-white p-3">
         <h1 className="text-xl font-bold">{t("cashier.tipPool.title")}</h1>
         <div className="my-3 grid grid-cols-3 gap-1">
@@ -333,7 +333,7 @@ export function TipPoolsPage() {
         </div>
       </aside>
 
-      <main className="grid min-h-0 grid-cols-2 gap-3 overflow-y-auto p-3">
+      <main className="grid min-h-0 min-w-0 grid-cols-1 content-start gap-3 p-3 lg:overflow-y-auto xl:grid-cols-2">
         <form onSubmit={savePool} className="rounded-lg bg-white p-4">
           <div className="flex items-center justify-between">
             <h2 className="font-bold">
@@ -365,7 +365,7 @@ export function TipPoolsPage() {
                 }))
               }
             />
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <label className="text-xs text-slate-500">
                 {t("cashier.tipPool.start")}
                 <input

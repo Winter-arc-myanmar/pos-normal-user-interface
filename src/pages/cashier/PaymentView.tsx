@@ -193,8 +193,8 @@ export function PaymentView({
   }, [cardLookupOpen, confirmClose, requestClosePay, showMemberCardLookup]);
 
   return (
-    <section className="grid h-full min-h-0 grid-cols-1 grid-rows-[minmax(0,1fr)_auto_auto] overflow-hidden bg-[#202020] text-white md:grid-cols-[minmax(11rem,16rem)_4.5rem_minmax(0,1fr)] md:grid-rows-none">
-      <aside className="order-3 flex min-h-0 max-h-[38vh] flex-col overflow-y-auto border-t border-white/10 p-2 md:order-none md:max-h-none md:border-r md:border-t-0">
+    <section className="grid h-full min-h-0 grid-cols-1 grid-rows-[minmax(0,1fr)_auto_auto] overflow-hidden bg-[#202020] text-white min-[1100px]:grid-cols-[minmax(11rem,16rem)_4.5rem_minmax(0,1fr)] min-[1100px]:grid-rows-none">
+      <aside className="order-3 flex min-h-0 max-h-[38%] flex-col overflow-y-auto border-t border-white/10 p-2 min-[1100px]:order-none min-[1100px]:max-h-none min-[1100px]:border-r min-[1100px]:border-t-0">
         <div className="rounded bg-white p-3 text-slate-900">
           <p className="text-sm font-semibold">{t("cashier.payment.bill")}</p>
           <div className="mt-3 flex justify-between text-sm">
@@ -297,7 +297,7 @@ export function PaymentView({
         )}
       </aside>
 
-      <div className="order-2 flex min-h-0 flex-row items-stretch gap-1 overflow-x-auto border-t border-white/10 bg-[#171717] p-1 md:order-none md:flex-col md:overflow-y-auto md:border-r md:border-t-0">
+      <div className="order-2 flex min-h-0 flex-row items-stretch gap-1 overflow-x-auto border-t border-white/10 bg-[#171717] p-1 min-[1100px]:order-none min-[1100px]:flex-col min-[1100px]:overflow-y-auto min-[1100px]:border-r min-[1100px]:border-t-0">
         <button
           type="button"
           onClick={() => {
@@ -306,27 +306,27 @@ export function PaymentView({
           aria-pressed={isSplitMode}
           aria-label={t("cashier.payment.split")}
           className={[
-            "flex min-h-12 min-w-0 flex-1 flex-row items-center justify-center gap-2 rounded px-2 py-2 text-[11px] font-semibold md:min-h-20 md:w-full md:flex-none md:flex-col md:gap-0",
+            "flex min-h-12 min-w-0 flex-1 flex-row items-center justify-center gap-2 rounded px-2 py-2 text-[11px] font-semibold min-[1100px]:min-h-20 min-[1100px]:w-full min-[1100px]:flex-none min-[1100px]:flex-col min-[1100px]:gap-0",
             isSplitMode
               ? "cursor-default bg-blue-700 text-white ring-2 ring-blue-300"
               : "bg-blue-600 text-white hover:bg-blue-500",
           ].join(" ")}
         >
           <SplitIcon />
-          <span className="md:mt-1">{t("cashier.payment.split")}</span>
+          <span className="min-[1100px]:mt-1">{t("cashier.payment.split")}</span>
         </button>
         <button
           type="button"
           onClick={requestClosePay}
           aria-label={t("cashier.payment.closePayTitle")}
-          className="flex min-h-12 min-w-0 flex-1 flex-row items-center justify-center gap-2 rounded bg-slate-800 px-2 py-2 text-[11px] font-semibold text-white hover:bg-slate-600 md:min-h-16 md:w-full md:flex-none md:flex-col md:gap-0"
+          className="flex min-h-12 min-w-0 flex-1 flex-row items-center justify-center gap-2 rounded bg-slate-800 px-2 py-2 text-[11px] font-semibold text-white hover:bg-slate-600 min-[1100px]:min-h-16 min-[1100px]:w-full min-[1100px]:flex-none min-[1100px]:flex-col min-[1100px]:gap-0"
         >
           <CloseSplitIcon />
-          <span className="md:mt-1">{t("cashier.payment.closePay")}</span>
+          <span className="min-[1100px]:mt-1">{t("cashier.payment.closePay")}</span>
         </button>
       </div>
 
-      <div className="order-1 flex min-h-0 flex-col p-2 md:order-none">
+      <div className="order-1 flex min-h-0 min-w-0 flex-col overflow-y-auto p-2 min-[1100px]:order-none">
         <div
           className={[
             "flex min-h-12 items-center rounded px-3 text-sm font-semibold",
@@ -450,7 +450,7 @@ export function PaymentView({
             {t("cashier.payment.reopenCardLookup")}
           </button>
         ) : null}
-        <div className="mt-2 grid min-h-0 flex-1 grid-cols-2 content-start gap-2 overflow-y-auto">
+        <div className="mt-2 grid min-h-40 shrink-0 flex-1 grid-cols-2 content-start gap-2 overflow-y-auto">
           {sortedMethods.map((method) => {
             const selected = selectedMethodId === method.id;
             const memberCard = isMemberCardPaymentMethod(method);

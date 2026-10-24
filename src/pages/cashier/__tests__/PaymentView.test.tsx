@@ -40,6 +40,14 @@ const renderPaymentView = (
   );
 
 describe("PaymentView", () => {
+  it("keeps payment methods scrollable when the member lookup takes vertical space", () => {
+    renderPaymentView();
+
+    const methodsGrid = screen.getByRole("button", { name: /memberCard/i }).parentElement;
+    expect(methodsGrid).toHaveClass("min-h-40", "overflow-y-auto");
+    expect(methodsGrid?.parentElement).toHaveClass("min-w-0", "overflow-y-auto");
+  });
+
   it("selects member card and can add a split tender", () => {
     const onSelectMethod = vi.fn();
     const onAddTender = vi.fn();
