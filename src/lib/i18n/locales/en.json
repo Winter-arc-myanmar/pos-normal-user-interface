@@ -1070,6 +1070,8 @@
       "decreaseQuantity": "Decrease quantity",
       "increaseQuantity": "Increase quantity",
       "lineQuantity": "Quantity {{count}}",
+      "expandItem": "Expand {{name}} details",
+      "collapseItem": "Collapse {{name}} details",
       "remove": "Remove",
       "itemUpdated": "Item quantity updated.",
       "itemRemoved": "Item removed from order.",

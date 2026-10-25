@@ -1,4 +1,4 @@
-import { useEffect, useState, type RefObject } from "react";
+import { useEffect, useId, useState, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import {
@@ -159,6 +159,11 @@ export function OrderPanel({
 }: OrderPanelProps) {
   const { t } = useTranslation();
   const [confirmCancelOrder, setConfirmCancelOrder] = useState(false);
+  const [expandedLine, setExpandedLine] = useState<{
+    orderId: string | undefined;
+    lineId: string;
+  } | null>(null);
+  const lineDetailsId = useId();
   const variants = Object.values(variantsByProductId).flat();
   const hasActiveOrder = !!selectedOrder || selectedOrderLines.length > 0;
   const isSettledOrder = isSettledSalesOrder(selectedOrder);
@@ -187,7 +192,7 @@ export function OrderPanel({
     );
   };
 
-  /** Under the name: which variant of the item this line is. */
+  /** In the expanded details: which variant of the item this line is. */
   const resolveLineVariant = (line: SalesOrderLine) => {
     const variant = variants.find((item) => item.id === line.variantId);
     return variantDisplayName(line) || variantDisplayName(variant ?? {});
@@ -246,7 +251,7 @@ export function OrderPanel({
               </p>
             ) : null}
 
-            <div className="space-y-2 py-3">
+            <div className="my-3 divide-y divide-slate-200 overflow-hidden rounded border border-slate-200">
               {selectedOrderLines.map((line) => {
                 const lineName = resolveLineName(line);
                 const lineVariant = resolveLineVariant(line);
@@ -271,13 +276,38 @@ export function OrderPanel({
                 // A previewed saving is not on the bill yet, so take it off here.
                 const lineDue =
                   lineTotal - (saving && !line.appliedPromotionId ? saving.amount : 0);
+                const isExpanded =
+                  expandedLine?.orderId === selectedOrder?.id &&
+                  expandedLine?.lineId === line.id;
+                const detailsId = `${lineDetailsId}-${line.id}`;
                 return (
                   <div
                     key={line.id}
-                    className="rounded border border-slate-200 bg-slate-50 p-2"
+                    className={isExpanded ? "bg-slate-50" : "bg-white"}
                   >
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="flex min-w-0 items-baseline gap-1.5 text-sm font-medium">
+                    <button
+                      type="button"
+                      className="flex min-h-11 w-full min-w-0 items-center gap-2 px-2 text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
+                      aria-expanded={isExpanded}
+                      aria-controls={detailsId}
+                      aria-label={t(
+                        isExpanded ? "cashier.orderPanel.collapseItem" : "cashier.orderPanel.expandItem",
+                        { name: lineName }
+                      )}
+                      onClick={() => setExpandedLine(
+                        isExpanded ? null : {
+                          orderId: selectedOrder?.id,
+                          lineId: line.id,
+                        }
+                      )}
+                    >
+                      <span
+                        className="shrink-0 text-xs font-semibold tabular-nums text-slate-500"
+                        aria-label={t("cashier.orderPanel.lineQuantity", { count: quantityLabel })}
+                      >
+                        {quantityLabel}×
+                      </span>
+                      <span className="flex min-w-0 flex-1 items-center gap-1.5 text-sm font-medium">
                         {saving ? (
                           <span
                             className="shrink-0 rounded border border-emerald-600 px-1 text-[10px] font-semibold tracking-wide text-emerald-700"
@@ -286,77 +316,95 @@ export function OrderPanel({
                             {t("cashier.orderPanel.promo")}
                           </span>
                         ) : null}
-                        <span className="min-w-0 truncate">{lineName}</span>
+                        {isFocLine(line) ? (
+                          <span className="shrink-0 rounded bg-slate-100 px-1 text-[10px] font-semibold text-slate-600">
+                            {t("cashier.orderPanel.foc")}
+                          </span>
+                        ) : null}
+                        <span className="min-w-0 truncate" title={lineName}>{lineName}</span>
                       </span>
                       <span className="shrink-0 text-sm tabular-nums">
                         {formatPosMoney(lineDue)}
                       </span>
-                    </div>
-                    {lineVariant && lineVariant !== lineName ? (
-                      <p className="mt-0.5 break-words text-xs text-slate-500">
-                        {lineVariant}
-                      </p>
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform duration-150 motion-reduce:transition-none ${isExpanded ? "rotate-180" : ""}`}
+                      >
+                        <path d="m4 6 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                    {isExpanded ? (
+                      <div id={detailsId} className="border-t border-slate-200 px-2 pb-2 pt-1.5">
+                        <p className="break-words text-sm font-medium">{lineName}</p>
+                        {lineVariant && lineVariant !== lineName ? (
+                          <p className="mt-0.5 break-words text-xs text-slate-500">
+                            {lineVariant}
+                          </p>
+                        ) : null}
+                        <p className="mt-0.5 text-xs tabular-nums text-slate-600">
+                          <span className={saving ? "text-slate-400 line-through" : ""}>
+                            {formatPosMoney(line.unitPrice)}
+                          </span>
+                          {saving && promoLabel ? ` · ${promoLabel}` : ""}
+                        </p>
+                        {saving ? (
+                          <p className="mt-0.5 text-xs font-medium text-emerald-700">
+                            {t("cashier.orderPanel.promoSaving", {
+                              name: promoLabel,
+                              amount: formatPosMoney(saving.amount),
+                            })}
+                          </p>
+                        ) : null}
+                        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                          <button
+                            type="button"
+                            className="min-h-11 min-w-11 rounded border border-slate-300 px-2 font-semibold leading-none hover:bg-slate-100 focus-visible:outline-blue-500 disabled:opacity-50"
+                            aria-label={t("cashier.orderPanel.decreaseQuantity")}
+                            onClick={() => onDecreaseLineQuantity(line)}
+                            disabled={isLoading || isSettledOrder}
+                          >
+                            -
+                          </button>
+                          <span
+                            className="min-w-[2ch] text-center font-medium tabular-nums"
+                            aria-label={t("cashier.orderPanel.lineQuantity", {
+                              count: quantityLabel,
+                            })}
+                          >
+                            {quantityLabel}
+                          </span>
+                          <button
+                            type="button"
+                            className="min-h-11 min-w-11 rounded border border-slate-300 px-2 font-semibold leading-none hover:bg-slate-100 focus-visible:outline-blue-500 disabled:opacity-50"
+                            aria-label={t("cashier.orderPanel.increaseQuantity")}
+                            onClick={() => onIncreaseLineQuantity(line)}
+                            disabled={isLoading || isSettledOrder}
+                          >
+                            +
+                          </button>
+                          <button
+                            type="button"
+                            className="min-h-11 rounded border border-slate-300 px-2 py-1 font-medium hover:bg-slate-100 focus-visible:outline-blue-500 disabled:opacity-50"
+                            onClick={() => onToggleFoc?.(line)}
+                            disabled={isLoading || isSettledOrder || !onToggleFoc}
+                          >
+                            {isFocLine(line)
+                              ? t("cashier.orderPanel.undoFoc")
+                              : t("cashier.orderPanel.foc")}
+                          </button>
+                          <button
+                            type="button"
+                            className="min-h-11 rounded border border-red-300 px-2 py-1 font-medium text-red-700 hover:bg-red-50 focus-visible:outline-blue-500 disabled:opacity-50"
+                            onClick={() => onRemoveLine(line)}
+                            disabled={isLoading || isSettledOrder}
+                          >
+                            {t("cashier.orderPanel.remove")}
+                          </button>
+                        </div>
+                      </div>
                     ) : null}
-                    <p className="mt-0.5 text-xs tabular-nums text-slate-600">
-                      <span className={saving ? "text-slate-400 line-through" : ""}>
-                        {formatPosMoney(line.unitPrice)}
-                      </span>
-                      {saving && promoLabel ? ` · ${promoLabel}` : ""}
-                    </p>
-                    {saving ? (
-                      <p className="mt-0.5 text-xs font-medium text-emerald-700">
-                        {t("cashier.orderPanel.promoSaving", {
-                          name: promoLabel,
-                          amount: formatPosMoney(saving.amount),
-                        })}
-                      </p>
-                    ) : null}
-                    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-                      <button
-                        type="button"
-                        className="min-h-7 min-w-7 rounded border border-slate-300 px-2 font-semibold leading-none"
-                        aria-label={t("cashier.orderPanel.decreaseQuantity")}
-                        onClick={() => onDecreaseLineQuantity(line)}
-                        disabled={isLoading || isSettledOrder}
-                      >
-                        -
-                      </button>
-                      <span
-                        className="min-w-[2ch] text-center font-medium tabular-nums"
-                        aria-label={t("cashier.orderPanel.lineQuantity", {
-                          count: quantityLabel,
-                        })}
-                      >
-                        {quantityLabel}
-                      </span>
-                      <button
-                        type="button"
-                        className="min-h-7 min-w-7 rounded border border-slate-300 px-2 font-semibold leading-none"
-                        aria-label={t("cashier.orderPanel.increaseQuantity")}
-                        onClick={() => onIncreaseLineQuantity(line)}
-                        disabled={isLoading || isSettledOrder}
-                      >
-                        +
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded border border-slate-300 px-2 py-1 font-medium"
-                        onClick={() => onToggleFoc?.(line)}
-                        disabled={isLoading || isSettledOrder || !onToggleFoc}
-                      >
-                        {isFocLine(line)
-                          ? t("cashier.orderPanel.undoFoc")
-                          : t("cashier.orderPanel.foc")}
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded border border-red-300 px-2 py-1 font-medium text-red-700"
-                        onClick={() => onRemoveLine(line)}
-                        disabled={isLoading || isSettledOrder}
-                      >
-                        {t("cashier.orderPanel.remove")}
-                      </button>
-                    </div>
                   </div>
                 );
               })}

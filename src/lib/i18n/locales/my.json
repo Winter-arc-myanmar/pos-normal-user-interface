@@ -1070,6 +1070,8 @@
       "decreaseQuantity": "အရေအတွက် လျှော့မည်",
       "increaseQuantity": "အရေအတွက် တိုးမည်",
       "lineQuantity": "အရေအတွက် {{count}}",
+      "expandItem": "{{name}} အသေးစိတ် ဖွင့်မည်",
+      "collapseItem": "{{name}} အသေးစိတ် ပိတ်မည်",
       "remove": "ဖယ်ရှားမည်",
       "itemUpdated": "ပစ္စည်းအရေအတွက် ပြင်ဆင်ပြီး။",
       "itemRemoved": "အော်ဒါမှ ပစ္စည်း ဖယ်ပြီး။",
