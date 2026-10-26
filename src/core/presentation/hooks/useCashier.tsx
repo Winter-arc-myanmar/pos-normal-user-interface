@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   CheckoutRequestDTO,
   CreateOrderPaymentDTO,
@@ -7,6 +7,8 @@ import {
   CreateWaitlistEntryDTO,
   DiningTableFilterDTO,
   FireKdsDTO,
+  fromApiServiceType,
+  toApiServiceType,
   KdsTicketFilterDTO,
   KdsTicketListDTO,
   OpenTableSessionDTO,
@@ -219,6 +221,23 @@ export function useCashier(): UseCashierReturn {
 
   const clearError = useCallback(() => setError(null), []);
 
+  /**
+   * The service type each open order was started with on this till.
+   *
+   * Creating a sales order cannot carry a service type (only checkout can), so
+   * the API answers DINE_IN for a pick-up or take-away draft. Reading the order
+   * back would then move it to the dine-in tab: the pick-up count drops to zero
+   * and the order cannot be found where it was opened. Remember the type the
+   * till opened it with until the order is settled.
+   */
+  const openedServiceTypes = useRef(new Map<string, ServiceType>());
+
+  const withOpenedServiceType = useCallback((order: SalesOrder): SalesOrder => {
+    const opened = openedServiceTypes.current.get(order.id);
+    if (!opened || opened === order.serviceType) return order;
+    return new SalesOrder({ ...order, serviceType: opened });
+  }, []);
+
   const setActiveLocationId = useCallback((locationId: string) => {
     setActiveLocationIdState(locationId);
     const tenantId = inventoryLocations[0]?.tenantId;
@@ -292,7 +311,7 @@ export function useCashier(): UseCashierReturn {
       clearError();
       try {
         const result = await cashierService.getSalesOrders(params);
-        setSalesOrders(result);
+        setSalesOrders(result.map(withOpenedServiceType));
       } catch (err) {
         const message =
           err instanceof Error ? err.message : "Failed to fetch sales orders";
@@ -302,7 +321,7 @@ export function useCashier(): UseCashierReturn {
         setIsLoading(false);
       }
     },
-    [cashierService, clearError]
+    [cashierService, clearError, withOpenedServiceType]
   );
 
   const clearOrderSelection = useCallback(() => {
@@ -316,10 +335,11 @@ export function useCashier(): UseCashierReturn {
       setIsLoading(true);
       clearError();
       try {
-        setSelectedOrder(order);
+        const knownOrder = withOpenedServiceType(order);
+        setSelectedOrder(knownOrder);
         const [lines, payments] = await Promise.all([
-          cashierService.getSalesOrderLines(order.id),
-          cashierService.getOrderPayments(order.id),
+          cashierService.getSalesOrderLines(knownOrder.id),
+          cashierService.getOrderPayments(knownOrder.id),
         ]);
         setSelectedOrderLines(lines);
         setSelectedOrderPayments(payments);
@@ -331,7 +351,7 @@ export function useCashier(): UseCashierReturn {
         setIsLoading(false);
       }
     },
-    [cashierService, clearError]
+    [cashierService, clearError, withOpenedServiceType]
   );
 
   const createOrder = useCallback(
@@ -340,9 +360,16 @@ export function useCashier(): UseCashierReturn {
       clearError();
       try {
         const order = await cashierService.createSalesOrder(payload);
-        setSalesOrders((prev) => [order, ...prev]);
-        await selectOrder(order);
-        return order;
+        if (payload.serviceType) {
+          openedServiceTypes.current.set(
+            order.id,
+            fromApiServiceType(toApiServiceType(payload.serviceType))
+          );
+        }
+        const created = withOpenedServiceType(order);
+        setSalesOrders((prev) => [created, ...prev]);
+        await selectOrder(created);
+        return created;
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to create order";
         setError(message);
@@ -351,7 +378,7 @@ export function useCashier(): UseCashierReturn {
         setIsLoading(false);
       }
     },
-    [cashierService, clearError, selectOrder]
+    [cashierService, clearError, selectOrder, withOpenedServiceType]
   );
 
   const ensureVariants = useCallback(
@@ -1110,7 +1137,9 @@ export function useCashier(): UseCashierReturn {
       setIsLoading(true);
       clearError();
       try {
-        const order = await cashierService.getSalesOrderById(orderId);
+        const order = withOpenedServiceType(
+          await cashierService.getSalesOrderById(orderId)
+        );
         await selectOrder(order);
         return order;
       } catch (err) {
@@ -1121,7 +1150,7 @@ export function useCashier(): UseCashierReturn {
         setIsLoading(false);
       }
     },
-    [cashierService, clearError, selectOrder]
+    [cashierService, clearError, selectOrder, withOpenedServiceType]
   );
 
   const openTableSession = useCallback(
