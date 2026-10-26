@@ -1075,6 +1075,7 @@
       "remove": "Remove",
       "itemUpdated": "Item quantity updated.",
       "itemRemoved": "Item removed from order.",
+      "kdsDeleteTitle": "DELETE",
       "adjustments": "Adjustments",
       "discount": "Discount",
       "discountReason": "Discount reason",

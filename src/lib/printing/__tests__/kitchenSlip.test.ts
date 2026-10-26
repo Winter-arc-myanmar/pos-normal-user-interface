@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { KdsTicket } from "@/core/domain/entities/Cashier";
-import { formatKdsTicket, kdsTicketPlace, kdsTicketSender } from "../formatKdsTicket";
+import {
+  formatKdsTicket,
+  formatKitchenSlip,
+  kdsTicketPlace,
+  kdsTicketSender,
+} from "../formatKdsTicket";
 
 const ticket = (fields: Partial<KdsTicket>): KdsTicket =>
   ({
@@ -63,5 +68,19 @@ describe("the kitchen slip", () => {
     expect(text).toContain("Sent by Aung Aung (ID: SHW0001)");
     expect(text).toContain("Order SO-0012");
     expect(text).toContain("1 x FRIED RICE");
+  });
+
+  it("heads a delete slip with DELETE and marks the removed item", () => {
+    const text = formatKitchenSlip({
+      title: "DELETE",
+      stationName: "Bar",
+      place: "Table T4",
+      lines: [{ name: "Coffee", quantity: "1", remarks: "DELETE" }],
+    });
+
+    expect(text).toContain("BAR");
+    expect(text).toContain("#DELETE");
+    expect(text).toContain("1 x COFFEE");
+    expect(text).toContain("** DELETE **");
   });
 });
