@@ -159,6 +159,12 @@ export class SalesOrderLine {
   productName?: string;
   variantName?: string;
   sku?: string;
+  /**
+   * The category this line was sold under, recorded by the server. Station
+   * printing routes by it, so it must not depend on the menu this till has
+   * loaded (a newly added item may not be in it yet).
+   */
+  categoryId?: string;
   categoryName?: string;
   createdAt?: string;
   updatedAt?: string;

@@ -462,6 +462,7 @@ export function CashierPage() {
       return {
         ...line,
         productName: line.productName || product?.name,
+        categoryId: line.categoryId || product?.categoryId,
         taxInclusive: Boolean(isPriceInclusive),
         unitPrice: formatAmount(unitPrice),
         taxRateId: lineTotals.taxAmount > 0 ? (ownRateId ?? fallback?.id) : line.taxRateId,
@@ -515,6 +516,7 @@ export function CashierPage() {
       variantName?: string;
       quantity?: string | number;
       unitPrice?: string;
+      categoryId?: string;
       categoryName?: string;
       selectedModifiers?: Record<string, unknown>;
     }>
@@ -530,7 +532,9 @@ export function CashierPage() {
           name: line.productName || product?.name || line.variantName || "Item",
           quantity: String(line.quantity || "1"),
           unitPrice: unitPrice || undefined,
-          categoryId: product?.categoryId,
+          // The category the server recorded on the line routes it to its
+          // station printer; the menu lookup is only for lines added here.
+          categoryId: line.categoryId || product?.categoryId,
           categoryName: line.categoryName || product?.categoryName,
           modifiers: modifiers.names,
           modifierPrices: modifiers.prices,

@@ -434,7 +434,8 @@ const readSalesOrderLineNames = (item: Record<string, unknown>) => {
   };
 };
 
-const ticketLineCategoryId = (row: Record<string, unknown>) => {
+/** The category a sold line was routed by, wherever the API puts it. */
+const readLineCategoryId = (row: Record<string, unknown>) => {
   const salesOrderLine = asRecord(row.salesOrderLine);
   const product =
     asRecord(row.product) || asRecord(salesOrderLine?.product);
@@ -456,7 +457,7 @@ const mapTicketLine = (entry: unknown) => {
   return {
     name: ticketLineName(row),
     quantity: String(row.quantity || "1"),
-    categoryId: ticketLineCategoryId(row),
+    categoryId: readLineCategoryId(row),
     modifiers,
   };
 };
@@ -1322,6 +1323,7 @@ export class ApiCashierRepository implements ICashierRepository {
       seatNumber:
         typeof item.seatNumber === "number" ? item.seatNumber : payload.seatNumber,
       createdAt: item.createdAt ? String(item.createdAt) : undefined,
+      categoryId: readLineCategoryId(item),
     });
   }
 
@@ -1350,6 +1352,7 @@ export class ApiCashierRepository implements ICashierRepository {
       seatNumber:
         typeof item.seatNumber === "number" ? item.seatNumber : payload.seatNumber,
       createdAt: item.createdAt ? String(item.createdAt) : undefined,
+      categoryId: readLineCategoryId(item),
     });
   }
 
@@ -1378,6 +1381,7 @@ export class ApiCashierRepository implements ICashierRepository {
         status: item.status ? String(item.status) : undefined,
         seatNumber: typeof item.seatNumber === "number" ? item.seatNumber : undefined,
         createdAt: item.createdAt ? String(item.createdAt) : undefined,
+        categoryId: readLineCategoryId(item),
         categoryName: asName(item.categoryName) || asName(asRecord(item.product)?.categoryName),
         ...names,
       });
@@ -1616,6 +1620,7 @@ export class ApiCashierRepository implements ICashierRepository {
       status: item.status ? String(item.status) : undefined,
       seatNumber:
         typeof item.seatNumber === "number" ? item.seatNumber : payload.seatNumber,
+      categoryId: readLineCategoryId(item),
     });
   }
 
