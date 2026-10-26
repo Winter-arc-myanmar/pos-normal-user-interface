@@ -339,7 +339,7 @@ export function RoomTabletPage() {
 
   if (!setup) {
     return (
-      <main className="min-h-screen bg-[#080808] p-6 text-white">
+      <main className="h-dvh min-h-0 overflow-y-auto bg-[#080808] p-4 text-white sm:p-6">
         <div className="mx-auto max-w-3xl space-y-4">
           <h1 className="text-2xl font-bold">{t("tablet.setupTitle")}</h1>
           <p className="text-slate-400">{t("tablet.setupDescription")}</p>
@@ -551,7 +551,7 @@ export function RoomTabletPage() {
 
   return (
     <main
-      className="flex min-h-screen flex-col bg-[#080808] text-white"
+      className="flex h-dvh min-h-0 flex-col overflow-y-auto bg-[#080808] text-white"
       onPointerDown={touch}
       onKeyDown={touch}
     >
@@ -563,7 +563,7 @@ export function RoomTabletPage() {
         </p>
       ) : null}
 
-      <section className="flex min-h-0 flex-1 flex-col p-6">
+      <section className="flex shrink-0 flex-1 flex-col p-4 sm:p-6">
         {payFor ? (
           <>
             {tapPanel(t("tablet.tapToPay", { amount: money(payAmount) }))}

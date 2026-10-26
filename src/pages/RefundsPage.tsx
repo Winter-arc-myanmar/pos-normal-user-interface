@@ -345,7 +345,7 @@ export function RefundsPage() {
         </p>
       ) : null}
 
-      <div className="pos-split grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden px-4 pb-4 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,32rem)]">
+      <div className="pos-split grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(18rem,1fr)_minmax(28rem,1fr)] gap-3 overflow-y-auto px-4 pb-4 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,32rem)] lg:grid-rows-1 lg:overflow-hidden">
         <div className="pos-pane-scroll rounded-md bg-[#101010]">
           {!loadedOrderId ? (
             <div className="flex h-full min-h-64 items-center justify-center px-6 text-center text-sm text-slate-400">

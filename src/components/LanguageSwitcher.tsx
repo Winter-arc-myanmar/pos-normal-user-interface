@@ -23,7 +23,7 @@ function ChevronDownIcon() {
   );
 }
 
-export function LanguageSwitcher() {
+export function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
   const { i18n, t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [currentValue, setCurrentValue] = useState<AppLanguage>(() =>
@@ -72,10 +72,15 @@ export function LanguageSwitcher() {
   }, [isOpen]);
 
   return (
-    <div className="relative" ref={containerRef}>
+    <div className={compact ? "relative w-full" : "relative"} ref={containerRef}>
       <button
         type="button"
-        className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+        className={[
+          "inline-flex items-center rounded-lg border border-slate-200 bg-white font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
+          compact
+            ? "w-full justify-between gap-1 whitespace-nowrap px-2 py-2 text-xs"
+            : "gap-2 px-3 py-2 text-sm",
+        ].join(" ")}
         aria-label={t("language.switchLanguage")}
         aria-haspopup="listbox"
         aria-expanded={isOpen}

@@ -94,7 +94,7 @@ export function SearchInput({
   return (
     <div
       className={[
-        "relative flex items-center",
+        "relative flex min-w-0 max-w-full items-center",
         "bg-white border border-slate-200 rounded-lg",
         "focus-within:border-blue-900 focus-within:ring-[3px] focus-within:ring-blue-900/10",
         "transition-all duration-150",
@@ -113,7 +113,7 @@ export function SearchInput({
         placeholder={placeholder}
         disabled={disabled}
         className={[
-          "w-full bg-transparent border-none outline-none",
+          "min-w-0 w-full bg-transparent border-none outline-none",
           "text-sm text-slate-900 placeholder:text-slate-400",
           "pl-10 pr-9 py-2",
           "rounded-lg",

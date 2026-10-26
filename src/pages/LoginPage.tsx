@@ -66,12 +66,14 @@ export function LoginPage() {
   };
 
   return (
-    <section className="flex h-dvh items-center justify-center overflow-y-auto bg-black px-4 py-6">
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0c0c0c] p-8 shadow-sm">
+    <section className="pos-login flex h-full flex-col items-center overflow-y-auto bg-black px-4 py-6">
+      <div className="my-auto w-full max-w-md shrink-0 rounded-2xl border border-white/10 bg-[#0c0c0c] p-5 shadow-sm sm:p-8">
         <div className="mb-6 text-center">
           <img
             src="/logo.png"
             alt=""
+            width={176}
+            height={176}
             className="mx-auto -my-6 h-44 w-44 object-contain"
           />
           <h1 className="text-2xl font-bold tracking-tight text-white">

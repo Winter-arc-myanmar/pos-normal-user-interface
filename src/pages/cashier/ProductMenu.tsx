@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { Product, ProductVariant } from "@/core/domain/entities/Cashier";
@@ -15,6 +15,8 @@ interface ProductMenuProps {
   ) => Promise<void>;
   onClose: () => void;
   groupByCategory?: boolean;
+  /** Shown under the search, e.g. category filters the page owns. */
+  toolbar?: ReactNode;
 }
 
 const variantLabel = (variant: ProductVariant): string =>
@@ -40,7 +42,7 @@ function ProductCardImage({
   const [failed, setFailed] = useState(false);
   if (!src || failed) {
     return (
-      <span className="flex h-24 items-center justify-center bg-slate-800 text-lg font-semibold uppercase text-slate-500">
+      <span className="flex h-14 items-center justify-center bg-slate-800 [@media(min-height:640px)]:h-24 text-lg font-semibold uppercase text-slate-500">
         {name.trim().slice(0, 1) || "?"}
       </span>
     );
@@ -50,7 +52,7 @@ function ProductCardImage({
     <img
       src={src}
       alt=""
-      className="h-24 w-full object-cover"
+      className="h-14 w-full object-cover [@media(min-height:640px)]:h-24"
       onError={() => setFailed(true)}
     />
   );
@@ -64,6 +66,7 @@ export function ProductMenu({
   onAdd,
   onClose,
   groupByCategory = false,
+  toolbar,
 }: ProductMenuProps) {
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
@@ -191,19 +194,21 @@ export function ProductMenu({
   };
 
   return (
-    <section className="flex h-full min-h-0 flex-col text-white">
+    <section className="flex h-full min-h-0 flex-col px-2 pt-2 text-white">
       <header className="flex items-center gap-2 border-b border-white/10 pb-2">
         <input
           type="search"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder={t("cashier.productMenu.search")}
-          className="min-h-10 flex-1 rounded border border-slate-700 bg-slate-900 px-3 text-sm text-white outline-none focus:border-blue-500"
+          className="min-h-10 min-w-0 flex-1 rounded border border-slate-700 bg-slate-900 px-3 text-sm text-white outline-none focus:border-blue-500"
         />
         <Button variant="outline" onClick={onClose}>
           {t("cashier.productMenu.close")}
         </Button>
       </header>
+
+      {toolbar}
 
       {groupByCategory && categories.length > 1 ? (
         <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
@@ -225,8 +230,8 @@ export function ProductMenu({
         </div>
       ) : null}
 
-      <div className="mt-2 min-h-0 flex-1 overflow-y-auto">
-        <div className="grid content-start grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+      <div className="pos-scroll-hint mt-2 min-h-0 flex-1 overflow-y-auto p-1">
+        <div className="grid content-start grid-cols-[repeat(auto-fill,minmax(min(9.5rem,calc(50%_-_0.25rem)),1fr))] gap-2">
           {visibleProducts.map((product) => {
             const orderedQty = Number(orderedProductQuantities[product.id] || 0);
             const isSelected =
@@ -240,7 +245,7 @@ export function ProductMenu({
                 disabled={unavailable}
                 onClick={() => void selectProduct(product)}
                 className={[
-                  "relative overflow-hidden rounded border bg-[#181818] text-left",
+                  "relative flex flex-col overflow-hidden rounded border bg-[#181818] text-left",
                   unavailable ? "cursor-not-allowed opacity-50" : "",
                   isSelected
                     ? "border-blue-500 ring-2 ring-blue-400 ring-offset-1 ring-offset-[#070707]"
@@ -260,8 +265,8 @@ export function ProductMenu({
                     {orderedQty}
                   </span>
                 ) : null}
-                <span className="block px-3 py-2">
-                  <span className="block truncate text-sm font-semibold">
+                <span className="block flex-1 px-3 py-2">
+                  <span className="line-clamp-2 break-words text-sm font-semibold leading-snug">
                     {product.name}
                   </span>
                   <span className="mt-1 block font-semibold text-blue-400">
@@ -291,7 +296,7 @@ export function ProductMenu({
           onClick={closeVariantModal}
         >
           <div
-            className="w-full max-w-md rounded-2xl border border-slate-700 bg-[#181818] p-5 text-white shadow-xl"
+            className="max-h-[calc(100dvh-4rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-slate-700 bg-[#181818] p-5 text-white shadow-xl"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">

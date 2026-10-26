@@ -101,7 +101,9 @@ describe("ProductMenu", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Deli Soup/ }));
 
-    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toBeInTheDocument();
+    expect(dialog.firstElementChild).toHaveClass("max-h-[calc(100dvh-4rem)]", "overflow-y-auto");
     expect(screen.getByText("cashier.productMenu.chooseVariant")).toBeInTheDocument();
     expect(onAdd).not.toHaveBeenCalled();
 

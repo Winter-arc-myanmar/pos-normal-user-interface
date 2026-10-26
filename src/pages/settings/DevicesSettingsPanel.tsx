@@ -38,9 +38,9 @@ function formatUptime(from: Date): string {
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="pos-split grid grid-cols-[9rem_minmax(0,1fr)] gap-3 border-b border-slate-100 py-2 text-sm last:border-b-0">
+    <div className="grid grid-cols-1 gap-1 border-b border-slate-100 py-2 text-sm last:border-b-0 sm:grid-cols-[minmax(0,9rem)_minmax(0,1fr)] sm:gap-3">
       <dt className="text-slate-500">{label}</dt>
-      <dd className="truncate font-medium text-slate-900">{value || "—"}</dd>
+      <dd className="min-w-0 break-words font-medium text-slate-900">{value || "—"}</dd>
     </div>
   );
 }

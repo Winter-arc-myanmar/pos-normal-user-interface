@@ -550,8 +550,8 @@ export function KtvRoomPage() {
   }
 
   return (
-    <section className="grid h-full min-h-0 grid-cols-[18rem_minmax(0,1fr)] bg-[#080808] text-white">
-      <aside className="flex min-h-0 flex-col border-r border-white/10 bg-slate-950 p-4">
+    <section className="grid h-full min-h-0 grid-cols-1 grid-rows-[minmax(24rem,1fr)_minmax(24rem,1fr)] overflow-y-auto bg-[#080808] text-white md:grid-cols-[18rem_minmax(0,1fr)] md:grid-rows-1 md:overflow-hidden">
+      <aside className="flex min-h-0 min-w-0 flex-col overflow-y-auto border-r border-white/10 bg-slate-950 p-4">
         <div
           className={`rounded-lg border p-3 ${
             warning.level === "EXPIRED"
@@ -634,7 +634,7 @@ export function KtvRoomPage() {
           </Button>
         </div>
       </aside>
-      <main className="min-h-0 p-4">
+      <main className="relative min-h-0 min-w-0 p-4">
         {view === "menu" ? (
           <ProductMenu
             products={roomMenu.products}

@@ -370,7 +370,7 @@ export function WaitlistPage() {
     entry.status === "WAITING" || entry.status === "NOTIFIED";
 
   return (
-    <section className="pos-split grid h-full min-h-0 grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)] overflow-hidden bg-slate-100">
+    <section className="pos-split grid h-full min-h-0 grid-cols-1 grid-rows-[20rem_minmax(28rem,1fr)] overflow-y-auto bg-slate-100 lg:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)] lg:grid-rows-1 lg:overflow-hidden">
       <aside className="flex min-h-0 flex-col border-r border-slate-200 bg-white">
         <header className="border-b border-slate-200 p-4">
           <div className="flex items-center justify-between gap-2">
@@ -708,7 +708,7 @@ export function WaitlistPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
           <form
             onSubmit={handleSubmit}
-            className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-xl"
+            className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-xl border border-slate-200 bg-white p-5 shadow-xl"
           >
             <h2 className="text-lg font-bold text-slate-900">
               {editing
