@@ -1948,6 +1948,59 @@ export function CashierPage() {
     }
   };
 
+  /**
+   * Tells the kitchen to stop making a line it was already sent: a DELETE slip
+   * on that line's station printer. Nothing prints for a line the kitchen never
+   * got, and a print problem never undoes the removal.
+   */
+  const printKdsDelete = async (line: SalesOrderLine) => {
+    if (isPendingKdsLine(line)) return null;
+    const [printLine] = printableLines([line]);
+    if (!printLine) return null;
+    const title = t("cashier.orderPanel.kdsDeleteTitle");
+    try {
+      const listed = locationId
+        ? await listStations({ page: 1, limit: 100, locationId })
+        : { stations: [] };
+      const printPlan = await printer.printKitchen(
+        {
+          title,
+          firedAt: new Date().toISOString(),
+          orderRef: selectedOrder?.orderNumber,
+          lines: [{ ...printLine, remarks: title }],
+          ...receiptParty(),
+        },
+        listed.stations.map((station) => ({
+          id: station.id,
+          name: station.name,
+          printerIds: station.printerIds,
+          categoryIds: station.routingRules.categoryIds,
+        })),
+        { requireStationRouting: true }
+      );
+      const problems: string[] = [];
+      if (printPlan.unrouted.length) {
+        problems.push(
+          t("cashier.errors.kdsUnrouted", {
+            items: printPlan.unrouted.map((item) => item.name).join(", "),
+          })
+        );
+      }
+      if (printPlan.missingPrinterRoutes.length) {
+        problems.push(
+          t("cashier.errors.kdsPrinterUnavailable", {
+            stations: printPlan.missingPrinterRoutes
+              .map((route) => route.stationName)
+              .join(", "),
+          })
+        );
+      }
+      return problems.length ? problems.join(" ") : null;
+    } catch (error) {
+      return error instanceof Error ? error.message : t("cashier.errors.kdsFailed");
+    }
+  };
+
   const mutateOrderLineQuantity = async (lineId: string, nextQty: number) => {
     if (isSettledSalesOrder(selectedOrder) && !isDirectCheckoutMode) {
       throw new Error(t("cashier.errors.orderAlreadyPaid"));
@@ -1979,6 +2032,8 @@ export function CashierPage() {
     if (!selectedOrder) return;
     if (quantity <= 0) {
       await removeOrderLine(selectedOrder.id, lineId);
+      const deletePrintError = await printKdsDelete(targetLine);
+      if (deletePrintError) setLocalError(deletePrintError);
       return;
     }
 
@@ -2174,6 +2229,8 @@ export function CashierPage() {
           throw new Error(t("cashier.errors.orderAlreadyPaid"));
         }
         await removeOrderLine(selectedOrder.id, line.id);
+        const deletePrintError = await printKdsDelete(line);
+        if (deletePrintError) setLocalError(deletePrintError);
       }
       setNotice(t("cashier.orderPanel.itemRemoved"));
     } catch (caught) {
