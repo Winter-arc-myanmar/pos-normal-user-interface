@@ -267,6 +267,7 @@ vi.mock("@/core/presentation/hooks/useGuestWalletManagement", () => ({
 describe("CashierPage integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
     selectedOrderLinesState = [orderLine];
     tableChargesState = { offered: [], running: [] };
     tableChargesLoadedState = false;
@@ -448,12 +449,21 @@ describe("CashierPage integration", () => {
 
     expect(screen.queryAllByText("10.50").length).toBeGreaterThan(0);
 
+    // The bill prints only when the till ticks the box.
+    expect(
+      screen.getByRole("checkbox", { name: "cashier.payment.printBillOnConfirm" })
+    ).not.toBeChecked();
+
     fireEvent.click(
       screen.getByRole("button", { name: "cashier.orderPanel.sendKds" })
     );
     fireEvent.click(
       screen.getByRole("button", { name: "cashier.orderPanel.pickedUp" })
     );
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "cashier.payment.printBillOnConfirm" })
+    );
+    expect(window.localStorage.getItem("pos:print-bill-on-confirm")).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
 
     await waitFor(() => {
@@ -476,6 +486,24 @@ describe("CashierPage integration", () => {
         "AVAILABLE"
       );
     });
+  });
+
+  it("does not print the bill on confirm unless the till asks for it", async () => {
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=pay"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+
+    await waitFor(() =>
+      expect(mocks.checkoutTableSession).toHaveBeenCalledWith("session-1", {
+        posSessionId: "pos-session-1",
+        payments: [{ paymentMethodId: "cash", amount: "10.5000" }],
+      })
+    );
+    expect(mocks.printReceipt).not.toHaveBeenCalled();
   });
 
   it("does not send or print order lines which were already sent to KDS", async () => {
