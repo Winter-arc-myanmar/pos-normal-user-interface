@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildReceiptPdf,
   printLinesAsPdf,
@@ -6,6 +6,13 @@ import {
 } from "../documentPrint";
 
 describe("documentPrint", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    delete window.median;
+    document.querySelectorAll("iframe.pos-print-frame").forEach((frame) => frame.remove());
+  });
+
   it("builds a narrow receipt pdf", () => {
     const doc = buildReceiptPdf(["Beer  2", "TOTAL  10.00"], 80);
     expect(doc.getNumberOfPages()).toBe(1);
@@ -35,7 +42,45 @@ describe("documentPrint", () => {
     expect(open).toHaveBeenCalledWith("blob:receipt", "_blank", "noopener,noreferrer");
   });
 
-  it("opens a print-ready browser document for Android printing", async () => {
+  it("shares a receipt PDF with Android printer apps", async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    const canShare = vi.fn().mockReturnValue(true);
+    const open = vi.fn();
+    vi.stubGlobal("navigator", {
+      userAgent: "Mozilla/5.0 (Linux; Android 14)",
+      share,
+      canShare,
+    });
+    vi.stubGlobal("open", open);
+
+    await printLinesWithBrowserDialog(["Coffee", "TOTAL  10.00"], "Receipt test");
+
+    expect(canShare).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Receipt test", files: [expect.any(File)] })
+    );
+    expect(share).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Receipt test", files: [expect.any(File)] })
+    );
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it("opens a PDF on Android when file sharing is unavailable", async () => {
+    const open = vi.fn().mockReturnValue({});
+    vi.stubGlobal("navigator", { userAgent: "Mozilla/5.0 (Linux; Android 14)" });
+    vi.stubGlobal("open", open);
+    URL.createObjectURL = vi.fn(() => "blob:android-receipt");
+
+    await printLinesWithBrowserDialog(["Coffee"], "Receipt test");
+
+    expect(open).toHaveBeenCalledWith(
+      "blob:android-receipt",
+      "_blank",
+      "noopener,noreferrer"
+    );
+    expect(document.querySelector("iframe.pos-print-frame")).toBeNull();
+  });
+
+  it("opens a print-ready browser document on desktop", async () => {
     const printDocument = {
       open: vi.fn(),
       write: vi.fn(),
@@ -48,6 +93,7 @@ describe("documentPrint", () => {
     };
     const open = vi.fn().mockReturnValue(printWindow);
     vi.stubGlobal("open", open);
+    vi.stubGlobal("navigator", { userAgent: "Mozilla/5.0 (Windows NT 10.0)" });
 
     await printLinesWithBrowserDialog(["Coffee <large>", "TOTAL  10.00"], "Receipt & test");
 
@@ -62,6 +108,7 @@ describe("documentPrint", () => {
   });
 
   it("prints from a hidden iframe when the popup is blocked", async () => {
+    vi.stubGlobal("navigator", { userAgent: "Mozilla/5.0 (Windows NT 10.0)" });
     vi.stubGlobal("open", vi.fn().mockReturnValue(null));
     vi.spyOn(window, "print").mockImplementation(() => undefined);
 

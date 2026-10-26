@@ -32,7 +32,7 @@ export function PosActionRail({
 }: PosActionRailProps) {
   const { t } = useTranslation();
   return (
-    <aside className="pos-action-rail pos-safe-y flex min-h-0 flex-col border-l border-white/10 bg-[#202020] p-1.5 text-white">
+    <aside className="pos-action-rail pos-safe-y flex min-h-0 min-w-0 flex-col border-l border-white/10 bg-[#202020] p-1.5 text-white">
       <div className="flex flex-col items-center gap-1.5">
         {branches.length > 1 ? (
           <label className="w-full">
@@ -51,7 +51,7 @@ export function PosActionRail({
             </select>
           </label>
         ) : null}
-        <LanguageSwitcher />
+        <LanguageSwitcher compact />
         <div id="pos-tablet-print-settings" className="w-full" />
       </div>
 

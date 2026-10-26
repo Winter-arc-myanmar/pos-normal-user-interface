@@ -244,6 +244,7 @@ const normalizePaymentEntriesAsDecimals = (
 const normalizeTableSessionCheckoutPayload = (
   payload: TableSessionCheckoutDTO
 ): Record<string, unknown> => ({
+  posSessionId: payload.posSessionId,
   payments: normalizePaymentEntriesAsNumbers(payload.payments),
   ...(payload.tipAmount !== undefined ? { tipAmount: payload.tipAmount } : {}),
   ...(payload.serviceCharge !== undefined
@@ -1320,6 +1321,8 @@ export class ApiCashierRepository implements ICashierRepository {
       taxAmount: item.taxAmount ? String(item.taxAmount) : undefined,
       taxInclusive: item.taxInclusive === true,
       status: item.status ? String(item.status) : undefined,
+      firedAt: item.firedAt ? String(item.firedAt) : undefined,
+      voidedAt: item.voidedAt ? String(item.voidedAt) : undefined,
       seatNumber:
         typeof item.seatNumber === "number" ? item.seatNumber : payload.seatNumber,
       createdAt: item.createdAt ? String(item.createdAt) : undefined,
@@ -1349,6 +1352,8 @@ export class ApiCashierRepository implements ICashierRepository {
           : payload.lineDiscount,
       taxAmount: item.taxAmount ? String(item.taxAmount) : payload.taxAmount,
       status: item.status ? String(item.status) : undefined,
+      firedAt: item.firedAt ? String(item.firedAt) : undefined,
+      voidedAt: item.voidedAt ? String(item.voidedAt) : undefined,
       seatNumber:
         typeof item.seatNumber === "number" ? item.seatNumber : payload.seatNumber,
       createdAt: item.createdAt ? String(item.createdAt) : undefined,
@@ -1379,6 +1384,8 @@ export class ApiCashierRepository implements ICashierRepository {
         taxAmount: item.taxAmount ? String(item.taxAmount) : undefined,
         taxInclusive: item.taxInclusive === true,
         status: item.status ? String(item.status) : undefined,
+        firedAt: item.firedAt ? String(item.firedAt) : undefined,
+        voidedAt: item.voidedAt ? String(item.voidedAt) : undefined,
         seatNumber: typeof item.seatNumber === "number" ? item.seatNumber : undefined,
         createdAt: item.createdAt ? String(item.createdAt) : undefined,
         categoryId: readLineCategoryId(item),

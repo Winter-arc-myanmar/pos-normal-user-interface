@@ -1,4 +1,4 @@
-name: CI and production deployment
+name: CI and dual frontend production deployment
 
 on:
   push:
@@ -45,8 +45,11 @@ jobs:
       - name: Validate complete production image and Nginx configuration
         run: docker build --build-arg VITE_API_URL=https://apivision.winterarc.asia -t vision-pos-ci-runtime .
 
+      - name: Validate Yankin production image and backend configuration
+        run: docker build --build-arg VITE_API_URL=https://api1.mmlnkits.com -t yankinfoodhouse-ci-runtime .
+
   deploy:
-    name: Deploy main to PrivateVIP
+    name: Deploy main to PrivateVIP and Yankin
     needs: ci
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
@@ -65,7 +68,7 @@ jobs:
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/deploy_key" "$HOME/.ssh/known_hosts"
 
-      - name: Deploy the exact commit with health checks and rollback
+      - name: Deploy both frontends from the exact commit with health checks and rollback
         env:
           DEPLOY_SHA: ${{ github.sha }}
         run: |
@@ -81,6 +84,13 @@ jobs:
             --connect-timeout 10 --max-time 30 https://privatevip.mmlnkits.com/healthz
           curl --fail --silent --show-error --output /dev/null \
             --connect-timeout 10 --max-time 30 https://privatevip.mmlnkits.com/login
+
+      - name: Verify Yankin public HTTPS
+        run: |
+          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors \
+            --connect-timeout 10 --max-time 30 https://yankinfoodhouse.mmlnkits.com/healthz
+          curl --fail --silent --show-error --output /dev/null \
+            --connect-timeout 10 --max-time 30 https://yankinfoodhouse.mmlnkits.com/login
 
       - name: Remove SSH private key
         if: always()

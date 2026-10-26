@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   addTableCharge: vi.fn(),
   stopTableCharges: vi.fn(),
   addProductToTableSession: vi.fn(),
+  updateOrderLine: vi.fn(),
   checkoutTableSession: vi.fn(),
   closePosSession: vi.fn(),
   createPosRegister: vi.fn(),
@@ -68,7 +69,7 @@ const order = {
   salesChannel: "POS",
   serviceType: "PICK_UP",
   status: "DRAFT",
-  grandTotal: "10.0000",
+  grandTotal: "10.5000",
   subtotal: "10.0000",
   totalTax: "0.0000",
   totalDiscount: "0.0000",
@@ -96,7 +97,22 @@ const table = {
   status: "OCCUPIED",
 };
 
+const orderLine = {
+  id: "line-1",
+  salesOrderId: "order-1",
+  variantId: "variant-1",
+  quantity: "1.0000",
+  unitPrice: "10.0000",
+  lineDiscount: "0.0000",
+  taxAmount: "0.0000",
+};
+
+let selectedOrderLinesState: Array<
+  typeof orderLine & { status?: string; firedAt?: string }
+> = [orderLine];
+
 vi.mock("react-i18next", () => ({
+  initReactI18next: { type: "3rdParty", init: () => undefined },
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
@@ -106,6 +122,7 @@ vi.mock("@/core/presentation/hooks/useAuth", () => ({
       id: "cashier-1",
       tenantId: "tenant-1",
       activeBranchId: "branch-1",
+      permissions: ["sales:checkout:write"],
     },
   }),
 }));
@@ -152,11 +169,13 @@ let tableChargesState: { offered: Record<string, unknown>[]; running: Record<str
   offered: [],
   running: [],
 };
+let tableChargesLoadedState = false;
 vi.mock("@/core/presentation/hooks/useTableCharges", () => ({
   useTableCharges: () => ({
     charges: tableChargesState,
     add: mocks.addTableCharge,
     stop: mocks.stopTableCharges,
+    isLoaded: tableChargesLoadedState,
     isBusy: false,
     error: null,
   }),
@@ -173,17 +192,7 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
     variantsByProductId: { "product-1": [variant] },
     salesOrders: [order],
     selectedOrder: order,
-    selectedOrderLines: [
-      {
-        id: "line-1",
-        salesOrderId: "order-1",
-        variantId: "variant-1",
-        quantity: "1.0000",
-        unitPrice: "10.0000",
-        lineDiscount: "0.0000",
-        taxAmount: "0.0000",
-      },
-    ],
+    selectedOrderLines: selectedOrderLinesState,
     paymentMethods: [
       { id: "cash", tenantId: "tenant-1", name: "Cash" },
     ],
@@ -222,7 +231,7 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
     selectOrderById: mocks.selectOrderById,
     createOrder: vi.fn(),
     addProductToOrder: vi.fn(),
-    updateOrderLine: vi.fn(),
+    updateOrderLine: mocks.updateOrderLine,
     removeOrderLine: vi.fn(),
     addProductToTableSession: mocks.addProductToTableSession,
     getCounterOrderById: mocks.getCounterOrderById,
@@ -257,7 +266,9 @@ vi.mock("@/core/presentation/hooks/useGuestWalletManagement", () => ({
 describe("CashierPage integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    selectedOrderLinesState = [orderLine];
     tableChargesState = { offered: [], running: [] };
+    tableChargesLoadedState = false;
     mocks.addTableCharge.mockResolvedValue({ offered: [], running: [] });
     mocks.stopTableCharges.mockResolvedValue({ offered: [], running: [] });
     mocks.fetchProductVariants.mockResolvedValue([variant]);
@@ -345,7 +356,7 @@ describe("CashierPage integration", () => {
     mocks.openTableSession.mockResolvedValue(session);
   });
 
-  it("loads variants and adds a product to a table session", async () => {
+  it("increments an existing product line instead of adding a duplicate", async () => {
     render(
       <MemoryRouter initialEntries={["/cashier?view=menu"]}>
         <CashierPage />
@@ -355,17 +366,53 @@ describe("CashierPage integration", () => {
     fireEvent.click(screen.getByRole("button", { name: /Coffee/ }));
 
     await waitFor(() =>
-      expect(mocks.addProductToTableSession).toHaveBeenCalledWith(
-        "session-1",
-        product,
-        "variant-1",
-        1,
-        undefined
-      )
+      expect(mocks.updateOrderLine).toHaveBeenCalledWith("order-1", "line-1", {
+        variantId: "variant-1",
+        quantity: "2.0000",
+        unitPrice: "10.0000",
+        lineDiscount: "0.0000",
+        taxAmount: "0.0000",
+        seatNumber: undefined,
+      })
     );
+    expect(mocks.addProductToTableSession).not.toHaveBeenCalled();
     expect(mocks.updateTableSessionState).toHaveBeenCalledWith("session-1", {
       sessionState: "ORDERING",
     });
+  });
+
+  it("merges rapid repeated product taps into the newly created line", async () => {
+    selectedOrderLinesState = [];
+    mocks.addProductToTableSession.mockResolvedValue({
+      ...orderLine,
+      id: "line-new",
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=menu"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    const productButton = screen.getByRole("button", { name: /Coffee/ });
+    fireEvent.click(productButton);
+    fireEvent.click(productButton);
+
+    await waitFor(() =>
+      expect(mocks.updateOrderLine).toHaveBeenCalledWith(
+        "order-1",
+        "line-new",
+        {
+          variantId: "variant-1",
+          quantity: "2.0000",
+          unitPrice: "10.0000",
+          lineDiscount: "0.0000",
+          taxAmount: "0.0000",
+          seatNumber: undefined,
+        }
+      )
+    );
+    expect(mocks.addProductToTableSession).toHaveBeenCalledTimes(1);
   });
 
   it("shows menu categories in the menu session and filters products", () => {
@@ -375,15 +422,16 @@ describe("CashierPage integration", () => {
       </MemoryRouter>
     );
 
+    // The side list on wide screens and the strip over the menu on narrower ones.
     expect(
-      screen.getByRole("button", { name: "cashier.productMenu.allCategories" })
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Drinks" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Main" })).toBeInTheDocument();
+      screen.getAllByRole("button", { name: "cashier.productMenu.allCategories" })
+    ).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Drinks" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Main" })).toHaveLength(2);
     expect(screen.getByRole("button", { name: /Coffee/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Deli Soup/ })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Main" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Main" })[0]);
 
     expect(screen.queryByRole("button", { name: /Coffee/ })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Deli Soup/ })).toBeInTheDocument();
@@ -415,6 +463,7 @@ describe("CashierPage integration", () => {
       expect(mocks.getCounterOrderById).toHaveBeenCalledWith("order-1");
       expect(mocks.pickupCounterOrder).toHaveBeenCalledWith("order-1");
       expect(mocks.checkoutTableSession).toHaveBeenCalledWith("session-1", {
+        posSessionId: "pos-session-1",
         payments: [{ paymentMethodId: "cash", amount: "10.5000" }],
       });
       expect(mocks.updateTableSessionState).toHaveBeenCalledWith("session-1", {
@@ -425,6 +474,31 @@ describe("CashierPage integration", () => {
         "AVAILABLE"
       );
     });
+  });
+
+  it("does not send or print order lines which were already sent to KDS", async () => {
+    selectedOrderLinesState = [
+      {
+        ...orderLine,
+        status: "FIRED",
+        firedAt: "2026-10-23T10:00:00.000Z",
+      },
+    ];
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=menu"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "cashier.orderPanel.sendKds" })
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText("cashier.errors.kdsNothingNew")).toBeInTheDocument()
+    );
+    expect(mocks.fireToKds).not.toHaveBeenCalled();
+    expect(mocks.printKitchen).not.toHaveBeenCalled();
   });
 
   it("refetches table status on an interval without waiting for a click", async () => {
@@ -568,6 +642,106 @@ describe("CashierPage integration", () => {
 
       await waitFor(() => expect(mocks.stopTableCharges).toHaveBeenCalledWith());
       await waitFor(() => expect(mocks.selectOrderById).toHaveBeenCalledWith("order-1"));
+    });
+
+    it("syncs a running table charge when the pay route is opened directly", async () => {
+      tableChargesLoadedState = true;
+      tableChargesState = {
+        offered: [poolClock],
+        running: [
+          {
+            variantId: "variant-pool",
+            name: "Pool table",
+            startedAt: "2026-10-07T12:00:00Z",
+          },
+        ],
+      };
+      render(
+        <MemoryRouter initialEntries={["/cashier?view=pay"]}>
+          <CashierPage />
+        </MemoryRouter>
+      );
+
+      await waitFor(() => expect(mocks.stopTableCharges).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(mocks.selectOrderById).toHaveBeenCalledWith("order-1"));
+    });
+
+    it("refreshes table charges on confirm and does not submit a stale payment total", async () => {
+      tableChargesState = {
+        offered: [poolClock],
+        running: [
+          {
+            variantId: "variant-pool",
+            name: "Pool table",
+            startedAt: "2026-10-07T12:00:00Z",
+          },
+        ],
+      };
+      mocks.selectOrderById.mockResolvedValueOnce({
+        ...order,
+        grandTotal: "12.0000",
+      });
+      render(
+        <MemoryRouter initialEntries={["/cashier?view=pay"]}>
+          <CashierPage />
+        </MemoryRouter>
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+
+      await waitFor(() => expect(mocks.stopTableCharges).toHaveBeenCalledWith());
+      await waitFor(() => expect(mocks.selectOrderById).toHaveBeenCalledWith("order-1"));
+      expect(mocks.checkoutTableSession).not.toHaveBeenCalled();
+      expect(await screen.findByText("cashier.errors.billUpdated")).toBeInTheDocument();
+    });
+
+    it("does not add the local service charge to the refreshed server grand total again", async () => {
+      mocks.selectOrderById.mockResolvedValueOnce({
+        ...order,
+        grandTotal: "10.5000",
+      });
+      render(
+        <MemoryRouter initialEntries={["/cashier?view=pay"]}>
+          <CashierPage />
+        </MemoryRouter>
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+
+      await waitFor(() => expect(mocks.checkoutTableSession).toHaveBeenCalledWith(
+        "session-1",
+        expect.objectContaining({
+          payments: [{ paymentMethodId: "cash", amount: "10.5000" }],
+        })
+      ));
+      expect(mocks.stopTableCharges).not.toHaveBeenCalled();
+      expect(screen.queryByText("cashier.errors.billUpdated")).not.toBeInTheDocument();
+    });
+
+    it("uses the server-required total when checkout detects a later bill change", async () => {
+      mocks.checkoutTableSession.mockRejectedValueOnce(
+        new Error("Insufficient payment: required 12.2500, received 10.5000")
+      );
+      render(
+        <MemoryRouter initialEntries={["/cashier?view=pay"]}>
+          <CashierPage />
+        </MemoryRouter>
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+
+      await waitFor(() => expect(mocks.checkoutTableSession).toHaveBeenCalled());
+      expect(await screen.findByText("cashier.errors.billUpdated")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+
+      await waitFor(() => expect(mocks.checkoutTableSession).toHaveBeenCalledTimes(2));
+      expect(mocks.checkoutTableSession).toHaveBeenLastCalledWith(
+        "session-1",
+        expect.objectContaining({
+          payments: [{ paymentMethodId: "cash", amount: "12.2500" }],
+        })
+      );
     });
 
     it("keeps room charges and other areas' products off the restaurant menu", () => {

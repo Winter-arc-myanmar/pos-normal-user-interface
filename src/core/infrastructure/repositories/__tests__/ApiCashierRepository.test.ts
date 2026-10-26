@@ -14,6 +14,8 @@ describe("ApiCashierRepository", () => {
             variantId: "variant-1",
             quantity: "2.0000",
             unitPrice: "10000.0000",
+            status: "FIRED",
+            firedAt: "2026-10-23T10:00:00.000Z",
             product: { name: "Fish Ball Stick" },
             variant: { variantSku: "FBS-01" },
           },
@@ -51,7 +53,12 @@ describe("ApiCashierRepository", () => {
 
     const lines = await repository.getSalesOrderLines("order-1");
 
-    expect(lines[0]).toMatchObject({ productName: "Fish Ball Stick", sku: "FBS-01" });
+    expect(lines[0]).toMatchObject({
+      productName: "Fish Ball Stick",
+      sku: "FBS-01",
+      status: "FIRED",
+      firedAt: "2026-10-23T10:00:00.000Z",
+    });
     expect(lines[1].productName).toBe("Wine");
     expect(lines[2].productName).toBeUndefined();
     expect(lines[2].sku).toBe("LEO-01");
@@ -343,12 +350,14 @@ describe("ApiCashierRepository", () => {
     );
 
     await repository.checkoutTableSession("session-1", {
+      posSessionId: "pos-session-current",
       payments: [{ paymentMethodId: "cash", amount: "10.5000" }],
     });
 
     expect(post).toHaveBeenCalledWith(
       "/api/v1/table-sessions/session-1/checkout",
       {
+        posSessionId: "pos-session-current",
         payments: [{ paymentMethodId: "cash", amount: 10.5 }],
       }
     );

@@ -59,7 +59,10 @@ export const buildCheckoutPayments = (args: {
     withOptionalGuestCard(
       {
         paymentMethodId: args.paymentMethodId,
-        amount: formatPaymentAmount(toAmount(args.paymentAmount ?? args.total)),
+        // A normal checkout has no editable amount field: always charge the
+        // latest bill total. paymentAmount is only the next tender input while
+        // split mode is active and can be stale after table charges refresh.
+        amount: formatPaymentAmount(toAmount(args.total)),
       },
       args.guestCardId
     ),
@@ -101,6 +104,6 @@ export const assertCheckoutPaymentsReady = (args: {
     throw new Error("Payment amount must be greater than zero");
   }
   if (Math.abs(paid - total) > 0.009) {
-    throw new Error("Split payments must equal the remaining receivable.");
+    throw new Error("Payment amount must equal the total due.");
   }
 };

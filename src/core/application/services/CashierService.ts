@@ -69,6 +69,8 @@ import {
 import { PosPaymentCatalog } from "./PosPaymentCatalog";
 import { TableWarningPolicy } from "./TableWarningPolicy";
 
+const MAX_PRODUCT_PAGES = 50;
+
 export class CashierService implements ICashierService {
   constructor(private readonly cashierRepository: ICashierRepository) {}
 
@@ -76,8 +78,17 @@ export class CashierService implements ICashierService {
     return this.cashierRepository.getInventoryLocations();
   }
 
+  /** Every page of products, so a menu searches and filters the whole of it. */
   async getProducts(params?: ProductFilterDTO): Promise<Product[]> {
-    return this.cashierRepository.getProducts(params);
+    const first = await this.cashierRepository.listProducts(params);
+    const products = [...first.products];
+    const lastPage = Math.min(first.totalPages, MAX_PRODUCT_PAGES);
+    for (let page = first.page + 1; page <= lastPage; page += 1) {
+      const next = await this.cashierRepository.listProducts({ ...params, page });
+      if (!next.products.length) break;
+      products.push(...next.products);
+    }
+    return products;
   }
 
   async getVariants(productId: string): Promise<ProductVariant[]> {
@@ -408,6 +419,7 @@ export class CashierService implements ICashierService {
     payload: TableSessionCheckoutDTO
   ): Promise<TableSession> {
     if (!sessionId?.trim()) throw new Error("Session ID is required");
+    if (!payload.posSessionId?.trim()) throw new Error("POS session is required");
     if (!payload.payments.length) {
       throw new Error("At least one payment is required");
     }

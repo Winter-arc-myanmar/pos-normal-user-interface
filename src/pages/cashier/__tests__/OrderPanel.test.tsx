@@ -1,5 +1,6 @@
 import { createRef, type ComponentProps } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { DiningTable, PaymentMethod, SalesOrder, SalesOrderLine } from "@/core/domain/entities/Cashier";
 import type { RunningPromotion } from "@/core/domain/entities/Promotion";
@@ -74,6 +75,98 @@ const promotion: RunningPromotion = {
 };
 
 describe("OrderPanel", () => {
+  it("starts with compact summaries and reveals details only when expanded", async () => {
+    const user = userEvent.setup();
+    render(
+      <OrderPanel
+        {...defaultProps}
+        selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
+        selectedOrderLines={[
+          new SalesOrderLine({ ...line, productName: "Coffee", variantName: "Large", quantity: "2.0000" }),
+        ]}
+      />
+    );
+
+    const toggle = screen.getByRole("button", { name: "cashier.orderPanel.expandItem" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveTextContent("Coffee");
+    expect(toggle).toHaveTextContent("2×");
+    expect(toggle).toHaveTextContent("20.00");
+    expect(screen.queryByText("Large")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "cashier.orderPanel.remove" })).not.toBeInTheDocument();
+
+    toggle.focus();
+    await user.keyboard("{Enter}");
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(document.getElementById(toggle.getAttribute("aria-controls")!)).toBeInTheDocument();
+    expect(screen.getByText("Large")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "cashier.orderPanel.remove" })).toBeInTheDocument();
+
+    await user.keyboard(" ");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Large")).not.toBeInTheDocument();
+  });
+
+  it("opens only one item at a time and collapses when switching orders", () => {
+    const props = {
+      ...defaultProps,
+      selectedOrder: new SalesOrder({ ...paidOrder, status: "DRAFT" }),
+      selectedOrderLines: [line, new SalesOrderLine({ ...line, id: "line-2", productName: "Coffee", variantName: "Small" })],
+    };
+    const { rerender } = render(<OrderPanel {...props} />);
+
+    fireEvent.click(screen.getAllByRole("button", { name: "cashier.orderPanel.expandItem" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.expandItem" }));
+    expect(screen.getAllByRole("button", { name: "cashier.orderPanel.collapseItem" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "cashier.orderPanel.remove" })).toHaveLength(1);
+    expect(screen.getByText("Small")).toBeInTheDocument();
+
+    rerender(<OrderPanel {...props} selectedOrder={new SalesOrder({ ...props.selectedOrder, id: "order-2" })} />);
+    expect(screen.queryByRole("button", { name: "cashier.orderPanel.collapseItem" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Small")).not.toBeInTheDocument();
+  });
+
+  it("preserves line actions inside the expanded row", () => {
+    const onIncreaseLineQuantity = vi.fn();
+    const onDecreaseLineQuantity = vi.fn();
+    const onRemoveLine = vi.fn();
+    const onToggleFoc = vi.fn();
+    render(
+      <OrderPanel
+        {...defaultProps}
+        selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
+        onIncreaseLineQuantity={onIncreaseLineQuantity}
+        onDecreaseLineQuantity={onDecreaseLineQuantity}
+        onRemoveLine={onRemoveLine}
+        onToggleFoc={onToggleFoc}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.expandItem" }));
+    for (const action of ["increaseQuantity", "decreaseQuantity", "foc", "remove"]) {
+      fireEvent.click(screen.getByRole("button", { name: `cashier.orderPanel.${action}` }));
+    }
+    for (const callback of [onIncreaseLineQuantity, onDecreaseLineQuantity, onToggleFoc, onRemoveLine]) {
+      expect(callback).toHaveBeenCalledExactlyOnceWith(line);
+    }
+    expect(screen.getByRole("button", { name: "cashier.orderPanel.collapseItem" })).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it.each([{ isLoading: true }, { selectedOrder: paidOrder }])("keeps expanded line actions disabled for %j", (overrides) => {
+    render(
+      <OrderPanel
+        {...defaultProps}
+        selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
+        onToggleFoc={vi.fn()}
+        {...overrides}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.expandItem" }));
+    for (const action of ["increaseQuantity", "decreaseQuantity", "foc", "remove"]) {
+      expect(screen.getByRole("button", { name: `cashier.orderPanel.${action}` })).toBeDisabled();
+    }
+  });
+
   it("does not allow paying a completed takeaway order again", () => {
     const onOpenPay = vi.fn();
     const onCheckout = vi.fn();
@@ -182,6 +275,7 @@ describe("OrderPanel", () => {
       screen.getByRole("button", { name: "cashier.orderPanel.removeDiscount" })
     );
     expect(onRemoveDiscount).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.expandItem" }));
     fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.foc" }));
     expect(onToggleFoc).toHaveBeenCalledTimes(1);
   });
@@ -237,6 +331,7 @@ describe("OrderPanel", () => {
     expect(screen.getByText("cashier.orderPanel.promotionsNow")).toBeInTheDocument();
     expect(screen.getByText("Special Menu (10%)")).toBeInTheDocument();
     expect(screen.getByText("cashier.orderPanel.promo")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.expandItem" }));
     expect(screen.getByText("cashier.orderPanel.promoSaving")).toBeInTheDocument();
     expect(screen.getByText("cashier.orderPanel.promotionDiscount")).toBeInTheDocument();
     expect(screen.getByText("−1.00")).toBeInTheDocument();
@@ -256,6 +351,7 @@ describe("OrderPanel", () => {
     );
 
     expect(screen.getByText("cashier.orderPanel.promo")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.expandItem" }));
     expect(screen.getByText("cashier.orderPanel.promoSaving")).toBeInTheDocument();
     // 10.00 on the line, 1.00 of promotion still to come off.
     expect(screen.getByText("9.00")).toBeInTheDocument();
@@ -299,6 +395,7 @@ describe("OrderPanel", () => {
     );
 
     expect(screen.getByText("Coffee")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.expandItem" }));
     expect(screen.getByText("Large")).toBeInTheDocument();
   });
 
@@ -338,6 +435,7 @@ describe("OrderPanel", () => {
       />
     );
 
+    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.expandItem" }));
     expect(screen.getByText("Large")).toBeInTheDocument();
   });
 });

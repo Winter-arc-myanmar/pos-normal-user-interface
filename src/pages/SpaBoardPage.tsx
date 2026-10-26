@@ -1447,13 +1447,13 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           : tr("confirmPayTitle");
 
   return (
-    <section className="flex h-full min-h-0 flex-col bg-[#080808] p-4 text-white">
+    <section className="flex h-full min-h-0 flex-col overflow-y-auto bg-[#080808] p-4 text-white">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
         <div>
           <h1 className="text-xl font-bold">{tr("boardTitle")}</h1>
           <p className="text-sm text-slate-400">{tr(`steps.${step}`)}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <LanguageSwitcher />
           {step !== "rooms" && !(step === "pay" && billClosed) && !paid ? (
             <Button variant="secondary" onClick={goBack}>
@@ -1496,7 +1496,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             {visibleRooms.length === 0 ? (
               <p className="mt-10 text-center text-slate-400">{tr("noRooms")}</p>
             ) : (
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {visibleRooms.map((item) => (
                   <SpaRoomTile
                     kind={kind}
@@ -1755,7 +1755,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       ) : null}
 
       {(step === "menu" || step === "pay") && session ? (
-        <div className="mt-4 grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[24rem_minmax(0,1fr)]">
+        <div className="mt-4 grid shrink-0 flex-1 grid-cols-1 gap-4 lg:min-h-0 lg:shrink lg:grid-cols-[24rem_minmax(0,1fr)]">
           <SpaBillPanel
             kind={kind}
             room={room}
@@ -2329,10 +2329,10 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       {showRoomForm ? (
         <div className="fixed inset-0 z-40 grid place-items-center bg-black/75 p-4">
           <form
-            className="grid w-full max-w-2xl grid-cols-2 gap-3 rounded-lg border border-slate-700 bg-slate-950 p-5"
+            className="grid max-h-[calc(100dvh-2rem)] w-full max-w-2xl grid-cols-1 gap-3 overflow-y-auto rounded-lg border border-slate-700 bg-slate-950 p-5 sm:grid-cols-2"
             onSubmit={handleSaveRoom}
           >
-            <h2 className="col-span-2 text-lg font-bold">
+            <h2 className="sm:col-span-2 text-lg font-bold">
               {editingRoom ? tr("editRoom") : tr("addRoom")}
             </h2>
             {(
@@ -2371,7 +2371,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               />
             </label>
             ) : null}
-            <p className="col-span-2 text-xs text-slate-400">
+            <p className="sm:col-span-2 text-xs text-slate-400">
               {isSpa
                 ? tr("roomNoPriceHint")
                 : roomForm.sessionPrice !== ""
@@ -2382,7 +2382,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                   })
                 : tr("priceHint")}
             </p>
-            <div className="col-span-2 flex justify-end gap-2">
+            <div className="flex flex-wrap justify-end gap-2 sm:col-span-2">
               {editingRoom ? (
                 <Button
                   variant="destructive"

@@ -170,9 +170,9 @@ export function KdsStationSettingsPanel() {
   return (
     <form
       onSubmit={(event) => void save(event)}
-      className="pos-split grid h-full min-h-0 gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]"
+      className="pos-split grid min-h-full grid-cols-1 gap-4 lg:h-full lg:min-h-0 lg:grid-cols-[16rem_minmax(0,1fr)]"
     >
-      <aside className="min-h-0 overflow-y-auto rounded-xl bg-white p-3 shadow-sm">
+      <aside className="max-h-64 min-h-0 min-w-0 overflow-y-auto rounded-xl bg-white p-3 shadow-sm lg:max-h-none">
         <button
           type="button"
           onClick={() => setDraft(emptyDraft())}
@@ -199,7 +199,7 @@ export function KdsStationSettingsPanel() {
         ))}
       </aside>
 
-      <section className="min-h-0 overflow-y-auto rounded-xl bg-white p-4 shadow-sm">
+      <section className="min-h-0 min-w-0 rounded-xl bg-white p-4 shadow-sm lg:overflow-y-auto">
         <label className="block text-sm text-slate-600">
           {t("settings.kdsStation.name")}
           <input

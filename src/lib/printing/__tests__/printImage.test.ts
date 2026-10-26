@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { defaultPrintTemplateSettings } from "@/core/domain/entities/PrintTemplate";
 import { encodeEscPos } from "../escPosBytes";
 import {
@@ -14,6 +14,7 @@ import {
   imageRuns,
   inlineIconCommand,
   isDot,
+  needsUnicodeRaster,
   rasterCommand,
 } from "../printImage";
 import { logoSize } from "../printLogo";
@@ -71,6 +72,45 @@ describe("printer dots", () => {
   it("keeps the picture's bytes as bytes on the way to the printer", () => {
     expect(Array.from(encodeEscPos("\x80\xff"))).toEqual([0x80, 0xff]);
     expect(Array.from(encodeEscPos("က"))).toEqual([0xe1, 0x80, 0x80]);
+  });
+
+  it("rasterizes Myanmar instead of sending unsupported UTF-8 text bytes", () => {
+    vi.stubGlobal("CanvasRenderingContext2D", class CanvasRenderingContext2D {});
+    const fillText = vi.fn();
+    const getContext = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue({
+        fillStyle: "",
+        textBaseline: "",
+        font: "",
+        fillRect: vi.fn(),
+        measureText: () => ({ width: 80 }),
+        save: vi.fn(),
+        scale: vi.fn(),
+        fillText,
+        restore: vi.fn(),
+        getImageData: (_x: number, _y: number, width: number, height: number) => ({
+          data: new Uint8ClampedArray(width * height * 4).fill(255),
+        }),
+      } as unknown as CanvasRenderingContext2D);
+
+    try {
+      const text = formatSaleReceipt({
+        title: "Receipt",
+        lines: [{ name: "ကြက်သားဟင်း", quantity: "1", unitPrice: "5000" }],
+        total: "5000",
+      });
+
+      expect(needsUnicodeRaster("ကြက်သားဟင်း")).toBe(true);
+      expect(needsUnicodeRaster("Chicken curry")).toBe(false);
+      expect(fillText).toHaveBeenCalledWith(expect.stringContaining("ကြက်သားဟင်း"), 3, 17);
+      expect(fillText).toHaveBeenCalledWith("5,000", 381, 17);
+      expect(text).toContain(`${GS}v0\x00`);
+      expect(text).not.toContain("ကြက်သားဟင်း");
+    } finally {
+      getContext.mockRestore();
+      vi.unstubAllGlobals();
+    }
   });
 
   it("fits a logo to half the roll and 160 dots high, in whole bytes", () => {

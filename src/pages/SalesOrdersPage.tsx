@@ -268,7 +268,7 @@ export function SalesOrdersPage() {
 
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden bg-[#080808] text-white">
-      <header className="flex items-center justify-between gap-3 px-4 pb-3 pt-4">
+      <header className="flex flex-wrap items-center justify-between gap-3 px-4 pb-3 pt-4">
         <div className="flex flex-wrap items-center gap-2">
           {(["open", "completed", "voided"] as const).map((tab) => (
             <button
@@ -295,7 +295,7 @@ export function SalesOrdersPage() {
           onClick={() => void handleCreateOrder()}
           disabled={isLoading}
           aria-label={t("salesOrders.create")}
-          className="flex h-11 w-11 items-center justify-center rounded-md bg-[#39c786] text-2xl font-light text-slate-950 transition hover:brightness-110 disabled:opacity-50"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-[#39c786] text-2xl font-light text-slate-950 transition hover:brightness-110 disabled:opacity-50"
         >
           +
         </button>
@@ -324,7 +324,7 @@ export function SalesOrdersPage() {
         </p>
       ) : null}
 
-      <div className="pos-split grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)_6.5rem] gap-3 overflow-hidden px-4 pb-4">
+      <div className="pos-split grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(18rem,1fr)_minmax(24rem,1fr)_auto] gap-3 overflow-y-auto px-4 pb-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)_6.5rem] lg:grid-rows-1 lg:overflow-hidden">
         <div className="pos-pane-scroll rounded-md bg-[#101010]">
           {isLoading && visibleOrders.length === 0 ? (
             <ApiLoadingState label={t("salesOrders.loading")} />
@@ -577,7 +577,7 @@ export function SalesOrdersPage() {
           )}
         </aside>
 
-        <aside className="flex min-h-0 flex-col overflow-y-auto rounded-md bg-[#161616] p-1.5">
+        <aside className="flex min-h-0 flex-row flex-wrap gap-2 overflow-y-auto rounded-md bg-[#161616] p-1.5 lg:flex-col lg:flex-nowrap">
           {serviceFilters.map((filter) => (
             <button
               key={filter.id}

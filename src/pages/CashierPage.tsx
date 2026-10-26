@@ -46,12 +46,14 @@ import {
   allocateOrderDiscountToLines,
   isFocLine,
   lineFocDiscount,
+  payableFromServerGrandTotal,
   payableTotal,
   toMoney,
   withOrderTipOnFirstPayment,
 } from "@/lib/pos/checkoutAdjustments";
 import { isUnspendableWalletStatus } from "@/lib/pos/guestWalletAmounts";
 import { isSettledSalesOrder } from "@/lib/pos/orderStatus";
+import { isPendingKdsLine, pendingKdsLines } from "@/lib/pos/kdsLines";
 import { promotionPreviewItems } from "@/lib/pos/promotions";
 import {
   findOpenTableSession,
@@ -158,6 +160,12 @@ export function CashierPage() {
   const [menuCategoryId, setMenuCategoryId] = useState("ALL");
   const [boardPage, setBoardPage] = useState(1);
   const [paymentAmount, setPaymentAmount] = useState("0.0000");
+  const [syncedPaymentTotal, setSyncedPaymentTotal] = useState<{
+    orderId: string;
+    discountAmount: string;
+    tipAmount: string;
+    total: number;
+  } | null>(null);
   const [paymentMethodId, setPaymentMethodId] = useState("");
   const [memberCardUid, setMemberCardUid] = useState("");
   const [memberCard, setMemberCard] = useState<GuestCard | null>(null);
@@ -186,6 +194,8 @@ export function CashierPage() {
   const paymentInputRef = useRef<HTMLInputElement>(null);
   const payReturnViewRef = useRef("menu");
   const pendingMemberDetectRef = useRef(false);
+  const productAddQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const payTableSyncRef = useRef<string | null>(null);
 
   const locationId = activeLocationId;
   const activeView = searchParams.get("view") || "orders";
@@ -340,6 +350,62 @@ export function CashierPage() {
   // The table's own charges: a pool table clock, a VIP room fee, a service charge.
   const tableCharges = useTableCharges(selectedOrderSession?.id ?? null);
 
+  // Opening the pay screen directly (for example from the right-hand Pay tab)
+  // bypasses handleOpenPay. Finalize a running table clock and reload the order
+  // here so the amount on screen is current before Confirm pay is pressed.
+  useEffect(() => {
+    if (activeView !== "pay") {
+      payTableSyncRef.current = null;
+      return;
+    }
+    if (
+      !selectedOrderSession ||
+      !selectedOrder ||
+      !tableCharges.isLoaded
+    ) {
+      return;
+    }
+
+    const syncKey = `${selectedOrderSession.id}:${selectedOrder.id}`;
+    if (payTableSyncRef.current === syncKey) return;
+    payTableSyncRef.current = syncKey;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        if (tableCharges.charges.running.length > 0) {
+          const finalizedCharges = await tableCharges.stop();
+          if (!finalizedCharges) {
+            throw new Error(t("cashier.errors.tableChargesFinalize"));
+          }
+        }
+        await selectOrderById(selectedOrder.id);
+      } catch (caught) {
+        if (!cancelled) {
+          payTableSyncRef.current = null;
+          setLocalError(
+            caught instanceof Error
+              ? caught.message
+              : t("cashier.errors.tableChargesFinalize")
+          );
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeView,
+    selectOrderById,
+    selectedOrder,
+    selectedOrderSession,
+    tableCharges.charges.running.length,
+    tableCharges.isLoaded,
+    tableCharges.stop,
+    t,
+  ]);
+
   /** Bills every running clock (a pool table) so the time used is on the bill. */
   const stopTableClocks = async () => {
     if (!selectedOrder || !tableCharges.charges.running.length) return;
@@ -486,6 +552,8 @@ export function CashierPage() {
     () => (isDirectCheckoutMode ? normalizedDirectCartLines : selectedOrderLines),
     [isDirectCheckoutMode, normalizedDirectCartLines, selectedOrderLines]
   );
+  const activeOrderLinesRef = useRef(activeOrderLines);
+  activeOrderLinesRef.current = activeOrderLines;
 
   const receiptParty = (includePaidAt = false) => {
     const outlet = inventoryLocations.find((location) => location.id === locationId);
@@ -626,16 +694,47 @@ export function CashierPage() {
     serviceChargeTaxRate,
   ]);
 
-  const orderTotal = useMemo(
-    () =>
-      payableTotal({
-        lineTotal: lineSubtotal,
+  const orderTotal = useMemo(() => {
+    if (
+      syncedPaymentTotal &&
+      syncedPaymentTotal.orderId === selectedOrder?.id &&
+      syncedPaymentTotal.discountAmount === discountAmount &&
+      syncedPaymentTotal.tipAmount === tipAmount
+    ) {
+      return syncedPaymentTotal.total.toFixed(4);
+    }
+
+    const serverGrandTotal = !isDirectCheckoutMode
+      ? Number(selectedOrder?.grandTotal || 0)
+      : 0;
+
+    // Persisted orders already include their server-calculated tax and service
+    // charge in grandTotal. Applying the local service charge again made the
+    // amount jump every time an overdue table was refreshed before payment.
+    if (serverGrandTotal > 0) {
+      return payableFromServerGrandTotal({
+        serverGrandTotal,
         orderDiscount: Number(discountAmount),
-        serviceCharge: serviceCharge + serviceChargeTax,
         tipAmount: Number(tipAmount),
-      }).toFixed(4),
-    [discountAmount, lineSubtotal, serviceCharge, serviceChargeTax, tipAmount]
-  );
+      }).toFixed(4);
+    }
+
+    return payableTotal({
+      lineTotal: lineSubtotal,
+      orderDiscount: Number(discountAmount),
+      serviceCharge: serviceCharge + serviceChargeTax,
+      tipAmount: Number(tipAmount),
+    }).toFixed(4);
+  }, [
+    discountAmount,
+    isDirectCheckoutMode,
+    lineSubtotal,
+    selectedOrder?.grandTotal,
+    serviceCharge,
+    serviceChargeTax,
+    syncedPaymentTotal,
+    tipAmount,
+  ]);
 
   const orderTax = useMemo(
     () =>
@@ -1353,7 +1452,7 @@ export function CashierPage() {
     ]
   );
 
-  const handleAddProduct = async (
+  const addProductToCart = async (
     product: (typeof products)[number],
     variantId: string,
     quantity: number
@@ -1371,6 +1470,52 @@ export function CashierPage() {
       !startFreshCart && selectedOrderSession && isPrimaryTableOrder
     );
 
+    const existingLine = !startFreshCart
+      ? activeOrderLinesRef.current.find(
+          (line) => line.variantId === variantId && isPendingKdsLine(line)
+        )
+      : undefined;
+
+    const rememberAddedLine = (line: SalesOrderLine) => {
+      const index = activeOrderLinesRef.current.findIndex(
+        (item) => item.id === line.id
+      );
+      activeOrderLinesRef.current =
+        index >= 0
+          ? activeOrderLinesRef.current.map((item, itemIndex) =>
+              itemIndex === index ? line : item
+            )
+          : [...activeOrderLinesRef.current, line];
+    };
+
+    if (existingLine && selectedOrder) {
+      const nextQuantity =
+        Number(existingLine.quantity || 0) + Math.max(1, quantity);
+      await updateOrderLine(selectedOrder.id, existingLine.id, {
+        variantId: existingLine.variantId,
+        quantity: nextQuantity.toFixed(4),
+        unitPrice: existingLine.unitPrice || "0.0000",
+        lineDiscount: existingLine.lineDiscount || "0.0000",
+        taxAmount: existingLine.taxAmount || "0.0000",
+        seatNumber: existingLine.seatNumber,
+      });
+      activeOrderLinesRef.current = activeOrderLinesRef.current.map((line) =>
+        line.id === existingLine.id
+          ? { ...line, quantity: nextQuantity.toFixed(4) }
+          : line
+      );
+
+      if (
+        shouldUseTableSession &&
+        selectedOrderSession?.sessionState === "SEATED"
+      ) {
+        await updateTableSessionState(selectedOrderSession.id, {
+          sessionState: "ORDERING",
+        });
+      }
+      return;
+    }
+
     if (shouldUseTableSession && selectedOrderSession) {
       const line = await addProductToTableSession(
         selectedOrderSession.id,
@@ -1379,6 +1524,7 @@ export function CashierPage() {
         quantity,
         tableOrderIds.length > 1 ? selectedOrder?.id : undefined
       );
+      rememberAddedLine(line);
       if (selectedOrderSession.sessionState === "SEATED") {
         await updateTableSessionState(selectedOrderSession.id, {
           sessionState: "ORDERING",
@@ -1402,12 +1548,13 @@ export function CashierPage() {
         });
       }
     } else if (selectedOrder && !startFreshCart) {
-      await addProductToOrder(
+      const line = await addProductToOrder(
         selectedOrder.id,
         product,
         variantId,
         quantity
       );
+      rememberAddedLine(line);
     } else if (!requiresTableSelection || isDirectCheckoutMode || startFreshCart) {
       setIsDirectCheckoutMode(true);
       setDirectCartLines((current) => {
@@ -1451,6 +1598,18 @@ export function CashierPage() {
     }
   };
 
+  const handleAddProduct = (
+    product: (typeof products)[number],
+    variantId: string,
+    quantity: number
+  ) => {
+    const pendingAdd = productAddQueueRef.current.then(() =>
+      addProductToCart(product, variantId, quantity)
+    );
+    productAddQueueRef.current = pendingAdd.catch(() => undefined);
+    return pendingAdd;
+  };
+
   const handleCheckout = async () => {
     setLocalError(null);
     setNotice(null);
@@ -1476,6 +1635,71 @@ export function CashierPage() {
       }
       if (orderDiscount > 0 && discountReasons.length && !discountReasonId) {
         throw new Error(t("cashier.errors.discountReasonRequired"));
+      }
+
+      // A table clock can gain another billing block after the pay screen was
+      // opened, and a directly opened ?view=pay route never ran handleOpenPay.
+      // Finalize the server-side charges and refresh the order before accepting
+      // money. If the bill changed, show the new amount and require a second
+      // confirmation so the cashier never charges more than the amount shown.
+      if (selectedOrderSession && isPrimaryTableOrder && selectedOrder) {
+        // The stop endpoint finalizes billable time. Calling it again after all
+        // clocks are stopped can duplicate charges on non-idempotent backends.
+        if (tableCharges.charges.running.length > 0) {
+          const finalizedCharges = await tableCharges.stop();
+          if (!finalizedCharges) {
+            throw new Error(t("cashier.errors.tableChargesFinalize"));
+          }
+        }
+
+        const refreshedOrder = await selectOrderById(selectedOrder.id);
+        const serverGrandTotal = Number(refreshedOrder.grandTotal || 0);
+        // grandTotal is already the server's final bill, including persisted
+        // tax and service charge. Adding the local service charge here again
+        // inflated 358,050 to 509,850. Only pending checkout adjustments belong
+        // on top of the refreshed authoritative total.
+        const serverRefreshedTotal = serverGrandTotal > 0
+          ? payableFromServerGrandTotal({
+              serverGrandTotal,
+              orderDiscount,
+              tipAmount: tip,
+            })
+          : Number(orderTotal);
+        const checkoutRequiredTotal =
+          syncedPaymentTotal &&
+          syncedPaymentTotal.orderId === selectedOrder.id &&
+          syncedPaymentTotal.discountAmount === discountAmount &&
+          syncedPaymentTotal.tipAmount === tipAmount
+            ? syncedPaymentTotal.total
+            : 0;
+        // A checkout rejection is the strongest source of truth. The order GET
+        // endpoint can lag behind it briefly, so never downgrade to that stale
+        // grandTotal on the cashier's next confirmation attempt.
+        const refreshedTotal = Math.max(
+          serverRefreshedTotal,
+          checkoutRequiredTotal
+        );
+
+        if (Math.abs(refreshedTotal - Number(orderTotal)) > 0.009) {
+          setIsSplitMode(false);
+          setSplitTenders([]);
+          setPaymentAmount(refreshedTotal.toFixed(4));
+          setSyncedPaymentTotal({
+            orderId: selectedOrder.id,
+            discountAmount,
+            tipAmount,
+            total: refreshedTotal,
+          });
+          setLocalError(
+            t("cashier.errors.billUpdated", {
+              amount: refreshedTotal.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              }),
+            })
+          );
+          return;
+        }
       }
 
       const checkoutPayments = withOrderTipOnFirstPayment(
@@ -1576,6 +1800,7 @@ export function CashierPage() {
 
       if (selectedOrderSession && isPrimaryTableOrder && selectedOrder) {
         await checkoutTableSession(selectedOrderSession.id, {
+          posSessionId: context.posSessionId,
           payments: checkoutPayments,
           ...(tip > 0 ? { tipAmount: tip } : {}),
           ...(discountReasonId ? { discountReasonId } : {}),
@@ -1652,6 +1877,37 @@ export function CashierPage() {
     } catch (caught) {
       const message =
         caught instanceof Error ? caught.message : t("cashier.errors.checkout");
+      const insufficient = message.match(
+        /insufficient payment:\s*required\s+([\d,.]+),\s*received\s+[\d,.]+/i
+      );
+      const requiredTotal = insufficient
+        ? Number(insufficient[1].replaceAll(",", ""))
+        : Number.NaN;
+      if (Number.isFinite(requiredTotal) && requiredTotal > 0) {
+        setIsSplitMode(false);
+        setSplitTenders([]);
+        setPaymentAmount(requiredTotal.toFixed(4));
+        if (selectedOrder) {
+          setSyncedPaymentTotal({
+            orderId: selectedOrder.id,
+            discountAmount,
+            tipAmount,
+            total: requiredTotal,
+          });
+        }
+        if (selectedOrder) {
+          await selectOrderById(selectedOrder.id).catch(() => undefined);
+        }
+        setLocalError(
+          t("cashier.errors.billUpdated", {
+            amount: requiredTotal.toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            }),
+          })
+        );
+        return;
+      }
       setLocalError(message);
     }
   };
@@ -1987,7 +2243,11 @@ export function CashierPage() {
         throw new Error(t("cashier.errors.kdsTargetMissing"));
       }
 
-      const kitchenLines = printableLines(displayOrderLines);
+      const unsentOrderLines = pendingKdsLines(displayOrderLines);
+      if (!unsentOrderLines.length) {
+        throw new Error(t("cashier.errors.kdsNothingNew"));
+      }
+      const kitchenLines = printableLines(unsentOrderLines);
 
       await fireToKds(
         sessionId ? { sessionId } : { salesOrderId: salesOrderId! }
@@ -2001,7 +2261,7 @@ export function CashierPage() {
         const printPlan = await printer.printKitchen(
           {
             title: selectedOrder?.orderNumber || "KITCHEN",
-            courseType: displayOrderLines.find((line) => line.courseType)?.courseType,
+            courseType: unsentOrderLines.find((line) => line.courseType)?.courseType,
             firedAt: new Date().toISOString(),
             orderRef: selectedOrder?.orderNumber || salesOrderId || sessionId,
             lines: kitchenLines,
@@ -2165,10 +2425,10 @@ export function CashierPage() {
   return (
     <section
       className={[
-        "pos-split grid h-full min-h-0 min-w-0 overflow-hidden bg-[#070707] text-white",
+        "pos-split grid h-full min-h-0 min-w-0 grid-cols-1 grid-rows-[minmax(24rem,1fr)_minmax(24rem,1fr)] overflow-y-auto bg-[#070707] text-white md:grid-rows-1 md:overflow-hidden",
         activeView === "multi-order" || activeView === "pay"
-          ? "grid-cols-[13rem_minmax(0,1fr)] min-[1100px]:grid-cols-[18rem_minmax(0,1fr)]"
-          : "grid-cols-[11rem_minmax(0,1fr)] min-[1100px]:grid-cols-[minmax(0,18rem)_minmax(0,1fr)_minmax(0,8rem)]",
+          ? "min-[768px]:grid-cols-[14rem_minmax(0,1fr)] min-[1100px]:grid-cols-[18rem_minmax(0,1fr)]"
+          : "min-[768px]:grid-cols-[14rem_minmax(0,1fr)] min-[1100px]:grid-cols-[minmax(0,18rem)_minmax(0,1fr)_minmax(0,8rem)]",
       ].join(" ")}
     >
       <OrderPanel
@@ -2300,6 +2560,29 @@ export function CashierPage() {
                 onLoadVariants={fetchProductVariants}
                 onAdd={handleAddProduct}
                 onClose={handleCloseMenu}
+                toolbar={
+                  menuCategories.length ? (
+                    <div className="mt-2 flex shrink-0 gap-1.5 overflow-x-auto pb-1 min-[1100px]:hidden">
+                      {[
+                        { id: "ALL", name: t("cashier.productMenu.allCategories") },
+                        ...menuCategories,
+                      ].map((category) => (
+                        <button
+                          key={category.id}
+                          type="button"
+                          aria-pressed={menuCategoryId === category.id}
+                          onClick={() => setMenuCategoryId(category.id)}
+                          className={[
+                            "min-h-9 shrink-0 whitespace-nowrap rounded px-3 text-xs font-medium",
+                            menuCategoryId === category.id ? "bg-blue-600" : "bg-slate-600",
+                          ].join(" ")}
+                        >
+                          {category.name}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null
+                }
               />
             </div>
           </div>
@@ -2398,7 +2681,7 @@ export function CashierPage() {
             >
               {t("cashier.productMenu.allCategories")}
             </button>
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="pos-scroll-hint min-h-0 flex-1 overflow-y-auto">
               {menuCategories.map((category) => (
                 <button
                   key={category.id}

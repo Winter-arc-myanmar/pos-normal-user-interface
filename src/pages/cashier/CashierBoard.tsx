@@ -153,7 +153,7 @@ export function CashierBoard({
         {isLoading && tables.length === 0 && orders.length === 0 ? (
           <ApiLoadingState label={t("cashier.loading")} />
         ) : (
-          <div className="grid grid-cols-3 gap-2 min-[900px]:grid-cols-4 min-[1200px]:grid-cols-5">
+          <div className="grid grid-cols-2 gap-2 min-[900px]:grid-cols-4 min-[1200px]:grid-cols-5">
             {serviceType === "TABLE" || serviceType === "DINE_IN"
               ? tables.map((table) => {
                   const latestSession = getLatestSession(table.id);

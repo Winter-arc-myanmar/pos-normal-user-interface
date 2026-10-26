@@ -94,6 +94,12 @@ describe("RoomTabletPage", () => {
     mocks.startRoom.mockResolvedValue({ sessionId: "session-1", charged: "52275.0000", balanceAfter: "-148775.0000" });
   });
 
+  it("owns a viewport-height scroll pane for short standalone screens", () => {
+    render(page);
+
+    expect(screen.getByRole("main")).toHaveClass("h-dvh", "min-h-0", "overflow-y-auto");
+  });
+
   it("is linked to its room once, by picking it", () => {
     window.localStorage.removeItem("room-tablet-room");
     render(page);

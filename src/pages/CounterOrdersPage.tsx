@@ -189,7 +189,7 @@ export function CounterOrdersPage() {
         </p>
       )}
 
-      <div className="pos-split grid min-h-0 flex-1 grid-cols-1 min-[900px]:grid-cols-[14rem_minmax(0,1fr)]">
+      <div className="pos-split grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(6rem,25%)_minmax(0,1fr)] min-[900px]:grid-cols-[14rem_minmax(0,1fr)] min-[900px]:grid-rows-1">
         <aside className="pos-pane-scroll border-r border-slate-200 bg-slate-50">
           <button
             type="button"
@@ -230,7 +230,7 @@ export function CounterOrdersPage() {
               tickets.map((ticket) => (
                 <article
                   key={ticket.id || ticket.ticketNumber}
-                  className="grid grid-cols-[auto_4.5rem_minmax(0,1fr)_auto] items-center gap-3 border-b border-slate-100 px-4 py-3"
+                  className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 border-b border-slate-100 px-3 py-3 sm:grid-cols-[auto_4.5rem_minmax(0,1fr)_auto] sm:gap-3 sm:px-4"
                 >
                   <span
                     className={[
@@ -262,7 +262,7 @@ export function CounterOrdersPage() {
                       </p>
                     ) : null}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
                     <button
                       type="button"
                       onClick={() => void openTicketDetails(ticket)}
@@ -288,7 +288,7 @@ export function CounterOrdersPage() {
             )}
           </div>
 
-          <footer className="flex items-center justify-between border-t border-slate-200 px-4 py-2 text-sm">
+          <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 px-4 py-2 text-sm">
             <span className={unlinkedCount ? "text-red-600" : "text-slate-400"}>
               {t("counterOrders.unlinked", { count: unlinkedCount })}
             </span>

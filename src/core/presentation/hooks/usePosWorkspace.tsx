@@ -18,6 +18,7 @@ import {
   markPosWorkspaceBootstrapped,
   shouldBootstrapPosWorkspace,
 } from "@/lib/pos/posWorkspace";
+import { usableShiftId } from "@/lib/pos/shiftDay";
 
 interface CashierContext {
   tenantId: string;
@@ -164,11 +165,7 @@ export function PosWorkspaceProvider({ children }: { children: ReactNode }) {
         // per-login device only your own shift is yours to sell on; a daily
         // one is shared by whoever is on it.
         const current = await shiftApi().current(register.id);
-        const usable =
-          current.shift &&
-          (current.shiftRule === "DAILY" || current.shift.cashierId === cashierId)
-            ? current.shift.id
-            : "";
+        const usable = usableShiftId(current, cashierId);
 
         setCurrentShift(current);
         setActivePosRegisterId(register.id);
@@ -404,13 +401,20 @@ export function PosWorkspaceProvider({ children }: { children: ReactNode }) {
   ]);
 
   // What a device sells and its shift can change in admin while staff are on it;
-  // picked up again every minute and when the screen comes back.
+  // picked up again every minute and when the screen comes back. A shift closed
+  // elsewhere is dropped here, or every payment would go on refusing it.
   useEffect(() => {
-    if (!activePosRegisterId) return;
+    if (!activePosRegisterId || !cashierId) return;
     const reload = () => {
       shiftApi()
         .current(activePosRegisterId)
-        .then(setCurrentShift)
+        .then((current) => {
+          setCurrentShift(current);
+          const usable = usableShiftId(current, cashierId);
+          if (usable === activePosSessionId) return;
+          setActivePosSessionId(usable);
+          if (!usable) setIsSetupModalOpen(true);
+        })
         .catch(() => undefined);
     };
     const timer = window.setInterval(reload, 60_000);
@@ -419,7 +423,7 @@ export function PosWorkspaceProvider({ children }: { children: ReactNode }) {
       window.clearInterval(timer);
       window.removeEventListener("focus", reload);
     };
-  }, [activePosRegisterId]);
+  }, [activePosRegisterId, activePosSessionId, cashierId]);
 
   const shiftClosed = useCallback(
     async (options?: { signingOut?: boolean }) => {

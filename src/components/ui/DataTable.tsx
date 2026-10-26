@@ -46,11 +46,11 @@ export function DataTable<T extends Record<string, unknown>>({
   return (
     <div
       className={[
-        "overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm",
+        "min-w-0 max-w-full overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm",
         className,
       ].join(" ")}
     >
-      <table className="w-full border-collapse text-left">
+      <table className="pos-data-table w-full border-collapse text-left">
         <thead>
           <tr>
             {columns.map((col) => (

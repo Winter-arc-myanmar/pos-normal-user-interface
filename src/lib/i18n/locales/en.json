@@ -1070,6 +1070,8 @@
       "decreaseQuantity": "Decrease quantity",
       "increaseQuantity": "Increase quantity",
       "lineQuantity": "Quantity {{count}}",
+      "expandItem": "Expand {{name}} details",
+      "collapseItem": "Collapse {{name}} details",
       "remove": "Remove",
       "itemUpdated": "Item quantity updated.",
       "itemRemoved": "Item removed from order.",
@@ -1136,12 +1138,15 @@
       "emptyOrder": "Add at least one item before sending to KDS.",
       "kdsTargetMissing": "Create or select an order before sending to KDS.",
       "kdsFailed": "Failed to send order to KDS.",
+      "kdsNothingNew": "All items have already been sent to KDS.",
       "kdsUnrouted": "No station for: {{items}}",
       "kdsPrinterUnavailable": "No connected printer is configured for: {{stations}}.",
       "tooManyRequests": "Too many requests. Wait a moment and try again.",
       "orderAlreadyPaid": "This order is already paid and cannot be charged again.",
       "discountReasonRequired": "Choose a discount reason before applying a discount.",
-      "discountTooLarge": "Discount cannot be greater than the order subtotal."
+      "discountTooLarge": "Discount cannot be greater than the order subtotal.",
+      "tableChargesFinalize": "Unable to finalize table charges. Refresh and try again.",
+      "billUpdated": "The table bill changed to {{amount}} after finalizing its charges. Review the new total, then confirm payment again."
     },
     "tableCharges": {
       "title": "Table charges",

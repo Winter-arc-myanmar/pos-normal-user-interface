@@ -117,23 +117,23 @@ export function PosSettingsPage() {
   };
 
   return (
-    <section className="pos-split flex h-full min-h-0 overflow-hidden bg-slate-100">
-      <aside className="flex w-56 shrink-0 flex-col border-r border-slate-200 bg-white">
-        <div className="border-b border-slate-100 px-4 py-5 text-center">
+    <section className="pos-split flex h-full min-h-0 flex-col overflow-hidden bg-slate-100 md:flex-row">
+      <aside className="flex min-h-0 w-full shrink-0 flex-col border-r border-slate-200 bg-white md:w-56">
+        <div className="hidden border-b border-slate-100 px-4 py-5 text-center md:block">
           <div className="flex justify-center">
             <UserAvatar name={displayName} />
           </div>
           <p className="mt-3 text-sm font-semibold text-slate-900">{displayName}</p>
         </div>
 
-        <nav className="flex-1 overflow-y-auto p-2">
+        <nav className="flex gap-2 overflow-x-auto p-2 md:block md:min-h-0 md:flex-1 md:overflow-y-auto">
           {tabIds.map((tabId) => (
             <button
               key={tabId}
               type="button"
               onClick={() => selectTab(tabId)}
               className={[
-                "mb-1 w-full rounded-lg px-3 py-2.5 text-left text-sm font-medium transition",
+                "shrink-0 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition md:mb-1 md:w-full",
                 activeTab === tabId
                   ? "bg-blue-600 text-white"
                   : "text-slate-700 hover:bg-slate-50",
@@ -145,7 +145,7 @@ export function PosSettingsPage() {
         </nav>
       </aside>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-4 sm:p-6">
         {activeTab === "cashier" ? (
           <div className="mx-auto max-w-4xl space-y-4">
             <div className="flex flex-wrap gap-2">

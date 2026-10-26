@@ -340,6 +340,8 @@ export interface SplitPaymentTenderDTO {
 }
 
 export interface TableSessionCheckoutDTO {
+  /** The open shift taking payment; it can differ from the shift that opened an overdue table. */
+  posSessionId: string;
   payments: CheckoutPaymentEntryDTO[];
   tipAmount?: number;
   serviceCharge?: number;
