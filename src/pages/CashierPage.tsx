@@ -81,6 +81,16 @@ import { cashierLabel } from "@/lib/printing/cashier";
 const BOARD_PAGE_SIZE = 15;
 const TABLE_STATUS_POLL_MS = 60_000;
 const TABLE_STATUS_BACKOFF_MS = 180_000;
+/** Whether Confirm pay prints the bill. Remembered per device. */
+const PRINT_BILL_KEY = "pos:print-bill-on-confirm";
+
+const readPrintBillOnConfirm = () => {
+  try {
+    return window.localStorage.getItem(PRINT_BILL_KEY) === "true";
+  } catch {
+    return false;
+  }
+};
 
 export function CashierPage() {
   const { t } = useTranslation();
@@ -190,6 +200,7 @@ export function CashierPage() {
   const [discountAmount, setDiscountAmount] = useState("0.0000");
   const [discountReasonId, setDiscountReasonId] = useState("");
   const [tipAmount, setTipAmount] = useState("0.0000");
+  const [printBillOnConfirm, setPrintBillOnConfirm] = useState(readPrintBillOnConfirm);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const paymentInputRef = useRef<HTMLInputElement>(null);
   const payReturnViewRef = useRef("menu");
@@ -1610,6 +1621,16 @@ export function CashierPage() {
     return pendingAdd;
   };
 
+  /** Confirm pay prints the bill only when the till asks for it. */
+  const choosePrintBillOnConfirm = (value: boolean) => {
+    setPrintBillOnConfirm(value);
+    try {
+      window.localStorage.setItem(PRINT_BILL_KEY, String(value));
+    } catch {
+      // Storage can be blocked; the choice then lasts until reload.
+    }
+  };
+
   const handleCheckout = async () => {
     setLocalError(null);
     setNotice(null);
@@ -1835,7 +1856,7 @@ export function CashierPage() {
         });
       }
 
-      const printError = await printPaidReceipt();
+      const printError = printBillOnConfirm ? await printPaidReceipt() : null;
 
       if (activeTableId && selectedOrder) {
         if (selectedOrderSession && isPrimaryTableOrder) {
@@ -2554,6 +2575,8 @@ export function CashierPage() {
         )}
         isPayView={activeView === "pay"}
         requiresTableAssignment={requiresTableAssignment}
+        printBillOnConfirm={printBillOnConfirm}
+        onPrintBillOnConfirmChange={choosePrintBillOnConfirm}
         onOpenPay={handleOpenPay}
         canTakePayment={canTakePayment}
         onCheckout={() => void handleCheckout()}

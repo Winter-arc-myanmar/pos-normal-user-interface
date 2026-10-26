@@ -1020,6 +1020,7 @@
       "splitTenderCount": "{{count}} tenders",
       "splitCovered": "Bill covered. Confirm pay when ready.",
       "chooseMethod": "Choose a payment method, then confirm pay.",
+      "printBillOnConfirm": "Print bill on confirm",
       "memberCard": "MEMBER CARD",
       "tapMemberCard": "Tap, swipe, or enter the guest card UID.",
       "lookupMemberCard": "Look up card",
