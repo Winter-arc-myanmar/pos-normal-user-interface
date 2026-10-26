@@ -66,6 +66,53 @@ describe("ApiCashierRepository", () => {
     expect(lines[3].sku).toBe("GUINNESS-01");
   });
 
+  it("keeps the category a line was sold under, however the API nests it", async () => {
+    const httpClient = {
+      get: vi.fn().mockResolvedValue({
+        success: true,
+        data: [
+          {
+            id: "line-1",
+            salesOrderId: "order-1",
+            variantId: "variant-1",
+            quantity: "1.0000",
+            unitPrice: "10000.0000",
+            categoryId: "cat-drinks",
+            categoryName: "Drinks",
+          },
+          {
+            id: "line-2",
+            salesOrderId: "order-1",
+            variantId: "variant-2",
+            quantity: "1.0000",
+            unitPrice: "8000.0000",
+            salesOrderLine: { categoryId: "cat-snacks" },
+          },
+          {
+            id: "line-3",
+            salesOrderId: "order-1",
+            variantId: "variant-3",
+            quantity: "1.0000",
+            unitPrice: "9000.0000",
+            product: { name: "Ginger tea", category: { id: "cat-tea" } },
+          },
+        ],
+      }),
+    };
+    const repository = new ApiCashierRepository(
+      httpClient as unknown as HttpClient
+    );
+
+    const lines = await repository.getSalesOrderLines("order-1");
+
+    expect(lines[0]).toMatchObject({
+      categoryId: "cat-drinks",
+      categoryName: "Drinks",
+    });
+    expect(lines[1].categoryId).toBe("cat-snacks");
+    expect(lines[2].categoryId).toBe("cat-tea");
+  });
+
   it("normalizes nested paginated list responses", async () => {
     const httpClient = {
       get: vi.fn().mockResolvedValue({

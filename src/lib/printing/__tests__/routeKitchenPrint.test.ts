@@ -70,6 +70,37 @@ describe("station print routing", () => {
     expect(plan.jobs[1].binding.id).toBe("food-printer");
   });
 
+  it("prints a newly added item on its category's printer, not the default one", () => {
+    const fallback = binding("main", "printer-main");
+    const plan = groupKitchenJobs(
+      [
+        { name: "Water", quantity: "1", categoryId: "drink" },
+        // Added after the station was set up: its category comes from the
+        // server's line, so it must follow the station, not the default.
+        { name: "New mojito", quantity: "1", categoryId: "drink" },
+      ],
+      [binding("bar-printer", "printer-bar"), fallback],
+      fallback,
+      undefined,
+      [
+        {
+          id: "bar",
+          name: "Bar",
+          printerIds: ["printer-bar"],
+          categoryIds: ["drink"],
+        },
+      ]
+    );
+
+    expect(plan.unrouted).toEqual([]);
+    expect(plan.jobs).toHaveLength(1);
+    expect(plan.jobs[0].binding.id).toBe("bar-printer");
+    expect(plan.jobs[0].lines.map((line) => line.name)).toEqual([
+      "Water",
+      "New mojito",
+    ]);
+  });
+
   it("leaves items with no station match unrouted", () => {
     const fallback = binding("main", "printer-main");
     const plan = groupKitchenJobs(
