@@ -979,6 +979,7 @@
     },
     "productMenu": {
       "allCategories": "အားလုံး",
+      "categories": "အမျိုးအစားများ",
       "search": "ကုန်ပစ္စည်း ရှာမည်",
       "close": "ပိတ်မည်",
       "noSku": "SKU မရှိ",
@@ -1077,6 +1078,7 @@
       "itemUpdated": "ပစ္စည်းအရေအတွက် ပြင်ဆင်ပြီး။",
       "itemRemoved": "အော်ဒါမှ ပစ္စည်း ဖယ်ပြီး။",
       "kdsDeleteTitle": "ဖျက်သည်။",
+      "tableReleased": "စားပွဲ ပြန်လွှတ်ပြီး။ အော်ဒါ မတင်ထားပါ။",
       "adjustments": "ချိန်ညှိမှုများ",
       "discount": "လျှော့စျေး",
       "discountReason": "လျှော့စျေးအကြောင်းရင်း",

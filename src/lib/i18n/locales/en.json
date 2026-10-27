@@ -979,6 +979,7 @@
     },
     "productMenu": {
       "allCategories": "All",
+      "categories": "Categories",
       "search": "Search products",
       "close": "Close",
       "noSku": "No SKU",
@@ -1077,6 +1078,7 @@
       "itemUpdated": "Item quantity updated.",
       "itemRemoved": "Item removed from order.",
       "kdsDeleteTitle": "DELETE",
+      "tableReleased": "Table released. No order was placed.",
       "adjustments": "Adjustments",
       "discount": "Discount",
       "discountReason": "Discount reason",
