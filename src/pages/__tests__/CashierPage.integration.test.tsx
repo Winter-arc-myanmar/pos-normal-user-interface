@@ -123,6 +123,7 @@ let venueSettingsState = {
   serviceChargeBps: 0,
   serviceChargeOn: { BAR: true, SPA: true, KTV: true },
   serviceChargeTaxRate: 0,
+  kdsDeleteSlips: true,
 };
 
 vi.mock("@/core/presentation/hooks/useVenueSetting", () => ({
@@ -296,6 +297,7 @@ describe("CashierPage integration", () => {
       serviceChargeBps: 0,
       serviceChargeOn: { BAR: true, SPA: true, KTV: true },
       serviceChargeTaxRate: 0,
+      kdsDeleteSlips: true,
     };
     mocks.processCheckout.mockResolvedValue({ orderId: "direct-order-1" });
     tableChargesState = { offered: [], running: [] };
@@ -927,6 +929,77 @@ describe("CashierPage integration", () => {
               remarks: "cashier.orderPanel.kdsDeleteTitle",
             }),
           ],
+        }),
+        [expect.objectContaining({ id: "station-drinks" })],
+        { requireStationRouting: true }
+      )
+    );
+  });
+
+  it("prints no DELETE slip when the shop turned them off", async () => {
+    venueSettingsState = { ...venueSettingsState, kdsDeleteSlips: false };
+    selectedOrderLinesState = [
+      {
+        ...orderLine,
+        status: "FIRED",
+        firedAt: "2026-10-23T10:00:00.000Z",
+      },
+    ];
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=menu"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "cashier.orderPanel.expandItem" })
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "cashier.orderPanel.remove" })
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText("cashier.orderPanel.itemRemoved")).toBeInTheDocument()
+    );
+    expect(mocks.printKitchen).not.toHaveBeenCalled();
+  });
+
+  it("prints a DELETE slip for sent lines when the order is cancelled", async () => {
+    selectedOrderLinesState = [
+      {
+        ...orderLine,
+        status: "FIRED",
+        firedAt: "2026-10-23T10:00:00.000Z",
+      },
+    ];
+    mocks.listStations.mockResolvedValue({
+      stations: [
+        {
+          id: "station-drinks",
+          name: "Bar",
+          printerIds: ["printer-bar"],
+          routingRules: { categoryIds: ["cat-drinks"] },
+        },
+      ],
+    });
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=orders"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "cashier.orderPanel.cancelOrder" })
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "cashier.orderPanel.confirmCancelOrder" })
+    );
+
+    await waitFor(() =>
+      expect(mocks.printKitchen).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "cashier.orderPanel.kdsDeleteTitle",
+          lines: [expect.objectContaining({ name: "Coffee" })],
         }),
         [expect.objectContaining({ id: "station-drinks" })],
         { requireStationRouting: true }
