@@ -3,12 +3,13 @@
 #
 # The service is completely stateless (no volumes): the SPA is baked into the
 # image and all state lives in the browser or the backend. That is what makes
-# it trivial to migrate - "docker compose up -d" on a new server and you are
-# back online, with nothing to restore.
+# it trivial to migrate: build/load the image on the new host, then start it.
 #
 # Usage:
 #   cp .env.docker.example .env      # then edit for the server
-#   docker compose up -d --build
+#   docker compose build web         # first install or intentional code update
+#   docker compose up -d --no-build  # reuse the local image
+#   docker compose restart web       # restart without building
 #   docker compose ps
 # ---------------------------------------------------------------------------
 
@@ -20,7 +21,8 @@ services:
       args:
         # Build-time API origin (Vite inlines it). See .env.docker.example.
         VITE_API_URL: ${VITE_API_URL:-https://apivision.winterarc.asia}
-    image: vision-pos-web:latest
+    image: ${APP_IMAGE:-vision-pos-web:latest}
+    pull_policy: never
     container_name: vision-pos-web
 
     # Survive host reboots / crashers and re-deploys without manual help.
@@ -39,23 +41,15 @@ services:
       API_UPSTREAM: ${API_UPSTREAM:-https://apivision.winterarc.asia}
 
     # =====================================================================
-    # CPU & RAM allocation
-    # ---------------------------------------------------------------------
-    # A static nginx server is extremely light. These numbers give plenty of
-    # headroom for a busy venue POS while protecting the host:
-    #   * hard ceiling  -> 1 CPU core / 256 MB  (container is killed if exceeded)
-    #   * reservation   -> 0.25 CPU / 64 MB     (guaranteed minimum)
-    # Real-world idle usage is roughly 5-20 MB RAM and near 0% CPU.
-    # Tune the limits for your fleet via the deploy.resources block below.
+    # Runtime limits only: building with Node needs additional host resources.
+    # Memory reservation is a soft limit, not preallocated/guaranteed RAM.
+    # Increase limits after measuring your actual traffic with docker stats.
     # =====================================================================
-    deploy:
-      resources:
-        limits:
-          cpus: "1.0"
-          memory: 256M
-        reservations:
-          cpus: "0.25"
-          memory: 64M
+    cpus: "${WEB_CPUS:-0.50}"
+    mem_limit: ${WEB_MEMORY_LIMIT:-128m}
+    mem_reservation: ${WEB_MEMORY_RESERVATION:-32m}
+    pids_limit: 64
+    stop_grace_period: 30s
 
     # Bounded, rotating logs so the host disk never fills up over months.
     logging:

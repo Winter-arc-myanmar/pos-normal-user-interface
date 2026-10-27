@@ -17,13 +17,6 @@ FROM node:24-alpine AS build
 
 WORKDIR /app
 
-# Vite inlines env vars into the bundle at BUILD time.
-#   * default  -> call the API origin directly (current behaviour)
-#   * override -> set this to the site's own origin to use the nginx proxy
-#                 (docker build --build-arg VITE_API_URL=https://vision.example.com)
-ARG VITE_API_URL=https://apivision.winterarc.asia
-ENV VITE_API_URL=${VITE_API_URL}
-
 # The repo pins legacy-peer-deps in .npmrc; mirror it and keep CI installs
 # reproducible and quiet.
 ENV NPM_CONFIG_LEGACY_PEER_DEPS=true \
@@ -33,19 +26,32 @@ ENV NPM_CONFIG_LEGACY_PEER_DEPS=true \
 
 # Install dependencies first so this layer is cached until the lockfile changes.
 COPY package.json package-lock.json .npmrc ./
-RUN npm ci
+RUN --mount=type=cache,id=vision-pos-npm,target=/root/.npm,sharing=locked \
+    npm ci --prefer-offline
 
-# Copy the sources and build the production bundle.
-COPY . .
-RUN npm run build
+# Copy only build/test inputs. Deployment scripts and documentation must not
+# invalidate the application build cache. Keep deploy-production.sh's input
+# fingerprint aligned with these COPY instructions and the runtime copies.
+COPY index.html tsconfig*.json vite.config.ts vitest.config.ts ./
+COPY scripts/vitest-windows-patch.cjs ./scripts/vitest-windows-patch.cjs
+COPY public/ ./public/
+COPY src/ ./src/
+
+# API-specific builds reuse the same dependency layer. Vite needs this only
+# when compiling, not while installing packages.
+ARG VITE_API_URL=https://apivision.winterarc.asia
+ENV VITE_API_URL=${VITE_API_URL}
+ARG NODE_MAX_OLD_SPACE_SIZE=1024
+RUN NODE_OPTIONS="--max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE}" npm run build \
+    && find dist -type f \( -name '*.js' -o -name '*.css' -o -name '*.html' -o -name '*.svg' -o -name '*.json' \) \
+        -size +1k -exec gzip -k -6 {} \;
 
 # ===========================================================================
 # Stage 2 - serve the static build with nginx
 # ===========================================================================
 FROM nginx:1.27-alpine AS runtime
 
-# envsubst (from gettext) renders the server template at container start.
-RUN apk add --no-cache gettext
+# The official nginx image already includes envsubst for its entrypoint.
 
 # Optional same-origin backend upstream. Change API_UPSTREAM at runtime to
 # re-point /api, /csrf and /uploads without rebuilding the image. Only this
