@@ -979,6 +979,7 @@
     },
     "productMenu": {
       "allCategories": "အားလုံး",
+      "categories": "အမျိုးအစားများ",
       "search": "ကုန်ပစ္စည်း ရှာမည်",
       "close": "ပိတ်မည်",
       "noSku": "SKU မရှိ",

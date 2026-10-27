@@ -431,6 +431,9 @@ describe("CashierPage integration", () => {
     ).toHaveLength(2);
     expect(screen.getAllByRole("button", { name: "Drinks" })).toHaveLength(2);
     expect(screen.getAllByRole("button", { name: "Main" })).toHaveLength(2);
+    expect(
+      screen.getByText("cashier.productMenu.categories")
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Coffee/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Deli Soup/ })).toBeInTheDocument();
 

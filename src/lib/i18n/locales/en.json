@@ -979,6 +979,7 @@
     },
     "productMenu": {
       "allCategories": "All",
+      "categories": "Categories",
       "search": "Search products",
       "close": "Close",
       "noSku": "No SKU",

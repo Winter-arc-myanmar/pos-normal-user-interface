@@ -2642,7 +2642,15 @@ export function CashierPage() {
                 onClose={handleCloseMenu}
                 toolbar={
                   menuCategories.length ? (
-                    <div className="mt-2 flex shrink-0 gap-1.5 overflow-x-auto pb-1 min-[1100px]:hidden">
+                    <div className="mt-2 min-[1100px]:hidden">
+                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                        {t("cashier.productMenu.categories")}
+                      </p>
+                      <div
+                        className="pos-scroll-hint flex shrink-0 gap-1.5 overflow-x-auto pb-1"
+                        role="group"
+                        aria-label={t("cashier.productMenu.categories")}
+                      >
                       {[
                         { id: "ALL", name: t("cashier.productMenu.allCategories") },
                         ...menuCategories,
@@ -2660,6 +2668,7 @@ export function CashierPage() {
                           {category.name}
                         </button>
                       ))}
+                      </div>
                     </div>
                   ) : null
                 }
