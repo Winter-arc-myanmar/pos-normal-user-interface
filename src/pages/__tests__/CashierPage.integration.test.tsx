@@ -542,11 +542,13 @@ describe("CashierPage integration", () => {
     });
   });
 
-  it("merges into a served line and folds existing 1x duplicates", async () => {
-    selectedOrderLinesState = [
-      { ...orderLine, status: "SERVED" },
-      { ...orderLine, id: "line-2", status: "SERVED" },
-    ];
+  it("adds a new pending line after Send KDS so the kitchen receives it", async () => {
+    selectedOrderLinesState = [{ ...orderLine, status: "FIRED" }];
+    mocks.addProductToTableSession.mockResolvedValue({
+      ...orderLine,
+      id: "line-new",
+      status: "PENDING",
+    });
     render(
       <MemoryRouter initialEntries={["/cashier?view=menu"]}>
         <CashierPage />
@@ -556,17 +558,15 @@ describe("CashierPage integration", () => {
     fireEvent.click(screen.getByRole("button", { name: /Coffee/ }));
 
     await waitFor(() =>
-      expect(mocks.updateOrderLine).toHaveBeenCalledWith("order-1", "line-1", {
-        variantId: "variant-1",
-        quantity: "3.0000",
-        unitPrice: "10.0000",
-        lineDiscount: "0.0000",
-        taxAmount: "0.0000",
-        seatNumber: undefined,
-      })
+      expect(mocks.addProductToTableSession).toHaveBeenCalledWith(
+        "session-1",
+        productState,
+        "variant-1",
+        1,
+        undefined
+      )
     );
-    expect(mocks.removeOrderLine).toHaveBeenCalledWith("order-1", "line-2");
-    expect(mocks.addProductToTableSession).not.toHaveBeenCalled();
+    expect(mocks.updateOrderLine).not.toHaveBeenCalled();
   });
 
   it("prints duplicate item lines as one combined quantity on the receipt", async () => {

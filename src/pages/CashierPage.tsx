@@ -1611,14 +1611,11 @@ export function CashierPage() {
             Number(line.unitPrice || 0).toFixed(4) === clickedUnitPrice &&
             !hasModifiers(line) &&
             !line.voidedAt &&
-            !["VOIDED", "COMPED"].includes(
-              String(line.status || "").toUpperCase()
-            )
+            isPendingKdsLine(line)
         );
-    // Prefer a line the kitchen has not seen yet, then fall back to any live
-    // line. Without that fallback, a served line became a second 1x row.
-    const existingLine =
-      matchingLines.find(isPendingKdsLine) ?? matchingLines[0];
+    // Additions after Send KDS stay on a new pending line so the kitchen
+    // receives them; the order panel still shows one combined quantity.
+    const existingLine = matchingLines[0];
 
     const rememberAddedLine = (line: SalesOrderLine) => {
       const index = activeOrderLinesRef.current.findIndex(
@@ -2433,6 +2430,16 @@ export function CashierPage() {
     try {
       setLocalError(null);
       setNotice(null);
+      if (!isDirectCheckoutMode && selectedOrder && !isPendingKdsLine(line)) {
+        const variant = variantById[line.variantId];
+        const product = variant ? productById[variant.productId] : undefined;
+        if (!product) {
+          throw new Error(t("cashier.errors.addProduct"));
+        }
+        await handleAddProduct(product, line.variantId, 1);
+        setNotice(t("cashier.orderPanel.itemUpdated"));
+        return;
+      }
       await mutateOrderLineQuantity(line.id, Number(line.quantity || 0) + 1);
       setNotice(t("cashier.orderPanel.itemUpdated"));
     } catch (caught) {
@@ -2459,15 +2466,24 @@ export function CashierPage() {
     try {
       setLocalError(null);
       setNotice(null);
+      const grouped = line as typeof line & {
+        groupedLines?: (typeof activeOrderLines)[number][];
+      };
+      const lines = grouped.groupedLines?.length ? grouped.groupedLines : [line];
       if (isDirectCheckoutMode) {
-        setDirectCartLines((current) => current.filter((entry) => entry.id !== line.id));
+        const ids = new Set(lines.map((entry) => entry.id));
+        setDirectCartLines((current) =>
+          current.filter((entry) => !ids.has(entry.id))
+        );
       } else if (selectedOrder) {
         if (isSettledSalesOrder(selectedOrder)) {
           throw new Error(t("cashier.errors.orderAlreadyPaid"));
         }
-        await removeOrderLine(selectedOrder.id, line.id);
-        const deletePrintError = await printKdsDelete(line);
-        if (deletePrintError) setLocalError(deletePrintError);
+        for (const entry of lines) {
+          await removeOrderLine(selectedOrder.id, entry.id);
+          const deletePrintError = await printKdsDelete(entry);
+          if (deletePrintError) setLocalError(deletePrintError);
+        }
       }
       setNotice(t("cashier.orderPanel.itemRemoved"));
     } catch (caught) {
