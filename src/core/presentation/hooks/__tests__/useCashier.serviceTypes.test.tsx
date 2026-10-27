@@ -55,6 +55,7 @@ const createPayload = (serviceType: ServiceType) => ({
 describe("useCashier service types", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
     mocks.createSalesOrder.mockResolvedValue(draftOrder("order-1"));
     mocks.getSalesOrders.mockResolvedValue([draftOrder("order-1")]);
     mocks.getSalesOrderById.mockResolvedValue(draftOrder("order-1"));
@@ -111,5 +112,52 @@ describe("useCashier service types", () => {
 
     expect(result.current.salesOrders).toHaveLength(1);
     expect(result.current.salesOrders[0].serviceType).toBe("DINE_IN");
+  });
+
+  it("keeps pick-up orders on the Pick Up tab after a reload", async () => {
+    const first = renderHook(() => useCashier());
+
+    await act(async () => {
+      await first.result.current.createOrder(createPayload("PICK_UP"));
+    });
+    first.unmount();
+
+    // A reload starts a new hook instance with the same device storage.
+    const second = renderHook(() => useCashier());
+    await act(async () => {
+      await second.result.current.fetchSalesOrders({ page: 1, limit: 100 });
+    });
+
+    expect(second.result.current.salesOrders[0].serviceType).toBe("PICK_UP");
+  });
+
+  it("keeps one dine-in and two pick-ups counted correctly after a reload", async () => {
+    let nextId = 1;
+    mocks.createSalesOrder.mockImplementation(async () =>
+      draftOrder(`order-${nextId++}`)
+    );
+    const first = renderHook(() => useCashier());
+
+    await act(async () => {
+      await first.result.current.createOrder(createPayload("DINE_IN"));
+      await first.result.current.createOrder(createPayload("PICK_UP"));
+      await first.result.current.createOrder(createPayload("PICK_UP"));
+    });
+    first.unmount();
+
+    // The API answers DINE_IN for every draft, as it does in production.
+    mocks.getSalesOrders.mockResolvedValue([
+      draftOrder("order-1"),
+      draftOrder("order-2"),
+      draftOrder("order-3"),
+    ]);
+    const second = renderHook(() => useCashier());
+    await act(async () => {
+      await second.result.current.fetchSalesOrders({ page: 1, limit: 100 });
+    });
+
+    expect(
+      second.result.current.salesOrders.map((order) => order.serviceType)
+    ).toEqual(["DINE_IN", "PICK_UP", "PICK_UP"]);
   });
 });

@@ -61,6 +61,53 @@ import {
 } from "@/lib/pos/activeLocation";
 import { findOpenTableSession } from "@/lib/pos/tableSession";
 
+/**
+ * Creating a sales order cannot carry a service type, so the API answers
+ * DINE_IN for a pick-up or take-away draft. Remember the type each order was
+ * opened with; keeping it in storage means a reload, a new browser tab, or a
+ * second visit to the cashier still counts the order where it was opened.
+ */
+const OPENED_SERVICE_TYPES_KEY = "pos:opened-service-types:v1";
+const MAX_OPENED_SERVICE_TYPES = 200;
+
+const readOpenedServiceTypes = (): Map<string, ServiceType> => {
+  try {
+    const raw = window.localStorage.getItem(OPENED_SERVICE_TYPES_KEY);
+    if (!raw) return new Map();
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const allowed = new Set<ServiceType>([
+      "TABLE",
+      "DINE_IN",
+      "TAKE_AWAY",
+      "DELIVERY",
+      "PICK_UP",
+    ]);
+    return new Map(
+      Object.entries(parsed).filter((entry): entry is [string, ServiceType] =>
+        allowed.has(entry[1] as ServiceType)
+      )
+    );
+  } catch {
+    return new Map();
+  }
+};
+
+const writeOpenedServiceTypes = (types: Map<string, ServiceType>) => {
+  try {
+    while (types.size > MAX_OPENED_SERVICE_TYPES) {
+      const oldest = types.keys().next().value;
+      if (!oldest) break;
+      types.delete(oldest);
+    }
+    window.localStorage.setItem(
+      OPENED_SERVICE_TYPES_KEY,
+      JSON.stringify(Object.fromEntries(types))
+    );
+  } catch {
+    // Storage can be blocked; the in-memory map still works for this session.
+  }
+};
+
 interface UseCashierReturn {
   products: Product[];
   inventoryLocations: InventoryLocation[];
@@ -230,7 +277,9 @@ export function useCashier(): UseCashierReturn {
    * and the order cannot be found where it was opened. Remember the type the
    * till opened it with until the order is settled.
    */
-  const openedServiceTypes = useRef(new Map<string, ServiceType>());
+  const openedServiceTypes = useRef<Map<string, ServiceType>>(
+    readOpenedServiceTypes()
+  );
 
   const withOpenedServiceType = useCallback((order: SalesOrder): SalesOrder => {
     const opened = openedServiceTypes.current.get(order.id);
@@ -365,6 +414,7 @@ export function useCashier(): UseCashierReturn {
             order.id,
             fromApiServiceType(toApiServiceType(payload.serviceType))
           );
+          writeOpenedServiceTypes(openedServiceTypes.current);
         }
         const created = withOpenedServiceType(order);
         setSalesOrders((prev) => [created, ...prev]);
