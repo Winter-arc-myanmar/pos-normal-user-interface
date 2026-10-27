@@ -63,10 +63,9 @@ import {
 import { findOpenTableSession } from "@/lib/pos/tableSession";
 
 /**
- * Creating a sales order cannot carry a service type, so the API answers
- * DINE_IN for a pick-up or take-away draft. Remember the type each order was
- * opened with; keeping it in storage means a reload, a new browser tab, or a
- * second visit to the cashier still counts the order where it was opened.
+ * Orders created before the backend stored a draft's service type come back
+ * with none, which reads as DINE_IN. Remember the type each order was opened
+ * with so those drafts still count where they were opened.
  */
 const OPENED_SERVICE_TYPES_KEY = "pos:opened-service-types:v1";
 const MAX_OPENED_SERVICE_TYPES = 200;
@@ -277,10 +276,8 @@ export function useCashier(): UseCashierReturn {
   /**
    * The service type each open order was started with on this till.
    *
-   * Creating a sales order cannot carry a service type (only checkout can), so
-   * the API answers DINE_IN for a pick-up or take-away draft. Reading the order
-   * back would then move it to the dine-in tab: the pick-up count drops to zero
-   * and the order cannot be found where it was opened. Remember the type the
+   * A draft opened before the backend stored its service type reads back as
+   * DINE_IN, which would move it off the pick-up tab. Remember the type the
    * till opened it with until the order is settled.
    */
   const openedServiceTypes = useRef<Map<string, ServiceType>>(

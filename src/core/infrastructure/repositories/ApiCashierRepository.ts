@@ -1291,6 +1291,9 @@ export class ApiCashierRepository implements ICashierRepository {
         totalTax: payload.totalTax,
         grandTotal: payload.grandTotal,
         status: payload.status,
+        serviceType: payload.serviceType
+          ? toApiServiceType(payload.serviceType)
+          : undefined,
       }
     );
     const item = unwrap(response);

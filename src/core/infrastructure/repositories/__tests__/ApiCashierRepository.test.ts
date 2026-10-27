@@ -587,7 +587,7 @@ describe("ApiCashierRepository", () => {
     });
   });
 
-  it("creates a sales order without serviceType", async () => {
+  it("creates a sales order with its service type", async () => {
     const post = vi.fn().mockResolvedValue({
       data: {
         id: "order-1",
@@ -621,6 +621,7 @@ describe("ApiCashierRepository", () => {
       totalTax: undefined,
       grandTotal: undefined,
       status: "DRAFT",
+      serviceType: "TAKEAWAY",
     });
     expect(order.serviceType).toBe("TAKE_AWAY");
   });
