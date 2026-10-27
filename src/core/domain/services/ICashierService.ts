@@ -32,6 +32,7 @@ import {
   UpdateProductDTO,
   UpdateProductVariantDTO,
   UpdateTableSessionStateDTO,
+  TableSeatingChangeDTO,
   UpdateTipPoolDTO,
   UpdateWaitlistEntryDTO,
   UpdateSalesOrderLineDTO,
@@ -134,6 +135,10 @@ export interface ICashierService {
   updateTableSessionState(
     sessionId: string,
     payload: UpdateTableSessionStateDTO
+  ): Promise<TableSession>;
+  changeTableSeating(
+    sessionId: string,
+    change: TableSeatingChangeDTO
   ): Promise<TableSession>;
   addTableSessionLine(
     sessionId: string,

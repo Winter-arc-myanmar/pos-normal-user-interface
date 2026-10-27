@@ -11,6 +11,7 @@ import {
   OrderStatus,
   ServiceType,
   SplitPaymentTenderDTO,
+  TableSeatingChangeDTO,
   TableSessionState,
   toApiServiceType,
 } from "@/core/application/dtos/CashierDTO";
@@ -27,6 +28,7 @@ import { useSalesOrderManagement } from "@/core/presentation/hooks/useSalesOrder
 import { CashierBoard } from "./cashier/CashierBoard";
 import { MultiOrderingView } from "./cashier/MultiOrderingView";
 import { OrderPanel } from "./cashier/OrderPanel";
+import { TableSeatingDialog } from "./cashier/TableSeatingDialog";
 import { PaymentView } from "./cashier/PaymentView";
 import { ProductMenu } from "./cashier/ProductMenu";
 import { TableChargesBar } from "./cashier/TableChargesBar";
@@ -124,6 +126,7 @@ export function CashierPage() {
     openTableSession,
     checkoutTableSession,
     updateTableSessionState,
+    changeTableSeating,
     fireToKds,
     getLatestSessionByTableId,
     selectOrder,
@@ -191,6 +194,9 @@ export function CashierPage() {
   const [directCartLines, setDirectCartLines] = useState<typeof selectedOrderLines>([]);
   const [isDirectCheckoutMode, setIsDirectCheckoutMode] = useState(false);
   const [activeTableId, setActiveTableId] = useState<string | null>(null);
+  const [seatingMode, setSeatingMode] = useState<"move" | "combine" | null>(
+    null
+  );
   const [tableOrderIds, setTableOrderIds] = useState<string[]>([]);
   const [multiOrderLines, setMultiOrderLines] = useState<
     Record<string, SalesOrderLine[]>
@@ -442,6 +448,14 @@ export function CashierPage() {
             (table) => table.id === selectedOrderSession.tableId
           ) || null
         : null,
+    [diningTables, selectedOrderSession]
+  );
+
+  const joinedOrderTables = useMemo(
+    () =>
+      (selectedOrderSession?.joinedTableIds ?? [])
+        .map((tableId) => diningTables.find((table) => table.id === tableId))
+        .filter((table): table is (typeof diningTables)[number] => Boolean(table)),
     [diningTables, selectedOrderSession]
   );
 
@@ -2538,6 +2552,47 @@ export function CashierPage() {
     }
   };
 
+  const handleSeatingChange = async (change: TableSeatingChangeDTO) => {
+    const session = selectedOrderSession;
+    if (!session) return;
+    const tableNumber = (tableId: string) =>
+      diningTables.find((table) => table.id === tableId)?.tableNumber || "";
+    setLocalError(null);
+    setNotice(null);
+    try {
+      await changeTableSeating(session.id, change);
+      setSeatingMode(null);
+      if (change.kind === "move") {
+        // This till's extra orders for the table go with the guests.
+        writeTableOrderIds(change.tableId, readTableOrderIds(session.tableId));
+        clearTableOrderIds(session.tableId);
+        if (activeTableId) setActiveTableId(change.tableId);
+        setNotice(
+          t("cashier.seating.moved", { table: tableNumber(change.tableId) })
+        );
+        return;
+      }
+      if (change.kind === "merge") {
+        if (selectedOrder) await selectOrderById(selectedOrder.id);
+        await refreshMultiOrderLines(tableOrderIds);
+        setNotice(t("cashier.seating.combined"));
+        return;
+      }
+      setNotice(
+        t(
+          change.kind === "join"
+            ? "cashier.seating.joined"
+            : "cashier.seating.released",
+          { table: tableNumber(change.tableId) }
+        )
+      );
+    } catch (caught) {
+      setLocalError(
+        caught instanceof Error ? caught.message : t("cashier.seating.failed")
+      );
+    }
+  };
+
   const handlePickup = async () => {
     if (!selectedOrder) return;
     setLocalError(null);
@@ -2708,7 +2763,33 @@ export function CashierPage() {
         onPickup={() => void handlePickup()}
         onTableStatusChange={(status) => void handleTableStatusChange(status)}
         onSessionStateChange={(state) => void handleSessionStateChange(state)}
+        joinedTables={joinedOrderTables}
+        onChangeTable={
+          selectedOrderSession && !isSettledSalesOrder(selectedOrder)
+            ? () => setSeatingMode("move")
+            : undefined
+        }
+        onCombineTables={
+          selectedOrderSession && !isSettledSalesOrder(selectedOrder)
+            ? () => setSeatingMode("combine")
+            : undefined
+        }
+        onReleaseTable={(tableId) =>
+          void handleSeatingChange({ kind: "release", tableId })
+        }
       />
+
+      {seatingMode && selectedOrderSession ? (
+        <TableSeatingDialog
+          mode={seatingMode}
+          session={selectedOrderSession}
+          tables={diningTables}
+          sessions={tableSessions}
+          isBusy={isLoading}
+          onConfirm={(change) => void handleSeatingChange(change)}
+          onClose={() => setSeatingMode(null)}
+        />
+      ) : null}
 
       <main className="h-full min-h-0 min-w-0 overflow-hidden">
         {activeView === "menu" ? (

@@ -226,7 +226,13 @@ export function CashierBoard({
                           className="mb-4 max-w-[90%] truncate text-[11px] font-semibold text-sky-700"
                           title={t("cashier.orderPanel.sessionState")}
                         >
-                          {session.sessionState}
+                          {session.tableId !== table.id
+                            ? t("cashier.seating.withTable", {
+                                table:
+                                  tables.find((item) => item.id === session.tableId)
+                                    ?.tableNumber || "",
+                              })
+                            : session.sessionState}
                         </span>
                       ) : null}
                       {orderCount > 1 ? (

@@ -337,6 +337,8 @@ export class TableSession {
   sessionState!: "SEATED" | "ORDERING" | "SERVED" | "PAYMENT_PENDING" | "CLOSED";
   posRegisterId?: string;
   openedByPosSessionId?: string;
+  /** Tables pushed together with this one for the same party and bill. */
+  joinedTableIds?: string[];
 
   constructor(data: Partial<TableSession>) {
     Object.assign(this, data);

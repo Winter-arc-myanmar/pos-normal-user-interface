@@ -3,6 +3,7 @@ type TableSessionLike = {
   closedAt?: string | null;
   sessionState?: string | null;
   openedAt?: string | null;
+  joinedTableIds?: string[];
 };
 
 export function normalizeDiningTableStatus(status?: string | null): string {
@@ -29,7 +30,10 @@ export function findOpenTableSession<T extends TableSessionLike>(
 ): T | undefined {
   return sessions
     .filter(
-      (session) => session.tableId === tableId && isOpenTableSession(session)
+      (session) =>
+        (session.tableId === tableId ||
+          Boolean(session.joinedTableIds?.includes(tableId))) &&
+        isOpenTableSession(session)
     )
     .sort(
       (left, right) =>
