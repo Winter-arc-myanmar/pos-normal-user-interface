@@ -707,6 +707,59 @@ describe("ApiCashierRepository", () => {
     });
   });
 
+  it("calls the seating endpoints and reads joined tables back", async () => {
+    const session = {
+      data: {
+        id: "session-1",
+        tableId: "table-5",
+        salesOrderId: "order-1",
+        sessionState: "ORDERING",
+        joinedTables: [{ sessionId: "session-1", tableId: "table-6" }],
+      },
+    };
+    const post = vi.fn().mockResolvedValue(session);
+    const del = vi.fn().mockResolvedValue(session);
+    const repository = new ApiCashierRepository({
+      post,
+      delete: del,
+    } as unknown as HttpClient);
+
+    const moved = await repository.changeTableSeating("session-1", {
+      kind: "move",
+      tableId: "table-9",
+    });
+    expect(post).toHaveBeenLastCalledWith("/api/v1/table-sessions/session-1/move", {
+      tableId: "table-9",
+    });
+    expect(moved.joinedTableIds).toEqual(["table-6"]);
+
+    await repository.changeTableSeating("session-1", {
+      kind: "merge",
+      sourceSessionId: "session-2",
+      keepTable: true,
+    });
+    expect(post).toHaveBeenLastCalledWith("/api/v1/table-sessions/session-1/merge", {
+      sourceSessionId: "session-2",
+      keepTable: true,
+    });
+
+    await repository.changeTableSeating("session-1", {
+      kind: "join",
+      tableId: "table-6",
+    });
+    expect(post).toHaveBeenLastCalledWith("/api/v1/table-sessions/session-1/tables", {
+      tableId: "table-6",
+    });
+
+    await repository.changeTableSeating("session-1", {
+      kind: "release",
+      tableId: "table-6",
+    });
+    expect(del).toHaveBeenCalledWith(
+      "/api/v1/table-sessions/session-1/tables/table-6"
+    );
+  });
+
   it("keeps table status and closed sessions from being misread", async () => {
     const get = vi.fn().mockImplementation((url: string) => {
       if (String(url).includes("dining-tables")) {

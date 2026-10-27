@@ -35,6 +35,7 @@ import {
   UpdateProductVariantDTO,
   UpdateDiningTableDTO,
   UpdateTableSessionStateDTO,
+  TableSeatingChangeDTO,
   UpdateTipPoolDTO,
   UpdateSalesOrderLineDTO,
   UpdateWaitlistEntryDTO,
@@ -403,6 +404,21 @@ export class CashierService implements ICashierService {
   ): Promise<TableSession> {
     if (!sessionId?.trim()) throw new Error("Session ID is required");
     return this.cashierRepository.updateTableSessionState(sessionId, payload);
+  }
+
+  async changeTableSeating(
+    sessionId: string,
+    change: TableSeatingChangeDTO
+  ): Promise<TableSession> {
+    if (!sessionId?.trim()) throw new Error("Session ID is required");
+    if (change.kind === "merge") {
+      if (!change.sourceSessionId?.trim()) {
+        throw new Error("Choose the table to combine");
+      }
+    } else if (!change.tableId?.trim()) {
+      throw new Error("Choose a table");
+    }
+    return this.cashierRepository.changeTableSeating(sessionId, change);
   }
 
   async addTableSessionLine(

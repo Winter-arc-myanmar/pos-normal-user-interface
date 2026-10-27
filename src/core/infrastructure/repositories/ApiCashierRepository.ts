@@ -34,6 +34,7 @@ import {
   UpdateProductDTO,
   UpdateProductVariantDTO,
   UpdateTableSessionStateDTO,
+  TableSeatingChangeDTO,
   UpdateSalesOrderLineDTO,
   UpdateTipPoolDTO,
   UpdateWaitlistEntryDTO,
@@ -852,6 +853,11 @@ const toTableSession = (
     openedByPosSessionId: item.openedByPosSessionId
       ? String(item.openedByPosSessionId)
       : undefined,
+    joinedTableIds: Array.isArray(item.joinedTables)
+      ? item.joinedTables
+          .map((joined) => nestedId(asRecord(joined)?.tableId))
+          .filter(Boolean)
+      : [],
   });
 
 const toDiningTableSession = (value: unknown): DiningTableActiveSession | null => {
@@ -1615,6 +1621,36 @@ export class ApiCashierRepository implements ICashierRepository {
     );
     const item = unwrap(response);
     return toTableSession(item, payload.sessionState);
+  }
+
+  async changeTableSeating(
+    sessionId: string,
+    change: TableSeatingChangeDTO
+  ): Promise<TableSession> {
+    const endpoints = API_ENDPOINTS.TABLE_SESSIONS;
+    const response =
+      change.kind === "move"
+        ? await this.httpClient.post<ApiEnvelope<Record<string, unknown>>>(
+            endpoints.MOVE(sessionId),
+            { tableId: change.tableId }
+          )
+        : change.kind === "merge"
+          ? await this.httpClient.post<ApiEnvelope<Record<string, unknown>>>(
+              endpoints.MERGE(sessionId),
+              {
+                sourceSessionId: change.sourceSessionId,
+                keepTable: change.keepTable,
+              }
+            )
+          : change.kind === "join"
+            ? await this.httpClient.post<ApiEnvelope<Record<string, unknown>>>(
+                endpoints.TABLES(sessionId),
+                { tableId: change.tableId }
+              )
+            : await this.httpClient.delete<ApiEnvelope<Record<string, unknown>>>(
+                endpoints.TABLE(sessionId, change.tableId)
+              );
+    return toTableSession(unwrap(response));
   }
 
   async addTableSessionLine(

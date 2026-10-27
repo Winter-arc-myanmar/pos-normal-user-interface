@@ -314,6 +314,13 @@ export interface UpdateTableSessionStateDTO {
   sessionState: TableSessionState;
 }
 
+/** Guests changing places: another table, two bills combined, tables joined. */
+export type TableSeatingChangeDTO =
+  | { kind: "move"; tableId: string }
+  | { kind: "merge"; sourceSessionId: string; keepTable: boolean }
+  | { kind: "join"; tableId: string }
+  | { kind: "release"; tableId: string };
+
 export type TableWarningLevel = "OK" | "WARNING" | "CRITICAL";
 
 export interface TableWarningPolicyDTO {

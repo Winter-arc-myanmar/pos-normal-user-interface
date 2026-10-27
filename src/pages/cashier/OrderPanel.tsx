@@ -104,6 +104,11 @@ interface OrderPanelProps {
   onPickup: () => void;
   onTableStatusChange: (status: DiningTableStatus) => void;
   onSessionStateChange: (state: TableSessionState) => void;
+  /** Tables pushed together with this one for the same party. */
+  joinedTables?: DiningTable[];
+  onChangeTable?: () => void;
+  onCombineTables?: () => void;
+  onReleaseTable?: (tableId: string) => void;
 }
 
 export function OrderPanel({
@@ -167,6 +172,10 @@ export function OrderPanel({
   onPickup,
   onTableStatusChange,
   onSessionStateChange,
+  joinedTables = [],
+  onChangeTable,
+  onCombineTables,
+  onReleaseTable,
 }: OrderPanelProps) {
   const { t } = useTranslation();
   const [confirmCancelOrder, setConfirmCancelOrder] = useState(false);
@@ -236,7 +245,10 @@ export function OrderPanel({
                 </p>
                 {selectedTable ? (
                   <p className="text-xs text-slate-500">
-                    {t("cashier.table")} {selectedTable.tableNumber}
+                    {t("cashier.table")}{" "}
+                    {[selectedTable, ...joinedTables]
+                      .map((table) => table.tableNumber)
+                      .join(" + ")}
                   </p>
                 ) : null}
               </div>
@@ -551,6 +563,52 @@ export function OrderPanel({
                     ))}
                   </select>
                 </label>
+              ) : null}
+            </div>
+          ) : null}
+          {selectedSession && onChangeTable && onCombineTables ? (
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  disabled={isLoading}
+                  onClick={onChangeTable}
+                  className="min-h-9 rounded border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-800 hover:border-blue-500 disabled:opacity-50"
+                >
+                  {t("cashier.seating.changeTable")}
+                </button>
+                <button
+                  type="button"
+                  disabled={isLoading}
+                  onClick={onCombineTables}
+                  className="min-h-9 rounded border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-800 hover:border-blue-500 disabled:opacity-50"
+                >
+                  {t("cashier.seating.combine")}
+                </button>
+              </div>
+              {joinedTables.length && onReleaseTable ? (
+                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                  <span className="text-slate-500">
+                    {t("cashier.seating.joinedTables")}:
+                  </span>
+                  {joinedTables.map((table) => (
+                    <button
+                      key={table.id}
+                      type="button"
+                      disabled={isLoading}
+                      onClick={() => onReleaseTable(table.id)}
+                      title={t("cashier.seating.release", {
+                        table: table.tableNumber,
+                      })}
+                      aria-label={t("cashier.seating.release", {
+                        table: table.tableNumber,
+                      })}
+                      className="rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 font-semibold text-slate-700 hover:border-red-400 hover:text-red-600 disabled:opacity-50"
+                    >
+                      {table.tableNumber} ×
+                    </button>
+                  ))}
+                </div>
               ) : null}
             </div>
           ) : null}

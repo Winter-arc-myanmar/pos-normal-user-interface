@@ -19,6 +19,17 @@ describe("isOpenTableSession", () => {
     expect(isOpenTableSession(null)).toBe(false);
   });
 
+  it("finds the party a table is joined to", () => {
+    const party = {
+      tableId: "table-5",
+      joinedTableIds: ["table-6"],
+      sessionState: "ORDERING",
+      openedAt: "2026-10-27T12:00:00.000Z",
+    };
+    expect(findOpenTableSession([party], "table-6")).toBe(party);
+    expect(findOpenTableSession([party], "table-7")).toBeUndefined();
+  });
+
   it("prefers an older open session over a later closed one", () => {
     expect(
       findOpenTableSession(

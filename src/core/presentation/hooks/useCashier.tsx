@@ -26,6 +26,7 @@ import {
   TipPoolFilterDTO,
   UpdateSalesOrderLineDTO,
   UpdateTableSessionStateDTO,
+  TableSeatingChangeDTO,
   UpdateTipPoolDTO,
   UpdateWaitlistEntryDTO,
   TableWarningStatusDTO,
@@ -156,6 +157,11 @@ interface UseCashierReturn {
   updateTableSessionState: (
     sessionId: string,
     payload: UpdateTableSessionStateDTO
+  ) => Promise<TableSession>;
+  /** Moves, combines, joins or releases tables, then reloads the floor. */
+  changeTableSeating: (
+    sessionId: string,
+    change: TableSeatingChangeDTO
   ) => Promise<TableSession>;
   fetchDiscountReasons: () => Promise<void>;
   fetchVoidReasons: () => Promise<void>;
@@ -1182,6 +1188,36 @@ export function useCashier(): UseCashierReturn {
     [cashierService, clearError]
   );
 
+  const changeTableSeating = useCallback(
+    async (sessionId: string, change: TableSeatingChangeDTO) => {
+      setIsLoading(true);
+      clearError();
+      try {
+        const updated = await cashierService.changeTableSeating(sessionId, change);
+        const [tables, sessions] = await Promise.all([
+          cashierService.getDiningTables({ page: 1, limit: 200 }),
+          cashierService.getTableSessions({
+            page: 1,
+            limit: 200,
+            sortBy: "openedAt",
+            sortOrder: "desc",
+          }),
+        ]);
+        setDiningTables(tables);
+        setTableSessions(sessions);
+        return updated;
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to change the table";
+        setError(message);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [cashierService, clearError]
+  );
+
   const selectOrderById = useCallback(
     async (orderId: string) => {
       setIsLoading(true);
@@ -1512,6 +1548,7 @@ export function useCashier(): UseCashierReturn {
       refreshDiningTableStatus,
       updateDiningTableStatus,
       updateTableSessionState,
+      changeTableSeating,
       fetchWaitlist,
       createWaitlistEntry,
       updateWaitlistEntry,
@@ -1592,6 +1629,7 @@ export function useCashier(): UseCashierReturn {
       refreshDiningTableStatus,
       updateDiningTableStatus,
       updateTableSessionState,
+      changeTableSeating,
       fetchWaitlist,
       createWaitlistEntry,
       updateWaitlistEntry,
