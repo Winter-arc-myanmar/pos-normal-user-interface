@@ -18,15 +18,34 @@ jobs:
   ci:
     name: Build and test
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Check out source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
 
+      - name: Validate deployment flow and Compose configuration
+        run: |
+          bash -n scripts/deploy-production.sh
+          node --test scripts/deploy-production.test.cjs
+          docker compose --env-file .env.docker.example config --quiet
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
       - name: Compile application in the production Node environment
-        run: docker build --target build --build-arg VITE_API_URL=https://apivision.winterarc.asia -t vision-pos-ci .
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: build
+          load: true
+          tags: vision-pos-ci:latest
+          build-args: VITE_API_URL=https://apivision.winterarc.asia
+          cache-from: |
+            type=gha,scope=vision-pos-build
+            type=gha,scope=vision-pos-runtime
+          cache-to: type=gha,scope=vision-pos-build,mode=max
 
       # Existing cashier and Burmese locale tests fail on the baseline main.
       # Remove continue-on-error after those application failures are fixed.
@@ -43,10 +62,61 @@ jobs:
           echo "Review the test step logs. The production image build remains a required gate." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Validate complete production image and Nginx configuration
-        run: docker build --build-arg VITE_API_URL=https://apivision.winterarc.asia -t vision-pos-ci-runtime .
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          load: true
+          tags: vision-pos-ci-runtime:latest
+          build-args: VITE_API_URL=https://apivision.winterarc.asia
+          cache-from: |
+            type=gha,scope=vision-pos-runtime
+            type=gha,scope=vision-pos-build
+          cache-to: type=gha,scope=vision-pos-runtime,mode=max
 
       - name: Validate Yankin production image and backend configuration
-        run: docker build --build-arg VITE_API_URL=https://api1.mmlnkits.com -t yankinfoodhouse-ci-runtime .
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          load: true
+          tags: yankinfoodhouse-ci-runtime:latest
+          build-args: VITE_API_URL=https://api1.mmlnkits.com
+          cache-from: |
+            type=gha,scope=yankin-runtime
+            type=gha,scope=vision-pos-runtime
+            type=gha,scope=vision-pos-build
+          cache-to: type=gha,scope=yankin-runtime,mode=max
+
+      - name: Smoke test both production containers with VPS resource limits
+        run: |
+          set -euo pipefail
+          cleanup() { docker rm -f vision-pos-smoke >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          for site in privatevip yankin; do
+            image=vision-pos-ci-runtime:latest
+            upstream=https://apivision.winterarc.asia
+            if [[ "$site" == yankin ]]; then
+              image=yankinfoodhouse-ci-runtime:latest
+              upstream=https://api1.mmlnkits.com
+            fi
+            docker run -d --name vision-pos-smoke --cpus 0.5 --memory 128m \
+              --pids-limit 64 -e "API_UPSTREAM=$upstream" "$image"
+            status=starting
+            for attempt in {1..30}; do
+              status=$(docker inspect --format '{{.State.Health.Status}}' vision-pos-smoke)
+              [[ "$status" == healthy ]] && break
+              sleep 2
+            done
+            if [[ "$status" != healthy ]]; then
+              docker logs vision-pos-smoke
+              echo "::error::$site container did not become healthy within 60 seconds."
+              exit 1
+            fi
+            docker exec vision-pos-smoke nginx -t
+            docker exec vision-pos-smoke wget -q -O /dev/null http://127.0.0.1/login
+            docker exec vision-pos-smoke sh -ec \
+              'test -n "$(find /usr/share/nginx/html/assets -name "*.gz" -print -quit)"'
+            cleanup
+          done
 
   deploy:
     name: Deploy main to PrivateVIP and Yankin

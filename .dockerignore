@@ -14,7 +14,6 @@ coverage
 # Local environment and secrets (never bake these into the image).
 .env
 .env.*
-!.env.docker.example
 
 # Logs and caches.
 *.log
@@ -30,3 +29,7 @@ docs
 *.md
 _ref-wmfe
 vercel.json
+.github
+docker-compose*.yml
+docker-compose*.yaml
+*.tsbuildinfo
