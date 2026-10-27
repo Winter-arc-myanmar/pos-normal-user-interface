@@ -75,6 +75,34 @@ const promotion: RunningPromotion = {
 };
 
 describe("OrderPanel", () => {
+  it.each([
+    [true, false, "11.00"],
+    [true, true, "10.00"],
+    [false, false, "10.00"],
+    [false, true, "9.00"],
+  ])("displays row amounts for includeTax=%s inclusive=%s", (includeTax, taxInclusive, expected) => {
+    render(<OrderPanel {...defaultProps} includeTax={includeTax}
+      selectedOrderLines={[new SalesOrderLine({ ...line, taxAmount: "1.0000", taxInclusive })]} />);
+    expect(screen.getByRole("button", { name: "cashier.orderPanel.expandItem" })).toHaveTextContent(expected);
+  });
+
+  it("uses bill-priced lines for display without changing action payloads", () => {
+    const onRemoveLine = vi.fn();
+    render(<OrderPanel {...defaultProps}
+      selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
+      billLines={[new SalesOrderLine({ ...line, lineDiscount: "2.0000" })]}
+      onRemoveLine={onRemoveLine} />);
+    expect(screen.getByRole("button", { name: "cashier.orderPanel.expandItem" })).toHaveTextContent("8.00");
+    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.expandItem" }));
+    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.remove" }));
+    expect(onRemoveLine).toHaveBeenCalledWith(line);
+  });
+
+  it("blocks finance printing while a bill quote is unavailable", () => {
+    render(<OrderPanel {...defaultProps} isPayView checkoutBlocked onPrintFinance={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "cashier.printFinance" })).toBeDisabled();
+  });
+
   it("starts with compact summaries and reveals details only when expanded", async () => {
     const user = userEvent.setup();
     render(

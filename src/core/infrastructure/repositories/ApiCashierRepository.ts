@@ -246,6 +246,10 @@ const normalizeTableSessionCheckoutPayload = (
 ): Record<string, unknown> => ({
   posSessionId: payload.posSessionId,
   payments: normalizePaymentEntriesAsNumbers(payload.payments),
+  ...(payload.includeTax !== undefined ? { includeTax: payload.includeTax } : {}),
+  ...(payload.includeServiceCharge !== undefined
+    ? { includeServiceCharge: payload.includeServiceCharge }
+    : {}),
   ...(payload.tipAmount !== undefined ? { tipAmount: payload.tipAmount } : {}),
   ...(payload.serviceCharge !== undefined
     ? { serviceCharge: payload.serviceCharge }
@@ -264,6 +268,10 @@ const normalizeCheckoutPayload = (
   locationId: payload.locationId,
   salesChannel: payload.salesChannel,
   serviceType: payload.serviceType,
+  ...(payload.includeTax !== undefined ? { includeTax: payload.includeTax } : {}),
+  ...(payload.includeServiceCharge !== undefined
+    ? { includeServiceCharge: payload.includeServiceCharge }
+    : {}),
   ...(payload.customerId ? { customerId: payload.customerId } : {}),
   ...(payload.posSessionId ? { posSessionId: payload.posSessionId } : {}),
   ...(payload.lineStatus ? { lineStatus: payload.lineStatus } : {}),

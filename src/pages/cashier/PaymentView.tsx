@@ -31,6 +31,14 @@ interface PaymentViewProps {
   paymentAmount: string;
   total: string;
   subtotal?: string;
+  billOptions?: {
+    includeTax: boolean;
+    includeServiceCharge: boolean;
+    isLoading: boolean;
+    disabled?: boolean;
+    error?: string;
+    onChange: (field: "includeTax" | "includeServiceCharge", value: boolean) => void;
+  };
   isSplitMode: boolean;
   splitTenders: SplitPaymentTenderDTO[];
   isLoading?: boolean;
@@ -125,6 +133,7 @@ export function PaymentView({
   paymentAmount,
   total,
   subtotal,
+  billOptions,
   isSplitMode,
   splitTenders,
   isLoading,
@@ -139,6 +148,7 @@ export function PaymentView({
   const { t } = useTranslation();
   const [confirmClose, setConfirmClose] = useState(false);
   const [cardLookupOpen, setCardLookupOpen] = useState(true);
+  const [optionsOpen, setOptionsOpen] = useState(false);
   const remaining = remainingReceivable(total, isSplitMode ? splitTenders : []);
   const displayRemaining = isSplitMode ? remaining : Number(total || 0);
   const splitCovered =
@@ -178,6 +188,10 @@ export function PaymentView({
         setConfirmClose(false);
         return;
       }
+      if (optionsOpen) {
+        setOptionsOpen(false);
+        return;
+      }
       if (
         showMemberCardLookup &&
         cardLookupOpen &&
@@ -190,7 +204,7 @@ export function PaymentView({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [cardLookupOpen, confirmClose, requestClosePay, showMemberCardLookup]);
+  }, [cardLookupOpen, confirmClose, optionsOpen, requestClosePay, showMemberCardLookup]);
 
   return (
     <section className="grid h-full min-h-0 grid-cols-1 grid-rows-[minmax(0,1fr)_auto_auto] overflow-hidden bg-[#202020] text-white min-[1100px]:grid-cols-[minmax(11rem,16rem)_4.5rem_minmax(0,1fr)] min-[1100px]:grid-rows-none">
@@ -295,6 +309,39 @@ export function PaymentView({
         ) : (
           <p className="mt-3 text-xs text-slate-400">{t("cashier.payment.splitRailHint")}</p>
         )}
+        {billOptions ? (
+          <div className="mt-3 shrink-0">
+            <button
+              type="button"
+              aria-expanded={optionsOpen}
+              aria-controls="payment-bill-options"
+              className="flex min-h-11 w-full items-center justify-between rounded border border-slate-600 bg-slate-800 px-3 text-sm font-semibold text-white transition hover:bg-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
+              onClick={() => setOptionsOpen((open) => !open)}
+            >
+              {t("cashier.payment.options")}
+              <span aria-hidden="true">{optionsOpen ? "−" : "+"}</span>
+            </button>
+            {optionsOpen ? (
+              <fieldset id="payment-bill-options" className="mt-2 rounded border border-slate-600 bg-slate-900 p-2" disabled={billOptions.disabled ?? isLoading}>
+                <legend className="sr-only">{t("cashier.payment.options")}</legend>
+                {(["includeTax", "includeServiceCharge"] as const).map((field) => (
+                  <label key={field} className="flex min-h-11 cursor-pointer items-center gap-3 px-1 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={billOptions[field]}
+                      onChange={(event) => billOptions.onChange(field, event.target.checked)}
+                      className="h-5 w-5 accent-blue-500"
+                    />
+                    {t(`cashier.payment.${field}`)}
+                  </label>
+                ))}
+                <p className="px-1 pb-1 text-xs text-slate-400">{t("cashier.payment.optionsHint")}</p>
+              </fieldset>
+            ) : null}
+            {billOptions.isLoading ? <p role="status" className="mt-2 text-xs text-blue-200">{t("cashier.payment.updatingBill")}</p> : null}
+            {billOptions.error ? <p role="alert" className="mt-2 text-xs text-red-300">{t("cashier.payment.billOptionsError")}</p> : null}
+          </div>
+        ) : null}
       </aside>
 
       <div className="order-2 flex min-h-0 flex-row items-stretch gap-1 overflow-x-auto border-t border-white/10 bg-[#171717] p-1 min-[1100px]:order-none min-[1100px]:flex-col min-[1100px]:overflow-y-auto min-[1100px]:border-r min-[1100px]:border-t-0">
@@ -305,8 +352,9 @@ export function PaymentView({
           }}
           aria-pressed={isSplitMode}
           aria-label={t("cashier.payment.split")}
+          disabled={isLoading}
           className={[
-            "flex min-h-12 min-w-0 flex-1 flex-row items-center justify-center gap-2 rounded px-2 py-2 text-[11px] font-semibold min-[1100px]:min-h-20 min-[1100px]:w-full min-[1100px]:flex-none min-[1100px]:flex-col min-[1100px]:gap-0",
+            "flex min-h-12 min-w-0 flex-1 flex-row items-center justify-center gap-2 rounded px-2 py-2 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-50 min-[1100px]:min-h-20 min-[1100px]:w-full min-[1100px]:flex-none min-[1100px]:flex-col min-[1100px]:gap-0",
             isSplitMode
               ? "cursor-default bg-blue-700 text-white ring-2 ring-blue-300"
               : "bg-blue-600 text-white hover:bg-blue-500",

@@ -40,6 +40,41 @@ const renderPaymentView = (
   );
 
 describe("PaymentView", () => {
+  it("opens bill options below the bill and toggles each charge independently", () => {
+    const onChange = vi.fn();
+    const onClosePay = vi.fn();
+    renderPaymentView({
+      onClosePay,
+      billOptions: { includeTax: true, includeServiceCharge: true, isLoading: false, onChange },
+    });
+    const options = screen.getByRole("button", { name: "cashier.payment.options" });
+    expect(options).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(options);
+    expect(options).toHaveAttribute("aria-expanded", "true");
+    const tax = screen.getByRole("checkbox", { name: "cashier.payment.includeTax" });
+    const service = screen.getByRole("checkbox", { name: "cashier.payment.includeServiceCharge" });
+    expect(tax).toBeChecked();
+    expect(service).toBeChecked();
+    fireEvent.click(tax);
+    expect(onChange).toHaveBeenCalledWith("includeTax", false);
+    fireEvent.click(service);
+    expect(onChange).toHaveBeenCalledWith("includeServiceCharge", false);
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(options).toHaveAttribute("aria-expanded", "false");
+    expect(onClosePay).not.toHaveBeenCalled();
+  });
+
+  it("announces quote loading and failure and prevents changes while payment is submitting", () => {
+    renderPaymentView({
+      isLoading: true,
+      billOptions: { includeTax: false, includeServiceCharge: true, isLoading: true, error: "Offline", onChange: vi.fn() },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "cashier.payment.options" }));
+    expect(screen.getByRole("status")).toHaveTextContent("cashier.payment.updatingBill");
+    expect(screen.getByRole("alert")).toHaveTextContent("cashier.payment.billOptionsError");
+    expect(screen.getByRole("checkbox", { name: "cashier.payment.includeTax" })).toBeDisabled();
+  });
+
   it("keeps payment methods scrollable when the member lookup takes vertical space", () => {
     renderPaymentView();
 

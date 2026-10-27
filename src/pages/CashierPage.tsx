@@ -41,6 +41,7 @@ import { useCardCapture } from "@/core/presentation/hooks/useCardCapture";
 import { useGuestWalletManagement } from "@/core/presentation/hooks/useGuestWalletManagement";
 import { calcLineTotals } from "@/lib/pos/checkoutCalculations";
 import { useVenueSetting } from "@/core/presentation/hooks/useVenueSetting";
+import { useBillOptions } from "@/core/presentation/hooks/useBillOptions";
 import { usePermissions } from "@/features/permissions/usePermissions";
 import {
   allocateOrderDiscountToLines,
@@ -149,6 +150,8 @@ export function CashierPage() {
     deleteOrderLine: deleteManagedOrderLine,
     updateOrder: updateManagedOrder,
     deleteOrder: deleteManagedOrder,
+    fetchOrderBill,
+    settleOrder,
   } = useSalesOrderManagement();
   const {
     activeLocationId,
@@ -174,6 +177,7 @@ export function CashierPage() {
     orderId: string;
     discountAmount: string;
     tipAmount: string;
+    billRevision: string;
     total: number;
   } | null>(null);
   const [paymentMethodId, setPaymentMethodId] = useState("");
@@ -200,6 +204,9 @@ export function CashierPage() {
   const [discountAmount, setDiscountAmount] = useState("0.0000");
   const [discountReasonId, setDiscountReasonId] = useState("");
   const [tipAmount, setTipAmount] = useState("0.0000");
+  const [billGeneration, setBillGeneration] = useState(0);
+  const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
+  const confirmingPaymentRef = useRef(false);
   const [printBillOnConfirm, setPrintBillOnConfirm] = useState(readPrintBillOnConfirm);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const paymentInputRef = useRef<HTMLInputElement>(null);
@@ -285,6 +292,7 @@ export function CashierPage() {
       setDiscountAmount("0.0000");
       setDiscountReasonId("");
       setTipAmount("0.0000");
+      setBillGeneration((generation) => generation + 1);
       setLocalError(null);
       setNotice(message);
       setSearchParams({ view: "orders" });
@@ -595,10 +603,13 @@ export function CashierPage() {
       variantName?: string;
       quantity?: string | number;
       unitPrice?: string;
+      taxAmount?: string;
+      taxInclusive?: boolean;
       categoryId?: string;
       categoryName?: string;
       selectedModifiers?: Record<string, unknown>;
-    }>
+    }>,
+    withoutTax = false
   ) =>
     lines
       .filter((line) => !line.voidedAt)
@@ -606,7 +617,10 @@ export function CashierPage() {
         const variant = variantById[line.variantId];
         const product = variant ? productById[variant.productId] : undefined;
         const modifiers = modifierPrintText(line.selectedModifiers);
-        const unitPrice = line.unitPrice?.trim();
+        const quantity = Number(line.quantity || 1);
+        const unitPrice = withoutTax && line.taxInclusive && quantity > 0
+          ? toMoney(Number(line.unitPrice || 0) - Number(line.taxAmount || 0) / quantity)
+          : line.unitPrice?.trim();
         return {
           name: line.productName || product?.name || line.variantName || "Item",
           quantity: String(line.quantity || "1"),
@@ -656,14 +670,43 @@ export function CashierPage() {
     }, {});
   }, [displayOrderLines, variantById]);
 
+  const billRevision = JSON.stringify([selectedOrder?.grandTotal, activeOrderLines]);
+  const billOptions = useBillOptions({
+    billKey: `${isDirectCheckoutMode ? "direct" : selectedOrder?.id || "empty"}:${billGeneration}`,
+    orderId: !isDirectCheckoutMode ? selectedOrder?.id : undefined,
+    discount: discountAmount,
+    revision: billRevision,
+    fetchBill: fetchOrderBill,
+  });
+  const chooseBillOption = (field: "includeTax" | "includeServiceCharge", value: boolean) => {
+    billOptions.choose(field, value);
+    setIsSplitMode(false);
+    setSplitTenders([]);
+    setSyncedPaymentTotal(null);
+    setLocalError(null);
+  };
+
+  // Instant checkout taxes the items after allocating the bill discount.
+  const paymentBillLines = useMemo(() => {
+    if (!isDirectCheckoutMode || !billOptions.changed) return displayOrderLines;
+    const allocated = allocateOrderDiscountToLines(activeOrderLines, Number(discountAmount));
+    return activeOrderLines.map((line, index) => {
+      const variant = variantById[line.variantId];
+      const product = variant ? productById[variant.productId] : undefined;
+      return buildDirectLine({ ...line, lineDiscount: allocated[index].lineDiscount }, product, variant);
+    });
+  }, [activeOrderLines, billOptions.changed, buildDirectLine, discountAmount, displayOrderLines, isDirectCheckoutMode, productById, variantById]);
+
   const lineSubtotal = useMemo(() => {
     const backendTotal = Number(selectedOrder?.grandTotal || 0);
-    const totalLines = isDirectCheckoutMode ? activeOrderLines : displayOrderLines;
+    const totalLines = paymentBillLines;
     const lineTotal = totalLines.reduce((sum, line) => {
       const quantity = Number(line.quantity || 0);
       const unitPrice = Number(line.unitPrice || 0);
       const discount = Number(line.lineDiscount || 0);
-      const tax = line.taxInclusive ? 0 : Number(line.taxAmount || 0);
+      const tax = billOptions.includeTax
+        ? (line.taxInclusive ? 0 : Number(line.taxAmount || 0))
+        : (line.taxInclusive ? -Number(line.taxAmount || 0) : 0);
       return sum + quantity * unitPrice - discount + tax;
     }, 0);
     if (!isDirectCheckoutMode && backendTotal > 0) {
@@ -671,8 +714,8 @@ export function CashierPage() {
     }
     return lineTotal > 0 ? lineTotal : backendTotal;
   }, [
-    activeOrderLines,
-    displayOrderLines,
+    paymentBillLines,
+    billOptions.includeTax,
     isDirectCheckoutMode,
     selectedOrder?.grandTotal,
   ]);
@@ -680,10 +723,10 @@ export function CashierPage() {
   // The shop's service charge, as the server will add it: on the items after
   // discounts and before tax, with the default taxes set to apply to it.
   const { serviceCharge, serviceChargeTax } = useMemo(() => {
-    if (!serviceChargeBps || !serviceChargeOn.BAR) {
+    if (!billOptions.includeServiceCharge || !serviceChargeBps || !serviceChargeOn.BAR) {
       return { serviceCharge: 0, serviceChargeTax: 0 };
     }
-    const lines = isDirectCheckoutMode ? activeOrderLines : displayOrderLines;
+    const lines = paymentBillLines;
     const preTax =
       lines.reduce(
         (sum, line) =>
@@ -692,13 +735,15 @@ export function CashierPage() {
           Number(line.lineDiscount || 0) -
           (line.taxInclusive ? Number(line.taxAmount || 0) : 0),
         0
-      ) - Math.max(0, Number(discountAmount) || 0);
+      ) - (isDirectCheckoutMode && billOptions.changed ? 0 : Math.max(0, Number(discountAmount) || 0));
     const charge = (Math.max(0, preTax) * serviceChargeBps) / 10000;
-    return { serviceCharge: charge, serviceChargeTax: charge * serviceChargeTaxRate };
+    return { serviceCharge: charge, serviceChargeTax: billOptions.includeTax ? charge * serviceChargeTaxRate : 0 };
   }, [
-    activeOrderLines,
+    paymentBillLines,
+    billOptions.changed,
+    billOptions.includeServiceCharge,
+    billOptions.includeTax,
     discountAmount,
-    displayOrderLines,
     isDirectCheckoutMode,
     serviceChargeBps,
     serviceChargeOn.BAR,
@@ -710,9 +755,13 @@ export function CashierPage() {
       syncedPaymentTotal &&
       syncedPaymentTotal.orderId === selectedOrder?.id &&
       syncedPaymentTotal.discountAmount === discountAmount &&
-      syncedPaymentTotal.tipAmount === tipAmount
+      syncedPaymentTotal.tipAmount === tipAmount &&
+      syncedPaymentTotal.billRevision === billRevision
     ) {
       return syncedPaymentTotal.total.toFixed(4);
+    }
+    if (billOptions.bill) {
+      return toMoney(Number(billOptions.bill.grandTotal) + Math.max(0, Number(tipAmount) || 0));
     }
 
     const serverGrandTotal = !isDirectCheckoutMode
@@ -732,15 +781,19 @@ export function CashierPage() {
 
     return payableTotal({
       lineTotal: lineSubtotal,
-      orderDiscount: Number(discountAmount),
+      orderDiscount: isDirectCheckoutMode && billOptions.changed ? 0 : Number(discountAmount),
       serviceCharge: serviceCharge + serviceChargeTax,
       tipAmount: Number(tipAmount),
     }).toFixed(4);
   }, [
+    billOptions.bill,
+    billOptions.changed,
+    billRevision,
     discountAmount,
     isDirectCheckoutMode,
     lineSubtotal,
     selectedOrder?.grandTotal,
+    selectedOrder?.id,
     serviceCharge,
     serviceChargeTax,
     syncedPaymentTotal,
@@ -749,11 +802,21 @@ export function CashierPage() {
 
   const orderTax = useMemo(
     () =>
-      displayOrderLines
+      (billOptions.includeTax ? paymentBillLines
         .reduce((total, line) => total + Number(line.taxAmount || 0), 0)
-        .toFixed(4),
-    [displayOrderLines]
+        : 0).toFixed(4),
+    [billOptions.includeTax, paymentBillLines]
   );
+  const receiptTax = billOptions.bill?.totalTax ?? toMoney(Number(orderTax) + serviceChargeTax);
+  const receiptServiceCharge = billOptions.bill?.serviceCharge ?? toMoney(serviceCharge);
+  const receiptSubtotal = billOptions.bill?.subtotal ?? (billOptions.changed
+    ? toMoney(paymentBillLines.reduce((sum, line) => sum + Number(line.quantity) * Number(line.unitPrice)
+      - (!billOptions.includeTax && line.taxInclusive ? Number(line.taxAmount || 0) : 0), 0))
+    : lineSubtotal.toFixed(4));
+  const receiptDiscount = billOptions.bill?.totalDiscount ?? (billOptions.changed
+    ? toMoney(paymentBillLines.reduce((sum, line) => sum + Number(line.lineDiscount || 0), 0)
+      + (isDirectCheckoutMode ? 0 : Math.max(0, Number(discountAmount) || 0)))
+    : discountAmount);
 
   const checkoutPaymentMethods = useMemo(
     () => ensureMemberCardPaymentMethod(paymentMethods),
@@ -1632,6 +1695,7 @@ export function CashierPage() {
   };
 
   const handleCheckout = async () => {
+    if (confirmingPaymentRef.current) return;
     setLocalError(null);
     setNotice(null);
 
@@ -1640,7 +1704,12 @@ export function CashierPage() {
       return;
     }
 
+    confirmingPaymentRef.current = true;
+    setIsConfirmingPayment(true);
     try {
+      if (billOptions.isLoading || billOptions.error) {
+        throw new Error(t("cashier.payment.billOptionsError"));
+      }
       if (isSettledSalesOrder(selectedOrder)) {
         throw new Error(t("cashier.errors.orderAlreadyPaid"));
       }
@@ -1651,7 +1720,10 @@ export function CashierPage() {
 
       const orderDiscount = Math.max(0, Number(discountAmount) || 0);
       const tip = Math.max(0, Number(tipAmount) || 0);
-      if (orderDiscount > lineSubtotal + 0.009) {
+      const discountLimit = isDirectCheckoutMode && billOptions.changed
+        ? activeOrderLines.reduce((sum, line) => sum + Number(line.quantity) * Number(line.unitPrice) - Number(line.lineDiscount || 0), 0)
+        : lineSubtotal;
+      if (orderDiscount > discountLimit + 0.009) {
         throw new Error(t("cashier.errors.discountTooLarge"));
       }
       if (orderDiscount > 0 && discountReasons.length && !discountReasonId) {
@@ -1679,7 +1751,13 @@ export function CashierPage() {
         // tax and service charge. Adding the local service charge here again
         // inflated 358,050 to 509,850. Only pending checkout adjustments belong
         // on top of the refreshed authoritative total.
-        const serverRefreshedTotal = serverGrandTotal > 0
+        const refreshedBill = billOptions.changed
+          ? await fetchOrderBill(selectedOrder.id, billOptions.query)
+          : null;
+        if (refreshedBill) billOptions.acceptBill(refreshedBill);
+        const serverRefreshedTotal = refreshedBill
+          ? Number(refreshedBill.grandTotal) + tip
+          : serverGrandTotal > 0
           ? payableFromServerGrandTotal({
               serverGrandTotal,
               orderDiscount,
@@ -1690,7 +1768,8 @@ export function CashierPage() {
           syncedPaymentTotal &&
           syncedPaymentTotal.orderId === selectedOrder.id &&
           syncedPaymentTotal.discountAmount === discountAmount &&
-          syncedPaymentTotal.tipAmount === tipAmount
+          syncedPaymentTotal.tipAmount === tipAmount &&
+          syncedPaymentTotal.billRevision === billRevision
             ? syncedPaymentTotal.total
             : 0;
         // A checkout rejection is the strongest source of truth. The order GET
@@ -1709,6 +1788,7 @@ export function CashierPage() {
             orderId: selectedOrder.id,
             discountAmount,
             tipAmount,
+            billRevision,
             total: refreshedTotal,
           });
           setLocalError(
@@ -1784,14 +1864,11 @@ export function CashierPage() {
         showPrices: true,
         receiptId: selectedOrder?.orderNumber,
         ...receiptParty(true),
-        lines: printableLines(displayOrderLines),
-        subtotal: lineSubtotal.toFixed(4),
-        discount: orderDiscount > 0 ? toMoney(orderDiscount) : undefined,
-        tax:
-          Number(orderTax) + serviceChargeTax > 0
-            ? toMoney(Number(orderTax) + serviceChargeTax)
-            : undefined,
-        serviceCharge: serviceCharge > 0 ? toMoney(serviceCharge) : undefined,
+        lines: printableLines(paymentBillLines, !billOptions.includeTax),
+        subtotal: receiptSubtotal,
+        discount: Number(receiptDiscount) > 0 ? receiptDiscount : undefined,
+        tax: Number(receiptTax) > 0 ? receiptTax : undefined,
+        serviceCharge: Number(receiptServiceCharge) > 0 ? receiptServiceCharge : undefined,
         // The tip is inside the total below, so the slip says so.
         ...(tip > 0
           ? { amounts: [{ label: t("receipt.tip"), amount: toMoney(tip) }] }
@@ -1826,6 +1903,20 @@ export function CashierPage() {
           ...(tip > 0 ? { tipAmount: tip } : {}),
           ...(discountReasonId ? { discountReasonId } : {}),
           ...(orderDiscount > 0 ? { totalDiscount: orderDiscount } : {}),
+          ...(billOptions.changed ? {
+            includeTax: billOptions.includeTax,
+            includeServiceCharge: billOptions.includeServiceCharge,
+          } : {}),
+        });
+      } else if (billOptions.changed && selectedOrder && !isDirectCheckoutMode) {
+        await settleOrder(selectedOrder.id, {
+          payments: checkoutPayments,
+          posSessionId: context.posSessionId,
+          ...(tip > 0 ? { tipAmount: toMoney(tip) } : {}),
+          ...(orderDiscount > 0 ? { totalDiscount: toMoney(orderDiscount) } : {}),
+          ...(discountReasonId ? { discountReasonId } : {}),
+          includeTax: billOptions.includeTax,
+          includeServiceCharge: billOptions.includeServiceCharge,
         });
       } else if (isMultiOrderSecondary && selectedOrder) {
         for (const payment of checkoutPayments) {
@@ -1851,6 +1942,10 @@ export function CashierPage() {
           idempotencyKey: `checkout-${selectedOrder?.id || "direct"}-${Date.now()}`,
           ...(discountReasonId ? { discountReasonId } : {}),
           ...(tip > 0 ? { tipAmount: toMoney(tip) } : {}),
+          ...(billOptions.changed ? {
+            includeTax: billOptions.includeTax,
+            includeServiceCharge: billOptions.includeServiceCharge,
+          } : {}),
           items: allocateOrderDiscountToLines(activeOrderLines, orderDiscount),
           payments: checkoutPayments,
         });
@@ -1913,6 +2008,7 @@ export function CashierPage() {
             orderId: selectedOrder.id,
             discountAmount,
             tipAmount,
+            billRevision,
             total: requiredTotal,
           });
         }
@@ -1930,6 +2026,9 @@ export function CashierPage() {
         return;
       }
       setLocalError(message);
+    } finally {
+      confirmingPaymentRef.current = false;
+      setIsConfirmingPayment(false);
     }
   };
 
@@ -2138,6 +2237,7 @@ export function CashierPage() {
   };
 
   const handleOpenSplit = async () => {
+    if (billOptions.isLoading || billOptions.error || confirmingPaymentRef.current) return;
     if (requiresTableAssignment) {
       promptTableSelection();
       return;
@@ -2166,6 +2266,7 @@ export function CashierPage() {
   };
 
   const handleAddSplitTender = () => {
+    if (billOptions.isLoading || billOptions.error || confirmingPaymentRef.current) return;
     if (!paymentMethodId) {
       setLocalError(t("cashier.errors.paymentMethodRequired"));
       return;
@@ -2512,6 +2613,8 @@ export function CashierPage() {
       <OrderPanel
         selectedOrder={selectedOrder}
         selectedOrderLines={displayOrderLines}
+        billLines={paymentBillLines}
+        includeTax={billOptions.includeTax}
         products={products}
         variantsByProductId={variantsByProductId}
         paymentMethods={checkoutPaymentMethods}
@@ -2521,7 +2624,8 @@ export function CashierPage() {
         selectedTable={displayedOrderTable}
         selectedSession={selectedOrderSession}
         paymentInputRef={paymentInputRef}
-        isLoading={isLoading || isPosSessionLoading}
+        isLoading={isLoading || isPosSessionLoading || billOptions.isLoading || isConfirmingPayment}
+        checkoutBlocked={Boolean(billOptions.error)}
         canCreateOrder={isWorkspaceReady && !isPosSessionLoading}
         isDineInService={isDineInService}
         feedback={notice}
@@ -2544,7 +2648,7 @@ export function CashierPage() {
         discountAmount={discountAmount}
         discountReasonId={discountReasonId}
         discountReasons={discountReasons}
-        serviceCharge={toMoney(serviceCharge + serviceChargeTax)}
+        serviceCharge={toMoney(Number(receiptServiceCharge) + Number(billOptions.bill?.serviceChargeTax ?? serviceChargeTax))}
         tipAmount={tipAmount}
         memberCardUid={memberCardUid}
         memberPointsLabel={
@@ -2588,17 +2692,11 @@ export function CashierPage() {
             showPrices: true,
             receiptId: selectedOrder?.orderNumber,
             ...receiptParty(),
-            lines: printableLines(displayOrderLines),
-            subtotal: lineSubtotal.toFixed(4),
-            discount:
-              Number(discountAmount) > 0
-                ? toMoney(Number(discountAmount))
-                : undefined,
-            tax:
-              Number(orderTax) + serviceChargeTax > 0
-                ? toMoney(Number(orderTax) + serviceChargeTax)
-                : undefined,
-            serviceCharge: serviceCharge > 0 ? toMoney(serviceCharge) : undefined,
+            lines: printableLines(paymentBillLines, !billOptions.includeTax),
+            subtotal: receiptSubtotal,
+            discount: Number(receiptDiscount) > 0 ? receiptDiscount : undefined,
+            tax: Number(receiptTax) > 0 ? receiptTax : undefined,
+            serviceCharge: Number(receiptServiceCharge) > 0 ? receiptServiceCharge : undefined,
             ...(Number(tipAmount) > 0
               ? { amounts: [{ label: t("receipt.tip"), amount: toMoney(Number(tipAmount)) }] }
               : {}),
@@ -2681,10 +2779,18 @@ export function CashierPage() {
             selectedMethodId={paymentMethodId}
             paymentAmount={paymentAmount}
             total={orderTotal}
-            subtotal={selectedOrder?.subtotal || orderTotal}
+            subtotal={billOptions.bill?.subtotal || selectedOrder?.subtotal || orderTotal}
+            billOptions={{
+              includeTax: billOptions.includeTax,
+              includeServiceCharge: billOptions.includeServiceCharge,
+              isLoading: billOptions.isLoading,
+              disabled: isLoading || isPosSessionLoading || isConfirmingPayment,
+              error: billOptions.error,
+              onChange: chooseBillOption,
+            }}
             isSplitMode={isSplitMode}
             splitTenders={splitTenders}
-            isLoading={isLoading || isPosSessionLoading}
+            isLoading={isLoading || isPosSessionLoading || isConfirmingPayment || billOptions.isLoading || Boolean(billOptions.error)}
             memberCardLookup={{
               cardUid: memberCardUid,
               guestName: memberWallet?.guestName,

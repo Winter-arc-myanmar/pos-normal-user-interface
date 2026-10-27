@@ -2,6 +2,8 @@ import { useCallback, useState } from "react";
 import {
   CompSalesOrderLineDTO,
   CreateSalesOrderDTO,
+  SalesOrderBillDTO,
+  SalesOrderBillQueryDTO,
   SalesOrderFilterDTO,
   SalesOrderLineListResponseDTO,
   SalesOrderListResponseDTO,
@@ -28,6 +30,10 @@ interface UseSalesOrderManagementReturn {
   error: string | null;
   fetchOrders: (params?: SalesOrderFilterDTO) => Promise<SalesOrderListResponseDTO>;
   fetchOrderById: (id: string) => Promise<SalesOrder>;
+  fetchOrderBill: (
+    id: string,
+    query?: SalesOrderBillQueryDTO
+  ) => Promise<SalesOrderBillDTO>;
   createOrder: (payload: CreateSalesOrderDTO) => Promise<SalesOrder>;
   updateOrder: (id: string, payload: UpdateSalesOrderDTO) => Promise<SalesOrder>;
   deleteOrder: (id: string) => Promise<SalesOrder>;
@@ -133,6 +139,13 @@ export function useSalesOrderManagement(): UseSalesOrderManagementReturn {
       }
     },
     [clearError, salesOrderService]
+  );
+
+  // Preview callers own request state; changing shared loading here can retrigger effects.
+  const fetchOrderBill = useCallback(
+    (id: string, query?: SalesOrderBillQueryDTO) =>
+      salesOrderService.getSalesOrderBill(id, query),
+    [salesOrderService]
   );
 
   const createOrder = useCallback(
@@ -362,6 +375,7 @@ export function useSalesOrderManagement(): UseSalesOrderManagementReturn {
     error,
     fetchOrders,
     fetchOrderById,
+    fetchOrderBill,
     createOrder,
     updateOrder,
     deleteOrder,

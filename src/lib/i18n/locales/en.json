@@ -999,6 +999,12 @@
       "unavailable": "Unavailable"
     },
     "payment": {
+      "options": "Options",
+      "includeTax": "Include Tax",
+      "includeServiceCharge": "Include Service Charge",
+      "optionsHint": "Applies to this bill only. Changing options clears split tenders.",
+      "updatingBill": "Updating bill…",
+      "billOptionsError": "Unable to update the bill. Change an option to retry before paying.",
       "remaining": "Remaining receivable {{amount}}",
       "bill": "Bill",
       "subtotal": "Subtotal",

@@ -37,6 +37,7 @@ import {
 interface OrderPanelProps {
   selectedOrder: SalesOrder | null;
   selectedOrderLines: SalesOrderLine[];
+  billLines?: SalesOrderLine[];
   products: Product[];
   variantsByProductId: Record<string, ProductVariant[]>;
   paymentMethods: PaymentMethod[];
@@ -47,6 +48,8 @@ interface OrderPanelProps {
   selectedSession: TableSession | null;
   paymentInputRef: RefObject<HTMLInputElement | null>;
   isLoading: boolean;
+  checkoutBlocked?: boolean;
+  includeTax?: boolean;
   canCreateOrder?: boolean;
   isDineInService?: boolean;
   feedback?: string | null;
@@ -106,6 +109,7 @@ interface OrderPanelProps {
 export function OrderPanel({
   selectedOrder,
   selectedOrderLines,
+  billLines,
   products,
   variantsByProductId,
   paymentMethodId,
@@ -114,6 +118,8 @@ export function OrderPanel({
   selectedTable,
   selectedSession,
   isLoading,
+  checkoutBlocked = false,
+  includeTax = true,
   canCreateOrder = true,
   isDineInService = false,
   feedback,
@@ -260,10 +266,14 @@ export function OrderPanel({
               {selectedOrderLines.map((line) => {
                 const lineName = resolveLineName(line);
                 const lineVariant = resolveLineVariant(line);
+                const pricedLine = billLines?.find((entry) => entry.id === line.id) || line;
+                const tax = includeTax
+                  ? (pricedLine.taxInclusive ? 0 : Number(pricedLine.taxAmount || 0))
+                  : (pricedLine.taxInclusive ? -Number(pricedLine.taxAmount || 0) : 0);
                 const lineTotal =
-                  Number(line.quantity || 0) * Number(line.unitPrice || 0) -
-                  Number(line.lineDiscount || 0) +
-                  Number(line.taxAmount || 0);
+                  Number(pricedLine.quantity || 0) * Number(pricedLine.unitPrice || 0) -
+                  Number(pricedLine.lineDiscount || 0) +
+                  tax;
                 const quantity = Number(line.quantity || 0);
                 const quantityLabel =
                   Number.isFinite(quantity) && quantity % 1 === 0
@@ -597,6 +607,7 @@ export function OrderPanel({
             fullWidth
             disabled={
               isSettledOrder ||
+              checkoutBlocked ||
               !selectedOrderLines.length ||
               isLoading ||
               requiresTableAssignment ||
@@ -623,6 +634,7 @@ export function OrderPanel({
             <Button
               fullWidth
               className="!border-emerald-600 !bg-emerald-600 !text-white hover:!border-emerald-700 hover:!bg-emerald-700"
+              disabled={isLoading || checkoutBlocked}
               onClick={onPrintFinance}
             >
               {t("cashier.printFinance")}

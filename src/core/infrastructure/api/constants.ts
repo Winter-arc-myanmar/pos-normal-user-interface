@@ -165,6 +165,7 @@ export const API_ENDPOINTS = {
     UPDATE: (id: string) => `/api/v1/sales-orders/${id}`,
     DELETE: (id: string) => `/api/v1/sales-orders/${id}`,
     SETTLE: (id: string) => `/api/v1/sales-orders/${id}/settle`,
+    BILL: (id: string) => `/api/v1/sales-orders/${id}/bill`,
     LINES: (salesOrderId: string) => ({
       LIST: `/api/v1/sales-orders/${salesOrderId}/lines`,
       CREATE: `/api/v1/sales-orders/${salesOrderId}/lines`,

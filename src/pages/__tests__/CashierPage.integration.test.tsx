@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { CashierPage } from "../CashierPage";
 
@@ -32,6 +32,9 @@ const mocks = vi.hoisted(() => ({
   printKitchen: vi.fn(),
   printReceipt: vi.fn(),
   listStations: vi.fn(),
+  fetchOrderBill: vi.fn(),
+  settleOrder: vi.fn(),
+  processCheckout: vi.fn(),
 }));
 
 const product = {
@@ -111,6 +114,19 @@ const orderLine = {
 let selectedOrderLinesState: Array<
   typeof orderLine & { status?: string; firedAt?: string }
 > = [orderLine];
+let selectedOrderState: typeof order | null = order;
+let activeServiceTypeState = "TABLE";
+let productState = product;
+let venueSettingsState = {
+  defaultTaxRate: null,
+  serviceChargeBps: 0,
+  serviceChargeOn: { BAR: true, SPA: true, KTV: true },
+  serviceChargeTaxRate: 0,
+};
+
+vi.mock("@/core/presentation/hooks/useVenueSetting", () => ({
+  useVenueSetting: () => venueSettingsState,
+}));
 
 vi.mock("react-i18next", () => ({
   initReactI18next: { type: "3rdParty", init: () => undefined },
@@ -185,14 +201,14 @@ vi.mock("@/core/presentation/hooks/useTableCharges", () => ({
 vi.mock("@/core/presentation/hooks/useCashier", () => ({
   useCashier: () => ({
     products: [
-      product,
+      productState,
       soup,
       { ...product, id: "product-vip", name: "VIP room fee", kind: "RENTAL" },
       { ...product, id: "product-spa-tea", name: "Spa tea", soldAt: ["SPA"] },
     ],
     variantsByProductId: { "product-1": [variant] },
     salesOrders: [order],
-    selectedOrder: order,
+    selectedOrder: selectedOrderState,
     selectedOrderLines: selectedOrderLinesState,
     paymentMethods: [
       { id: "cash", tenantId: "tenant-1", name: "Cash" },
@@ -200,7 +216,7 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
     diningZones: [],
     diningTables: [table],
     tableSessions: [session],
-    activeServiceType: "TABLE",
+    activeServiceType: activeServiceTypeState,
     setActiveServiceType: vi.fn(),
     activeLocationId: "location-1",
     setActiveLocationId: vi.fn(),
@@ -237,7 +253,7 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
     addProductToTableSession: mocks.addProductToTableSession,
     getCounterOrderById: mocks.getCounterOrderById,
     pickupCounterOrder: mocks.pickupCounterOrder,
-    processCheckout: vi.fn(),
+    processCheckout: mocks.processCheckout,
     voidCheckout: mocks.voidCheckout,
     discountReasons: [],
     fetchDiscountReasons: vi.fn().mockResolvedValue(undefined),
@@ -254,6 +270,8 @@ vi.mock("@/core/presentation/hooks/useSalesOrderManagement", () => ({
     deleteOrderLine: mocks.deleteManagedOrderLine,
     updateOrder: mocks.updateManagedOrder,
     deleteOrder: mocks.deleteManagedOrder,
+    fetchOrderBill: mocks.fetchOrderBill,
+    settleOrder: mocks.settleOrder,
   }),
 }));
 
@@ -269,6 +287,16 @@ describe("CashierPage integration", () => {
     vi.clearAllMocks();
     window.localStorage.clear();
     selectedOrderLinesState = [orderLine];
+    selectedOrderState = order;
+    activeServiceTypeState = "TABLE";
+    productState = product;
+    venueSettingsState = {
+      defaultTaxRate: null,
+      serviceChargeBps: 0,
+      serviceChargeOn: { BAR: true, SPA: true, KTV: true },
+      serviceChargeTaxRate: 0,
+    };
+    mocks.processCheckout.mockResolvedValue({ orderId: "direct-order-1" });
     tableChargesState = { offered: [], running: [] };
     tableChargesLoadedState = false;
     mocks.addTableCharge.mockResolvedValue({ offered: [], running: [] });
@@ -356,7 +384,136 @@ describe("CashierPage integration", () => {
     });
     mocks.voidCheckout.mockResolvedValue({ orderId: "order-1" });
     mocks.selectOrderById.mockResolvedValue(order);
+    mocks.fetchOrderBill.mockImplementation(async (_id, query) => ({
+      orderId: "order-1", subtotal: "10.0000", totalDiscount: "0.0000",
+      addedTax: query.includeTax ? "0.5000" : "0.0000",
+      totalTax: query.includeTax ? "0.5000" : "0.0000",
+      serviceCharge: "0.0000", serviceChargeTax: "0.0000",
+      grandTotal: query.includeTax ? "10.5000" : "10.0000",
+    }));
     mocks.openTableSession.mockResolvedValue(session);
+  });
+
+  describe("direct checkout bill options", () => {
+    const startDirectBill = async () => {
+      render(<MemoryRouter initialEntries={["/cashier?view=menu"]}><CashierPage /></MemoryRouter>);
+      fireEvent.click(screen.getByRole("button", { name: "cashier.newOrder" }));
+      await waitFor(() => expect(screen.getByText("cashier.orderPanel.cartStarted")).toBeInTheDocument());
+      fireEvent.click(screen.getByRole("button", { name: /Coffee/ }));
+      await waitFor(() => expect(screen.getByRole("button", { name: "cashier.payNow" })).toBeEnabled());
+      fireEvent.click(screen.getByRole("button", { name: "cashier.payNow" }));
+      await screen.findByRole("button", { name: "cashier.payment.options" }, { timeout: 5000 });
+    };
+
+    beforeEach(() => {
+      selectedOrderState = null;
+      selectedOrderLinesState = [];
+      activeServiceTypeState = "TAKE_AWAY";
+      venueSettingsState = {
+        defaultTaxRate: null,
+        serviceChargeBps: 1000,
+        serviceChargeOn: { BAR: true, SPA: true, KTV: true },
+        serviceChargeTaxRate: 0.1,
+      };
+    });
+
+    it.each([
+      { inclusive: false, includeTax: false, includeServiceCharge: true, expected: "99.0000", service: "9.0000", tax: undefined },
+      { inclusive: false, includeTax: false, includeServiceCharge: false, expected: "90.0000", service: undefined, tax: undefined },
+      { inclusive: false, includeTax: true, includeServiceCharge: false, expected: "99.0000", service: undefined, tax: "9.0000" },
+      { inclusive: false, includeTax: true, includeServiceCharge: true, expected: "108.9000", service: "9.0000", tax: "9.9000" },
+      { inclusive: true, includeTax: false, includeServiceCharge: true, expected: "99.0000", service: "9.0000", tax: undefined },
+      { inclusive: true, includeTax: false, includeServiceCharge: false, expected: "90.0000", service: undefined, tax: undefined },
+      { inclusive: true, includeTax: true, includeServiceCharge: false, expected: "99.0000", service: undefined, tax: "9.0000" },
+      { inclusive: true, includeTax: true, includeServiceCharge: true, expected: "108.9000", service: "9.0000", tax: "9.9000" },
+    ])("matches discounted direct totals and receipts: inclusive=$inclusive tax=$includeTax service=$includeServiceCharge", async ({
+      inclusive, includeTax, includeServiceCharge, expected, service, tax,
+    }) => {
+      productState = { ...product, basePrice: inclusive ? "110.0000" : "100.0000", taxRate: 10, isPriceInclusive: inclusive };
+      await startDirectBill();
+      const adjustments = screen.getByRole("button", { name: "cashier.orderPanel.adjustments" });
+      if (adjustments.getAttribute("aria-expanded") !== "true") fireEvent.click(adjustments);
+      fireEvent.change(screen.getByRole("textbox", { name: "cashier.orderPanel.discount" }), {
+        target: { value: inclusive ? "11" : "10" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "cashier.payment.options" }));
+      const taxCheckbox = screen.getByRole("checkbox", { name: "cashier.payment.includeTax" });
+      const serviceCheckbox = screen.getByRole("checkbox", { name: "cashier.payment.includeServiceCharge" });
+      expect(taxCheckbox).toBeChecked();
+      expect(serviceCheckbox).toBeChecked();
+      // Returning to both enabled must still use the same discounted calculation.
+      fireEvent.click(taxCheckbox);
+      if (includeTax) fireEvent.click(taxCheckbox);
+      if (!includeServiceCharge) fireEvent.click(serviceCheckbox);
+      await waitFor(() => expect(screen.getAllByText(Number(expected).toFixed(2)).length).toBeGreaterThan(0));
+      fireEvent.click(screen.getByRole("checkbox", { name: "cashier.payment.printBillOnConfirm" }));
+      fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+
+      await waitFor(() => expect(mocks.processCheckout).toHaveBeenCalledWith(expect.objectContaining({
+        includeTax,
+        includeServiceCharge,
+        serviceType: "TAKEAWAY",
+        items: [{ variantId: "variant-1", quantity: "1.0000", lineDiscount: inclusive ? "11.0000" : "10.0000" }],
+        payments: [{ paymentMethodId: "cash", amount: expected }],
+      })));
+      await waitFor(() => expect(mocks.printReceipt).toHaveBeenCalledWith(expect.objectContaining({
+        total: expected,
+        subtotal: inclusive ? (includeTax ? "110.0000" : "101.0000") : "100.0000",
+        discount: inclusive ? "11.0000" : "10.0000",
+        tax,
+        serviceCharge: service,
+      })));
+      expect(mocks.fetchOrderBill).not.toHaveBeenCalled();
+      expect(mocks.checkoutTableSession).not.toHaveBeenCalled();
+      expect(mocks.settleOrder).not.toHaveBeenCalled();
+    });
+
+    it("keeps both direct checkout charges enabled and omits flags until a choice is made", async () => {
+      productState = { ...product, basePrice: "100.0000", taxRate: 10 };
+      await startDirectBill();
+      fireEvent.click(screen.getByRole("button", { name: "cashier.payment.options" }));
+      expect(screen.getByRole("checkbox", { name: "cashier.payment.includeTax" })).toBeChecked();
+      expect(screen.getByRole("checkbox", { name: "cashier.payment.includeServiceCharge" })).toBeChecked();
+      fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+
+      await waitFor(() => expect(mocks.processCheckout).toHaveBeenCalled());
+      const payload = mocks.processCheckout.mock.calls[0][0];
+      expect(payload.payments).toEqual([{ paymentMethodId: "cash", amount: "121.0000" }]);
+      expect(payload).not.toHaveProperty("includeTax");
+      expect(payload).not.toHaveProperty("includeServiceCharge");
+      expect(mocks.fetchOrderBill).not.toHaveBeenCalled();
+    });
+
+    it("resets direct bill choices after successful checkout instead of reusing removed charges", async () => {
+      productState = { ...product, basePrice: "110.0000", taxRate: 10, isPriceInclusive: true };
+      await startDirectBill();
+      fireEvent.click(screen.getByRole("button", { name: "cashier.payment.options" }));
+      fireEvent.click(screen.getByRole("checkbox", { name: "cashier.payment.includeTax" }));
+      fireEvent.click(screen.getByRole("checkbox", { name: "cashier.payment.includeServiceCharge" }));
+      fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+      await waitFor(() => expect(mocks.processCheckout).toHaveBeenCalledWith(expect.objectContaining({
+        includeTax: false, includeServiceCharge: false,
+        payments: [{ paymentMethodId: "cash", amount: "100.0000" }],
+      })));
+
+      await screen.findByText("cashier.orderPanel.checkoutSuccess");
+      await waitFor(() => expect(screen.getByRole("button", { name: "cashier.newOrder" })).toBeEnabled());
+      fireEvent.click(screen.getByRole("button", { name: "cashier.newOrder" }));
+      await waitFor(() => expect(screen.getByText("cashier.orderPanel.cartStarted")).toBeInTheDocument());
+      fireEvent.click(await screen.findByRole("button", { name: /Coffee/ }));
+      await waitFor(() => expect(screen.getByRole("button", { name: "cashier.payNow" })).toBeEnabled());
+      fireEvent.click(screen.getByRole("button", { name: "cashier.payNow" }));
+      fireEvent.click(await screen.findByRole("button", { name: "cashier.payment.options" }));
+      expect(screen.getByRole("checkbox", { name: "cashier.payment.includeTax" })).toBeChecked();
+      expect(screen.getByRole("checkbox", { name: "cashier.payment.includeServiceCharge" })).toBeChecked();
+      fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+
+      await waitFor(() => expect(mocks.processCheckout).toHaveBeenCalledTimes(2));
+      const secondBill = mocks.processCheckout.mock.calls[1][0];
+      expect(secondBill.payments).toEqual([{ paymentMethodId: "cash", amount: "121.0000" }]);
+      expect(secondBill).not.toHaveProperty("includeTax");
+      expect(secondBill).not.toHaveProperty("includeServiceCharge");
+    });
   });
 
   it("increments an existing product line instead of adding a duplicate", async () => {
@@ -507,6 +664,118 @@ describe("CashierPage integration", () => {
       })
     );
     expect(mocks.printReceipt).not.toHaveBeenCalled();
+  });
+
+  it("quotes the tax choice, charges that amount, and excludes tax from the receipt", async () => {
+    render(<MemoryRouter initialEntries={["/cashier?view=pay"]}><CashierPage /></MemoryRouter>);
+    fireEvent.click(screen.getByRole("button", { name: "cashier.payment.options" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "cashier.payment.includeTax" }));
+    await waitFor(() => expect(mocks.fetchOrderBill).toHaveBeenCalledWith("order-1", {
+      discount: "0.0000", includeTax: false, includeServiceCharge: true,
+    }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "cashier.confirmPay" })).toBeEnabled());
+    expect(screen.getAllByText("10.00").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("checkbox", { name: "cashier.payment.printBillOnConfirm" }));
+    fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+    await waitFor(() => expect(mocks.checkoutTableSession).toHaveBeenCalledWith("session-1", {
+      posSessionId: "pos-session-1", payments: [{ paymentMethodId: "cash", amount: "10.0000" }],
+      includeTax: false, includeServiceCharge: true,
+    }));
+    await waitFor(() => expect(mocks.printReceipt).toHaveBeenCalledWith(expect.objectContaining({
+      tax: undefined, total: "10.0000",
+    })));
+  });
+
+  it.each([
+    { includeTax: true, includeServiceCharge: true, subtotal: "110.0000", totalTax: "15.5000", serviceCharge: "10.0000", expected: "125.5000" },
+    { includeTax: true, includeServiceCharge: false, subtotal: "110.0000", totalTax: "15.0000", serviceCharge: "0.0000", expected: "115.0000" },
+    { includeTax: false, includeServiceCharge: true, subtotal: "100.0000", totalTax: "0.0000", serviceCharge: "10.0000", expected: "110.0000" },
+    { includeTax: false, includeServiceCharge: false, subtotal: "100.0000", totalTax: "0.0000", serviceCharge: "0.0000", expected: "100.0000" },
+  ])("uses authoritative persisted bill totals: tax=$includeTax service=$includeServiceCharge", async ({
+    includeTax, includeServiceCharge, subtotal, totalTax, serviceCharge, expected,
+  }) => {
+    const makeBill = (query: { includeTax: boolean; includeServiceCharge: boolean }) => ({
+      orderId: "order-1",
+      subtotal: query.includeTax ? "110.0000" : "100.0000",
+      totalDiscount: "0.0000",
+      addedTax: query.includeTax ? "5.0000" : "0.0000",
+      totalTax: query.includeTax ? (query.includeServiceCharge ? "15.5000" : "15.0000") : "0.0000",
+      serviceCharge: query.includeServiceCharge ? "10.0000" : "0.0000",
+      serviceChargeTax: query.includeTax && query.includeServiceCharge ? "0.5000" : "0.0000",
+      grandTotal: query.includeTax
+        ? (query.includeServiceCharge ? "125.5000" : "115.0000")
+        : (query.includeServiceCharge ? "110.0000" : "100.0000"),
+    });
+    mocks.fetchOrderBill.mockImplementation(async (_id, query) => makeBill(query));
+    render(<MemoryRouter initialEntries={["/cashier?view=pay"]}><CashierPage /></MemoryRouter>);
+    fireEvent.click(screen.getByRole("button", { name: "cashier.payment.options" }));
+    const taxCheckbox = screen.getByRole("checkbox", { name: "cashier.payment.includeTax" });
+    fireEvent.click(taxCheckbox);
+    if (includeTax) fireEvent.click(taxCheckbox);
+    if (!includeServiceCharge) fireEvent.click(screen.getByRole("checkbox", { name: "cashier.payment.includeServiceCharge" }));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "cashier.confirmPay" })).toBeEnabled());
+    expect(screen.getAllByText(Number(expected).toFixed(2)).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("checkbox", { name: "cashier.payment.printBillOnConfirm" }));
+    fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+
+    await waitFor(() => expect(mocks.checkoutTableSession).toHaveBeenCalledWith("session-1", {
+      posSessionId: "pos-session-1",
+      payments: [{ paymentMethodId: "cash", amount: expected }],
+      includeTax, includeServiceCharge,
+    }));
+    await waitFor(() => expect(mocks.printReceipt).toHaveBeenCalledWith(expect.objectContaining({
+      subtotal,
+      tax: includeTax ? totalTax : undefined,
+      serviceCharge: includeServiceCharge ? serviceCharge : undefined,
+      total: expected,
+    })));
+    expect(mocks.fetchOrderBill).toHaveBeenLastCalledWith("order-1", {
+      discount: "0.0000", includeTax, includeServiceCharge,
+    });
+    expect(mocks.processCheckout).not.toHaveBeenCalled();
+  });
+
+  it("blocks split and finance while a quote is pending but permits changing options and clears tenders", async () => {
+    let resolveQuote!: (bill: Record<string, string>) => void;
+    mocks.fetchOrderBill.mockImplementationOnce(() => new Promise((resolve) => { resolveQuote = resolve; }));
+    render(<MemoryRouter initialEntries={["/cashier?view=pay"]}><CashierPage /></MemoryRouter>);
+    fireEvent.click(screen.getByRole("button", { name: "cashier.payment.split" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "cashier.payment.addTender" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "cashier.payment.addTender" }));
+    expect(screen.getByRole("button", { name: "cashier.orderPanel.remove" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "cashier.payment.options" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "cashier.payment.includeTax" }));
+
+    expect(screen.queryByRole("button", { name: "cashier.orderPanel.remove" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "cashier.payment.split" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "cashier.printFinance" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "cashier.confirmPay" })).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "cashier.payment.includeTax" })).toBeEnabled();
+    expect(screen.getByRole("checkbox", { name: "cashier.payment.includeServiceCharge" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("checkbox", { name: "cashier.payment.includeServiceCharge" }));
+    await waitFor(() => expect(mocks.fetchOrderBill).toHaveBeenLastCalledWith("order-1", {
+      discount: "0.0000", includeTax: false, includeServiceCharge: false,
+    }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "cashier.confirmPay" })).toBeEnabled());
+    await act(async () => resolveQuote({
+      orderId: "order-1", subtotal: "999.0000", totalDiscount: "0.0000", totalTax: "999.0000",
+      addedTax: "999.0000", serviceCharge: "999.0000", serviceChargeTax: "999.0000", grandTotal: "999.0000",
+    }));
+    expect(screen.queryByText("999.00")).not.toBeInTheDocument();
+    expect(screen.getAllByText("10.00").length).toBeGreaterThan(0);
+    expect(mocks.printReceipt).not.toHaveBeenCalled();
+    expect(mocks.checkoutTableSession).not.toHaveBeenCalled();
+  });
+
+  it("blocks payment after an options quote fails", async () => {
+    mocks.fetchOrderBill.mockRejectedValue(new Error("Offline"));
+    render(<MemoryRouter initialEntries={["/cashier?view=pay"]}><CashierPage /></MemoryRouter>);
+    fireEvent.click(screen.getByRole("button", { name: "cashier.payment.options" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "cashier.payment.includeServiceCharge" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("cashier.payment.billOptionsError");
+    expect(screen.getByRole("button", { name: "cashier.confirmPay" })).toBeDisabled();
+    expect(mocks.checkoutTableSession).not.toHaveBeenCalled();
   });
 
   it("does not send or print order lines which were already sent to KDS", async () => {

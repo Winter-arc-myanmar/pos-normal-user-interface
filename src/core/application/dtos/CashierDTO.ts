@@ -276,6 +276,9 @@ export interface CheckoutRequestDTO {
   lineStatus?: string;
   tipAmount?: string;
   serviceCharge?: string;
+  /** Omitted charge flags default to true on the backend. */
+  includeTax?: boolean;
+  includeServiceCharge?: boolean;
   discountReasonId?: string;
   idempotencyKey?: string;
   tenantId: string;
@@ -345,6 +348,9 @@ export interface TableSessionCheckoutDTO {
   payments: CheckoutPaymentEntryDTO[];
   tipAmount?: number;
   serviceCharge?: number;
+  /** Omitted charge flags default to true on the backend. */
+  includeTax?: boolean;
+  includeServiceCharge?: boolean;
   discountReasonId?: string;
   totalDiscount?: number;
 }

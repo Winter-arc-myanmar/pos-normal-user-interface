@@ -3,6 +3,27 @@ import { HttpClient } from "../../api/HttpClient";
 import { ApiCashierRepository } from "../ApiCashierRepository";
 
 describe("ApiCashierRepository", () => {
+  it.each([[true, true], [false, true], [true, false], [false, false]])(
+    "preserves bill options through table and direct checkout (%s, %s)",
+    async (includeTax, includeServiceCharge) => {
+      const post = vi.fn().mockResolvedValue({ data: { id: "session-1" } });
+      const repository = new ApiCashierRepository({ post } as unknown as HttpClient);
+      await repository.checkoutTableSession("session-1", {
+        posSessionId: "shift-1", payments: [{ paymentMethodId: "cash", amount: "100.0000" }],
+        includeTax, includeServiceCharge,
+      });
+      expect(post).toHaveBeenLastCalledWith("/api/v1/table-sessions/session-1/checkout", expect.objectContaining({
+        includeTax, includeServiceCharge,
+      }));
+      await repository.checkout({
+        tenantId: "tenant-1", locationId: "location-1", salesChannel: "POS", serviceType: "DINE_IN",
+        items: [{ variantId: "variant-1", quantity: "1.0000" }],
+        payments: [{ paymentMethodId: "cash", amount: "100.0000" }], includeTax, includeServiceCharge,
+      });
+      expect(post).toHaveBeenLastCalledWith("/api/v1/checkout", expect.objectContaining({ includeTax, includeServiceCharge }));
+    }
+  );
+
   it("names an order line's item, however the API nests the name", async () => {
     const httpClient = {
       get: vi.fn().mockResolvedValue({
