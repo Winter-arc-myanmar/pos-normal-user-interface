@@ -3,12 +3,19 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { KitchenPrintPlan } from "@/lib/printing/routeKitchenPrint";
 import { savePrinterBinding } from "@/lib/pos/printerBindingStorage";
 import { defaultPrintTemplateSettings } from "@/core/domain/entities/PrintTemplate";
+import {
+  KdsStation,
+  KdsTicket,
+  KdsTicketLine,
+  SalesOrderLine,
+} from "@/core/domain/entities/Cashier";
 
 const mocks = vi.hoisted(() => ({
   connect: vi.fn(),
   printKitchen: vi.fn(),
   printReceipt: vi.fn(),
   resolveTemplate: vi.fn(),
+  getSalesOrderLines: vi.fn(),
 }));
 
 vi.mock("@/core/infrastructure/printing/getPrinterClient", () => ({
@@ -26,12 +33,17 @@ vi.mock("@/core/infrastructure/printing/getPrinterClient", () => ({
 
 vi.mock("@/core/infrastructure/di/container", () => ({
   default: {
-    resolve: () => ({
-      list: vi.fn().mockResolvedValue({ printers: [] }),
-      resolve: mocks.resolveTemplate,
-      company: vi.fn().mockResolvedValue({ name: "" }),
-      get: vi.fn().mockResolvedValue({ currency: "MMK" }),
-    }),
+    resolve: (key: string) => {
+      if (key === "salesOrderService") {
+        return { getSalesOrderLines: mocks.getSalesOrderLines };
+      }
+      return {
+        list: vi.fn().mockResolvedValue({ printers: [] }),
+        resolve: mocks.resolveTemplate,
+        company: vi.fn().mockResolvedValue({ name: "" }),
+        get: vi.fn().mockResolvedValue({ currency: "MMK" }),
+      };
+    },
   },
 }));
 
@@ -217,5 +229,93 @@ describe("usePrinterConnection paid bill copies", () => {
       await result.current.printReceipt({ ...sale, sale: undefined, title: "Top-up" });
     });
     expect(printed()).toEqual([["Till", "Top-up", "CHECKOUT"]]);
+  });
+});
+
+describe("usePrinterConnection KDS ticket modifiers", () => {
+  const station = {
+    id: "station-hot",
+    name: "Hot line",
+    printerIds: ["printer-hot"],
+    categoryIds: [] as string[],
+  };
+
+  beforeEach(() => {
+    localStorage.clear();
+    mocks.connect.mockReset();
+    mocks.connect.mockResolvedValue(undefined);
+    mocks.resolveTemplate.mockResolvedValue({ settings: undefined });
+    mocks.printKitchen.mockReset();
+    mocks.printKitchen.mockResolvedValue(undefined);
+    mocks.getSalesOrderLines.mockReset();
+    mocks.getSalesOrderLines.mockResolvedValue({ lines: [] });
+    savePrinterBinding(
+      tenantId,
+      registerId,
+      {
+        id: "backend:printer-hot",
+        backendPrinterId: "printer-hot",
+        transport: "NETWORK",
+        displayName: "Hot printer",
+        sectors: ["KDS"],
+        lastVerifiedAt: "",
+      },
+      true
+    );
+  });
+
+  it("fills a ticket's missing modifiers from its order line", async () => {
+    mocks.getSalesOrderLines.mockResolvedValue({
+      lines: [
+        new SalesOrderLine({
+          id: "line-1",
+          salesOrderId: "order-1",
+          selectedModifiers: [
+            { modifierId: "mod-1", name: "Oat milk", priceDelta: "1.5000" },
+          ],
+        }),
+      ],
+    });
+    const ticket = new KdsTicket({
+      id: "ticket-1",
+      ticketNumber: "KDS-001",
+      salesOrderId: "order-1",
+      stationId: "station-hot",
+      status: "PENDING",
+      station: new KdsStation({
+        id: "station-hot",
+        name: "Hot line",
+        printerIds: ["printer-hot"],
+      }),
+      kdsTicketLines: [
+        new KdsTicketLine({
+          id: "ticket-line-1",
+          salesOrderLineId: "line-1",
+          productName: "Coffee",
+          quantity: "1",
+          status: "PENDING",
+        }),
+      ],
+      lines: [{ name: "Coffee", quantity: "1" }],
+    });
+    const { result } = renderConnection();
+    await waitFor(() => expect(result.current.isConnected).toBe(true));
+
+    await act(async () => {
+      await result.current.printTicket(ticket, [station]);
+    });
+
+    expect(mocks.getSalesOrderLines).toHaveBeenCalledWith("order-1", {
+      page: 1,
+      limit: 100,
+    });
+    const [, slip] = mocks.printKitchen.mock.calls[0];
+    expect(slip.lines).toEqual([
+      expect.objectContaining({
+        name: "Coffee",
+        modifiers: "Oat milk",
+        modifierPrices: "1.5000",
+      }),
+    ]);
   });
 });

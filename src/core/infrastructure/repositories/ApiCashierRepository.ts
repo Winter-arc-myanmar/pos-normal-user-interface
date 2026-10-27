@@ -583,12 +583,13 @@ const toTicketPlace = (value: unknown): KdsTicketPlace | null => {
   };
 };
 
-const toKdsTicket = (item: Record<string, unknown>) =>
-  new KdsTicket({
+const toKdsTicket = (item: Record<string, unknown>) => {
+  const session = asRecord(item.session);
+  return new KdsTicket({
     id: String(item.id || ""),
     tenantId: String(item.tenantId || ""),
     sessionId: String(item.sessionId || ""),
-    salesOrderId: String(item.salesOrderId || ""),
+    salesOrderId: String(item.salesOrderId || session?.salesOrderId || ""),
     stationId: String(item.stationId || ""),
     ticketNumber: String(item.ticketNumber || ""),
     courseType: String(item.courseType || ""),
@@ -618,6 +619,9 @@ const toKdsTicket = (item: Record<string, unknown>) =>
             kitchenModifiers: line.kitchenModifiers
               ? String(line.kitchenModifiers)
               : undefined,
+            modifierPrices: line.modifierPrices
+              ? String(line.modifierPrices)
+              : undefined,
             status: String(line.status || "PENDING"),
             bumpedAt: line.bumpedAt ? String(line.bumpedAt) : null,
             createdAt: String(line.createdAt || ""),
@@ -645,6 +649,7 @@ const toKdsTicket = (item: Record<string, unknown>) =>
     createdAt: String(item.createdAt || ""),
     updatedAt: String(item.updatedAt || ""),
   });
+};
 
 const toKdsTicketList = (
   response: unknown,

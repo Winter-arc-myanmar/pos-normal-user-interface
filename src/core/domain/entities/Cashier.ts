@@ -200,6 +200,7 @@ export class KdsTicketLine {
   quantity!: string;
   seatNumber?: number;
   kitchenModifiers?: string;
+  modifierPrices?: string;
   status!: string;
   bumpedAt?: string | null;
   createdAt!: string;
@@ -369,6 +370,7 @@ export class KdsTicket {
     quantity: string;
     categoryId?: string;
     modifiers?: string;
+    modifierPrices?: string;
   }>;
   kdsTicketLines?: KdsTicketLine[];
   station?: KdsStation;

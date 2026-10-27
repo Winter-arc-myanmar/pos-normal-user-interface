@@ -861,6 +861,7 @@ describe("ApiCashierRepository", () => {
             courseType: "MAIN",
             stationId: "station-1",
             firedAt: "2026-09-22T16:53:22.241Z",
+            session: { salesOrderId: "order-1" },
             station: {
               id: "station-1",
               name: "Hot line",
@@ -915,6 +916,7 @@ describe("ApiCashierRepository", () => {
     });
     expect(list.totalPages).toBe(1);
     expect(ticket.ticketNumber).toBe("KDS-20260506-0001");
+    expect(ticket.salesOrderId).toBe("order-1");
     expect(ticket.station).toMatchObject({
       name: "Hot line",
       printerId: "printer-hot",

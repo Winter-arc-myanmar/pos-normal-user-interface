@@ -775,12 +775,14 @@ export function kdsTicketPrintLines(ticket: KdsTicket): PrintLine[] {
       quantity: line.quantity,
       categoryId: line.categoryId,
       modifiers: line.modifiers,
+      modifierPrices: line.modifierPrices,
     }));
   }
   return (ticket.kdsTicketLines || []).map((line) => ({
     name: line.productName || "Item",
     quantity: line.quantity || "1",
     modifiers: line.kitchenModifiers,
+    modifierPrices: line.modifierPrices,
     seat: line.seatNumber ? String(line.seatNumber) : undefined,
   }));
 }

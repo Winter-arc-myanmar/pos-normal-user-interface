@@ -113,7 +113,11 @@ const orderLine = {
 };
 
 let selectedOrderLinesState: Array<
-  typeof orderLine & { status?: string; firedAt?: string }
+  typeof orderLine & {
+    status?: string;
+    firedAt?: string;
+    selectedModifiers?: Record<string, unknown>;
+  }
 > = [orderLine];
 let selectedOrderState: typeof order | null = order;
 let activeServiceTypeState = "TABLE";
@@ -682,6 +686,43 @@ describe("CashierPage integration", () => {
 
     expect(screen.queryByRole("button", { name: /Coffee/ })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Deli Soup/ })).toBeInTheDocument();
+  });
+
+  it("prints selected modifiers on the KDS station slip", async () => {
+    selectedOrderLinesState = [
+      {
+        ...orderLine,
+        selectedModifiers: {
+          "modifier-1": { name: "Oat milk", priceDelta: "1.5000" },
+        },
+      },
+    ];
+
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=pay"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "cashier.orderPanel.sendKds" })
+    );
+
+    await waitFor(() =>
+      expect(mocks.printKitchen).toHaveBeenCalledWith(
+        expect.objectContaining({
+          lines: [
+            expect.objectContaining({
+              name: "Coffee",
+              modifiers: "Oat milk",
+              modifierPrices: "1.5000",
+            }),
+          ],
+        }),
+        expect.any(Array),
+        expect.objectContaining({ requireStationRouting: true })
+      )
+    );
   });
 
   it("syncs totals and connects checkout, KDS, and pickup actions", async () => {
