@@ -207,14 +207,6 @@ export function CashierPage() {
   const pendingMemberDetectRef = useRef(false);
   const productAddQueueRef = useRef<Promise<void>>(Promise.resolve());
   const payTableSyncRef = useRef<string | null>(null);
-  /** A table session this tap opened; released if the cashier leaves without ordering. */
-  const openedEmptyTableRef = useRef<{
-    tableId: string;
-    sessionId: string;
-    orderId?: string;
-    hadOrder: boolean;
-    releasing: boolean;
-  } | null>(null);
 
   const locationId = activeLocationId;
   const activeView = searchParams.get("view") || "orders";
@@ -283,7 +275,6 @@ export function CashierPage() {
 
   const resetWorkspaceAfterTransaction = useCallback(
     async (message: string) => {
-      openedEmptyTableRef.current = null;
       clearOrderSelection();
       clearError();
       setIsDirectCheckoutMode(false);
@@ -1144,99 +1135,6 @@ export function CashierPage() {
     [updateDiningTableStatus, updateTableSessionState]
   );
 
-  /** Any add attempt means the table has a real order, so it must stay occupied. */
-  const markOpenedTableOrdered = useCallback(() => {
-    const opened = openedEmptyTableRef.current;
-    if (opened && opened.tableId === activeTableId) opened.hadOrder = true;
-  }, [activeTableId]);
-
-  /**
-   * A table tap opens its session before the first item is added. If the
-   * cashier goes back without ordering, close that empty session and make the
-   * table available again. An order (or a failed check) keeps the table as it
-   * is, so existing tables and real orders are never released here.
-   */
-  const releaseEmptyOpenedTable = useCallback(async () => {
-    const opened = openedEmptyTableRef.current;
-    if (!opened || opened.releasing) return false;
-    if (opened.hadOrder) {
-      openedEmptyTableRef.current = null;
-      return false;
-    }
-
-    opened.releasing = true;
-    let keepReference = false;
-    try {
-      if (opened.orderId) {
-        let lines: SalesOrderLine[] = [];
-        try {
-          const result = await fetchManagedOrderLines(opened.orderId, {
-            page: 1,
-            limit: 1,
-          });
-          lines = result.lines;
-        } catch {
-          // The order cannot be checked right now; keep the table occupied.
-          keepReference = true;
-          return false;
-        }
-        if (lines.length) {
-          opened.hadOrder = true;
-          return false;
-        }
-        try {
-          await updateManagedOrder(opened.orderId, { status: "VOIDED" });
-        } catch {
-          // The empty order may already be voided.
-        }
-      }
-
-      await releasePaidTable(opened.tableId, opened.sessionId);
-      clearTableOrderIds(opened.tableId);
-      if (activeTableId === opened.tableId) {
-        setActiveTableId(null);
-        setTableOrderIds([]);
-        setMultiOrderLines({});
-        setSelectedMergeOrderIds([]);
-        clearOrderSelection();
-      }
-      setNotice(t("cashier.orderPanel.tableReleased"));
-      return true;
-    } finally {
-      opened.releasing = false;
-      if (!keepReference && openedEmptyTableRef.current === opened) {
-        openedEmptyTableRef.current = null;
-      }
-    }
-  }, [
-    activeTableId,
-    clearOrderSelection,
-    fetchManagedOrderLines,
-    releasePaidTable,
-    t,
-    updateManagedOrder,
-  ]);
-
-  const releaseEmptyTableRef = useRef(releaseEmptyOpenedTable);
-  releaseEmptyTableRef.current = releaseEmptyOpenedTable;
-  const lastActiveViewRef = useRef(activeView);
-
-  useEffect(() => {
-    const previousView = lastActiveViewRef.current;
-    lastActiveViewRef.current = activeView;
-    // Only an explicit return from the menu counts as leaving the table.
-    if (activeView === "orders" && previousView === "menu") {
-      void releaseEmptyTableRef.current();
-    }
-  }, [activeView]);
-
-  useEffect(
-    () => () => {
-      void releaseEmptyTableRef.current();
-    },
-    []
-  );
-
   const handleCreateOrder = async () => {
     setLocalError(null);
     try {
@@ -1264,12 +1162,6 @@ export function CashierPage() {
   const handleTableTap = async (tableId: string) => {
     setLocalError(null);
     setNotice(null);
-    if (
-      openedEmptyTableRef.current &&
-      openedEmptyTableRef.current.tableId !== tableId
-    ) {
-      await releaseEmptyOpenedTable();
-    }
     const pendingLines = isDirectCheckoutMode ? [...directCartLines] : [];
     if (!pendingLines.length) {
       setIsDirectCheckoutMode(false);
@@ -1369,13 +1261,6 @@ export function CashierPage() {
         openedByPosSessionId: context.posSessionId,
         salesChannel: "POS",
       });
-      openedEmptyTableRef.current = {
-        tableId: table.id,
-        sessionId: newSession.id,
-        orderId: newSession.salesOrderId,
-        hadOrder: pendingLines.length > 0,
-        releasing: false,
-      };
       if (pendingLines.length) {
         await flushPendingLinesToSession(newSession, pendingLines);
       }
@@ -1583,7 +1468,6 @@ export function CashierPage() {
     variantId: string,
     quantity: number
   ) => {
-    markOpenedTableOrdered();
     const startFreshCart = isSettledSalesOrder(selectedOrder);
     if (startFreshCart) {
       clearOrderSelection();
@@ -2736,12 +2620,11 @@ export function CashierPage() {
                 charges={tableCharges.charges}
                 isBusy={tableCharges.isBusy}
                 error={tableCharges.error}
-                onAdd={(charge) => {
-                  markOpenedTableOrdered();
+                onAdd={(charge) =>
                   void tableCharges
                     .add(charge.variantId, charge.minimumBlocks ?? undefined)
-                    .then((done) => (done && selectedOrder ? selectOrderById(selectedOrder.id) : null));
-                }}
+                    .then((done) => (done && selectedOrder ? selectOrderById(selectedOrder.id) : null))
+                }
                 onStop={(variantId) =>
                   void tableCharges
                     .stop(variantId)

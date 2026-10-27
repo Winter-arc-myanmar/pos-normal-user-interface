@@ -112,9 +112,6 @@ let selectedOrderLinesState: Array<
   typeof orderLine & { status?: string; firedAt?: string }
 > = [orderLine];
 
-let diningTablesState = [table];
-let tableSessionsState = [session];
-
 vi.mock("react-i18next", () => ({
   initReactI18next: { type: "3rdParty", init: () => undefined },
   useTranslation: () => ({ t: (key: string) => key }),
@@ -201,8 +198,8 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
       { id: "cash", tenantId: "tenant-1", name: "Cash" },
     ],
     diningZones: [],
-    diningTables: diningTablesState,
-    tableSessions: tableSessionsState,
+    diningTables: [table],
+    tableSessions: [session],
     activeServiceType: "TABLE",
     setActiveServiceType: vi.fn(),
     activeLocationId: "location-1",
@@ -230,11 +227,7 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
     checkoutTableSession: mocks.checkoutTableSession,
     updateTableSessionState: mocks.updateTableSessionState,
     fireToKds: mocks.fireToKds,
-    getLatestSessionByTableId: vi.fn((tableId: string) =>
-      tableSessionsState.find(
-        (item) => item.tableId === tableId && !item.closedAt
-      )
-    ),
+    getLatestSessionByTableId: vi.fn().mockReturnValue(session),
     selectOrder: vi.fn(),
     selectOrderById: mocks.selectOrderById,
     createOrder: vi.fn(),
@@ -276,8 +269,6 @@ describe("CashierPage integration", () => {
     vi.clearAllMocks();
     window.localStorage.clear();
     selectedOrderLinesState = [orderLine];
-    diningTablesState = [table];
-    tableSessionsState = [session];
     tableChargesState = { offered: [], running: [] };
     tableChargesLoadedState = false;
     mocks.addTableCharge.mockResolvedValue({ offered: [], running: [] });
@@ -681,121 +672,6 @@ describe("CashierPage integration", () => {
     });
     expect(mocks.openTableSession).not.toHaveBeenCalled();
     expect(mocks.updateDiningTableStatus).not.toHaveBeenCalled();
-  });
-
-  it("releases a table opened without an order when the cashier goes back", async () => {
-    const freeTable = {
-      ...table,
-      id: "table-2",
-      tableNumber: "T2",
-      status: "AVAILABLE",
-    };
-    const emptySession = {
-      ...session,
-      id: "session-2",
-      tableId: "table-2",
-      salesOrderId: "order-2",
-    };
-    diningTablesState = [freeTable];
-    tableSessionsState = [];
-    mocks.openTableSession.mockResolvedValue(emptySession);
-    mocks.fetchManagedOrderLines.mockResolvedValue({
-      lines: [],
-      total: 0,
-      page: 1,
-      limit: 1,
-      totalPages: 0,
-    });
-
-    render(
-      <MemoryRouter initialEntries={["/cashier?view=orders"]}>
-        <CashierPage />
-      </MemoryRouter>
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: /T2/ }));
-    await waitFor(() =>
-      expect(
-        screen.getByPlaceholderText("cashier.productMenu.search")
-      ).toBeInTheDocument()
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "cashier.productMenu.close" })
-    );
-
-    await waitFor(() => {
-      expect(mocks.fetchManagedOrderLines).toHaveBeenCalledWith("order-2", {
-        page: 1,
-        limit: 1,
-      });
-      expect(mocks.updateManagedOrder).toHaveBeenCalledWith("order-2", {
-        status: "VOIDED",
-      });
-      expect(mocks.updateTableSessionState).toHaveBeenCalledWith("session-2", {
-        sessionState: "CLOSED",
-      });
-      expect(mocks.updateDiningTableStatus).toHaveBeenCalledWith(
-        "table-2",
-        "AVAILABLE"
-      );
-    });
-    expect(
-      screen.getByText("cashier.orderPanel.tableReleased")
-    ).toBeInTheDocument();
-  });
-
-  it("keeps a table occupied when an order line was added", async () => {
-    const freeTable = {
-      ...table,
-      id: "table-2",
-      tableNumber: "T2",
-      status: "AVAILABLE",
-    };
-    const sessionWithOrder = {
-      ...session,
-      id: "session-2",
-      tableId: "table-2",
-      salesOrderId: "order-2",
-    };
-    diningTablesState = [freeTable];
-    tableSessionsState = [];
-    mocks.openTableSession.mockResolvedValue(sessionWithOrder);
-    mocks.fetchManagedOrderLines.mockResolvedValue({
-      lines: [{ ...orderLine, salesOrderId: "order-2" }],
-      total: 1,
-      page: 1,
-      limit: 1,
-      totalPages: 1,
-    });
-
-    render(
-      <MemoryRouter initialEntries={["/cashier?view=orders"]}>
-        <CashierPage />
-      </MemoryRouter>
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: /T2/ }));
-    await waitFor(() =>
-      expect(
-        screen.getByPlaceholderText("cashier.productMenu.search")
-      ).toBeInTheDocument()
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "cashier.productMenu.close" })
-    );
-
-    await waitFor(() =>
-      expect(mocks.fetchManagedOrderLines).toHaveBeenCalledWith("order-2", {
-        page: 1,
-        limit: 1,
-      })
-    );
-    expect(mocks.updateManagedOrder).not.toHaveBeenCalled();
-    expect(mocks.updateTableSessionState).not.toHaveBeenCalled();
-    expect(mocks.updateDiningTableStatus).not.toHaveBeenCalled();
-    expect(
-      screen.queryByText("cashier.orderPanel.tableReleased")
-    ).not.toBeInTheDocument();
   });
 
   it("cancels an unpaid order without calling checkout void", async () => {
