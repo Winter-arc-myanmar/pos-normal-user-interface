@@ -624,8 +624,8 @@ export function CashierPage() {
       selectedModifiers?: Record<string, unknown>;
     }>,
     withoutTax = false
-  ) =>
-    lines
+  ) => {
+    const printable = lines
       .filter((line) => !line.voidedAt)
       .map((line) => {
         const variant = variantById[line.variantId];
@@ -636,6 +636,7 @@ export function CashierPage() {
           ? toMoney(Number(line.unitPrice || 0) - Number(line.taxAmount || 0) / quantity)
           : line.unitPrice?.trim();
         return {
+          variantId: line.variantId,
           name: line.productName || product?.name || line.variantName || "Item",
           quantity: String(line.quantity || "1"),
           unitPrice: unitPrice || undefined,
@@ -647,6 +648,30 @@ export function CashierPage() {
           modifierPrices: modifiers.prices,
         };
       });
+    // A bill may already hold the same item on more than one line. The receipt
+    // shows one row with the combined quantity so it matches what was ordered.
+    const merged = new Map<string, (typeof printable)[number]>();
+    for (const line of printable) {
+      const key = JSON.stringify([
+        line.variantId,
+        line.name,
+        line.unitPrice,
+        line.categoryId,
+        line.modifiers,
+        line.modifierPrices,
+      ]);
+      const existing = merged.get(key);
+      if (!existing) {
+        merged.set(key, line);
+        continue;
+      }
+      merged.set(key, {
+        ...existing,
+        quantity: String(Number(existing.quantity) + Number(line.quantity)),
+      });
+    }
+    return [...merged.values()];
+  };
 
   const displayOrderLines = useMemo(() => {
     if (isDirectCheckoutMode) return activeOrderLines;
@@ -1558,11 +1583,42 @@ export function CashierPage() {
       !startFreshCart && selectedOrderSession && isPrimaryTableOrder
     );
 
-    const existingLine = !startFreshCart
-      ? activeOrderLinesRef.current.find(
-          (line) => line.variantId === variantId && isPendingKdsLine(line)
-        )
-      : undefined;
+    const tableLines = activeTableId
+      ? tableOrderIds.flatMap((orderId) => multiOrderLines[orderId] || [])
+      : [];
+    const clickedVariant = (variantsByProductId[product.id] || []).find(
+      (variant) => variant.id === variantId
+    );
+    const clickedUnitPrice = (
+      Number(product.basePrice || 0) + Number(clickedVariant?.priceModifier || 0)
+    ).toFixed(4);
+    const hasModifiers = (line: (typeof activeOrderLines)[number]) => {
+      const modifiers = line.selectedModifiers;
+      if (!modifiers) return false;
+      return Array.isArray(modifiers)
+        ? modifiers.length > 0
+        : Object.keys(modifiers).length > 0;
+    };
+    const candidates = new Map<string, (typeof activeOrderLines)[number]>();
+    for (const line of [...activeOrderLinesRef.current, ...tableLines]) {
+      if (!candidates.has(line.id)) candidates.set(line.id, line);
+    }
+    const matchingLines = startFreshCart
+      ? []
+      : [...candidates.values()].filter(
+          (line) =>
+            line.variantId === variantId &&
+            Number(line.unitPrice || 0).toFixed(4) === clickedUnitPrice &&
+            !hasModifiers(line) &&
+            !line.voidedAt &&
+            !["VOIDED", "COMPED"].includes(
+              String(line.status || "").toUpperCase()
+            )
+        );
+    // Prefer a line the kitchen has not seen yet, then fall back to any live
+    // line. Without that fallback, a served line became a second 1x row.
+    const existingLine =
+      matchingLines.find(isPendingKdsLine) ?? matchingLines[0];
 
     const rememberAddedLine = (line: SalesOrderLine) => {
       const index = activeOrderLinesRef.current.findIndex(
@@ -1577,9 +1633,15 @@ export function CashierPage() {
     };
 
     if (existingLine && selectedOrder) {
+      // Every matching 1x row plus this tap becomes the merged quantity, so
+      // collapsing old duplicates cannot lose an item.
       const nextQuantity =
-        Number(existingLine.quantity || 0) + Math.max(1, quantity);
-      await updateOrderLine(selectedOrder.id, existingLine.id, {
+        matchingLines.reduce(
+          (total, line) => total + Number(line.quantity || 0),
+          0
+        ) + Math.max(1, quantity);
+      const existingOrderId = existingLine.salesOrderId || selectedOrder.id;
+      await updateOrderLine(existingOrderId, existingLine.id, {
         variantId: existingLine.variantId,
         quantity: nextQuantity.toFixed(4),
         unitPrice: existingLine.unitPrice || "0.0000",
@@ -1592,6 +1654,45 @@ export function CashierPage() {
           ? { ...line, quantity: nextQuantity.toFixed(4) }
           : line
       );
+      setMultiOrderLines((current) => {
+        const lines = current[existingOrderId];
+        if (!lines) return current;
+        return {
+          ...current,
+          [existingOrderId]: lines.map((line) =>
+            line.id === existingLine.id
+              ? { ...line, quantity: nextQuantity.toFixed(4) }
+              : line
+          ),
+        };
+      });
+      // Orders created before this fix can already hold several 1x rows of the
+      // same item. Fold those into the line just incremented.
+      const duplicates = matchingLines.filter(
+        (line) =>
+          line.id !== existingLine.id &&
+          (line.salesOrderId || selectedOrder.id) === existingOrderId
+      );
+      if (duplicates.length) {
+        for (const duplicate of duplicates) {
+          await removeOrderLine(existingOrderId, duplicate.id).catch(
+            () => undefined
+          );
+        }
+        activeOrderLinesRef.current = activeOrderLinesRef.current.filter(
+          (line) => !duplicates.some((duplicate) => duplicate.id === line.id)
+        );
+        setMultiOrderLines((current) => {
+          const lines = current[existingOrderId];
+          if (!lines) return current;
+          return {
+            ...current,
+            [existingOrderId]: lines.filter(
+              (line) => !duplicates.some((duplicate) => duplicate.id === line.id)
+            ),
+          };
+        });
+      }
 
       if (
         shouldUseTableSession &&

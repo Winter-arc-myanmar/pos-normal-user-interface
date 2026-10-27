@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   stopTableCharges: vi.fn(),
   addProductToTableSession: vi.fn(),
   updateOrderLine: vi.fn(),
+  removeOrderLine: vi.fn(),
   checkoutTableSession: vi.fn(),
   closePosSession: vi.fn(),
   createPosRegister: vi.fn(),
@@ -249,7 +250,7 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
     createOrder: vi.fn(),
     addProductToOrder: vi.fn(),
     updateOrderLine: mocks.updateOrderLine,
-    removeOrderLine: vi.fn(),
+    removeOrderLine: mocks.removeOrderLine,
     addProductToTableSession: mocks.addProductToTableSession,
     getCounterOrderById: mocks.getCounterOrderById,
     pickupCounterOrder: mocks.pickupCounterOrder,
@@ -539,6 +540,55 @@ describe("CashierPage integration", () => {
     expect(mocks.updateTableSessionState).toHaveBeenCalledWith("session-1", {
       sessionState: "ORDERING",
     });
+  });
+
+  it("merges into a served line and folds existing 1x duplicates", async () => {
+    selectedOrderLinesState = [
+      { ...orderLine, status: "SERVED" },
+      { ...orderLine, id: "line-2", status: "SERVED" },
+    ];
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=menu"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Coffee/ }));
+
+    await waitFor(() =>
+      expect(mocks.updateOrderLine).toHaveBeenCalledWith("order-1", "line-1", {
+        variantId: "variant-1",
+        quantity: "3.0000",
+        unitPrice: "10.0000",
+        lineDiscount: "0.0000",
+        taxAmount: "0.0000",
+        seatNumber: undefined,
+      })
+    );
+    expect(mocks.removeOrderLine).toHaveBeenCalledWith("order-1", "line-2");
+    expect(mocks.addProductToTableSession).not.toHaveBeenCalled();
+  });
+
+  it("prints duplicate item lines as one combined quantity on the receipt", async () => {
+    selectedOrderLinesState = [
+      orderLine,
+      { ...orderLine, id: "line-2" },
+    ];
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=pay"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "cashier.printFinance" }));
+
+    await waitFor(() =>
+      expect(mocks.printReceipt).toHaveBeenCalledWith(
+        expect.objectContaining({
+          lines: [expect.objectContaining({ name: "Coffee", quantity: "2" })],
+        })
+      )
+    );
   });
 
   it("merges rapid repeated product taps into the newly created line", async () => {
