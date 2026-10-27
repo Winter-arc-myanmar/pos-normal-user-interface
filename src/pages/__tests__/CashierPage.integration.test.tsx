@@ -591,6 +591,38 @@ describe("CashierPage integration", () => {
     );
   });
 
+  it("adds a pending line when plus is pressed on a sent item", async () => {
+    selectedOrderLinesState = [{ ...orderLine, status: "FIRED" }];
+    mocks.addProductToTableSession.mockResolvedValue({
+      ...orderLine,
+      id: "line-new",
+      status: "PENDING",
+    });
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=menu"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "cashier.orderPanel.expandItem" })
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "cashier.orderPanel.increaseQuantity" })
+    );
+
+    await waitFor(() =>
+      expect(mocks.addProductToTableSession).toHaveBeenCalledWith(
+        "session-1",
+        productState,
+        "variant-1",
+        1,
+        undefined
+      )
+    );
+    expect(mocks.updateOrderLine).not.toHaveBeenCalled();
+  });
+
   it("merges rapid repeated product taps into the newly created line", async () => {
     selectedOrderLinesState = [];
     mocks.addProductToTableSession.mockResolvedValue({
