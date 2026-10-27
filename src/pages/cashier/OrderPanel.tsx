@@ -88,6 +88,9 @@ interface OrderPanelProps {
   splitRemaining?: number;
   isPayView?: boolean;
   requiresTableAssignment?: boolean;
+  /** Whether Confirm pay prints the bill; the till ticks it when the guest wants one. */
+  printBillOnConfirm?: boolean;
+  onPrintBillOnConfirmChange?: (value: boolean) => void;
   onOpenPay?: () => void;
   /** False for staff who take orders but not money, such as waiters. */
   canTakePayment?: boolean;
@@ -147,6 +150,8 @@ export function OrderPanel({
   splitRemaining = 0,
   isPayView = false,
   requiresTableAssignment = false,
+  printBillOnConfirm = false,
+  onPrintBillOnConfirmChange,
   onOpenPay,
   canTakePayment = true,
   onCheckout,
@@ -569,6 +574,20 @@ export function OrderPanel({
               <span />
             )}
           </div>
+          {isPayView && canTakePayment ? (
+            <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs font-medium text-slate-700">
+              <input
+                type="checkbox"
+                className="h-4 w-4"
+                checked={printBillOnConfirm}
+                disabled={isLoading}
+                onChange={(event) =>
+                  onPrintBillOnConfirmChange?.(event.target.checked)
+                }
+              />
+              {t("cashier.payment.printBillOnConfirm")}
+            </label>
+          ) : null}
           {!canTakePayment ? (
             <p className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-center text-xs text-slate-600">
               {t("cashier.orderPanel.paymentAtCashier")}

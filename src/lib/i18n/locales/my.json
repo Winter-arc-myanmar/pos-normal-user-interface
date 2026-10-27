@@ -1020,6 +1020,7 @@
       "splitTenderCount": "ပေးချေမှု {{count}} ခု",
       "splitCovered": "ဘിൽ ပြည့်ပြီး။ အဆင်သင့်ဖြစ်လျှင် ပေးချေ အတည်ပြုပါ။",
       "chooseMethod": "ပေးချေနည်း ရွေးပြီး ပေးချေ အတည်ပြုပါ။",
+      "printBillOnConfirm": "အတည်ပြုချိန် ဘီလ်ထုတ်မည်",
       "memberCard": "MEMBER CARD",
       "tapMemberCard": "ဧည့်သည်ကတ် UID ကို တို့ပါ၊ ပွတ်ပါ၊ သို့မဟုတ် ထည့်ပါ။",
       "lookupMemberCard": "ကတ်ရှာမည်",
