@@ -4,18 +4,27 @@ type SettingsToggleProps = {
   checked: boolean;
   onChange: (checked: boolean) => void;
   label: string;
+  disabled?: boolean;
 };
 
-export function SettingsToggle({ checked, onChange, label }: SettingsToggleProps) {
+export function SettingsToggle({
+  checked,
+  onChange,
+  label,
+  disabled = false,
+}: SettingsToggleProps) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
       aria-label={label}
-      onClick={() => onChange(!checked)}
+      disabled={disabled}
+      onClick={() => {
+        if (!disabled) onChange(!checked);
+      }}
       className={[
-        "relative h-7 w-12 rounded-full transition-colors",
+        "relative h-7 w-12 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-60",
         checked ? "bg-blue-600" : "bg-slate-300",
       ].join(" ")}
     >
@@ -34,6 +43,7 @@ type SettingsRowProps = {
   description: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
+  disabled?: boolean;
 };
 
 export function SettingsToggleRow({
@@ -41,6 +51,7 @@ export function SettingsToggleRow({
   description,
   checked,
   onChange,
+  disabled = false,
 }: SettingsRowProps) {
   return (
     <div className="flex items-start justify-between gap-4 border-b border-slate-100 py-4 last:border-b-0">
@@ -48,10 +59,16 @@ export function SettingsToggleRow({
         <p className="font-semibold text-slate-900">{title}</p>
         <p className="mt-1 text-sm leading-6 text-slate-500">{description}</p>
       </div>
-      <SettingsToggle checked={checked} onChange={onChange} label={title} />
+      <SettingsToggle
+        checked={checked}
+        onChange={onChange}
+        label={title}
+        disabled={disabled}
+      />
     </div>
   );
 }
+
 
 type QuickChipProps = {
   label: string;

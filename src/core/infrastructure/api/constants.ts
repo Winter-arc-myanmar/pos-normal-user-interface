@@ -418,6 +418,7 @@ export const API_ENDPOINTS = {
   // Placeholder POS sync endpoints — replace when backend contract is confirmed.
   VENUE_SETTINGS: {
     GET: "/api/v1/venue-settings",
+    UPDATE: "/api/v1/venue-settings",
   },
 
   SPA_PACKAGES: {
