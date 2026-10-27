@@ -12,6 +12,8 @@ export interface VenueSetting {
   currency: PriceCurrency;
   /** Sales check and deduct stock; off for a business without inventory. */
   trackStock: boolean;
+  /** Removing an item or cancelling an order the kitchen has prints a DELETE slip. */
+  kdsDeleteSlips: boolean;
   /**
    * The shop's default taxes as one rate, for taxable products with none of their
    * own: the fractions added up (0.05 for 5%), all inside the price or all on top.
@@ -63,6 +65,7 @@ export class ApiVenueSettingRepository {
       ktvMenuOrdering: data.ktvMenuOrdering !== false,
       currency: data.currency === "USD" ? "USD" : "MMK",
       trackStock: data.trackStock !== false,
+      kdsDeleteSlips: data.kdsDeleteSlips !== false,
       defaultTaxRate: toDefaultTaxRate(rates),
       serviceChargeBps: Math.max(0, Number(data.serviceChargeBps) || 0),
       serviceChargeOn: {

@@ -530,8 +530,13 @@ export function CashierPage() {
     );
   }, [variantsByProductId]);
 
-  const { defaultTaxRate, serviceChargeBps, serviceChargeOn, serviceChargeTaxRate } =
-    useVenueSetting();
+  const {
+    defaultTaxRate,
+    serviceChargeBps,
+    serviceChargeOn,
+    serviceChargeTaxRate,
+    kdsDeleteSlips,
+  } = useVenueSetting();
   const { hasPermission } = usePermissions();
   const canTakePayment = hasPermission("sales:checkout:write");
   const formatAmount = useCallback((value: number) => value.toFixed(4), []);
@@ -2146,6 +2151,12 @@ export function CashierPage() {
 
   const handleCancelOrder = async () => {
     const orderId = selectedOrder?.id || activeTableSession?.salesOrderId;
+    // A paid sale being voided was made already; only an open order stops the kitchen.
+    const cancelledLines =
+      isDirectCheckoutMode ||
+      String(selectedOrder?.status || "").toUpperCase() === "COMPLETED"
+        ? []
+        : activeOrderLines;
     const sessionId = selectedOrderSession?.id || activeTableSession?.id;
     const tableId = displayedOrderTable?.id || activeTableId;
 
@@ -2172,7 +2183,11 @@ export function CashierPage() {
         setActiveTableId(null);
       }
 
+      const deletePrintError = orderId
+        ? await printKdsDelete(cancelledLines)
+        : null;
       await resetWorkspaceAfterTransaction(t("cashier.orderPanel.orderCancelled"));
+      if (deletePrintError) setLocalError(deletePrintError);
     } catch (caught) {
       const message =
         caught instanceof Error ? caught.message : t("cashier.errors.cancelOrder");
@@ -2181,14 +2196,14 @@ export function CashierPage() {
   };
 
   /**
-   * Tells the kitchen to stop making a line it was already sent: a DELETE slip
-   * on that line's station printer. Nothing prints for a line the kitchen never
-   * got, and a print problem never undoes the removal.
+   * Tells the kitchen to stop making lines it was already sent: a DELETE slip
+   * on each line's station printer, when the shop prints them. Nothing prints
+   * for a line the kitchen never got, and a print problem never undoes the removal.
    */
-  const printKdsDelete = async (line: SalesOrderLine) => {
-    if (isPendingKdsLine(line)) return null;
-    const [printLine] = printableLines([line]);
-    if (!printLine) return null;
+  const printKdsDelete = async (lines: SalesOrderLine[]) => {
+    if (!kdsDeleteSlips) return null;
+    const printLines = printableLines(lines.filter((line) => !isPendingKdsLine(line)));
+    if (!printLines.length) return null;
     const title = t("cashier.orderPanel.kdsDeleteTitle");
     try {
       const listed = locationId
@@ -2199,7 +2214,7 @@ export function CashierPage() {
           title,
           firedAt: new Date().toISOString(),
           orderRef: selectedOrder?.orderNumber,
-          lines: [{ ...printLine, remarks: title }],
+          lines: printLines.map((line) => ({ ...line, remarks: title })),
           ...receiptParty(),
         },
         listed.stations.map((station) => ({
@@ -2264,7 +2279,7 @@ export function CashierPage() {
     if (!selectedOrder) return;
     if (quantity <= 0) {
       await removeOrderLine(selectedOrder.id, lineId);
-      const deletePrintError = await printKdsDelete(targetLine);
+      const deletePrintError = await printKdsDelete([targetLine]);
       if (deletePrintError) setLocalError(deletePrintError);
       return;
     }
@@ -2481,9 +2496,9 @@ export function CashierPage() {
         }
         for (const entry of lines) {
           await removeOrderLine(selectedOrder.id, entry.id);
-          const deletePrintError = await printKdsDelete(entry);
-          if (deletePrintError) setLocalError(deletePrintError);
         }
+        const deletePrintError = await printKdsDelete(lines);
+        if (deletePrintError) setLocalError(deletePrintError);
       }
       setNotice(t("cashier.orderPanel.itemRemoved"));
     } catch (caught) {
