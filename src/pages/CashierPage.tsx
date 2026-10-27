@@ -691,12 +691,12 @@ export function CashierPage() {
   ]);
 
   // Promotions for the shop's own menu (the BAR area), shown the same way the room
-  // tills show them. The server applies them itself; this only shows the saving.
+  // tills show them. The server prices every line saved on a bill, so only the
+  // quick-sale cart, not saved until checkout, needs a preview of the saving.
   const promotions = usePromotions(
     "BAR",
     locationId || undefined,
-    () => promotionPreviewItems(displayOrderLines),
-    selectedOrder?.id
+    () => (isDirectCheckoutMode ? promotionPreviewItems(displayOrderLines) : [])
   );
 
   const orderedProductQuantities = useMemo(() => {
@@ -2815,7 +2815,7 @@ export function CashierPage() {
         onRemoveLine={(line) => void handleRemoveLine(line)}
         onToggleFoc={(line) => void handleToggleFoc(line)}
         promotions={promotions.running}
-        promotionDiscounts={promotions.discounts}
+        promotionDiscounts={isDirectCheckoutMode ? promotions.discounts : undefined}
         promotionName={promotions.promotionName}
         discountAmount={discountAmount}
         discountReasonId={discountReasonId}
