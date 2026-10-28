@@ -30,7 +30,8 @@ describe("BrowserPrinterClient", () => {
 
     expect(printDialog).toHaveBeenCalledWith(
       expect.arrayContaining(["PRINTER TEST", "Kitchen"]),
-      "printer-test"
+      "printer-test",
+      80
     );
   });
 
@@ -53,7 +54,38 @@ describe("BrowserPrinterClient", () => {
 
     expect(printDialog).toHaveBeenCalledWith(
       expect.arrayContaining(["PRINTER TEST", "Kitchen"]),
-      "printer-test"
+      "printer-test",
+      80
+    );
+  });
+
+  it("keeps the configured paper width in the browser fallback", async () => {
+    vi.spyOn(printerCapabilities, "canSendRawEscPos").mockReturnValue(false);
+    const printDialog = vi
+      .spyOn(documentPrint, "printLinesWithBrowserDialog")
+      .mockResolvedValue(undefined);
+    const client = new BrowserPrinterClient();
+
+    await client.printReceipt(
+      {
+        id: "printer-58",
+        transport: "USB",
+        displayName: "58mm counter",
+        deviceName: "POS-58",
+        lastVerifiedAt: "",
+      },
+      {
+        title: "Customer bill",
+        paperWidth: "MM58",
+        lines: [{ name: "A product name which needs consistent wrapping", quantity: "1" }],
+        total: "1000",
+      }
+    );
+
+    expect(printDialog).toHaveBeenCalledWith(
+      expect.any(Array),
+      "Customer bill",
+      58
     );
   });
 

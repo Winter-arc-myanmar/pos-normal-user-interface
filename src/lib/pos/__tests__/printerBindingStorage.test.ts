@@ -184,6 +184,28 @@ describe("printer binding storage", () => {
     expect(resolveBindingsForPlace([counter, office], null, "KDS")).toEqual([]);
   });
 
+  it("resolves duplicate records for one physical printer only once", () => {
+    const local = {
+      id: "local-counter",
+      transport: "NETWORK" as const,
+      displayName: "Counter (local)",
+      host: "192.168.1.50",
+      port: 9100,
+      sectors: ["CHECKOUT" as const],
+      lastVerifiedAt: "",
+    };
+    const synced = {
+      ...local,
+      id: "backend:counter",
+      backendPrinterId: "counter",
+      displayName: "Counter",
+    };
+
+    expect(resolveBindingsForPlace([local, synced], local, "CHECKOUT")).toEqual([
+      local,
+    ]);
+  });
+
   it("keeps printing when the device denies local storage", () => {
     vi.stubGlobal("localStorage", {
       getItem: () => null,

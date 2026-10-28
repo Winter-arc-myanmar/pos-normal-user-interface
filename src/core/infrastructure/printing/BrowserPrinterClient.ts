@@ -1,5 +1,6 @@
 import { KdsTicket } from "../../domain/entities/Cashier";
 import { PrinterBinding, PrinterTransport } from "@/lib/pos/printerBindingStorage";
+import type { PrintPaperWidth } from "@/core/domain/entities/PrintTemplate";
 import { printLinesWithBrowserDialog } from "@/lib/printing/documentPrint";
 import {
   buildKitchenSlipLines,
@@ -115,7 +116,8 @@ export class BrowserPrinterClient implements IPrinterClient {
     binding: PrinterBinding,
     escPos: string,
     pdfLines: string[],
-    pdfTitle: string
+    pdfTitle: string,
+    paperWidth?: PrintPaperWidth
   ): Promise<void> {
     if (canSendRawEscPos(binding)) {
       try {
@@ -125,7 +127,11 @@ export class BrowserPrinterClient implements IPrinterClient {
         if (!isBrowserPrinting()) throw caught;
       }
     }
-    await printLinesWithBrowserDialog(pdfLines, pdfTitle);
+    await printLinesWithBrowserDialog(
+      pdfLines,
+      pdfTitle,
+      paperWidth === "MM58" ? 58 : 80
+    );
   }
 
   testPrint(binding: PrinterBinding): Promise<void> {
@@ -133,7 +139,8 @@ export class BrowserPrinterClient implements IPrinterClient {
       binding,
       formatPrinterTest(binding.displayName),
       buildPrinterTestLines(binding.displayName),
-      "printer-test"
+      "printer-test",
+      "MM80"
     );
   }
 
@@ -147,7 +154,8 @@ export class BrowserPrinterClient implements IPrinterClient {
       binding,
       escPos,
       buildKitchenSlipLines(slip),
-      slip.title || "kitchen"
+      slip.title || "kitchen",
+      slip.paperWidth
     );
   }
 
@@ -157,7 +165,8 @@ export class BrowserPrinterClient implements IPrinterClient {
       binding,
       escPos,
       buildSaleReceiptLines(receipt),
-      receipt.title || "receipt"
+      receipt.title || "receipt",
+      receipt.paperWidth
     );
   }
 }

@@ -129,6 +129,9 @@ describe("OrderPanel", () => {
     expect(toggle).toHaveTextContent("Cola");
     expect(toggle).toHaveTextContent("3×");
     expect(toggle).toHaveTextContent("30.00");
+    expect(screen.getByLabelText("cashier.orderPanel.kdsPending")).toHaveClass(
+      "bg-emerald-500"
+    );
     fireEvent.click(toggle);
     fireEvent.click(
       screen.getByRole("button", { name: "cashier.orderPanel.remove" })
@@ -145,6 +148,32 @@ describe("OrderPanel", () => {
   it("blocks finance printing while a bill quote is unavailable", () => {
     render(<OrderPanel {...defaultProps} isPayView checkoutBlocked onPrintFinance={vi.fn()} />);
     expect(screen.getByRole("button", { name: "cashier.printFinance" })).toBeDisabled();
+  });
+
+  it("marks pending KDS lines green and sent lines with an unfilled circle", () => {
+    render(
+      <OrderPanel
+        {...defaultProps}
+        selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
+        selectedOrderLines={[
+          new SalesOrderLine({ ...line, productName: "Pending coffee" }),
+          new SalesOrderLine({
+            ...line,
+            id: "line-sent",
+            variantId: "variant-2",
+            productName: "Sent coffee",
+            firedAt: "2026-10-28T10:00:00.000Z",
+          }),
+        ]}
+      />
+    );
+
+    expect(screen.getByLabelText("cashier.orderPanel.kdsPending")).toHaveClass(
+      "bg-emerald-500"
+    );
+    expect(screen.getByLabelText("cashier.orderPanel.kdsAlreadySent")).toHaveClass(
+      "bg-transparent"
+    );
   });
 
   it("starts with compact summaries and reveals details only when expanded", async () => {
