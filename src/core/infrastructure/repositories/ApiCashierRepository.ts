@@ -54,6 +54,7 @@ import {
   KdsTicketLine,
   KdsTicketPlace,
   KdsStation,
+  type ModifierGroup,
   OrderPayment,
   PaymentMethod,
   PosRegister,
@@ -980,6 +981,37 @@ const ownTaxes = (item: Record<string, unknown>) => {
   };
 };
 
+const toModifierGroups = (value: unknown): ModifierGroup[] =>
+  Array.isArray(value)
+    ? value.map(asRecord).flatMap((group) =>
+        group?.id
+          ? [
+              {
+                id: String(group.id),
+                name: String(group.name || ""),
+                minSelection: toNumber(group.minSelection) ?? 0,
+                maxSelection: toNumber(group.maxSelection) ?? null,
+                isRequired: toBoolean(group.isRequired) ?? false,
+                modifiers: (Array.isArray(group.modifiers) ? group.modifiers : [])
+                  .map(asRecord)
+                  .flatMap((option) =>
+                    option?.id
+                      ? [
+                          {
+                            id: String(option.id),
+                            name: String(option.name || ""),
+                            priceDelta: String(option.priceDelta ?? "0"),
+                            isDefault: toBoolean(option.isDefault) ?? false,
+                          },
+                        ]
+                      : []
+                  ),
+              },
+            ]
+          : []
+      )
+    : [];
+
 const toProduct = (item: Record<string, unknown>) => {
   const taxRate = asRecord(item.taxRate);
   const own = ownTaxes(item);
@@ -1038,6 +1070,7 @@ const toProduct = (item: Record<string, unknown>) => {
     minimumBlocks: toNumber(item.minimumBlocks) ?? null,
     askWhoServed: toBoolean(item.askWhoServed) ?? false,
     chargeMode: item.chargeMode === "CLOCK" ? "CLOCK" : item.chargeMode === "PAY_FIRST" ? "PAY_FIRST" : null,
+    modifierGroups: toModifierGroups(item.modifierGroups),
     autoApply: toBoolean(item.autoApply) ?? false,
     deletedAt: item.deletedAt ? String(item.deletedAt) : item.deletedAt === null ? null : undefined,
     createdAt: item.createdAt ? String(item.createdAt) : undefined,

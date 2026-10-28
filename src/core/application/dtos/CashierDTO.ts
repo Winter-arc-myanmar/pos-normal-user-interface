@@ -286,6 +286,7 @@ export interface CheckoutRequestDTO {
     variantId: string;
     quantity: string;
     lineDiscount?: string;
+    selectedModifiers?: Array<{ modifierId: string }>;
   }>;
   payments: CheckoutPaymentEntryDTO[];
 }

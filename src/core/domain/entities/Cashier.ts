@@ -13,6 +13,29 @@ export class InventoryLocation {
   }
 }
 
+export interface ModifierOption {
+  id: string;
+  name: string;
+  priceDelta: string;
+  isDefault: boolean;
+}
+
+/** A choice offered with an item, like add-ons; maxSelection 0 or null: no limit. */
+export interface ModifierGroup {
+  id: string;
+  name: string;
+  minSelection: number;
+  maxSelection: number | null;
+  isRequired: boolean;
+  modifiers: ModifierOption[];
+}
+
+export interface ChosenModifier {
+  modifierId: string;
+  name: string;
+  priceDelta: string;
+}
+
 export class Product {
   id!: string;
   tenantId!: string;
@@ -49,6 +72,7 @@ export class Product {
   chargeMode?: "PAY_FIRST" | "CLOCK" | null;
   /** Room or table charge added by itself when the place opens. */
   autoApply?: boolean;
+  modifierGroups?: ModifierGroup[];
   deletedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
@@ -154,7 +178,7 @@ export class SalesOrderLine {
   voidReasonId?: string;
   compReasonId?: string;
   courseType?: string;
-  selectedModifiers?: Record<string, unknown>;
+  selectedModifiers?: Record<string, unknown> | ChosenModifier[];
   seatNumber?: number;
   productName?: string;
   variantName?: string;

@@ -1,7 +1,20 @@
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
-import { Product, ProductVariant } from "@/core/domain/entities/Cashier";
+import {
+  ChosenModifier,
+  ModifierGroup,
+  Product,
+  ProductVariant,
+} from "@/core/domain/entities/Cashier";
+import {
+  chosenModifiers,
+  defaultOptions,
+  groupLimit,
+  groupNeed,
+  missingGroup,
+  toggleOption,
+} from "@/lib/modifiers/choices";
 
 interface ProductMenuProps {
   products: Product[];
@@ -11,9 +24,12 @@ interface ProductMenuProps {
   onAdd: (
     product: Product,
     variantId: string,
-    quantity: number
+    quantity: number,
+    modifiers?: ChosenModifier[]
   ) => Promise<void>;
   onClose: () => void;
+  /** Asks for the item's options (add-ons) before adding it. */
+  offerOptions?: boolean;
   groupByCategory?: boolean;
   /** Shown under the search, e.g. category filters the page owns. */
   toolbar?: ReactNode;
@@ -58,6 +74,72 @@ function ProductCardImage({
   );
 }
 
+function OptionGroup({
+  group,
+  selected,
+  onToggle,
+}: {
+  group: ModifierGroup;
+  selected: string[];
+  onToggle: (optionId: string) => void;
+}) {
+  const { t } = useTranslation();
+  const limit = groupLimit(group);
+  const need = groupNeed(group);
+  const picked = group.modifiers.filter((option) => selected.includes(option.id)).length;
+  const hint =
+    limit === 1
+      ? t("cashier.productMenu.pickOne")
+      : limit === Infinity
+        ? t("cashier.productMenu.pickAny")
+        : t("cashier.productMenu.pickUpTo", { count: limit });
+  return (
+    <fieldset className="mt-4">
+      <legend className="flex w-full items-baseline justify-between gap-2 text-sm font-semibold">
+        <span>
+          {group.name}
+          {need > 0 ? (
+            <span className="ml-2 text-xs font-normal text-amber-300">
+              {t("cashier.productMenu.required")}
+            </span>
+          ) : null}
+        </span>
+        <span className="text-xs font-normal text-slate-400">{hint}</span>
+      </legend>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        {group.modifiers.map((option) => {
+          const on = selected.includes(option.id);
+          const full = !on && limit !== 1 && picked >= limit;
+          const price = Number(option.priceDelta) || 0;
+          return (
+            <button
+              key={option.id}
+              type="button"
+              role={limit === 1 ? "radio" : "checkbox"}
+              aria-checked={on}
+              disabled={full}
+              onClick={() => onToggle(option.id)}
+              className={[
+                "flex items-center justify-between gap-2 rounded border px-3 py-3 text-left text-sm",
+                on ? "border-blue-500 bg-blue-500/10" : "border-slate-700 bg-slate-900",
+                full ? "cursor-not-allowed opacity-50" : "",
+              ].join(" ")}
+            >
+              <span className="min-w-0 break-words">{option.name}</span>
+              {price ? (
+                <span className="shrink-0 text-xs text-blue-300">
+                  {price > 0 ? "+" : ""}
+                  {price}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
+
 export function ProductMenu({
   products,
   variantsByProductId,
@@ -67,6 +149,7 @@ export function ProductMenu({
   onClose,
   groupByCategory = false,
   toolbar,
+  offerOptions = false,
 }: ProductMenuProps) {
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
@@ -77,6 +160,7 @@ export function ProductMenu({
   const [quantity, setQuantity] = useState(1);
   const [isAdding, setIsAdding] = useState(false);
   const [needsVariantChoice, setNeedsVariantChoice] = useState(false);
+  const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [localError, setLocalError] = useState<string | null>(null);
 
   const categoryOf = useCallback(
@@ -112,8 +196,15 @@ export function ProductMenu({
       ? variantsByProductId[selectedProduct.id] || []
       : [];
 
+  const optionGroupsOf = (product: Product | null): ModifierGroup[] =>
+    offerOptions && product
+      ? (product.modifierGroups || []).filter((group) => group.modifiers.length)
+      : [];
+  const optionGroups = optionGroupsOf(selectedProduct);
+
   const closeVariantModal = () => {
     setNeedsVariantChoice(false);
+    setSelectedOptions([]);
     setSelectedProduct(null);
     setSelectedVariantId("");
     setVariantOptions([]);
@@ -130,13 +221,14 @@ export function ProductMenu({
   const addProduct = async (
     product: Product,
     variantId: string,
-    nextQuantity: number
+    nextQuantity: number,
+    modifiers?: ChosenModifier[]
   ) => {
     if (!variantId) return false;
     setIsAdding(true);
     setLocalError(null);
     try {
-      await onAdd(product, variantId, nextQuantity);
+      await onAdd(product, variantId, nextQuantity, modifiers);
       setQuantity(1);
       return true;
     } catch (caught) {
@@ -169,7 +261,9 @@ export function ProductMenu({
       setSelectedVariantId(defaultVariantId);
       setVariantOptions(loaded);
 
-      if (loaded.length > 1) {
+      const groups = optionGroupsOf(product);
+      if (loaded.length > 1 || (defaultVariantId && groups.length)) {
+        setSelectedOptions(defaultOptions(groups));
         setNeedsVariantChoice(true);
         return;
       }
@@ -189,7 +283,18 @@ export function ProductMenu({
 
   const addSelected = async () => {
     if (!selectedProduct || !selectedVariantId) return;
-    const added = await addProduct(selectedProduct, selectedVariantId, quantity);
+    const missing = missingGroup(optionGroups, selectedOptions);
+    if (missing) {
+      setLocalError(t("cashier.productMenu.pickFrom", { name: missing.name }));
+      return;
+    }
+    const modifiers = chosenModifiers(optionGroups, selectedOptions);
+    const added = await addProduct(
+      selectedProduct,
+      selectedVariantId,
+      quantity,
+      modifiers.length ? modifiers : undefined
+    );
     if (added) closeVariantModal();
   };
 
@@ -302,7 +407,9 @@ export function ProductMenu({
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs uppercase tracking-wide text-slate-400">
-                  {t("cashier.productMenu.chooseVariant")}
+                  {variants.length > 1
+                    ? t("cashier.productMenu.chooseVariant")
+                    : t("cashier.productMenu.chooseOptions")}
                 </p>
                 <h2
                   id="product-variant-title"
@@ -316,26 +423,41 @@ export function ProductMenu({
               </Button>
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              {variants.map((variant) => {
-                const selected = selectedVariantId === variant.id;
-                return (
-                  <button
-                    key={variant.id}
-                    type="button"
-                    onClick={() => setSelectedVariantId(variant.id)}
-                    className={[
-                      "rounded border px-3 py-3 text-left text-sm",
-                      selected
-                        ? "border-blue-500 bg-blue-500/10"
-                        : "border-slate-700 bg-slate-900",
-                    ].join(" ")}
-                  >
-                    {variantLabel(variant)}
-                  </button>
-                );
-              })}
-            </div>
+            {variants.length > 1 ? (
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                {variants.map((variant) => {
+                  const selected = selectedVariantId === variant.id;
+                  return (
+                    <button
+                      key={variant.id}
+                      type="button"
+                      onClick={() => setSelectedVariantId(variant.id)}
+                      className={[
+                        "rounded border px-3 py-3 text-left text-sm",
+                        selected
+                          ? "border-blue-500 bg-blue-500/10"
+                          : "border-slate-700 bg-slate-900",
+                      ].join(" ")}
+                    >
+                      {variantLabel(variant)}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+
+            {optionGroups.map((group) => (
+              <OptionGroup
+                key={group.id}
+                group={group}
+                selected={selectedOptions}
+                onToggle={(optionId) =>
+                  setSelectedOptions((current) =>
+                    toggleOption(current, group, optionId)
+                  )
+                }
+              />
+            ))}
 
             <label className="mt-4 block text-xs text-slate-300">
               {t("cashier.productMenu.quantity")}

@@ -18,6 +18,7 @@ import {
 import { OrderTabs } from "./OrderTabs";
 import { OrderAdjustments } from "./OrderAdjustments";
 import { isSettledSalesOrder } from "@/lib/pos/orderStatus";
+import { modifierPrintText } from "@/lib/printing/modifierText";
 import { isPendingKdsLine } from "@/lib/pos/kdsLines";
 import { isFocLine } from "@/lib/pos/checkoutAdjustments";
 import type {
@@ -320,6 +321,7 @@ export function OrderPanel({
             <div className="my-3 divide-y divide-slate-200 overflow-hidden rounded border border-slate-200">
               {groupedOrderLines.map((line) => {
                 const lineName = resolveLineName(line);
+                const lineOptions = modifierPrintText(line.selectedModifiers).names;
                 const lineVariant = resolveLineVariant(line);
                 const groupLines = line.groupedLines ?? [line];
                 const pricedLines = groupLines.map(
@@ -444,6 +446,14 @@ export function OrderPanel({
                         <path d="m4 6 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     </button>
+                    {lineOptions ? (
+                      <p
+                        className="truncate px-2 pb-1 text-xs text-slate-500"
+                        title={lineOptions}
+                      >
+                        {lineOptions}
+                      </p>
+                    ) : null}
                     {isExpanded ? (
                       <div id={detailsId} className="border-t border-slate-200 px-2 pb-2 pt-1.5">
                         <p className="break-words text-sm font-medium">{lineName}</p>
