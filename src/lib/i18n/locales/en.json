@@ -731,6 +731,11 @@
       "qtyFirst": "Quantity first",
       "price": "Price",
       "modifiers": "Modifiers",
+      "deleteSlip": {
+        "title": "KDS delete slip",
+        "description": "Print a DELETE slip on the station printer when a sent item is removed or an open order is cancelled. This applies to every POS at this shop.",
+        "saving": "Saving…"
+      },
       "productRemarks": "Product remarks",
       "bilingual": "Bilingual",
       "categorySubtotal": "Category subtotal",
@@ -759,11 +764,6 @@
     },
     "kdsStation": {
       "newStation": "New station",
-      "deleteSlip": {
-        "title": "KDS delete slip",
-        "description": "Print a DELETE slip on the station printer when a sent item is removed or an open order is cancelled. This applies to every POS at this shop.",
-        "saving": "Saving…"
-      },
       "name": "Station name",
       "color": "Display color",
       "printers": "Printers",
