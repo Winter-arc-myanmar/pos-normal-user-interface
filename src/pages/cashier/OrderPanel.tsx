@@ -417,24 +417,13 @@ export function OrderPanel({
                         }
                       )}
                     >
-                      <span
-                        className={[
-                          "h-2.5 w-2.5 shrink-0 rounded-full border-2",
-                          isPendingKds
-                            ? "border-emerald-500 bg-emerald-500"
-                            : "border-slate-400 bg-transparent",
-                        ].join(" ")}
-                        aria-label={t(
-                          isPendingKds
-                            ? "cashier.orderPanel.kdsPending"
-                            : "cashier.orderPanel.kdsAlreadySent"
-                        )}
-                        title={t(
-                          isPendingKds
-                            ? "cashier.orderPanel.kdsPending"
-                            : "cashier.orderPanel.kdsAlreadySent"
-                        )}
-                      />
+                      {isPendingKds ? (
+                        <span
+                          className="h-2.5 w-2.5 shrink-0 rounded-full border-2 border-emerald-500 bg-emerald-500"
+                          aria-label={t("cashier.orderPanel.kdsPending")}
+                          title={t("cashier.orderPanel.kdsPending")}
+                        />
+                      ) : null}
                       <span
                         className="shrink-0 text-xs font-semibold tabular-nums text-slate-500"
                         aria-label={t("cashier.orderPanel.lineQuantity", { count: quantityLabel })}

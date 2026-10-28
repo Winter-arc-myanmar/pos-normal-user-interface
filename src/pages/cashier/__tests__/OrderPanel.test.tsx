@@ -205,7 +205,7 @@ describe("OrderPanel", () => {
     expect(screen.getByRole("button", { name: "cashier.printFinance" })).toBeDisabled();
   });
 
-  it("marks pending KDS lines green and sent lines with an unfilled circle", () => {
+  it("marks pending KDS lines green and hides the marker after they are sent", () => {
     render(
       <OrderPanel
         {...defaultProps}
@@ -226,9 +226,7 @@ describe("OrderPanel", () => {
     expect(screen.getByLabelText("cashier.orderPanel.kdsPending")).toHaveClass(
       "bg-emerald-500"
     );
-    expect(screen.getByLabelText("cashier.orderPanel.kdsAlreadySent")).toHaveClass(
-      "bg-transparent"
-    );
+    expect(screen.getAllByLabelText("cashier.orderPanel.kdsPending")).toHaveLength(1);
   });
 
   it("starts with compact summaries and reveals details only when expanded", async () => {
