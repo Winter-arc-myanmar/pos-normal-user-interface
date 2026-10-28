@@ -1083,6 +1083,9 @@
       "quickCheckout": "Quick Checkout",
       "tableStatus": "Table status",
       "tableStatusLabel": "Table",
+      "tableControls": "Table & session",
+      "expandTableControls": "Expand table and session controls",
+      "collapseTableControls": "Collapse table and session controls",
       "tableStatusOption": "Table: {{status}}",
       "tableStatuses": {
         "AVAILABLE": "Available",

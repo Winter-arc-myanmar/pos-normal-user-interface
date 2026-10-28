@@ -1083,6 +1083,9 @@
       "quickCheckout": "အမြန်ငွေရှင်း",
       "tableStatus": "စားပွဲအခြေအနေ",
       "tableStatusLabel": "စားပွဲ",
+      "tableControls": "စားပွဲနှင့် ဆက်ရှင်",
+      "expandTableControls": "စားပွဲနှင့် ဆက်ရှင် ထိန်းချုပ်မှုများကို ဖြန့်မည်",
+      "collapseTableControls": "စားပွဲနှင့် ဆက်ရှင် ထိန်းချုပ်မှုများကို ခေါက်မည်",
       "tableStatusOption": "စားပွဲ: {{status}}",
       "tableStatuses": {
         "AVAILABLE": "လွတ်သည်",

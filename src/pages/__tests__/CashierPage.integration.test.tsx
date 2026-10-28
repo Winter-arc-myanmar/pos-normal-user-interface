@@ -1140,6 +1140,11 @@ describe("CashierPage integration", () => {
       screen.getByRole("button", { name: /cashier.status.all/i })
     ).toBeInTheDocument();
 
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "cashier.orderPanel.expandTableControls",
+      })
+    );
     fireEvent.change(screen.getByLabelText("cashier.orderPanel.tableStatus"), {
       target: { value: "DIRTY" },
     });

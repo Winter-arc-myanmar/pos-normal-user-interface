@@ -218,11 +218,13 @@ export function OrderPanel({
 }: OrderPanelProps) {
   const { t } = useTranslation();
   const [confirmCancelOrder, setConfirmCancelOrder] = useState(false);
+  const [tableControlsExpanded, setTableControlsExpanded] = useState(false);
   const [expandedLine, setExpandedLine] = useState<{
     orderId: string | undefined;
     lineId: string;
   } | null>(null);
   const lineDetailsId = useId();
+  const tableControlsId = useId();
   const groupedOrderLines = useMemo(
     () => groupOrderLines(selectedOrderLines),
     [selectedOrderLines]
@@ -239,6 +241,10 @@ export function OrderPanel({
   useEffect(() => {
     if (!hasActiveOrder) setConfirmCancelOrder(false);
   }, [hasActiveOrder]);
+
+  useEffect(() => {
+    setTableControlsExpanded(false);
+  }, [selectedOrder?.id, selectedSession?.id, selectedTable?.id]);
 
   const resolveLineName = (line: SalesOrderLine) => {
     const variant = variants.find((item) => item.id === line.variantId);
@@ -602,116 +608,163 @@ export function OrderPanel({
             </p>
           ) : null}
           {selectedTable || selectedSession ? (
-            <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
-              {selectedTable ? (
-                <label
-                  className={[
-                    "min-w-0 space-y-1",
-                    selectedSession ? "" : "col-span-2",
-                  ].join(" ")}
-                >
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                    {t("cashier.orderPanel.tableStatusLabel")}
+            <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+              <button
+                type="button"
+                className="flex min-h-11 w-full items-center gap-2 px-3 text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
+                aria-expanded={tableControlsExpanded}
+                aria-controls={tableControlsId}
+                aria-label={t(
+                  tableControlsExpanded
+                    ? "cashier.orderPanel.collapseTableControls"
+                    : "cashier.orderPanel.expandTableControls"
+                )}
+                onClick={() => setTableControlsExpanded((expanded) => !expanded)}
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                    {t("cashier.orderPanel.tableControls")}
                   </span>
-                  <select
-                    aria-label={t("cashier.orderPanel.tableStatus")}
-                    value={selectedTable.status}
-                    onChange={(event) =>
-                      onTableStatusChange(event.target.value as DiningTableStatus)
-                    }
-                    className="min-h-9 w-full min-w-0 rounded border border-slate-300 bg-white px-2 text-xs focus:border-blue-500 focus:outline-none"
-                  >
-                    {(["AVAILABLE", "OCCUPIED", "DIRTY", "RESERVED"] as const).map(
-                      (status) => (
-                        <option key={status} value={status}>
-                          {t(`cashier.orderPanel.tableStatuses.${status}`)}
-                        </option>
-                      )
-                    )}
-                  </select>
-                </label>
-              ) : null}
-              {selectedSession ? (
-                <label
-                  className={[
-                    "min-w-0 space-y-1",
-                    selectedTable ? "" : "col-span-2",
-                  ].join(" ")}
-                >
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                    {t("cashier.orderPanel.sessionStateLabel")}
+                  <span className="block truncate text-xs font-medium text-slate-800">
+                    {[
+                      selectedTable
+                        ? selectedTable.tableNumber ||
+                          t(`cashier.orderPanel.tableStatuses.${selectedTable.status}`)
+                        : null,
+                      selectedSession
+                        ? t(`cashier.orderPanel.sessionStates.${selectedSession.sessionState}`)
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </span>
-                  <select
-                    aria-label={t("cashier.orderPanel.sessionState")}
-                    value={selectedSession.sessionState}
-                    onChange={(event) =>
-                      onSessionStateChange(event.target.value as TableSessionState)
-                    }
-                    className="min-h-9 w-full min-w-0 rounded border border-slate-300 bg-white px-2 text-xs focus:border-blue-500 focus:outline-none"
-                  >
-                    {(
-                      [
-                        "SEATED",
-                        "ORDERING",
-                        "SERVED",
-                        "PAYMENT_PENDING",
-                        "CLOSED",
-                      ] as const
-                    ).map((state) => (
-                      <option key={state} value={state}>
-                        {t(`cashier.orderPanel.sessionStates.${state}`)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : null}
-            </div>
-          ) : null}
-          {selectedSession && onChangeTable && onCombineTables ? (
-            <div className="space-y-2">
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  disabled={isLoading}
-                  onClick={onChangeTable}
-                  className="min-h-9 rounded border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-800 hover:border-blue-500 disabled:opacity-50"
+                </span>
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  className={`h-4 w-4 shrink-0 text-slate-500 transition-transform duration-200 motion-reduce:transition-none ${tableControlsExpanded ? "rotate-180" : ""}`}
                 >
-                  {t("cashier.seating.changeTable")}
-                </button>
-                <button
-                  type="button"
-                  disabled={isLoading}
-                  onClick={onCombineTables}
-                  className="min-h-9 rounded border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-800 hover:border-blue-500 disabled:opacity-50"
-                >
-                  {t("cashier.seating.combine")}
-                </button>
-              </div>
-              {joinedTables.length && onReleaseTable ? (
-                <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                  <span className="text-slate-500">
-                    {t("cashier.seating.joinedTables")}:
-                  </span>
-                  {joinedTables.map((table) => (
-                    <button
-                      key={table.id}
-                      type="button"
-                      disabled={isLoading}
-                      onClick={() => onReleaseTable(table.id)}
-                      title={t("cashier.seating.release", {
-                        table: table.tableNumber,
-                      })}
-                      aria-label={t("cashier.seating.release", {
-                        table: table.tableNumber,
-                      })}
-                      className="rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 font-semibold text-slate-700 hover:border-red-400 hover:text-red-600 disabled:opacity-50"
-                    >
-                      {table.tableNumber} ×
-                    </button>
-                  ))}
+                  <path d="m4 6 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+
+              {tableControlsExpanded ? (
+                <div id={tableControlsId} className="space-y-2 border-t border-slate-200 bg-slate-50 p-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    {selectedTable ? (
+                      <label
+                        className={[
+                          "min-w-0 space-y-1",
+                          selectedSession ? "" : "col-span-2",
+                        ].join(" ")}
+                      >
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                          {t("cashier.orderPanel.tableStatusLabel")}
+                        </span>
+                        <select
+                          aria-label={t("cashier.orderPanel.tableStatus")}
+                          value={selectedTable.status}
+                          onChange={(event) =>
+                            onTableStatusChange(event.target.value as DiningTableStatus)
+                          }
+                          className="min-h-11 w-full min-w-0 rounded border border-slate-300 bg-white px-2 text-xs focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        >
+                          {(["AVAILABLE", "OCCUPIED", "DIRTY", "RESERVED"] as const).map(
+                            (status) => (
+                              <option key={status} value={status}>
+                                {t(`cashier.orderPanel.tableStatuses.${status}`)}
+                              </option>
+                            )
+                          )}
+                        </select>
+                      </label>
+                    ) : null}
+                    {selectedSession ? (
+                      <label
+                        className={[
+                          "min-w-0 space-y-1",
+                          selectedTable ? "" : "col-span-2",
+                        ].join(" ")}
+                      >
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                          {t("cashier.orderPanel.sessionStateLabel")}
+                        </span>
+                        <select
+                          aria-label={t("cashier.orderPanel.sessionState")}
+                          value={selectedSession.sessionState}
+                          onChange={(event) =>
+                            onSessionStateChange(event.target.value as TableSessionState)
+                          }
+                          className="min-h-11 w-full min-w-0 rounded border border-slate-300 bg-white px-2 text-xs focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        >
+                          {(
+                            [
+                              "SEATED",
+                              "ORDERING",
+                              "SERVED",
+                              "PAYMENT_PENDING",
+                              "CLOSED",
+                            ] as const
+                          ).map((state) => (
+                            <option key={state} value={state}>
+                              {t(`cashier.orderPanel.sessionStates.${state}`)}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
+                  </div>
+
+                  {selectedSession && onChangeTable && onCombineTables ? (
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          disabled={isLoading}
+                          onClick={onChangeTable}
+                          className="min-h-11 rounded border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-800 transition-colors hover:border-blue-500 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {t("cashier.seating.changeTable")}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isLoading}
+                          onClick={onCombineTables}
+                          className="min-h-11 rounded border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-800 transition-colors hover:border-blue-500 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {t("cashier.seating.combine")}
+                        </button>
+                      </div>
+                      {joinedTables.length && onReleaseTable ? (
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <span className="text-slate-500">
+                            {t("cashier.seating.joinedTables")}:
+                          </span>
+                          {joinedTables.map((table) => (
+                            <button
+                              key={table.id}
+                              type="button"
+                              disabled={isLoading}
+                              onClick={() => onReleaseTable(table.id)}
+                              title={t("cashier.seating.release", {
+                                table: table.tableNumber,
+                              })}
+                              aria-label={t("cashier.seating.release", {
+                                table: table.tableNumber,
+                              })}
+                              className="min-h-11 rounded-full border border-slate-300 bg-white px-3 font-semibold text-slate-700 transition-colors hover:border-red-400 hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {table.tableNumber} ×
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
-            </div>
+            </section>
           ) : null}
           <div className="grid grid-cols-2 gap-2">
             <Button
