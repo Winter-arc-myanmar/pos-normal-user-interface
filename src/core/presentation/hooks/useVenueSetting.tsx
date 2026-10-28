@@ -11,6 +11,7 @@ const PAY_WHEN_ORDERING: VenueSetting = {
   ktvMenuOrdering: true,
   currency: "MMK",
   trackStock: true,
+  kdsDeleteSlips: true,
   defaultTaxRate: null,
   serviceChargeBps: 0,
   serviceChargeOn: { BAR: true, SPA: true, KTV: true },

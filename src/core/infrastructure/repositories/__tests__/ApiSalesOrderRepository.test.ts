@@ -1,8 +1,74 @@
 import { describe, expect, it, vi } from "vitest";
 import { HttpClient } from "../../api/HttpClient";
 import { ApiSalesOrderRepository } from "../ApiSalesOrderRepository";
+import type { SalesOrderBillQueryDTO } from "../../../application/dtos/SalesOrderDTO";
 
 describe("ApiSalesOrderRepository", () => {
+  it.each<SalesOrderBillQueryDTO>([
+    { discount: "12.50", includeTax: false, includeServiceCharge: false },
+    { discount: "0", includeTax: false, includeServiceCharge: true },
+    { includeTax: true, includeServiceCharge: false },
+    { includeTax: true, includeServiceCharge: true },
+  ])("forwards bill query unchanged and normalizes preview totals: %j", async (query) => {
+    const get = vi.fn().mockResolvedValue({
+      success: true,
+      data: {
+        orderId: "order-1",
+        subtotal: "110.0000",
+        totalDiscount: "10",
+        addedTax: 5,
+        totalTax: "15.5000",
+        serviceCharge: "10.00",
+        serviceChargeTax: 0.5,
+        grandTotal: "115.5",
+      },
+    });
+    const repository = new ApiSalesOrderRepository({ get } as unknown as HttpClient);
+
+    const result = await repository.getSalesOrderBill("order-1", query);
+
+    expect(get).toHaveBeenCalledWith("/api/v1/sales-orders/order-1/bill", {
+      params: query,
+    });
+    expect(result).toEqual({
+      orderId: "order-1",
+      subtotal: "110.0000",
+      totalDiscount: "10.0000",
+      addedTax: "5.0000",
+      totalTax: "15.5000",
+      serviceCharge: "10.0000",
+      serviceChargeTax: "0.5000",
+      grandTotal: "115.5000",
+    });
+  });
+
+  it("leaves omitted preview flags to backend defaults and supports an unwrapped response", async () => {
+    const get = vi.fn().mockResolvedValue({
+      orderId: "order-2",
+      subtotal: 100,
+      totalDiscount: 0,
+      addedTax: 0,
+      totalTax: 0,
+      serviceCharge: 0,
+      serviceChargeTax: 0,
+      grandTotal: 100,
+    });
+    const repository = new ApiSalesOrderRepository({ get } as unknown as HttpClient);
+
+    const result = await repository.getSalesOrderBill("order-2");
+
+    expect(get).toHaveBeenCalledWith("/api/v1/sales-orders/order-2/bill", {
+      params: undefined,
+    });
+    expect(result).toMatchObject({
+      grandTotal: "100.0000",
+      totalDiscount: "0.0000",
+      totalTax: "0.0000",
+      serviceCharge: "0.0000",
+      serviceChargeTax: "0.0000",
+    });
+  });
+
   it("maps customer names, item summaries, and product labels from nested payloads", async () => {
     const get = vi.fn().mockResolvedValue({
       data: [
@@ -112,6 +178,10 @@ describe("ApiSalesOrderRepository", () => {
       payments: [{ paymentMethodId: "card-method", guestCardId: "card-1" }],
       posSessionId: "pos-1",
       idempotencyKey: "spa-settle-session-1",
+      includeTax: false,
+      includeServiceCharge: false,
+      totalDiscount: "12.5000",
+      discountReasonId: "reason-1",
     };
 
     const result = await repository.settleSalesOrder("order-1", payload);

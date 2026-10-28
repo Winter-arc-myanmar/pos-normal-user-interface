@@ -276,6 +276,9 @@ export interface CheckoutRequestDTO {
   lineStatus?: string;
   tipAmount?: string;
   serviceCharge?: string;
+  /** Omitted charge flags default to true on the backend. */
+  includeTax?: boolean;
+  includeServiceCharge?: boolean;
   discountReasonId?: string;
   idempotencyKey?: string;
   tenantId: string;
@@ -311,6 +314,13 @@ export interface UpdateTableSessionStateDTO {
   sessionState: TableSessionState;
 }
 
+/** Guests changing places: another table, two bills combined, tables joined. */
+export type TableSeatingChangeDTO =
+  | { kind: "move"; tableId: string }
+  | { kind: "merge"; sourceSessionId: string; keepTable: boolean }
+  | { kind: "join"; tableId: string }
+  | { kind: "release"; tableId: string };
+
 export type TableWarningLevel = "OK" | "WARNING" | "CRITICAL";
 
 export interface TableWarningPolicyDTO {
@@ -345,6 +355,9 @@ export interface TableSessionCheckoutDTO {
   payments: CheckoutPaymentEntryDTO[];
   tipAmount?: number;
   serviceCharge?: number;
+  /** Omitted charge flags default to true on the backend. */
+  includeTax?: boolean;
+  includeServiceCharge?: boolean;
   discountReasonId?: string;
   totalDiscount?: number;
 }

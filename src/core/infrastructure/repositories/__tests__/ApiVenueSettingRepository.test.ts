@@ -17,3 +17,47 @@ describe("the shop's default tax rate", () => {
     expect((await repositoryReturning({ defaultTaxRate: null }).get()).defaultTaxRate).toBeNull();
   });
 });
+
+describe("the shop's KDS delete slips", () => {
+  it("saves the switch without dropping the other venue settings", async () => {
+    const current = {
+      spaEnabled: true,
+      spaMenuOrdering: false,
+      ktvEnabled: true,
+      ktvMenuOrdering: true,
+      paymentTiming: "PAY_AT_END",
+      roomCardOnly: true,
+      maxPromotionsPerItem: 1,
+      maxPromotionsPerBill: 5,
+      currency: "MMK",
+      trackStock: false,
+      kdsDeleteSlips: true,
+      defaultTaxRateIds: ["tax-1"],
+      serviceChargeBps: 500,
+      serviceChargeOnBar: true,
+      serviceChargeOnSpa: true,
+      serviceChargeOnKtv: true,
+    };
+    const put = vi.fn().mockResolvedValue({
+      data: { ...current, kdsDeleteSlips: false },
+    });
+    const repository = new ApiVenueSettingRepository({
+      get: vi.fn().mockResolvedValue({ data: current }),
+      put,
+    } as unknown as HttpClient);
+
+    const updated = await repository.updateKdsDeleteSlips(false);
+
+    expect(updated.kdsDeleteSlips).toBe(false);
+    expect(put).toHaveBeenCalledWith(
+      "/api/v1/venue-settings",
+      expect.objectContaining({
+        kdsDeleteSlips: false,
+        spaMenuOrdering: false,
+        trackStock: false,
+        defaultTaxRateIds: ["tax-1"],
+        serviceChargeBps: 500,
+      })
+    );
+  });
+});

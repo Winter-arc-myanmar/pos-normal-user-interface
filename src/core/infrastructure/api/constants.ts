@@ -165,6 +165,7 @@ export const API_ENDPOINTS = {
     UPDATE: (id: string) => `/api/v1/sales-orders/${id}`,
     DELETE: (id: string) => `/api/v1/sales-orders/${id}`,
     SETTLE: (id: string) => `/api/v1/sales-orders/${id}/settle`,
+    BILL: (id: string) => `/api/v1/sales-orders/${id}/bill`,
     LINES: (salesOrderId: string) => ({
       LIST: `/api/v1/sales-orders/${salesOrderId}/lines`,
       CREATE: `/api/v1/sales-orders/${salesOrderId}/lines`,
@@ -242,6 +243,11 @@ export const API_ENDPOINTS = {
     CHECKOUT: (id: string) => `/api/v1/table-sessions/${id}/checkout`,
     CHARGES: (id: string) => `/api/v1/table-sessions/${id}/charges`,
     CHARGES_STOP: (id: string) => `/api/v1/table-sessions/${id}/charges/stop`,
+    MOVE: (id: string) => `/api/v1/table-sessions/${id}/move`,
+    MERGE: (id: string) => `/api/v1/table-sessions/${id}/merge`,
+    TABLES: (id: string) => `/api/v1/table-sessions/${id}/tables`,
+    TABLE: (id: string, tableId: string) =>
+      `/api/v1/table-sessions/${id}/tables/${tableId}`,
   },
 
   KTV_ROOMS: {
@@ -412,6 +418,7 @@ export const API_ENDPOINTS = {
   // Placeholder POS sync endpoints — replace when backend contract is confirmed.
   VENUE_SETTINGS: {
     GET: "/api/v1/venue-settings",
+    UPDATE: "/api/v1/venue-settings",
   },
 
   SPA_PACKAGES: {

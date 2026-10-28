@@ -100,13 +100,13 @@ function initials(name: string): string {
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 }
 
-function isClosedStatus(status: string): boolean {
-  const value = status.toUpperCase();
+function isClosedStatus(status?: string | null): boolean {
+  const value = String(status || "").toUpperCase();
   return value === "CLOSED" || value === "SETTLED" || value === "VOIDED";
 }
 
-function isSettlingStatus(status: string): boolean {
-  return status.toUpperCase() === "SETTLING";
+function isSettlingStatus(status?: string | null): boolean {
+  return String(status || "").toUpperCase() === "SETTLING";
 }
 
 function MemberEmptyIllustration() {
@@ -400,7 +400,10 @@ export function CustomersPage() {
   const selectedWallet = currentWallet;
   const defaultPaymentMethodId = paymentMethods[0]?.id || "";
   const activeCards = useMemo(
-    () => cards.filter((card) => card.status.toUpperCase() === "ACTIVE"),
+    () =>
+      cards.filter(
+        (card) => String(card.status || "").toUpperCase() === "ACTIVE"
+      ),
     [cards]
   );
   const walletClosed = selectedWallet ? isClosedStatus(selectedWallet.status) : true;
@@ -1244,7 +1247,7 @@ export function CustomersPage() {
                                 {card.status}
           </p>
         </div>
-                            {card.status.toUpperCase() === "ACTIVE" ? (
+                            {String(card.status || "").toUpperCase() === "ACTIVE" ? (
                               <div className="flex flex-wrap gap-1">
                                 <Button
                                   size="sm"

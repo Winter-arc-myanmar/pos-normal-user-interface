@@ -3,6 +3,27 @@ import { HttpClient } from "../../api/HttpClient";
 import { ApiCashierRepository } from "../ApiCashierRepository";
 
 describe("ApiCashierRepository", () => {
+  it.each([[true, true], [false, true], [true, false], [false, false]])(
+    "preserves bill options through table and direct checkout (%s, %s)",
+    async (includeTax, includeServiceCharge) => {
+      const post = vi.fn().mockResolvedValue({ data: { id: "session-1" } });
+      const repository = new ApiCashierRepository({ post } as unknown as HttpClient);
+      await repository.checkoutTableSession("session-1", {
+        posSessionId: "shift-1", payments: [{ paymentMethodId: "cash", amount: "100.0000" }],
+        includeTax, includeServiceCharge,
+      });
+      expect(post).toHaveBeenLastCalledWith("/api/v1/table-sessions/session-1/checkout", expect.objectContaining({
+        includeTax, includeServiceCharge,
+      }));
+      await repository.checkout({
+        tenantId: "tenant-1", locationId: "location-1", salesChannel: "POS", serviceType: "DINE_IN",
+        items: [{ variantId: "variant-1", quantity: "1.0000" }],
+        payments: [{ paymentMethodId: "cash", amount: "100.0000" }], includeTax, includeServiceCharge,
+      });
+      expect(post).toHaveBeenLastCalledWith("/api/v1/checkout", expect.objectContaining({ includeTax, includeServiceCharge }));
+    }
+  );
+
   it("names an order line's item, however the API nests the name", async () => {
     const httpClient = {
       get: vi.fn().mockResolvedValue({
@@ -111,6 +132,79 @@ describe("ApiCashierRepository", () => {
     });
     expect(lines[1].categoryId).toBe("cat-snacks");
     expect(lines[2].categoryId).toBe("cat-tea");
+  });
+
+  it("keeps modifiers, tax and promotion fields on a reloaded order line", async () => {
+    // The till reads these back from a line it already rang up: the order panel
+    // merges a plain tap only into lines without modifiers, prints the
+    // modifiers on the bill, and copies tax/promotion when a line moves.
+    const httpClient = {
+      get: vi.fn().mockResolvedValue({
+        success: true,
+        data: [
+          {
+            id: "line-1",
+            salesOrderId: "order-1",
+            variantId: "variant-1",
+            quantity: "1.0000",
+            unitPrice: "10000.0000",
+            lineDiscount: "1000.0000",
+            taxRateId: "tax-1",
+            taxAmount: "900.0000",
+            taxInclusive: true,
+            appliedPromotionId: "promo-1",
+            voidReasonId: "void-1",
+            compReasonId: "comp-1",
+            courseType: "MAIN",
+            selectedModifiers: [
+              { modifierId: "mod-1", name: "Oat milk", priceDelta: "1500.0000" },
+            ],
+            updatedAt: "2026-10-23T10:00:00.000Z",
+          },
+          {
+            id: "line-2",
+            salesOrderId: "order-1",
+            variantId: "variant-2",
+            quantity: "2.0000",
+            unitPrice: "5000.0000",
+            selectedModifiers: {
+              "mod-2": { modifierId: "mod-2", name: "No ice" },
+            },
+          },
+          {
+            id: "line-3",
+            salesOrderId: "order-1",
+            variantId: "variant-3",
+            quantity: "1.0000",
+            unitPrice: "5000.0000",
+            selectedModifiers: [],
+          },
+        ],
+      }),
+    };
+    const repository = new ApiCashierRepository(
+      httpClient as unknown as HttpClient
+    );
+
+    const lines = await repository.getSalesOrderLines("order-1");
+
+    expect(lines[0]).toMatchObject({
+      taxRateId: "tax-1",
+      taxAmount: "900.0000",
+      taxInclusive: true,
+      appliedPromotionId: "promo-1",
+      voidReasonId: "void-1",
+      compReasonId: "comp-1",
+      courseType: "MAIN",
+      updatedAt: "2026-10-23T10:00:00.000Z",
+    });
+    expect(lines[0].selectedModifiers).toEqual([
+      { modifierId: "mod-1", name: "Oat milk", priceDelta: "1500.0000" },
+    ]);
+    expect(lines[1].selectedModifiers).toEqual({
+      "mod-2": { modifierId: "mod-2", name: "No ice" },
+    });
+    expect(lines[2].selectedModifiers).toBeUndefined();
   });
 
   it("normalizes nested paginated list responses", async () => {
@@ -566,7 +660,7 @@ describe("ApiCashierRepository", () => {
     });
   });
 
-  it("creates a sales order without serviceType", async () => {
+  it("creates a sales order with its service type", async () => {
     const post = vi.fn().mockResolvedValue({
       data: {
         id: "order-1",
@@ -600,6 +694,7 @@ describe("ApiCashierRepository", () => {
       totalTax: undefined,
       grandTotal: undefined,
       status: "DRAFT",
+      serviceType: "TAKEAWAY",
     });
     expect(order.serviceType).toBe("TAKE_AWAY");
   });
@@ -684,6 +779,59 @@ describe("ApiCashierRepository", () => {
       salesOrderId: "order-1",
       sessionState: "ORDERING",
     });
+  });
+
+  it("calls the seating endpoints and reads joined tables back", async () => {
+    const session = {
+      data: {
+        id: "session-1",
+        tableId: "table-5",
+        salesOrderId: "order-1",
+        sessionState: "ORDERING",
+        joinedTables: [{ sessionId: "session-1", tableId: "table-6" }],
+      },
+    };
+    const post = vi.fn().mockResolvedValue(session);
+    const del = vi.fn().mockResolvedValue(session);
+    const repository = new ApiCashierRepository({
+      post,
+      delete: del,
+    } as unknown as HttpClient);
+
+    const moved = await repository.changeTableSeating("session-1", {
+      kind: "move",
+      tableId: "table-9",
+    });
+    expect(post).toHaveBeenLastCalledWith("/api/v1/table-sessions/session-1/move", {
+      tableId: "table-9",
+    });
+    expect(moved.joinedTableIds).toEqual(["table-6"]);
+
+    await repository.changeTableSeating("session-1", {
+      kind: "merge",
+      sourceSessionId: "session-2",
+      keepTable: true,
+    });
+    expect(post).toHaveBeenLastCalledWith("/api/v1/table-sessions/session-1/merge", {
+      sourceSessionId: "session-2",
+      keepTable: true,
+    });
+
+    await repository.changeTableSeating("session-1", {
+      kind: "join",
+      tableId: "table-6",
+    });
+    expect(post).toHaveBeenLastCalledWith("/api/v1/table-sessions/session-1/tables", {
+      tableId: "table-6",
+    });
+
+    await repository.changeTableSeating("session-1", {
+      kind: "release",
+      tableId: "table-6",
+    });
+    expect(del).toHaveBeenCalledWith(
+      "/api/v1/table-sessions/session-1/tables/table-6"
+    );
   });
 
   it("keeps table status and closed sessions from being misread", async () => {
@@ -786,6 +934,7 @@ describe("ApiCashierRepository", () => {
             courseType: "MAIN",
             stationId: "station-1",
             firedAt: "2026-09-22T16:53:22.241Z",
+            session: { salesOrderId: "order-1" },
             station: {
               id: "station-1",
               name: "Hot line",
@@ -840,6 +989,7 @@ describe("ApiCashierRepository", () => {
     });
     expect(list.totalPages).toBe(1);
     expect(ticket.ticketNumber).toBe("KDS-20260506-0001");
+    expect(ticket.salesOrderId).toBe("order-1");
     expect(ticket.station).toMatchObject({
       name: "Hot line",
       printerId: "printer-hot",

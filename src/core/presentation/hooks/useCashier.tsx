@@ -26,6 +26,7 @@ import {
   TipPoolFilterDTO,
   UpdateSalesOrderLineDTO,
   UpdateTableSessionStateDTO,
+  TableSeatingChangeDTO,
   UpdateTipPoolDTO,
   UpdateWaitlistEntryDTO,
   TableWarningStatusDTO,
@@ -62,10 +63,9 @@ import {
 import { findOpenTableSession } from "@/lib/pos/tableSession";
 
 /**
- * Creating a sales order cannot carry a service type, so the API answers
- * DINE_IN for a pick-up or take-away draft. Remember the type each order was
- * opened with; keeping it in storage means a reload, a new browser tab, or a
- * second visit to the cashier still counts the order where it was opened.
+ * Orders created before the backend stored a draft's service type come back
+ * with none, which reads as DINE_IN. Remember the type each order was opened
+ * with so those drafts still count where they were opened.
  */
 const OPENED_SERVICE_TYPES_KEY = "pos:opened-service-types:v1";
 const MAX_OPENED_SERVICE_TYPES = 200;
@@ -156,6 +156,11 @@ interface UseCashierReturn {
   updateTableSessionState: (
     sessionId: string,
     payload: UpdateTableSessionStateDTO
+  ) => Promise<TableSession>;
+  /** Moves, combines, joins or releases tables, then reloads the floor. */
+  changeTableSeating: (
+    sessionId: string,
+    change: TableSeatingChangeDTO
   ) => Promise<TableSession>;
   fetchDiscountReasons: () => Promise<void>;
   fetchVoidReasons: () => Promise<void>;
@@ -271,10 +276,8 @@ export function useCashier(): UseCashierReturn {
   /**
    * The service type each open order was started with on this till.
    *
-   * Creating a sales order cannot carry a service type (only checkout can), so
-   * the API answers DINE_IN for a pick-up or take-away draft. Reading the order
-   * back would then move it to the dine-in tab: the pick-up count drops to zero
-   * and the order cannot be found where it was opened. Remember the type the
+   * A draft opened before the backend stored its service type reads back as
+   * DINE_IN, which would move it off the pick-up tab. Remember the type the
    * till opened it with until the order is settled.
    */
   const openedServiceTypes = useRef<Map<string, ServiceType>>(
@@ -1182,6 +1185,36 @@ export function useCashier(): UseCashierReturn {
     [cashierService, clearError]
   );
 
+  const changeTableSeating = useCallback(
+    async (sessionId: string, change: TableSeatingChangeDTO) => {
+      setIsLoading(true);
+      clearError();
+      try {
+        const updated = await cashierService.changeTableSeating(sessionId, change);
+        const [tables, sessions] = await Promise.all([
+          cashierService.getDiningTables({ page: 1, limit: 200 }),
+          cashierService.getTableSessions({
+            page: 1,
+            limit: 200,
+            sortBy: "openedAt",
+            sortOrder: "desc",
+          }),
+        ]);
+        setDiningTables(tables);
+        setTableSessions(sessions);
+        return updated;
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to change the table";
+        setError(message);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [cashierService, clearError]
+  );
+
   const selectOrderById = useCallback(
     async (orderId: string) => {
       setIsLoading(true);
@@ -1512,6 +1545,7 @@ export function useCashier(): UseCashierReturn {
       refreshDiningTableStatus,
       updateDiningTableStatus,
       updateTableSessionState,
+      changeTableSeating,
       fetchWaitlist,
       createWaitlistEntry,
       updateWaitlistEntry,
@@ -1592,6 +1626,7 @@ export function useCashier(): UseCashierReturn {
       refreshDiningTableStatus,
       updateDiningTableStatus,
       updateTableSessionState,
+      changeTableSeating,
       fetchWaitlist,
       createWaitlistEntry,
       updateWaitlistEntry,

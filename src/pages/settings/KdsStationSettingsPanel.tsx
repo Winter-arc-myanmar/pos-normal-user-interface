@@ -3,9 +3,11 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/core/presentation/hooks/useAuth";
 import { useCategoryManagement } from "@/core/presentation/hooks/useCategoryManagement";
+import { useKdsDeleteSlipShopSetting } from "@/core/presentation/hooks/useKdsDeleteSlipShopSetting";
 import { useKdsStationManagement } from "@/core/presentation/hooks/useKdsStationManagement";
 import { useKitchenPrinterManagement } from "@/core/presentation/hooks/useKitchenPrinterManagement";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
+import { SettingsToggleRow } from "./settingsUi";
 
 const fieldClass =
   "mt-1 min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500";
@@ -41,6 +43,7 @@ export function KdsStationSettingsPanel() {
     updateStation,
     deleteStation,
   } = useKdsStationManagement();
+  const kdsDeleteSlip = useKdsDeleteSlipShopSetting();
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [notice, setNotice] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -200,6 +203,25 @@ export function KdsStationSettingsPanel() {
       </aside>
 
       <section className="min-h-0 min-w-0 rounded-xl bg-white p-4 shadow-sm lg:overflow-y-auto">
+        {kdsDeleteSlip.canWrite ? (
+          <div className="mb-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <SettingsToggleRow
+              title={t("settings.kdsStation.deleteSlip.title")}
+              description={t("settings.kdsStation.deleteSlip.description")}
+              checked={kdsDeleteSlip.enabled}
+              onChange={(enabled) => void kdsDeleteSlip.save(enabled)}
+              disabled={kdsDeleteSlip.isSaving}
+            />
+            {kdsDeleteSlip.isSaving ? (
+              <p className="mt-2 text-xs text-slate-500">
+                {t("settings.kdsStation.deleteSlip.saving")}
+              </p>
+            ) : null}
+            {kdsDeleteSlip.error ? (
+              <p className="mt-2 text-sm text-red-600">{kdsDeleteSlip.error}</p>
+            ) : null}
+          </div>
+        ) : null}
         <label className="block text-sm text-slate-600">
           {t("settings.kdsStation.name")}
           <input

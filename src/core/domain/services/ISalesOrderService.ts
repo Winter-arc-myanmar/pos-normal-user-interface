@@ -1,6 +1,8 @@
 import {
   CompSalesOrderLineDTO,
   CreateSalesOrderDTO,
+  SalesOrderBillDTO,
+  SalesOrderBillQueryDTO,
   SalesOrderFilterDTO,
   SalesOrderLineListResponseDTO,
   SalesOrderListResponseDTO,
@@ -16,6 +18,10 @@ import { SalesOrder, SalesOrderLine } from "../entities/Cashier";
 export interface ISalesOrderService {
   getSalesOrders(params?: SalesOrderFilterDTO): Promise<SalesOrderListResponseDTO>;
   getSalesOrderById(id: string): Promise<SalesOrder>;
+  getSalesOrderBill(
+    id: string,
+    query?: SalesOrderBillQueryDTO
+  ): Promise<SalesOrderBillDTO>;
   createSalesOrder(payload: CreateSalesOrderDTO): Promise<SalesOrder>;
   updateSalesOrder(id: string, payload: UpdateSalesOrderDTO): Promise<SalesOrder>;
   deleteSalesOrder(id: string): Promise<SalesOrder>;

@@ -1,6 +1,8 @@
 import {
   CompSalesOrderLineDTO,
   CreateSalesOrderDTO,
+  SalesOrderBillDTO,
+  SalesOrderBillQueryDTO,
   SalesOrderFilterDTO,
   SalesOrderLineListResponseDTO,
   SalesOrderListResponseDTO,
@@ -378,6 +380,27 @@ export class ApiSalesOrderRepository implements ISalesOrderRepository {
       body
     );
     return toSalesOrder(asRecord(unwrap(response)) || {});
+  }
+
+  async getSalesOrderBill(
+    id: string,
+    query?: SalesOrderBillQueryDTO
+  ): Promise<SalesOrderBillDTO> {
+    const response = await this.httpClient.get<ApiEnvelope<Record<string, unknown>>>(
+      API_ENDPOINTS.SALES_ORDERS.BILL(id),
+      { params: query }
+    );
+    const item = asRecord(unwrap(response)) || {};
+    return {
+      orderId: String(item.orderId || id),
+      subtotal: toDecimalString(item.subtotal),
+      totalDiscount: toDecimalString(item.totalDiscount),
+      addedTax: toDecimalString(item.addedTax),
+      totalTax: toDecimalString(item.totalTax),
+      serviceCharge: toDecimalString(item.serviceCharge),
+      serviceChargeTax: toDecimalString(item.serviceChargeTax),
+      grandTotal: toDecimalString(item.grandTotal),
+    };
   }
 
   async updateSalesOrder(

@@ -83,4 +83,21 @@ describe("the kitchen slip", () => {
     expect(text).toContain("1 x COFFEE");
     expect(text).toContain("** DELETE **");
   });
+
+  it("prints the modifiers chosen for a kitchen item", () => {
+    const text = formatKitchenSlip({
+      title: "KDS-0012",
+      lines: [
+        {
+          name: "Coffee",
+          quantity: "1",
+          modifiers: "Oat milk",
+          modifierPrices: "1.5000",
+        },
+      ],
+    });
+
+    expect(text).toContain("+ Oat milk");
+    expect(text).not.toContain("+ Oat milk (+");
+  });
 });

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { KdsTicket } from "../../domain/entities/Cashier";
 import { IKitchenPrinterService } from "../../domain/services/IKitchenPrinterService";
 import { IPrintTemplateService } from "../../domain/services/IPrintTemplateService";
+import type { ISalesOrderService } from "../../domain/services/ISalesOrderService";
 import {
   PriceCurrency,
   PrintCompany,
@@ -19,6 +20,7 @@ import {
   PrintPlace,
   SaleReceipt,
 } from "@/lib/printing/formatKdsTicket";
+import { applyKdsTicketModifiers } from "@/lib/printing/kdsTicketModifiers";
 import { hasNativePrinterBridge } from "@/lib/printing/webPrinterTransports";
 import {
   groupKitchenJobs,
@@ -407,9 +409,28 @@ export function usePrinterConnection(
     [backendTargets, currentBindings, registerId, templateFor, tenantId]
   );
 
+  const ticketWithModifiers = useCallback(async (ticket: KdsTicket) => {
+    const missing = ticket.kdsTicketLines?.some(
+      (line) => !line.kitchenModifiers?.trim()
+    );
+    if (!missing || !ticket.salesOrderId) return ticket;
+    try {
+      const service = container.resolve<ISalesOrderService>("salesOrderService");
+      const result = await service.getSalesOrderLines(ticket.salesOrderId, {
+        page: 1,
+        limit: 100,
+      });
+      return applyKdsTicketModifiers(ticket, result.lines);
+    } catch {
+      // A ticket still prints if its order lines cannot be reloaded.
+      return ticket;
+    }
+  }, []);
+
   const printTicket = useCallback(
     async (ticket: KdsTicket, stations: StationRoute[] = []) => {
-      const stationId = ticket.stationId || ticket.station?.id;
+      const enriched = await ticketWithModifiers(ticket);
+      const stationId = enriched.stationId || enriched.station?.id;
       const listed = stationId
         ? stations.find((station) => station.id === stationId)
         : undefined;
@@ -418,23 +439,27 @@ export function usePrinterConnection(
             ...listed,
             printerIds: listed.printerIds.length
               ? listed.printerIds
-              : ticket.station?.printerIds || [],
-            name: ticket.station?.name || listed.name,
+              : enriched.station?.printerIds || [],
+            name: enriched.station?.name || listed.name,
           }
-        : ticket.station
+        : enriched.station
           ? {
-              id: ticket.station.id,
-              name: ticket.station.name,
-              printerIds: ticket.station.printerIds,
+              id: enriched.station.id,
+              name: enriched.station.name,
+              printerIds: enriched.station.printerIds,
               categoryIds: [],
             }
           : undefined;
       return printKitchen(
-        { ...kdsTicketSlip(ticket), stationId, stationName: station?.name },
+        {
+          ...kdsTicketSlip(enriched),
+          stationId,
+          stationName: station?.name,
+        },
         station ? [station] : []
       );
     },
-    [printKitchen]
+    [printKitchen, ticketWithModifiers]
   );
 
   return {

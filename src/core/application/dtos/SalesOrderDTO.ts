@@ -58,7 +58,34 @@ export interface SettleSalesOrderDTO {
   posSessionId?: string;
   tipAmount?: string;
   serviceCharge?: string;
+  /** Omitted charge flags default to true on the backend. */
+  includeTax?: boolean;
+  includeServiceCharge?: boolean;
+  totalDiscount?: string;
+  discountReasonId?: string;
   idempotencyKey?: string;
+}
+
+export interface SalesOrderBillQueryDTO {
+  /** Nonnegative decimal string for the order discount. */
+  discount?: string;
+  /** Omitted charge flags default to true on the backend. */
+  includeTax?: boolean;
+  includeServiceCharge?: boolean;
+}
+
+/** Authoritative preview totals, normalized to decimal strings by the repository. */
+export interface SalesOrderBillDTO {
+  orderId: string;
+  /** Gross prices before discount; tax-free net prices when includeTax is false. */
+  subtotal: string;
+  totalDiscount: string;
+  addedTax: string;
+  /** All tax, including inclusive line tax and service-charge tax. */
+  totalTax: string;
+  serviceCharge: string;
+  serviceChargeTax: string;
+  grandTotal: string;
 }
 
 export interface SettleSalesOrderResultDTO {

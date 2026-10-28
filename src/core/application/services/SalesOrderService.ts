@@ -3,6 +3,8 @@ import { ISalesOrderService } from "../../domain/services/ISalesOrderService";
 import {
   CompSalesOrderLineDTO,
   CreateSalesOrderDTO,
+  SalesOrderBillDTO,
+  SalesOrderBillQueryDTO,
   SalesOrderFilterDTO,
   SalesOrderLineListResponseDTO,
   SalesOrderListResponseDTO,
@@ -27,6 +29,14 @@ export class SalesOrderService implements ISalesOrderService {
   async getSalesOrderById(id: string): Promise<SalesOrder> {
     if (!id?.trim()) throw new Error("Sales order ID is required");
     return this.salesOrderRepository.getSalesOrderById(id);
+  }
+
+  async getSalesOrderBill(
+    id: string,
+    query?: SalesOrderBillQueryDTO
+  ): Promise<SalesOrderBillDTO> {
+    if (!id?.trim()) throw new Error("Sales order ID is required");
+    return this.salesOrderRepository.getSalesOrderBill(id, query);
   }
 
   async createSalesOrder(payload: CreateSalesOrderDTO): Promise<SalesOrder> {

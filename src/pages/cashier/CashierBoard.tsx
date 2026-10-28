@@ -84,6 +84,9 @@ export function CashierBoard({
   onPageChange,
 }: CashierBoardProps) {
   const { t } = useTranslation();
+  // The cashier page resets a paid filter back to All on every board, so a Paid
+  // tab never stays active. Hide it rather than offering a dead control.
+  const visibleStatusTabs = statusTabs.filter((tab) => tab.key !== "COMPLETED");
 
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden p-2 min-[1100px]:p-3">
@@ -122,7 +125,7 @@ export function CashierBoard({
       </div>
 
       <div className="mt-1 flex min-w-0 items-center gap-1.5 overflow-x-auto">
-        {statusTabs.map((tab) => {
+        {visibleStatusTabs.map((tab) => {
           const tabCount = statusTabCounts?.[tab.key];
           return (
             <button
@@ -226,7 +229,13 @@ export function CashierBoard({
                           className="mb-4 max-w-[90%] truncate text-[11px] font-semibold text-sky-700"
                           title={t("cashier.orderPanel.sessionState")}
                         >
-                          {session.sessionState}
+                          {session.tableId !== table.id
+                            ? t("cashier.seating.withTable", {
+                                table:
+                                  tables.find((item) => item.id === session.tableId)
+                                    ?.tableNumber || "",
+                              })
+                            : session.sessionState}
                         </span>
                       ) : null}
                       {orderCount > 1 ? (
@@ -287,7 +296,7 @@ export function CashierBoard({
           disabled={page <= 1}
           onClick={() => onPageChange(page - 1)}
           className="h-10 w-10 rounded bg-white text-xl text-black disabled:opacity-30"
-          aria-label="Previous"
+          aria-label={t("common.previous")}
         >
           ←
         </button>
@@ -299,7 +308,7 @@ export function CashierBoard({
           disabled={page >= pageCount}
           onClick={() => onPageChange(page + 1)}
           className="h-10 w-10 rounded bg-white text-xl text-black disabled:opacity-30"
-          aria-label="Next"
+          aria-label={t("common.next")}
         >
           →
         </button>

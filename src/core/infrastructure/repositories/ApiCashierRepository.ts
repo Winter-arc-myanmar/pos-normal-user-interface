@@ -34,6 +34,7 @@ import {
   UpdateProductDTO,
   UpdateProductVariantDTO,
   UpdateTableSessionStateDTO,
+  TableSeatingChangeDTO,
   UpdateSalesOrderLineDTO,
   UpdateTipPoolDTO,
   UpdateWaitlistEntryDTO,
@@ -246,6 +247,10 @@ const normalizeTableSessionCheckoutPayload = (
 ): Record<string, unknown> => ({
   posSessionId: payload.posSessionId,
   payments: normalizePaymentEntriesAsNumbers(payload.payments),
+  ...(payload.includeTax !== undefined ? { includeTax: payload.includeTax } : {}),
+  ...(payload.includeServiceCharge !== undefined
+    ? { includeServiceCharge: payload.includeServiceCharge }
+    : {}),
   ...(payload.tipAmount !== undefined ? { tipAmount: payload.tipAmount } : {}),
   ...(payload.serviceCharge !== undefined
     ? { serviceCharge: payload.serviceCharge }
@@ -264,6 +269,10 @@ const normalizeCheckoutPayload = (
   locationId: payload.locationId,
   salesChannel: payload.salesChannel,
   serviceType: payload.serviceType,
+  ...(payload.includeTax !== undefined ? { includeTax: payload.includeTax } : {}),
+  ...(payload.includeServiceCharge !== undefined
+    ? { includeServiceCharge: payload.includeServiceCharge }
+    : {}),
   ...(payload.customerId ? { customerId: payload.customerId } : {}),
   ...(payload.posSessionId ? { posSessionId: payload.posSessionId } : {}),
   ...(payload.lineStatus ? { lineStatus: payload.lineStatus } : {}),
@@ -435,6 +444,22 @@ const readSalesOrderLineNames = (item: Record<string, unknown>) => {
   };
 };
 
+/**
+ * The modifiers a sold line carries, in whichever shape the API returns them:
+ * the array this till posts to add/update a line, or an object keyed by
+ * modifier. Both are kept as they come, so a line read back from the server
+ * still knows the modifiers it was rung up with.
+ */
+const readLineModifiers = (
+  value: unknown
+): Record<string, unknown> | undefined => {
+  if (Array.isArray(value)) {
+    return value.length ? (value as unknown as Record<string, unknown>) : undefined;
+  }
+  const record = asRecord(value);
+  return record && Object.keys(record).length ? record : undefined;
+};
+
 /** The category a sold line was routed by, wherever the API puts it. */
 const readLineCategoryId = (row: Record<string, unknown>) => {
   const salesOrderLine = asRecord(row.salesOrderLine);
@@ -574,12 +599,13 @@ const toTicketPlace = (value: unknown): KdsTicketPlace | null => {
   };
 };
 
-const toKdsTicket = (item: Record<string, unknown>) =>
-  new KdsTicket({
+const toKdsTicket = (item: Record<string, unknown>) => {
+  const session = asRecord(item.session);
+  return new KdsTicket({
     id: String(item.id || ""),
     tenantId: String(item.tenantId || ""),
     sessionId: String(item.sessionId || ""),
-    salesOrderId: String(item.salesOrderId || ""),
+    salesOrderId: String(item.salesOrderId || session?.salesOrderId || ""),
     stationId: String(item.stationId || ""),
     ticketNumber: String(item.ticketNumber || ""),
     courseType: String(item.courseType || ""),
@@ -609,6 +635,9 @@ const toKdsTicket = (item: Record<string, unknown>) =>
             kitchenModifiers: line.kitchenModifiers
               ? String(line.kitchenModifiers)
               : undefined,
+            modifierPrices: line.modifierPrices
+              ? String(line.modifierPrices)
+              : undefined,
             status: String(line.status || "PENDING"),
             bumpedAt: line.bumpedAt ? String(line.bumpedAt) : null,
             createdAt: String(line.createdAt || ""),
@@ -636,6 +665,7 @@ const toKdsTicket = (item: Record<string, unknown>) =>
     createdAt: String(item.createdAt || ""),
     updatedAt: String(item.updatedAt || ""),
   });
+};
 
 const toKdsTicketList = (
   response: unknown,
@@ -844,6 +874,11 @@ const toTableSession = (
     openedByPosSessionId: item.openedByPosSessionId
       ? String(item.openedByPosSessionId)
       : undefined,
+    joinedTableIds: Array.isArray(item.joinedTables)
+      ? item.joinedTables
+          .map((joined) => nestedId(asRecord(joined)?.tableId))
+          .filter(Boolean)
+      : [],
   });
 
 const toDiningTableSession = (value: unknown): DiningTableActiveSession | null => {
@@ -1277,6 +1312,9 @@ export class ApiCashierRepository implements ICashierRepository {
         totalTax: payload.totalTax,
         grandTotal: payload.grandTotal,
         status: payload.status,
+        serviceType: payload.serviceType
+          ? toApiServiceType(payload.serviceType)
+          : undefined,
       }
     );
     const item = unwrap(response);
@@ -1381,13 +1419,22 @@ export class ApiCashierRepository implements ICashierRepository {
         quantity: String(item.quantity || "0"),
         unitPrice: String(item.unitPrice || "0"),
         lineDiscount: item.lineDiscount ? String(item.lineDiscount) : undefined,
+        taxRateId: item.taxRateId ? String(item.taxRateId) : undefined,
         taxAmount: item.taxAmount ? String(item.taxAmount) : undefined,
         taxInclusive: item.taxInclusive === true,
+        appliedPromotionId: item.appliedPromotionId
+          ? String(item.appliedPromotionId)
+          : undefined,
         status: item.status ? String(item.status) : undefined,
         firedAt: item.firedAt ? String(item.firedAt) : undefined,
         voidedAt: item.voidedAt ? String(item.voidedAt) : undefined,
+        voidReasonId: item.voidReasonId ? String(item.voidReasonId) : undefined,
+        compReasonId: item.compReasonId ? String(item.compReasonId) : undefined,
+        courseType: item.courseType ? String(item.courseType) : undefined,
+        selectedModifiers: readLineModifiers(item.selectedModifiers),
         seatNumber: typeof item.seatNumber === "number" ? item.seatNumber : undefined,
         createdAt: item.createdAt ? String(item.createdAt) : undefined,
+        updatedAt: item.updatedAt ? String(item.updatedAt) : undefined,
         categoryId: readLineCategoryId(item),
         categoryName: asName(item.categoryName) || asName(asRecord(item.product)?.categoryName),
         ...names,
@@ -1607,6 +1654,36 @@ export class ApiCashierRepository implements ICashierRepository {
     );
     const item = unwrap(response);
     return toTableSession(item, payload.sessionState);
+  }
+
+  async changeTableSeating(
+    sessionId: string,
+    change: TableSeatingChangeDTO
+  ): Promise<TableSession> {
+    const endpoints = API_ENDPOINTS.TABLE_SESSIONS;
+    const response =
+      change.kind === "move"
+        ? await this.httpClient.post<ApiEnvelope<Record<string, unknown>>>(
+            endpoints.MOVE(sessionId),
+            { tableId: change.tableId }
+          )
+        : change.kind === "merge"
+          ? await this.httpClient.post<ApiEnvelope<Record<string, unknown>>>(
+              endpoints.MERGE(sessionId),
+              {
+                sourceSessionId: change.sourceSessionId,
+                keepTable: change.keepTable,
+              }
+            )
+          : change.kind === "join"
+            ? await this.httpClient.post<ApiEnvelope<Record<string, unknown>>>(
+                endpoints.TABLES(sessionId),
+                { tableId: change.tableId }
+              )
+            : await this.httpClient.delete<ApiEnvelope<Record<string, unknown>>>(
+                endpoints.TABLE(sessionId, change.tableId)
+              );
+    return toTableSession(unwrap(response));
   }
 
   async addTableSessionLine(

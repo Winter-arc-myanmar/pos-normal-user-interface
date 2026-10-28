@@ -12,6 +12,8 @@ export interface VenueSetting {
   currency: PriceCurrency;
   /** Sales check and deduct stock; off for a business without inventory. */
   trackStock: boolean;
+  /** Removing an item or cancelling an order the kitchen has prints a DELETE slip. */
+  kdsDeleteSlips: boolean;
   /**
    * The shop's default taxes as one rate, for taxable products with none of their
    * own: the fractions added up (0.05 for 5%), all inside the price or all on top.
@@ -49,13 +51,61 @@ const toDefaultTaxRate = (rates: RecordValue[]): VenueSetting["defaultTaxRate"] 
   };
 };
 
+/** The PUT replaces the venue record; send the current values back with the one change. */
+const UPDATE_KEYS = [
+  "spaEnabled",
+  "spaMenuOrdering",
+  "ktvEnabled",
+  "ktvMenuOrdering",
+  "paymentTiming",
+  "roomCardOnly",
+  "maxPromotionsPerItem",
+  "maxPromotionsPerBill",
+  "currency",
+  "trackStock",
+  "defaultTaxRateIds",
+  "defaultTaxRateId",
+  "serviceChargeBps",
+  "serviceChargeOnBar",
+  "serviceChargeOnSpa",
+  "serviceChargeOnKtv",
+] as const;
+
 export class ApiVenueSettingRepository {
   constructor(private readonly httpClient: HttpClient) {}
 
   /** How this business takes payment for SPA and KTV rooms, from Venue setup. */
   async get(): Promise<VenueSetting> {
-    const response = asRecord(await this.httpClient.get<unknown>(API_ENDPOINTS.VENUE_SETTINGS.GET));
-    const data = asRecord("data" in response ? response.data : response);
+    return this.toSetting(await this.fetchData());
+  }
+
+  /**
+   * Turns KDS DELETE slips on or off for the whole shop, keeping every other
+   * venue setting as it is.
+   */
+  async updateKdsDeleteSlips(kdsDeleteSlips: boolean): Promise<VenueSetting> {
+    const current = await this.fetchData();
+    const payload: RecordValue = { kdsDeleteSlips };
+    for (const key of UPDATE_KEYS) {
+      if (current[key] !== undefined) payload[key] = current[key];
+    }
+    const response = asRecord(
+      await this.httpClient.put<unknown>(API_ENDPOINTS.VENUE_SETTINGS.UPDATE, payload)
+    );
+    const updated = asRecord("data" in response ? response.data : response);
+    return this.toSetting(
+      Object.keys(updated).length ? updated : { ...current, kdsDeleteSlips }
+    );
+  }
+
+  private async fetchData(): Promise<RecordValue> {
+    const response = asRecord(
+      await this.httpClient.get<unknown>(API_ENDPOINTS.VENUE_SETTINGS.GET)
+    );
+    return asRecord("data" in response ? response.data : response);
+  }
+
+  private toSetting(data: RecordValue): VenueSetting {
     const rates = toRates(data);
     return {
       paymentTiming: data.paymentTiming === "PAY_AT_END" ? "PAY_AT_END" : "PAY_WHEN_ORDERING",
@@ -63,6 +113,7 @@ export class ApiVenueSettingRepository {
       ktvMenuOrdering: data.ktvMenuOrdering !== false,
       currency: data.currency === "USD" ? "USD" : "MMK",
       trackStock: data.trackStock !== false,
+      kdsDeleteSlips: data.kdsDeleteSlips !== false,
       defaultTaxRate: toDefaultTaxRate(rates),
       serviceChargeBps: Math.max(0, Number(data.serviceChargeBps) || 0),
       serviceChargeOn: {

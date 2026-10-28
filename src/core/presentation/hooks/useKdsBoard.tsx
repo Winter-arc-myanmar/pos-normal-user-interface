@@ -35,12 +35,26 @@ export function useKdsBoard() {
     );
 
   const start = useCallback(
-    async (id: string) => replace(await service.startKdsTicket(id)),
+    async (id: string) => {
+      try {
+        replace(await service.startKdsTicket(id));
+        setError(null);
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : "Unable to start ticket");
+      }
+    },
     [service]
   );
 
   const ready = useCallback(
-    async (id: string) => replace(await service.readyKdsTicket(id)),
+    async (id: string) => {
+      try {
+        replace(await service.readyKdsTicket(id));
+        setError(null);
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : "Unable to ready ticket");
+      }
+    },
     [service]
   );
 

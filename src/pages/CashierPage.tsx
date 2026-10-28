@@ -11,6 +11,7 @@ import {
   OrderStatus,
   ServiceType,
   SplitPaymentTenderDTO,
+  TableSeatingChangeDTO,
   TableSessionState,
   toApiServiceType,
 } from "@/core/application/dtos/CashierDTO";
@@ -27,6 +28,7 @@ import { useSalesOrderManagement } from "@/core/presentation/hooks/useSalesOrder
 import { CashierBoard } from "./cashier/CashierBoard";
 import { MultiOrderingView } from "./cashier/MultiOrderingView";
 import { OrderPanel } from "./cashier/OrderPanel";
+import { TableSeatingDialog } from "./cashier/TableSeatingDialog";
 import { PaymentView } from "./cashier/PaymentView";
 import { ProductMenu } from "./cashier/ProductMenu";
 import { TableChargesBar } from "./cashier/TableChargesBar";
@@ -41,6 +43,7 @@ import { useCardCapture } from "@/core/presentation/hooks/useCardCapture";
 import { useGuestWalletManagement } from "@/core/presentation/hooks/useGuestWalletManagement";
 import { calcLineTotals } from "@/lib/pos/checkoutCalculations";
 import { useVenueSetting } from "@/core/presentation/hooks/useVenueSetting";
+import { useBillOptions } from "@/core/presentation/hooks/useBillOptions";
 import { usePermissions } from "@/features/permissions/usePermissions";
 import {
   allocateOrderDiscountToLines,
@@ -123,6 +126,7 @@ export function CashierPage() {
     openTableSession,
     checkoutTableSession,
     updateTableSessionState,
+    changeTableSeating,
     fireToKds,
     getLatestSessionByTableId,
     selectOrder,
@@ -149,6 +153,8 @@ export function CashierPage() {
     deleteOrderLine: deleteManagedOrderLine,
     updateOrder: updateManagedOrder,
     deleteOrder: deleteManagedOrder,
+    fetchOrderBill,
+    settleOrder,
   } = useSalesOrderManagement();
   const {
     activeLocationId,
@@ -174,6 +180,7 @@ export function CashierPage() {
     orderId: string;
     discountAmount: string;
     tipAmount: string;
+    billRevision: string;
     total: number;
   } | null>(null);
   const [paymentMethodId, setPaymentMethodId] = useState("");
@@ -187,6 +194,9 @@ export function CashierPage() {
   const [directCartLines, setDirectCartLines] = useState<typeof selectedOrderLines>([]);
   const [isDirectCheckoutMode, setIsDirectCheckoutMode] = useState(false);
   const [activeTableId, setActiveTableId] = useState<string | null>(null);
+  const [seatingMode, setSeatingMode] = useState<"move" | "combine" | null>(
+    null
+  );
   const [tableOrderIds, setTableOrderIds] = useState<string[]>([]);
   const [multiOrderLines, setMultiOrderLines] = useState<
     Record<string, SalesOrderLine[]>
@@ -200,6 +210,9 @@ export function CashierPage() {
   const [discountAmount, setDiscountAmount] = useState("0.0000");
   const [discountReasonId, setDiscountReasonId] = useState("");
   const [tipAmount, setTipAmount] = useState("0.0000");
+  const [billGeneration, setBillGeneration] = useState(0);
+  const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
+  const confirmingPaymentRef = useRef(false);
   const [printBillOnConfirm, setPrintBillOnConfirm] = useState(readPrintBillOnConfirm);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const paymentInputRef = useRef<HTMLInputElement>(null);
@@ -285,6 +298,7 @@ export function CashierPage() {
       setDiscountAmount("0.0000");
       setDiscountReasonId("");
       setTipAmount("0.0000");
+      setBillGeneration((generation) => generation + 1);
       setLocalError(null);
       setNotice(message);
       setSearchParams({ view: "orders" });
@@ -437,6 +451,14 @@ export function CashierPage() {
     [diningTables, selectedOrderSession]
   );
 
+  const joinedOrderTables = useMemo(
+    () =>
+      (selectedOrderSession?.joinedTableIds ?? [])
+        .map((tableId) => diningTables.find((table) => table.id === tableId))
+        .filter((table): table is (typeof diningTables)[number] => Boolean(table)),
+    [diningTables, selectedOrderSession]
+  );
+
   const activeMultiOrderTable = useMemo(
     () =>
       activeTableId
@@ -508,8 +530,13 @@ export function CashierPage() {
     );
   }, [variantsByProductId]);
 
-  const { defaultTaxRate, serviceChargeBps, serviceChargeOn, serviceChargeTaxRate } =
-    useVenueSetting();
+  const {
+    defaultTaxRate,
+    serviceChargeBps,
+    serviceChargeOn,
+    serviceChargeTaxRate,
+    kdsDeleteSlips,
+  } = useVenueSetting();
   const { hasPermission } = usePermissions();
   const canTakePayment = hasPermission("sales:checkout:write");
   const formatAmount = useCallback((value: number) => value.toFixed(4), []);
@@ -595,19 +622,26 @@ export function CashierPage() {
       variantName?: string;
       quantity?: string | number;
       unitPrice?: string;
+      taxAmount?: string;
+      taxInclusive?: boolean;
       categoryId?: string;
       categoryName?: string;
       selectedModifiers?: Record<string, unknown>;
-    }>
-  ) =>
-    lines
+    }>,
+    withoutTax = false
+  ) => {
+    const printable = lines
       .filter((line) => !line.voidedAt)
       .map((line) => {
         const variant = variantById[line.variantId];
         const product = variant ? productById[variant.productId] : undefined;
         const modifiers = modifierPrintText(line.selectedModifiers);
-        const unitPrice = line.unitPrice?.trim();
+        const quantity = Number(line.quantity || 1);
+        const unitPrice = withoutTax && line.taxInclusive && quantity > 0
+          ? toMoney(Number(line.unitPrice || 0) - Number(line.taxAmount || 0) / quantity)
+          : line.unitPrice?.trim();
         return {
+          variantId: line.variantId,
           name: line.productName || product?.name || line.variantName || "Item",
           quantity: String(line.quantity || "1"),
           unitPrice: unitPrice || undefined,
@@ -619,6 +653,30 @@ export function CashierPage() {
           modifierPrices: modifiers.prices,
         };
       });
+    // A bill may already hold the same item on more than one line. The receipt
+    // shows one row with the combined quantity so it matches what was ordered.
+    const merged = new Map<string, (typeof printable)[number]>();
+    for (const line of printable) {
+      const key = JSON.stringify([
+        line.variantId,
+        line.name,
+        line.unitPrice,
+        line.categoryId,
+        line.modifiers,
+        line.modifierPrices,
+      ]);
+      const existing = merged.get(key);
+      if (!existing) {
+        merged.set(key, line);
+        continue;
+      }
+      merged.set(key, {
+        ...existing,
+        quantity: String(Number(existing.quantity) + Number(line.quantity)),
+      });
+    }
+    return [...merged.values()];
+  };
 
   const displayOrderLines = useMemo(() => {
     if (isDirectCheckoutMode) return activeOrderLines;
@@ -638,12 +696,12 @@ export function CashierPage() {
   ]);
 
   // Promotions for the shop's own menu (the BAR area), shown the same way the room
-  // tills show them. The server applies them itself; this only shows the saving.
+  // tills show them. The server prices every line saved on a bill, so only the
+  // quick-sale cart, not saved until checkout, needs a preview of the saving.
   const promotions = usePromotions(
     "BAR",
     locationId || undefined,
-    () => promotionPreviewItems(displayOrderLines),
-    selectedOrder?.id
+    () => (isDirectCheckoutMode ? promotionPreviewItems(displayOrderLines) : [])
   );
 
   const orderedProductQuantities = useMemo(() => {
@@ -656,14 +714,43 @@ export function CashierPage() {
     }, {});
   }, [displayOrderLines, variantById]);
 
+  const billRevision = JSON.stringify([selectedOrder?.grandTotal, activeOrderLines]);
+  const billOptions = useBillOptions({
+    billKey: `${isDirectCheckoutMode ? "direct" : selectedOrder?.id || "empty"}:${billGeneration}`,
+    orderId: !isDirectCheckoutMode ? selectedOrder?.id : undefined,
+    discount: discountAmount,
+    revision: billRevision,
+    fetchBill: fetchOrderBill,
+  });
+  const chooseBillOption = (field: "includeTax" | "includeServiceCharge", value: boolean) => {
+    billOptions.choose(field, value);
+    setIsSplitMode(false);
+    setSplitTenders([]);
+    setSyncedPaymentTotal(null);
+    setLocalError(null);
+  };
+
+  // Instant checkout taxes the items after allocating the bill discount.
+  const paymentBillLines = useMemo(() => {
+    if (!isDirectCheckoutMode || !billOptions.changed) return displayOrderLines;
+    const allocated = allocateOrderDiscountToLines(activeOrderLines, Number(discountAmount));
+    return activeOrderLines.map((line, index) => {
+      const variant = variantById[line.variantId];
+      const product = variant ? productById[variant.productId] : undefined;
+      return buildDirectLine({ ...line, lineDiscount: allocated[index].lineDiscount }, product, variant);
+    });
+  }, [activeOrderLines, billOptions.changed, buildDirectLine, discountAmount, displayOrderLines, isDirectCheckoutMode, productById, variantById]);
+
   const lineSubtotal = useMemo(() => {
     const backendTotal = Number(selectedOrder?.grandTotal || 0);
-    const totalLines = isDirectCheckoutMode ? activeOrderLines : displayOrderLines;
+    const totalLines = paymentBillLines;
     const lineTotal = totalLines.reduce((sum, line) => {
       const quantity = Number(line.quantity || 0);
       const unitPrice = Number(line.unitPrice || 0);
       const discount = Number(line.lineDiscount || 0);
-      const tax = line.taxInclusive ? 0 : Number(line.taxAmount || 0);
+      const tax = billOptions.includeTax
+        ? (line.taxInclusive ? 0 : Number(line.taxAmount || 0))
+        : (line.taxInclusive ? -Number(line.taxAmount || 0) : 0);
       return sum + quantity * unitPrice - discount + tax;
     }, 0);
     if (!isDirectCheckoutMode && backendTotal > 0) {
@@ -671,8 +758,8 @@ export function CashierPage() {
     }
     return lineTotal > 0 ? lineTotal : backendTotal;
   }, [
-    activeOrderLines,
-    displayOrderLines,
+    paymentBillLines,
+    billOptions.includeTax,
     isDirectCheckoutMode,
     selectedOrder?.grandTotal,
   ]);
@@ -680,10 +767,10 @@ export function CashierPage() {
   // The shop's service charge, as the server will add it: on the items after
   // discounts and before tax, with the default taxes set to apply to it.
   const { serviceCharge, serviceChargeTax } = useMemo(() => {
-    if (!serviceChargeBps || !serviceChargeOn.BAR) {
+    if (!billOptions.includeServiceCharge || !serviceChargeBps || !serviceChargeOn.BAR) {
       return { serviceCharge: 0, serviceChargeTax: 0 };
     }
-    const lines = isDirectCheckoutMode ? activeOrderLines : displayOrderLines;
+    const lines = paymentBillLines;
     const preTax =
       lines.reduce(
         (sum, line) =>
@@ -692,13 +779,15 @@ export function CashierPage() {
           Number(line.lineDiscount || 0) -
           (line.taxInclusive ? Number(line.taxAmount || 0) : 0),
         0
-      ) - Math.max(0, Number(discountAmount) || 0);
+      ) - (isDirectCheckoutMode && billOptions.changed ? 0 : Math.max(0, Number(discountAmount) || 0));
     const charge = (Math.max(0, preTax) * serviceChargeBps) / 10000;
-    return { serviceCharge: charge, serviceChargeTax: charge * serviceChargeTaxRate };
+    return { serviceCharge: charge, serviceChargeTax: billOptions.includeTax ? charge * serviceChargeTaxRate : 0 };
   }, [
-    activeOrderLines,
+    paymentBillLines,
+    billOptions.changed,
+    billOptions.includeServiceCharge,
+    billOptions.includeTax,
     discountAmount,
-    displayOrderLines,
     isDirectCheckoutMode,
     serviceChargeBps,
     serviceChargeOn.BAR,
@@ -710,9 +799,13 @@ export function CashierPage() {
       syncedPaymentTotal &&
       syncedPaymentTotal.orderId === selectedOrder?.id &&
       syncedPaymentTotal.discountAmount === discountAmount &&
-      syncedPaymentTotal.tipAmount === tipAmount
+      syncedPaymentTotal.tipAmount === tipAmount &&
+      syncedPaymentTotal.billRevision === billRevision
     ) {
       return syncedPaymentTotal.total.toFixed(4);
+    }
+    if (billOptions.bill) {
+      return toMoney(Number(billOptions.bill.grandTotal) + Math.max(0, Number(tipAmount) || 0));
     }
 
     const serverGrandTotal = !isDirectCheckoutMode
@@ -732,15 +825,19 @@ export function CashierPage() {
 
     return payableTotal({
       lineTotal: lineSubtotal,
-      orderDiscount: Number(discountAmount),
+      orderDiscount: isDirectCheckoutMode && billOptions.changed ? 0 : Number(discountAmount),
       serviceCharge: serviceCharge + serviceChargeTax,
       tipAmount: Number(tipAmount),
     }).toFixed(4);
   }, [
+    billOptions.bill,
+    billOptions.changed,
+    billRevision,
     discountAmount,
     isDirectCheckoutMode,
     lineSubtotal,
     selectedOrder?.grandTotal,
+    selectedOrder?.id,
     serviceCharge,
     serviceChargeTax,
     syncedPaymentTotal,
@@ -749,11 +846,21 @@ export function CashierPage() {
 
   const orderTax = useMemo(
     () =>
-      displayOrderLines
+      (billOptions.includeTax ? paymentBillLines
         .reduce((total, line) => total + Number(line.taxAmount || 0), 0)
-        .toFixed(4),
-    [displayOrderLines]
+        : 0).toFixed(4),
+    [billOptions.includeTax, paymentBillLines]
   );
+  const receiptTax = billOptions.bill?.totalTax ?? toMoney(Number(orderTax) + serviceChargeTax);
+  const receiptServiceCharge = billOptions.bill?.serviceCharge ?? toMoney(serviceCharge);
+  const receiptSubtotal = billOptions.bill?.subtotal ?? (billOptions.changed
+    ? toMoney(paymentBillLines.reduce((sum, line) => sum + Number(line.quantity) * Number(line.unitPrice)
+      - (!billOptions.includeTax && line.taxInclusive ? Number(line.taxAmount || 0) : 0), 0))
+    : lineSubtotal.toFixed(4));
+  const receiptDiscount = billOptions.bill?.totalDiscount ?? (billOptions.changed
+    ? toMoney(paymentBillLines.reduce((sum, line) => sum + Number(line.lineDiscount || 0), 0)
+      + (isDirectCheckoutMode ? 0 : Math.max(0, Number(discountAmount) || 0)))
+    : discountAmount);
 
   const checkoutPaymentMethods = useMemo(
     () => ensureMemberCardPaymentMethod(paymentMethods),
@@ -1481,11 +1588,39 @@ export function CashierPage() {
       !startFreshCart && selectedOrderSession && isPrimaryTableOrder
     );
 
-    const existingLine = !startFreshCart
-      ? activeOrderLinesRef.current.find(
-          (line) => line.variantId === variantId && isPendingKdsLine(line)
-        )
-      : undefined;
+    const tableLines = activeTableId
+      ? tableOrderIds.flatMap((orderId) => multiOrderLines[orderId] || [])
+      : [];
+    const clickedVariant = (variantsByProductId[product.id] || []).find(
+      (variant) => variant.id === variantId
+    );
+    const clickedUnitPrice = (
+      Number(product.basePrice || 0) + Number(clickedVariant?.priceModifier || 0)
+    ).toFixed(4);
+    const hasModifiers = (line: (typeof activeOrderLines)[number]) => {
+      const modifiers = line.selectedModifiers;
+      if (!modifiers) return false;
+      return Array.isArray(modifiers)
+        ? modifiers.length > 0
+        : Object.keys(modifiers).length > 0;
+    };
+    const candidates = new Map<string, (typeof activeOrderLines)[number]>();
+    for (const line of [...activeOrderLinesRef.current, ...tableLines]) {
+      if (!candidates.has(line.id)) candidates.set(line.id, line);
+    }
+    const matchingLines = startFreshCart
+      ? []
+      : [...candidates.values()].filter(
+          (line) =>
+            line.variantId === variantId &&
+            Number(line.unitPrice || 0).toFixed(4) === clickedUnitPrice &&
+            !hasModifiers(line) &&
+            !line.voidedAt &&
+            isPendingKdsLine(line)
+        );
+    // Additions after Send KDS stay on a new pending line so the kitchen
+    // receives them; the order panel still shows one combined quantity.
+    const existingLine = matchingLines[0];
 
     const rememberAddedLine = (line: SalesOrderLine) => {
       const index = activeOrderLinesRef.current.findIndex(
@@ -1500,9 +1635,15 @@ export function CashierPage() {
     };
 
     if (existingLine && selectedOrder) {
+      // Every matching 1x row plus this tap becomes the merged quantity, so
+      // collapsing old duplicates cannot lose an item.
       const nextQuantity =
-        Number(existingLine.quantity || 0) + Math.max(1, quantity);
-      await updateOrderLine(selectedOrder.id, existingLine.id, {
+        matchingLines.reduce(
+          (total, line) => total + Number(line.quantity || 0),
+          0
+        ) + Math.max(1, quantity);
+      const existingOrderId = existingLine.salesOrderId || selectedOrder.id;
+      await updateOrderLine(existingOrderId, existingLine.id, {
         variantId: existingLine.variantId,
         quantity: nextQuantity.toFixed(4),
         unitPrice: existingLine.unitPrice || "0.0000",
@@ -1515,6 +1656,45 @@ export function CashierPage() {
           ? { ...line, quantity: nextQuantity.toFixed(4) }
           : line
       );
+      setMultiOrderLines((current) => {
+        const lines = current[existingOrderId];
+        if (!lines) return current;
+        return {
+          ...current,
+          [existingOrderId]: lines.map((line) =>
+            line.id === existingLine.id
+              ? { ...line, quantity: nextQuantity.toFixed(4) }
+              : line
+          ),
+        };
+      });
+      // Orders created before this fix can already hold several 1x rows of the
+      // same item. Fold those into the line just incremented.
+      const duplicates = matchingLines.filter(
+        (line) =>
+          line.id !== existingLine.id &&
+          (line.salesOrderId || selectedOrder.id) === existingOrderId
+      );
+      if (duplicates.length) {
+        for (const duplicate of duplicates) {
+          await removeOrderLine(existingOrderId, duplicate.id).catch(
+            () => undefined
+          );
+        }
+        activeOrderLinesRef.current = activeOrderLinesRef.current.filter(
+          (line) => !duplicates.some((duplicate) => duplicate.id === line.id)
+        );
+        setMultiOrderLines((current) => {
+          const lines = current[existingOrderId];
+          if (!lines) return current;
+          return {
+            ...current,
+            [existingOrderId]: lines.filter(
+              (line) => !duplicates.some((duplicate) => duplicate.id === line.id)
+            ),
+          };
+        });
+      }
 
       if (
         shouldUseTableSession &&
@@ -1632,6 +1812,7 @@ export function CashierPage() {
   };
 
   const handleCheckout = async () => {
+    if (confirmingPaymentRef.current) return;
     setLocalError(null);
     setNotice(null);
 
@@ -1640,7 +1821,12 @@ export function CashierPage() {
       return;
     }
 
+    confirmingPaymentRef.current = true;
+    setIsConfirmingPayment(true);
     try {
+      if (billOptions.isLoading || billOptions.error) {
+        throw new Error(t("cashier.payment.billOptionsError"));
+      }
       if (isSettledSalesOrder(selectedOrder)) {
         throw new Error(t("cashier.errors.orderAlreadyPaid"));
       }
@@ -1651,7 +1837,10 @@ export function CashierPage() {
 
       const orderDiscount = Math.max(0, Number(discountAmount) || 0);
       const tip = Math.max(0, Number(tipAmount) || 0);
-      if (orderDiscount > lineSubtotal + 0.009) {
+      const discountLimit = isDirectCheckoutMode && billOptions.changed
+        ? activeOrderLines.reduce((sum, line) => sum + Number(line.quantity) * Number(line.unitPrice) - Number(line.lineDiscount || 0), 0)
+        : lineSubtotal;
+      if (orderDiscount > discountLimit + 0.009) {
         throw new Error(t("cashier.errors.discountTooLarge"));
       }
       if (orderDiscount > 0 && discountReasons.length && !discountReasonId) {
@@ -1679,7 +1868,13 @@ export function CashierPage() {
         // tax and service charge. Adding the local service charge here again
         // inflated 358,050 to 509,850. Only pending checkout adjustments belong
         // on top of the refreshed authoritative total.
-        const serverRefreshedTotal = serverGrandTotal > 0
+        const refreshedBill = billOptions.changed
+          ? await fetchOrderBill(selectedOrder.id, billOptions.query)
+          : null;
+        if (refreshedBill) billOptions.acceptBill(refreshedBill);
+        const serverRefreshedTotal = refreshedBill
+          ? Number(refreshedBill.grandTotal) + tip
+          : serverGrandTotal > 0
           ? payableFromServerGrandTotal({
               serverGrandTotal,
               orderDiscount,
@@ -1690,7 +1885,8 @@ export function CashierPage() {
           syncedPaymentTotal &&
           syncedPaymentTotal.orderId === selectedOrder.id &&
           syncedPaymentTotal.discountAmount === discountAmount &&
-          syncedPaymentTotal.tipAmount === tipAmount
+          syncedPaymentTotal.tipAmount === tipAmount &&
+          syncedPaymentTotal.billRevision === billRevision
             ? syncedPaymentTotal.total
             : 0;
         // A checkout rejection is the strongest source of truth. The order GET
@@ -1709,6 +1905,7 @@ export function CashierPage() {
             orderId: selectedOrder.id,
             discountAmount,
             tipAmount,
+            billRevision,
             total: refreshedTotal,
           });
           setLocalError(
@@ -1784,14 +1981,11 @@ export function CashierPage() {
         showPrices: true,
         receiptId: selectedOrder?.orderNumber,
         ...receiptParty(true),
-        lines: printableLines(displayOrderLines),
-        subtotal: lineSubtotal.toFixed(4),
-        discount: orderDiscount > 0 ? toMoney(orderDiscount) : undefined,
-        tax:
-          Number(orderTax) + serviceChargeTax > 0
-            ? toMoney(Number(orderTax) + serviceChargeTax)
-            : undefined,
-        serviceCharge: serviceCharge > 0 ? toMoney(serviceCharge) : undefined,
+        lines: printableLines(paymentBillLines, !billOptions.includeTax),
+        subtotal: receiptSubtotal,
+        discount: Number(receiptDiscount) > 0 ? receiptDiscount : undefined,
+        tax: Number(receiptTax) > 0 ? receiptTax : undefined,
+        serviceCharge: Number(receiptServiceCharge) > 0 ? receiptServiceCharge : undefined,
         // The tip is inside the total below, so the slip says so.
         ...(tip > 0
           ? { amounts: [{ label: t("receipt.tip"), amount: toMoney(tip) }] }
@@ -1826,6 +2020,20 @@ export function CashierPage() {
           ...(tip > 0 ? { tipAmount: tip } : {}),
           ...(discountReasonId ? { discountReasonId } : {}),
           ...(orderDiscount > 0 ? { totalDiscount: orderDiscount } : {}),
+          ...(billOptions.changed ? {
+            includeTax: billOptions.includeTax,
+            includeServiceCharge: billOptions.includeServiceCharge,
+          } : {}),
+        });
+      } else if (billOptions.changed && selectedOrder && !isDirectCheckoutMode) {
+        await settleOrder(selectedOrder.id, {
+          payments: checkoutPayments,
+          posSessionId: context.posSessionId,
+          ...(tip > 0 ? { tipAmount: toMoney(tip) } : {}),
+          ...(orderDiscount > 0 ? { totalDiscount: toMoney(orderDiscount) } : {}),
+          ...(discountReasonId ? { discountReasonId } : {}),
+          includeTax: billOptions.includeTax,
+          includeServiceCharge: billOptions.includeServiceCharge,
         });
       } else if (isMultiOrderSecondary && selectedOrder) {
         for (const payment of checkoutPayments) {
@@ -1851,6 +2059,10 @@ export function CashierPage() {
           idempotencyKey: `checkout-${selectedOrder?.id || "direct"}-${Date.now()}`,
           ...(discountReasonId ? { discountReasonId } : {}),
           ...(tip > 0 ? { tipAmount: toMoney(tip) } : {}),
+          ...(billOptions.changed ? {
+            includeTax: billOptions.includeTax,
+            includeServiceCharge: billOptions.includeServiceCharge,
+          } : {}),
           items: allocateOrderDiscountToLines(activeOrderLines, orderDiscount),
           payments: checkoutPayments,
         });
@@ -1913,6 +2125,7 @@ export function CashierPage() {
             orderId: selectedOrder.id,
             discountAmount,
             tipAmount,
+            billRevision,
             total: requiredTotal,
           });
         }
@@ -1930,11 +2143,20 @@ export function CashierPage() {
         return;
       }
       setLocalError(message);
+    } finally {
+      confirmingPaymentRef.current = false;
+      setIsConfirmingPayment(false);
     }
   };
 
   const handleCancelOrder = async () => {
     const orderId = selectedOrder?.id || activeTableSession?.salesOrderId;
+    // A paid sale being voided was made already; only an open order stops the kitchen.
+    const cancelledLines =
+      isDirectCheckoutMode ||
+      String(selectedOrder?.status || "").toUpperCase() === "COMPLETED"
+        ? []
+        : activeOrderLines;
     const sessionId = selectedOrderSession?.id || activeTableSession?.id;
     const tableId = displayedOrderTable?.id || activeTableId;
 
@@ -1961,7 +2183,11 @@ export function CashierPage() {
         setActiveTableId(null);
       }
 
+      const deletePrintError = orderId
+        ? await printKdsDelete(cancelledLines)
+        : null;
       await resetWorkspaceAfterTransaction(t("cashier.orderPanel.orderCancelled"));
+      if (deletePrintError) setLocalError(deletePrintError);
     } catch (caught) {
       const message =
         caught instanceof Error ? caught.message : t("cashier.errors.cancelOrder");
@@ -1970,14 +2196,14 @@ export function CashierPage() {
   };
 
   /**
-   * Tells the kitchen to stop making a line it was already sent: a DELETE slip
-   * on that line's station printer. Nothing prints for a line the kitchen never
-   * got, and a print problem never undoes the removal.
+   * Tells the kitchen to stop making lines it was already sent: a DELETE slip
+   * on each line's station printer, when the shop prints them. Nothing prints
+   * for a line the kitchen never got, and a print problem never undoes the removal.
    */
-  const printKdsDelete = async (line: SalesOrderLine) => {
-    if (isPendingKdsLine(line)) return null;
-    const [printLine] = printableLines([line]);
-    if (!printLine) return null;
+  const printKdsDelete = async (lines: SalesOrderLine[]) => {
+    if (!kdsDeleteSlips) return null;
+    const printLines = printableLines(lines.filter((line) => !isPendingKdsLine(line)));
+    if (!printLines.length) return null;
     const title = t("cashier.orderPanel.kdsDeleteTitle");
     try {
       const listed = locationId
@@ -1988,7 +2214,7 @@ export function CashierPage() {
           title,
           firedAt: new Date().toISOString(),
           orderRef: selectedOrder?.orderNumber,
-          lines: [{ ...printLine, remarks: title }],
+          lines: printLines.map((line) => ({ ...line, remarks: title })),
           ...receiptParty(),
         },
         listed.stations.map((station) => ({
@@ -2053,7 +2279,7 @@ export function CashierPage() {
     if (!selectedOrder) return;
     if (quantity <= 0) {
       await removeOrderLine(selectedOrder.id, lineId);
-      const deletePrintError = await printKdsDelete(targetLine);
+      const deletePrintError = await printKdsDelete([targetLine]);
       if (deletePrintError) setLocalError(deletePrintError);
       return;
     }
@@ -2138,6 +2364,7 @@ export function CashierPage() {
   };
 
   const handleOpenSplit = async () => {
+    if (billOptions.isLoading || billOptions.error || confirmingPaymentRef.current) return;
     if (requiresTableAssignment) {
       promptTableSelection();
       return;
@@ -2166,6 +2393,7 @@ export function CashierPage() {
   };
 
   const handleAddSplitTender = () => {
+    if (billOptions.isLoading || billOptions.error || confirmingPaymentRef.current) return;
     if (!paymentMethodId) {
       setLocalError(t("cashier.errors.paymentMethodRequired"));
       return;
@@ -2217,6 +2445,16 @@ export function CashierPage() {
     try {
       setLocalError(null);
       setNotice(null);
+      if (!isDirectCheckoutMode && selectedOrder && !isPendingKdsLine(line)) {
+        const variant = variantById[line.variantId];
+        const product = variant ? productById[variant.productId] : undefined;
+        if (!product) {
+          throw new Error(t("cashier.errors.addProduct"));
+        }
+        await handleAddProduct(product, line.variantId, 1);
+        setNotice(t("cashier.orderPanel.itemUpdated"));
+        return;
+      }
       await mutateOrderLineQuantity(line.id, Number(line.quantity || 0) + 1);
       setNotice(t("cashier.orderPanel.itemUpdated"));
     } catch (caught) {
@@ -2243,14 +2481,23 @@ export function CashierPage() {
     try {
       setLocalError(null);
       setNotice(null);
+      const grouped = line as typeof line & {
+        groupedLines?: (typeof activeOrderLines)[number][];
+      };
+      const lines = grouped.groupedLines?.length ? grouped.groupedLines : [line];
       if (isDirectCheckoutMode) {
-        setDirectCartLines((current) => current.filter((entry) => entry.id !== line.id));
+        const ids = new Set(lines.map((entry) => entry.id));
+        setDirectCartLines((current) =>
+          current.filter((entry) => !ids.has(entry.id))
+        );
       } else if (selectedOrder) {
         if (isSettledSalesOrder(selectedOrder)) {
           throw new Error(t("cashier.errors.orderAlreadyPaid"));
         }
-        await removeOrderLine(selectedOrder.id, line.id);
-        const deletePrintError = await printKdsDelete(line);
+        for (const entry of lines) {
+          await removeOrderLine(selectedOrder.id, entry.id);
+        }
+        const deletePrintError = await printKdsDelete(lines);
         if (deletePrintError) setLocalError(deletePrintError);
       }
       setNotice(t("cashier.orderPanel.itemRemoved"));
@@ -2437,6 +2684,47 @@ export function CashierPage() {
     }
   };
 
+  const handleSeatingChange = async (change: TableSeatingChangeDTO) => {
+    const session = selectedOrderSession;
+    if (!session) return;
+    const tableNumber = (tableId: string) =>
+      diningTables.find((table) => table.id === tableId)?.tableNumber || "";
+    setLocalError(null);
+    setNotice(null);
+    try {
+      await changeTableSeating(session.id, change);
+      setSeatingMode(null);
+      if (change.kind === "move") {
+        // This till's extra orders for the table go with the guests.
+        writeTableOrderIds(change.tableId, readTableOrderIds(session.tableId));
+        clearTableOrderIds(session.tableId);
+        if (activeTableId) setActiveTableId(change.tableId);
+        setNotice(
+          t("cashier.seating.moved", { table: tableNumber(change.tableId) })
+        );
+        return;
+      }
+      if (change.kind === "merge") {
+        if (selectedOrder) await selectOrderById(selectedOrder.id);
+        await refreshMultiOrderLines(tableOrderIds);
+        setNotice(t("cashier.seating.combined"));
+        return;
+      }
+      setNotice(
+        t(
+          change.kind === "join"
+            ? "cashier.seating.joined"
+            : "cashier.seating.released",
+          { table: tableNumber(change.tableId) }
+        )
+      );
+    } catch (caught) {
+      setLocalError(
+        caught instanceof Error ? caught.message : t("cashier.seating.failed")
+      );
+    }
+  };
+
   const handlePickup = async () => {
     if (!selectedOrder) return;
     setLocalError(null);
@@ -2512,6 +2800,8 @@ export function CashierPage() {
       <OrderPanel
         selectedOrder={selectedOrder}
         selectedOrderLines={displayOrderLines}
+        billLines={paymentBillLines}
+        includeTax={billOptions.includeTax}
         products={products}
         variantsByProductId={variantsByProductId}
         paymentMethods={checkoutPaymentMethods}
@@ -2521,7 +2811,8 @@ export function CashierPage() {
         selectedTable={displayedOrderTable}
         selectedSession={selectedOrderSession}
         paymentInputRef={paymentInputRef}
-        isLoading={isLoading || isPosSessionLoading}
+        isLoading={isLoading || isPosSessionLoading || billOptions.isLoading || isConfirmingPayment}
+        checkoutBlocked={Boolean(billOptions.error)}
         canCreateOrder={isWorkspaceReady && !isPosSessionLoading}
         isDineInService={isDineInService}
         feedback={notice}
@@ -2539,12 +2830,12 @@ export function CashierPage() {
         onRemoveLine={(line) => void handleRemoveLine(line)}
         onToggleFoc={(line) => void handleToggleFoc(line)}
         promotions={promotions.running}
-        promotionDiscounts={promotions.discounts}
+        promotionDiscounts={isDirectCheckoutMode ? promotions.discounts : undefined}
         promotionName={promotions.promotionName}
         discountAmount={discountAmount}
         discountReasonId={discountReasonId}
         discountReasons={discountReasons}
-        serviceCharge={toMoney(serviceCharge + serviceChargeTax)}
+        serviceCharge={toMoney(Number(receiptServiceCharge) + Number(billOptions.bill?.serviceChargeTax ?? serviceChargeTax))}
         tipAmount={tipAmount}
         memberCardUid={memberCardUid}
         memberPointsLabel={
@@ -2588,17 +2879,11 @@ export function CashierPage() {
             showPrices: true,
             receiptId: selectedOrder?.orderNumber,
             ...receiptParty(),
-            lines: printableLines(displayOrderLines),
-            subtotal: lineSubtotal.toFixed(4),
-            discount:
-              Number(discountAmount) > 0
-                ? toMoney(Number(discountAmount))
-                : undefined,
-            tax:
-              Number(orderTax) + serviceChargeTax > 0
-                ? toMoney(Number(orderTax) + serviceChargeTax)
-                : undefined,
-            serviceCharge: serviceCharge > 0 ? toMoney(serviceCharge) : undefined,
+            lines: printableLines(paymentBillLines, !billOptions.includeTax),
+            subtotal: receiptSubtotal,
+            discount: Number(receiptDiscount) > 0 ? receiptDiscount : undefined,
+            tax: Number(receiptTax) > 0 ? receiptTax : undefined,
+            serviceCharge: Number(receiptServiceCharge) > 0 ? receiptServiceCharge : undefined,
             ...(Number(tipAmount) > 0
               ? { amounts: [{ label: t("receipt.tip"), amount: toMoney(Number(tipAmount)) }] }
               : {}),
@@ -2610,7 +2895,33 @@ export function CashierPage() {
         onPickup={() => void handlePickup()}
         onTableStatusChange={(status) => void handleTableStatusChange(status)}
         onSessionStateChange={(state) => void handleSessionStateChange(state)}
+        joinedTables={joinedOrderTables}
+        onChangeTable={
+          selectedOrderSession && !isSettledSalesOrder(selectedOrder)
+            ? () => setSeatingMode("move")
+            : undefined
+        }
+        onCombineTables={
+          selectedOrderSession && !isSettledSalesOrder(selectedOrder)
+            ? () => setSeatingMode("combine")
+            : undefined
+        }
+        onReleaseTable={(tableId) =>
+          void handleSeatingChange({ kind: "release", tableId })
+        }
       />
+
+      {seatingMode && selectedOrderSession ? (
+        <TableSeatingDialog
+          mode={seatingMode}
+          session={selectedOrderSession}
+          tables={diningTables}
+          sessions={tableSessions}
+          isBusy={isLoading}
+          onConfirm={(change) => void handleSeatingChange(change)}
+          onClose={() => setSeatingMode(null)}
+        />
+      ) : null}
 
       <main className="h-full min-h-0 min-w-0 overflow-hidden">
         {activeView === "menu" ? (
@@ -2681,10 +2992,18 @@ export function CashierPage() {
             selectedMethodId={paymentMethodId}
             paymentAmount={paymentAmount}
             total={orderTotal}
-            subtotal={selectedOrder?.subtotal || orderTotal}
+            subtotal={billOptions.bill?.subtotal || selectedOrder?.subtotal || orderTotal}
+            billOptions={{
+              includeTax: billOptions.includeTax,
+              includeServiceCharge: billOptions.includeServiceCharge,
+              isLoading: billOptions.isLoading,
+              disabled: isLoading || isPosSessionLoading || isConfirmingPayment,
+              error: billOptions.error,
+              onChange: chooseBillOption,
+            }}
             isSplitMode={isSplitMode}
             splitTenders={splitTenders}
-            isLoading={isLoading || isPosSessionLoading}
+            isLoading={isLoading || isPosSessionLoading || isConfirmingPayment || billOptions.isLoading || Boolean(billOptions.error)}
             memberCardLookup={{
               cardUid: memberCardUid,
               guestName: memberWallet?.guestName,

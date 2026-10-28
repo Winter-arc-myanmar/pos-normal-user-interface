@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type RefObject } from "react";
+import { useEffect, useId, useMemo, useState, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import {
@@ -18,6 +18,7 @@ import {
 import { OrderTabs } from "./OrderTabs";
 import { OrderAdjustments } from "./OrderAdjustments";
 import { isSettledSalesOrder } from "@/lib/pos/orderStatus";
+import { isPendingKdsLine } from "@/lib/pos/kdsLines";
 import { isFocLine } from "@/lib/pos/checkoutAdjustments";
 import type {
   PromotionDiscount,
@@ -34,9 +35,48 @@ import {
   variantDisplayName,
 } from "@/lib/pos/orderListDisplay";
 
+export type GroupedSalesOrderLine = SalesOrderLine & {
+  groupedLines?: SalesOrderLine[];
+  groupedLineIds?: string[];
+};
+
+/**
+ * One row for one ordered item. Post-KDS additions stay as separate pending
+ * bill lines so the kitchen receives them, while the cashier still sees a
+ * single combined quantity.
+ */
+export function groupOrderLines(lines: SalesOrderLine[]): GroupedSalesOrderLine[] {
+  const groups = new Map<string, SalesOrderLine[]>();
+  for (const line of lines) {
+    const key = JSON.stringify([
+      line.variantId,
+      Number(line.unitPrice || 0).toFixed(4),
+      Number(line.lineDiscount || 0).toFixed(4),
+      line.selectedModifiers ?? null,
+      line.status === "VOIDED" || line.status === "COMPED" ? line.status : "",
+    ]);
+    groups.set(key, [...(groups.get(key) || []), line]);
+  }
+  return [...groups.values()].map((group) => {
+    if (group.length === 1) return group[0];
+    const pending = group.find(isPendingKdsLine);
+    const representative = pending ?? group[0];
+    const quantity = group.reduce(
+      (total, line) => total + Number(line.quantity || 0),
+      0
+    );
+    return Object.assign(new SalesOrderLine(representative), {
+      quantity: quantity.toFixed(4),
+      groupedLines: group,
+      groupedLineIds: group.map((line) => line.id),
+    });
+  });
+}
+
 interface OrderPanelProps {
   selectedOrder: SalesOrder | null;
   selectedOrderLines: SalesOrderLine[];
+  billLines?: SalesOrderLine[];
   products: Product[];
   variantsByProductId: Record<string, ProductVariant[]>;
   paymentMethods: PaymentMethod[];
@@ -47,6 +87,8 @@ interface OrderPanelProps {
   selectedSession: TableSession | null;
   paymentInputRef: RefObject<HTMLInputElement | null>;
   isLoading: boolean;
+  checkoutBlocked?: boolean;
+  includeTax?: boolean;
   canCreateOrder?: boolean;
   isDineInService?: boolean;
   feedback?: string | null;
@@ -101,11 +143,17 @@ interface OrderPanelProps {
   onPickup: () => void;
   onTableStatusChange: (status: DiningTableStatus) => void;
   onSessionStateChange: (state: TableSessionState) => void;
+  /** Tables pushed together with this one for the same party. */
+  joinedTables?: DiningTable[];
+  onChangeTable?: () => void;
+  onCombineTables?: () => void;
+  onReleaseTable?: (tableId: string) => void;
 }
 
 export function OrderPanel({
   selectedOrder,
   selectedOrderLines,
+  billLines,
   products,
   variantsByProductId,
   paymentMethodId,
@@ -114,6 +162,8 @@ export function OrderPanel({
   selectedTable,
   selectedSession,
   isLoading,
+  checkoutBlocked = false,
+  includeTax = true,
   canCreateOrder = true,
   isDineInService = false,
   feedback,
@@ -161,6 +211,10 @@ export function OrderPanel({
   onPickup,
   onTableStatusChange,
   onSessionStateChange,
+  joinedTables = [],
+  onChangeTable,
+  onCombineTables,
+  onReleaseTable,
 }: OrderPanelProps) {
   const { t } = useTranslation();
   const [confirmCancelOrder, setConfirmCancelOrder] = useState(false);
@@ -169,6 +223,10 @@ export function OrderPanel({
     lineId: string;
   } | null>(null);
   const lineDetailsId = useId();
+  const groupedOrderLines = useMemo(
+    () => groupOrderLines(selectedOrderLines),
+    [selectedOrderLines]
+  );
   const variants = Object.values(variantsByProductId).flat();
   const hasActiveOrder = !!selectedOrder || selectedOrderLines.length > 0;
   const isSettledOrder = isSettledSalesOrder(selectedOrder);
@@ -230,7 +288,10 @@ export function OrderPanel({
                 </p>
                 {selectedTable ? (
                   <p className="text-xs text-slate-500">
-                    {t("cashier.table")} {selectedTable.tableNumber}
+                    {t("cashier.table")}{" "}
+                    {[selectedTable, ...joinedTables]
+                      .map((table) => table.tableNumber)
+                      .join(" + ")}
                   </p>
                 ) : null}
               </div>
@@ -257,13 +318,35 @@ export function OrderPanel({
             ) : null}
 
             <div className="my-3 divide-y divide-slate-200 overflow-hidden rounded border border-slate-200">
-              {selectedOrderLines.map((line) => {
+              {groupedOrderLines.map((line) => {
                 const lineName = resolveLineName(line);
                 const lineVariant = resolveLineVariant(line);
+                const groupLines = line.groupedLines ?? [line];
+                const pricedLines = groupLines.map(
+                  (entry) =>
+                    billLines?.find((priced) => priced.id === entry.id) || entry
+                );
+                const tax = pricedLines.reduce(
+                  (sum, pricedLine) =>
+                    sum +
+                    (includeTax
+                      ? pricedLine.taxInclusive
+                        ? 0
+                        : Number(pricedLine.taxAmount || 0)
+                      : pricedLine.taxInclusive
+                        ? -Number(pricedLine.taxAmount || 0)
+                        : 0),
+                  0
+                );
                 const lineTotal =
-                  Number(line.quantity || 0) * Number(line.unitPrice || 0) -
-                  Number(line.lineDiscount || 0) +
-                  Number(line.taxAmount || 0);
+                  pricedLines.reduce(
+                    (sum, pricedLine) =>
+                      sum +
+                      Number(pricedLine.quantity || 0) *
+                        Number(pricedLine.unitPrice || 0) -
+                      Number(pricedLine.lineDiscount || 0),
+                    0
+                  ) + tax;
                 const quantity = Number(line.quantity || 0);
                 const quantityLabel =
                   Number.isFinite(quantity) && quantity % 1 === 0
@@ -271,7 +354,29 @@ export function OrderPanel({
                     : String(line.quantity || "0");
                 // What the promotions take off this line: what the server already
                 // credited it, or what the running rules would take off it.
-                const saving = linePromotionSaving(line, promotionDiscounts);
+                const savings = groupLines
+                  .map((entry) =>
+                    linePromotionSaving(entry, promotionDiscounts)
+                  )
+                  .filter((entry) => entry !== null);
+                const saving = savings.length
+                  ? {
+                      amount: savings.reduce(
+                        (sum, entry) => sum + entry.amount,
+                        0
+                      ),
+                      names: [...new Set(savings.flatMap((entry) => entry.names))],
+                    }
+                  : null;
+                const previewSaving = groupLines
+                  .filter((entry) => !entry.appliedPromotionId)
+                  .reduce((sum, entry) => {
+                    const entrySaving = linePromotionSaving(
+                      entry,
+                      promotionDiscounts
+                    );
+                    return sum + (entrySaving?.amount || 0);
+                  }, 0);
                 const promoLabel =
                   (line.appliedPromotionId
                     ? promotionName(line.appliedPromotionId)
@@ -279,8 +384,7 @@ export function OrderPanel({
                   saving?.names.join(", ") ||
                   (saving ? t("cashier.orderPanel.promo") : "");
                 // A previewed saving is not on the bill yet, so take it off here.
-                const lineDue =
-                  lineTotal - (saving && !line.appliedPromotionId ? saving.amount : 0);
+                const lineDue = lineTotal - previewSaving;
                 const isExpanded =
                   expandedLine?.orderId === selectedOrder?.id &&
                   expandedLine?.lineId === line.id;
@@ -544,6 +648,52 @@ export function OrderPanel({
               ) : null}
             </div>
           ) : null}
+          {selectedSession && onChangeTable && onCombineTables ? (
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  disabled={isLoading}
+                  onClick={onChangeTable}
+                  className="min-h-9 rounded border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-800 hover:border-blue-500 disabled:opacity-50"
+                >
+                  {t("cashier.seating.changeTable")}
+                </button>
+                <button
+                  type="button"
+                  disabled={isLoading}
+                  onClick={onCombineTables}
+                  className="min-h-9 rounded border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-800 hover:border-blue-500 disabled:opacity-50"
+                >
+                  {t("cashier.seating.combine")}
+                </button>
+              </div>
+              {joinedTables.length && onReleaseTable ? (
+                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                  <span className="text-slate-500">
+                    {t("cashier.seating.joinedTables")}:
+                  </span>
+                  {joinedTables.map((table) => (
+                    <button
+                      key={table.id}
+                      type="button"
+                      disabled={isLoading}
+                      onClick={() => onReleaseTable(table.id)}
+                      title={t("cashier.seating.release", {
+                        table: table.tableNumber,
+                      })}
+                      aria-label={t("cashier.seating.release", {
+                        table: table.tableNumber,
+                      })}
+                      className="rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 font-semibold text-slate-700 hover:border-red-400 hover:text-red-600 disabled:opacity-50"
+                    >
+                      {table.tableNumber} ×
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           <div className="grid grid-cols-2 gap-2">
             <Button
               variant="secondary"
@@ -597,6 +747,7 @@ export function OrderPanel({
             fullWidth
             disabled={
               isSettledOrder ||
+              checkoutBlocked ||
               !selectedOrderLines.length ||
               isLoading ||
               requiresTableAssignment ||
@@ -623,6 +774,7 @@ export function OrderPanel({
             <Button
               fullWidth
               className="!border-emerald-600 !bg-emerald-600 !text-white hover:!border-emerald-700 hover:!bg-emerald-700"
+              disabled={isLoading || checkoutBlocked}
               onClick={onPrintFinance}
             >
               {t("cashier.printFinance")}
