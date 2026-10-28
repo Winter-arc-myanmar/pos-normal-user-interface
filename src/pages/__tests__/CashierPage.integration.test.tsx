@@ -971,6 +971,9 @@ describe("CashierPage integration", () => {
         ...orderLine,
         status: "FIRED",
         firedAt: "2026-10-23T10:00:00.000Z",
+        selectedModifiers: {
+          "modifier-1": { name: "Oat milk", priceDelta: "1.5000" },
+        },
       },
     ];
     mocks.listStations.mockResolvedValue({
@@ -1004,6 +1007,8 @@ describe("CashierPage integration", () => {
           lines: [
             expect.objectContaining({
               name: "Coffee",
+              modifiers: "Oat milk",
+              modifierPrices: "1.5000",
               remarks: "cashier.orderPanel.kdsDeleteTitle",
             }),
           ],

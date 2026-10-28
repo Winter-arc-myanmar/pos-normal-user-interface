@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { KdsTicket } from "@/core/domain/entities/Cashier";
+import { defaultPrintTemplateSettings } from "@/core/domain/entities/PrintTemplate";
 import {
   formatKdsTicket,
   formatKitchenSlip,
@@ -84,8 +85,9 @@ describe("the kitchen slip", () => {
     expect(text).toContain("** DELETE **");
   });
 
-  it("prints the modifiers chosen for a kitchen item", () => {
-    const text = formatKitchenSlip({
+  it("obeys the Kitchen template Modifiers switch", () => {
+    const settings = defaultPrintTemplateSettings();
+    const slip = {
       title: "KDS-0012",
       lines: [
         {
@@ -95,9 +97,16 @@ describe("the kitchen slip", () => {
           modifierPrices: "1.5000",
         },
       ],
-    });
+    };
 
-    expect(text).toContain("+ Oat milk");
-    expect(text).not.toContain("+ Oat milk (+");
+    settings.item.modifiers = false;
+    expect(formatKitchenSlip({ ...slip, template: settings })).not.toContain(
+      "+ Oat milk"
+    );
+
+    settings.item.modifiers = true;
+    expect(formatKitchenSlip({ ...slip, template: settings })).toContain(
+      "+ Oat milk"
+    );
   });
 });
