@@ -4,6 +4,7 @@ import {
   KdsTicketLine,
   SalesOrderLine,
 } from "@/core/domain/entities/Cashier";
+import { formatKdsTicket } from "../formatKdsTicket";
 import { applyKdsTicketModifiers } from "../kdsTicketModifiers";
 
 const ticket = () =>
@@ -42,6 +43,7 @@ describe("KDS ticket modifiers", () => {
     expect(enriched.lines?.[0].modifiers).toBe("Oat milk");
     expect(enriched.lines?.[0].modifierPrices).toBe("1.5000");
     expect(enriched.lines?.[0].categoryId).toBe("cat-drinks");
+    expect(formatKdsTicket(enriched)).toContain("+ Oat milk");
   });
 
   it("keeps modifiers the ticket already has", () => {
