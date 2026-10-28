@@ -444,6 +444,22 @@ const readSalesOrderLineNames = (item: Record<string, unknown>) => {
   };
 };
 
+/**
+ * The modifiers a sold line carries, in whichever shape the API returns them:
+ * the array this till posts to add/update a line, or an object keyed by
+ * modifier. Both are kept as they come, so a line read back from the server
+ * still knows the modifiers it was rung up with.
+ */
+const readLineModifiers = (
+  value: unknown
+): Record<string, unknown> | undefined => {
+  if (Array.isArray(value)) {
+    return value.length ? (value as unknown as Record<string, unknown>) : undefined;
+  }
+  const record = asRecord(value);
+  return record && Object.keys(record).length ? record : undefined;
+};
+
 /** The category a sold line was routed by, wherever the API puts it. */
 const readLineCategoryId = (row: Record<string, unknown>) => {
   const salesOrderLine = asRecord(row.salesOrderLine);
@@ -1403,13 +1419,22 @@ export class ApiCashierRepository implements ICashierRepository {
         quantity: String(item.quantity || "0"),
         unitPrice: String(item.unitPrice || "0"),
         lineDiscount: item.lineDiscount ? String(item.lineDiscount) : undefined,
+        taxRateId: item.taxRateId ? String(item.taxRateId) : undefined,
         taxAmount: item.taxAmount ? String(item.taxAmount) : undefined,
         taxInclusive: item.taxInclusive === true,
+        appliedPromotionId: item.appliedPromotionId
+          ? String(item.appliedPromotionId)
+          : undefined,
         status: item.status ? String(item.status) : undefined,
         firedAt: item.firedAt ? String(item.firedAt) : undefined,
         voidedAt: item.voidedAt ? String(item.voidedAt) : undefined,
+        voidReasonId: item.voidReasonId ? String(item.voidReasonId) : undefined,
+        compReasonId: item.compReasonId ? String(item.compReasonId) : undefined,
+        courseType: item.courseType ? String(item.courseType) : undefined,
+        selectedModifiers: readLineModifiers(item.selectedModifiers),
         seatNumber: typeof item.seatNumber === "number" ? item.seatNumber : undefined,
         createdAt: item.createdAt ? String(item.createdAt) : undefined,
+        updatedAt: item.updatedAt ? String(item.updatedAt) : undefined,
         categoryId: readLineCategoryId(item),
         categoryName: asName(item.categoryName) || asName(asRecord(item.product)?.categoryName),
         ...names,

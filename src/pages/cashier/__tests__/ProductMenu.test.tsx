@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Product, ProductVariant } from "@/core/domain/entities/Cashier";
 import { ProductMenu } from "../ProductMenu";
 
@@ -141,6 +141,55 @@ describe("ProductMenu", () => {
     expect(screen.getByRole("button", { name: /Deli Soup/ })).toHaveAttribute(
       "aria-pressed",
       "false"
+    );
+  });
+
+  it("ignores a late variant response from a previously tapped product", async () => {
+    const onAdd = vi.fn().mockResolvedValue(undefined);
+    const pending = new Map<string, (variants: ProductVariant[]) => void>();
+    const onLoadVariants = vi.fn(
+      (productId: string) =>
+        new Promise<ProductVariant[]>((resolve) => {
+          pending.set(productId, resolve);
+        })
+    );
+
+    render(
+      <ProductMenu
+        products={[coffee, soup]}
+        variantsByProductId={{}}
+        onLoadVariants={onLoadVariants}
+        onAdd={onAdd}
+        onClose={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Coffee/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Deli Soup/ }));
+
+    await act(async () => {
+      pending.get("product-2")?.([soupSmall, soupLarge]);
+    });
+    expect(
+      screen.getByRole("heading", { name: "Deli Soup" })
+    ).toBeInTheDocument();
+
+    await act(async () => {
+      pending.get("product-1")?.([coffeeVariant]);
+    });
+
+    expect(
+      screen.getByRole("heading", { name: "Deli Soup" })
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "SOUP-L" })).toBeInTheDocument();
+    expect(onAdd).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "SOUP-L" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "cashier.productMenu.add" })
+    );
+    await waitFor(() =>
+      expect(onAdd).toHaveBeenCalledWith(soup, "variant-l", 1)
     );
   });
 

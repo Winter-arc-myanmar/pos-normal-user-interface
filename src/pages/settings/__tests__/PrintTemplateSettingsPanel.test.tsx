@@ -5,7 +5,16 @@ import { PrintTemplateSettingsPanel } from "../PrintTemplateSettingsPanel";
 const createTemplate = vi.fn();
 
 vi.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string) => {
+      const labels: Record<string, string> = {
+        "settings.printTemplate.contact": "Phone",
+        "settings.printTemplate.email": "Email",
+        "settings.printTemplate.logo": "Logo",
+      };
+      return labels[key] || key;
+    },
+  }),
 }));
 
 vi.mock("@/core/presentation/hooks/usePosWorkspace", () => ({
@@ -147,7 +156,7 @@ describe("PrintTemplateSettingsPanel", () => {
     expect(preview).toHaveTextContent("hello@grandspa.com");
     expect(screen.getByRole("img", { name: "Phone" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("checkbox", { name: "settings.printTemplate.email" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Email" }));
     expect(preview).not.toHaveTextContent("hello@grandspa.com");
     expect(preview).toHaveTextContent("09 123");
   });

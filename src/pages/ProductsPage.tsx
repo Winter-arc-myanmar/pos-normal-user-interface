@@ -350,7 +350,10 @@ export function ProductsPage() {
                 setCurrentPage(1);
                 setSearch(event.target.value);
               }}
-              onClear={() => setSearch("")}
+              onClear={() => {
+                setCurrentPage(1);
+                setSearch("");
+              }}
             />
           </div>
           <Button type="button" onClick={startCreate}>

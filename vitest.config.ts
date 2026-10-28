@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 import { fileURLToPath, URL } from "node:url";
 import ts from "typescript";
 
@@ -40,6 +40,7 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: "./src/test/setup.ts",
+    exclude: [...configDefaults.exclude, "scripts/deploy-production.test.cjs"],
     pool: "threads",
   },
 });

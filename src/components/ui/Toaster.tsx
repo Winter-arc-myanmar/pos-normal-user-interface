@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { useTranslation } from "react-i18next";
 import {
   currentToasts,
   dismissToast,
@@ -13,6 +14,7 @@ const accent: Record<ToastTone, string> = {
 };
 
 export function Toaster() {
+  const { t } = useTranslation();
   const visible = useSyncExternalStore(subscribeToToasts, currentToasts);
 
   return (
@@ -27,7 +29,7 @@ export function Toaster() {
           <p className="min-w-0 flex-1 break-words">{item.message}</p>
           <button
             type="button"
-            aria-label="Dismiss"
+            aria-label={t("common.dismiss")}
             className="shrink-0 text-slate-500 hover:text-slate-200"
             onClick={() => dismissToast(item.id)}
           >

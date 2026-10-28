@@ -444,7 +444,7 @@ export function AppRouter() {
                   <RequirePermission
                     requiredPermissions={PAGE_PERMISSIONS.settings}
                   >
-                    <Navigate to="/settings/cashier" replace />
+                    <Navigate to="/settings/devices" replace />
                   </RequirePermission>
                 }
               />

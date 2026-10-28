@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   loadLedger: vi.fn(),
   beginSettlement: vi.fn(),
   requireCashierContext: vi.fn(),
+  cards: [] as Array<Record<string, unknown>>,
 }));
 
 vi.mock("@/components/shift/shiftApi", () => ({
@@ -88,7 +89,7 @@ vi.mock("@/core/presentation/hooks/useGuestWalletManagement", () => ({
   useGuestWalletManagement: () => ({
     wallets: [],
     currentWallet: null,
-    cards: [],
+    cards: mocks.cards,
     ledger: [],
     settlementQuote: null,
     audit: null,
@@ -162,6 +163,7 @@ vi.mock("@/core/presentation/hooks/useCustomerManagement", () => ({
 describe("CRM page integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.cards = [];
     mocks.getCustomers.mockResolvedValue({
       customers: [
         {
@@ -261,6 +263,25 @@ describe("CRM page integration", () => {
         })
       );
     });
+  });
+
+  it("renders a card with no status instead of crashing", () => {
+    mocks.cards = [
+      {
+        id: "card-1",
+        cardUid: "04A3B2C1",
+        walletId: "wallet-1",
+        label: "Guest card",
+      },
+    ];
+
+    render(
+      <MemoryRouter>
+        <CustomersPage />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText("Test1")).toBeInTheDocument();
   });
 
   it("looks up a member from a USB/NFC card swipe", async () => {

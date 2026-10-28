@@ -12,6 +12,9 @@
     "save": "Save",
     "cancel": "Cancel",
     "loading": "Loading...",
+    "dismiss": "Dismiss",
+    "previous": "Previous",
+    "next": "Next",
     "clearSearch": "Clear search",
     "preparingWorkspace": "Preparing your workspace."
   },

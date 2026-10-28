@@ -45,7 +45,7 @@ export function ShiftDayBanner() {
       <>
         <div
           role="status"
-          className="fixed inset-x-0 top-0 z-40 flex items-center justify-center gap-3 bg-amber-500 px-4 py-2 text-sm font-medium text-black print:hidden"
+          className="fixed right-0 left-16 top-0 z-40 flex items-center justify-center gap-3 bg-amber-500 px-4 py-2 text-sm font-medium text-black print:hidden md:left-0"
         >
           <span>{t("shift.dayEnding", { time: clock(dueAt) })}</span>
           <button type="button" className="rounded-md bg-black/80 px-3 py-1 text-white" onClick={() => setClosing(true)}>

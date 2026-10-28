@@ -520,6 +520,9 @@ export function AppShell() {
       <button
         type="button"
         className={[
+          // Stay below modal overlays (z-40). The day-ending banner leaves this
+          // corner free on phones, so the menu remains reachable without
+          // crossing above dialogs.
           "pos-nav-hamburger fixed z-30 inline-flex h-11 w-11 items-center justify-center rounded-lg border border-white/20 bg-black/80 text-white shadow-lg backdrop-blur-sm transition-opacity duration-200 ease-out",
           mobileOpen ? "pointer-events-none opacity-0" : "opacity-100",
         ].join(" ")}
