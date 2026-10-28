@@ -24,7 +24,7 @@ export function SettingsToggle({
         if (!disabled) onChange(!checked);
       }}
       className={[
-        "relative h-7 w-12 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+        "relative h-7 w-12 min-w-[3rem] shrink-0 touch-manipulation rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60",
         checked ? "bg-blue-600" : "bg-slate-300",
       ].join(" ")}
     >
