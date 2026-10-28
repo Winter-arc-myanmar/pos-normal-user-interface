@@ -242,6 +242,28 @@ export function bindingsForSector(
   return bindings.filter((binding) => binding.sectors?.includes(sector));
 }
 
+const physicalPrinterKey = (binding: PrinterBinding): string => {
+  if (binding.transport === "NETWORK" && binding.host) {
+    return `NETWORK:${binding.host.trim().toLowerCase()}:${binding.port || 9100}`;
+  }
+  if (binding.deviceName?.trim()) {
+    return `${binding.transport}:${binding.deviceName.trim().toLowerCase()}`;
+  }
+  if (binding.backendPrinterId) return `BACKEND:${binding.backendPrinterId}`;
+  return `BINDING:${binding.id}`;
+};
+
+/** A physical printer may have both an old local and a synced backend binding. */
+const uniquePhysicalPrinters = (bindings: PrinterBinding[]): PrinterBinding[] => {
+  const seen = new Set<string>();
+  return bindings.filter((binding) => {
+    const key = physicalPrinterKey(binding);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
 /**
  * Printers a receipt/kitchen job should go to for one section.
  *
@@ -256,7 +278,8 @@ export function resolveBindingsForPlace(
   place: PrinterSector
 ): PrinterBinding[] {
   const bySector = bindingsForSector(bindings, place);
-  if (bySector.length) return bySector;
+  if (bySector.length) return uniquePhysicalPrinters(bySector);
   if (defaultBinding) return [defaultBinding];
-  return bindings.length === 1 ? [bindings[0]] : [];
+  const uniqueBindings = uniquePhysicalPrinters(bindings);
+  return uniqueBindings.length === 1 ? uniqueBindings : [];
 }

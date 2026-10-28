@@ -1112,6 +1112,8 @@
       "decreaseQuantity": "အရေအတွက် လျှော့မည်",
       "increaseQuantity": "အရေအတွက် တိုးမည်",
       "lineQuantity": "အရေအတွက် {{count}}",
+      "kdsPending": "KDS သို့ မပို့ရသေးပါ",
+      "kdsAlreadySent": "KDS သို့ ပို့ပြီးပါပြီ",
       "expandItem": "{{name}} အသေးစိတ် ဖွင့်မည်",
       "collapseItem": "{{name}} အသေးစိတ် ပိတ်မည်",
       "remove": "ဖယ်ရှားမည်",

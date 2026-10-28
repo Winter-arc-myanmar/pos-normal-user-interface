@@ -2574,8 +2574,11 @@ export function CashierPage() {
       }
       const kitchenLines = printableLines(unsentOrderLines);
 
+      // A table session can outlive several KDS sends. Target the current sales
+      // order when it exists so a later send only evaluates that order's new
+      // lines instead of rebuilding the session's earlier batch.
       await fireToKds(
-        sessionId ? { sessionId } : { salesOrderId: salesOrderId! }
+        salesOrderId ? { salesOrderId } : { sessionId: sessionId! }
       );
 
       let kitchenPrintError: string | null = null;

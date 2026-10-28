@@ -753,7 +753,7 @@ describe("CashierPage integration", () => {
 
     await waitFor(() => {
       expect(mocks.fireToKds).toHaveBeenCalledWith({
-        sessionId: "session-1",
+        salesOrderId: "order-1",
       });
       expect(mocks.printKitchen).toHaveBeenCalled();
       expect(mocks.printReceipt).toHaveBeenCalled();
@@ -926,6 +926,43 @@ describe("CashierPage integration", () => {
     );
     expect(mocks.fireToKds).not.toHaveBeenCalled();
     expect(mocks.printKitchen).not.toHaveBeenCalled();
+  });
+
+  it("sends only the extra quantity added after an earlier KDS send", async () => {
+    selectedOrderLinesState = [
+      {
+        ...orderLine,
+        quantity: "5.0000",
+        status: "FIRED",
+        firedAt: "2026-10-23T10:00:00.000Z",
+      },
+      {
+        ...orderLine,
+        id: "line-2",
+        quantity: "1.0000",
+        status: "PENDING",
+      },
+    ];
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=menu"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "cashier.orderPanel.sendKds" })
+    );
+
+    await waitFor(() =>
+      expect(mocks.fireToKds).toHaveBeenCalledWith({ salesOrderId: "order-1" })
+    );
+    expect(mocks.printKitchen).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lines: [expect.objectContaining({ name: "Coffee", quantity: "1.0000" })],
+      }),
+      expect.any(Array),
+      { requireStationRouting: true }
+    );
   });
 
   it("prints a DELETE slip on the station printer when a sent line is removed", async () => {

@@ -1112,6 +1112,8 @@
       "decreaseQuantity": "Decrease quantity",
       "increaseQuantity": "Increase quantity",
       "lineQuantity": "Quantity {{count}}",
+      "kdsPending": "Not sent to KDS",
+      "kdsAlreadySent": "Sent to KDS",
       "expandItem": "Expand {{name}} details",
       "collapseItem": "Collapse {{name}} details",
       "remove": "Remove",
