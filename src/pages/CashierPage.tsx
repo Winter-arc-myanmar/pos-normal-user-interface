@@ -19,6 +19,8 @@ import { useAuth } from "@/core/presentation/hooks/useAuth";
 import { useCashier } from "@/core/presentation/hooks/useCashier";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
 import { usePromotions } from "@/core/presentation/hooks/usePromotions";
+import { useExtraFees } from "@/core/presentation/hooks/useExtraFees";
+import type { ChosenFee } from "@/core/domain/entities/ExtraFee";
 import { useKdsStationManagement } from "@/core/presentation/hooks/useKdsStationManagement";
 import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
 import { modifierPrintText } from "@/lib/printing/modifierText";
@@ -29,6 +31,7 @@ import { CashierBoard } from "./cashier/CashierBoard";
 import { MultiOrderingView } from "./cashier/MultiOrderingView";
 import { OrderPanel } from "./cashier/OrderPanel";
 import { TableSeatingDialog } from "./cashier/TableSeatingDialog";
+import { ExtraFeeDialog } from "./cashier/ExtraFeeDialog";
 import { PaymentView } from "./cashier/PaymentView";
 import { ProductMenu } from "./cashier/ProductMenu";
 import { TableChargesBar } from "./cashier/TableChargesBar";
@@ -95,6 +98,19 @@ const readPrintBillOnConfirm = () => {
   }
 };
 
+/** A fee line from the cart as it goes on a saved bill. */
+const feeOf = (line: {
+  variantId: string;
+  quantity?: string;
+  unitPrice?: string;
+  productName?: string;
+}): ChosenFee => ({
+  variantId: line.variantId,
+  name: line.productName || "",
+  unitPrice: Number(line.unitPrice || 0),
+  quantity: Number(line.quantity || 1),
+});
+
 export function CashierPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -136,6 +152,7 @@ export function CashierPage() {
     updateOrderLine,
     removeOrderLine,
     addProductToTableSession,
+    addExtraFeeLine,
     addPayment,
     getCounterOrderById,
     pickupCounterOrder,
@@ -219,6 +236,9 @@ export function CashierPage() {
   const payReturnViewRef = useRef("menu");
   const pendingMemberDetectRef = useRef(false);
   const productAddQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const { fees: extraFees, isFeeLine } = useExtraFees();
+  const [extraFeeOpen, setExtraFeeOpen] = useState(false);
+  const [isAddingFee, setIsAddingFee] = useState(false);
   const payTableSyncRef = useRef<string | null>(null);
 
   const locationId = activeLocationId;
@@ -733,13 +753,13 @@ export function CashierPage() {
   // Instant checkout taxes the items after allocating the bill discount.
   const paymentBillLines = useMemo(() => {
     if (!isDirectCheckoutMode || !billOptions.changed) return displayOrderLines;
-    const allocated = allocateOrderDiscountToLines(activeOrderLines, Number(discountAmount));
+    const allocated = allocateOrderDiscountToLines(activeOrderLines, Number(discountAmount), isFeeLine);
     return activeOrderLines.map((line, index) => {
       const variant = variantById[line.variantId];
       const product = variant ? productById[variant.productId] : undefined;
       return buildDirectLine({ ...line, lineDiscount: allocated[index].lineDiscount }, product, variant);
     });
-  }, [activeOrderLines, billOptions.changed, buildDirectLine, discountAmount, displayOrderLines, isDirectCheckoutMode, productById, variantById]);
+  }, [activeOrderLines, billOptions.changed, buildDirectLine, discountAmount, displayOrderLines, isDirectCheckoutMode, isFeeLine, productById, variantById]);
 
   const lineSubtotal = useMemo(() => {
     const backendTotal = Number(selectedOrder?.grandTotal || 0);
@@ -770,7 +790,8 @@ export function CashierPage() {
     if (!billOptions.includeServiceCharge || !serviceChargeBps || !serviceChargeOn.BAR) {
       return { serviceCharge: 0, serviceChargeTax: 0 };
     }
-    const lines = paymentBillLines;
+    // Extra fees carry no service charge.
+    const lines = paymentBillLines.filter((line) => !isFeeLine(line));
     const preTax =
       lines.reduce(
         (sum, line) =>
@@ -789,6 +810,7 @@ export function CashierPage() {
     billOptions.includeTax,
     discountAmount,
     isDirectCheckoutMode,
+    isFeeLine,
     serviceChargeBps,
     serviceChargeOn.BAR,
     serviceChargeTaxRate,
@@ -1188,6 +1210,10 @@ export function CashierPage() {
       lines: typeof directCartLines
     ) => {
       for (const line of lines) {
+        if (isFeeLine(line)) {
+          await addExtraFeeLine({ sessionId: session.id }, feeOf(line));
+          continue;
+        }
         const variant = variantById[line.variantId];
         const product = variant ? productById[variant.productId] : undefined;
         if (!product) continue;
@@ -1207,7 +1233,9 @@ export function CashierPage() {
       setDirectCartLines([]);
     },
     [
+      addExtraFeeLine,
       addProductToTableSession,
+      isFeeLine,
       productById,
       updateTableSessionState,
       variantById,
@@ -1801,6 +1829,79 @@ export function CashierPage() {
     return pendingAdd;
   };
 
+  /**
+   * Puts an extra fee on whichever bill is open: a table's, an open bill, or the
+   * quick-sale cart. A fee is always a line of its own.
+   */
+  const addExtraFeeToBill = async (fee: ChosenFee) => {
+    const startFreshCart = isSettledSalesOrder(selectedOrder);
+    if (startFreshCart) {
+      clearOrderSelection();
+      setActiveTableId(null);
+      setTableOrderIds([]);
+      setMultiOrderLines({});
+      setIsDirectCheckoutMode(true);
+    }
+
+    if (!startFreshCart && selectedOrderSession && isPrimaryTableOrder) {
+      const line = await addExtraFeeLine(
+        { sessionId: selectedOrderSession.id },
+        fee,
+        tableOrderIds.length > 1 ? selectedOrder?.id : undefined
+      );
+      if (
+        selectedOrder &&
+        tableOrderIds.includes(selectedOrder.id) &&
+        (!line.salesOrderId || line.salesOrderId === selectedOrder.id)
+      ) {
+        setMultiOrderLines((current) => ({
+          ...current,
+          [selectedOrder.id]: [
+            ...(current[selectedOrder.id] || []).filter((item) => item.id !== line.id),
+            line,
+          ],
+        }));
+      }
+    } else if (selectedOrder && !startFreshCart) {
+      await addExtraFeeLine({ orderId: selectedOrder.id }, fee);
+    } else if (!requiresTableSelection || isDirectCheckoutMode || startFreshCart) {
+      setIsDirectCheckoutMode(true);
+      setDirectCartLines((current) => [
+        ...current,
+        {
+          id: `fee-${fee.variantId}-${Date.now()}`,
+          salesOrderId: "direct-checkout",
+          variantId: fee.variantId,
+          quantity: Math.max(1, fee.quantity).toFixed(4),
+          unitPrice: Math.max(0, fee.unitPrice).toFixed(4),
+          lineDiscount: "0.0000",
+          taxAmount: "0.0000",
+          status: "PENDING",
+          productName: fee.name,
+        },
+      ]);
+    } else {
+      throw new Error(t("cashier.errors.selectOrder"));
+    }
+  };
+
+  const confirmExtraFee = async (fee: ChosenFee) => {
+    setLocalError(null);
+    setNotice(null);
+    setIsAddingFee(true);
+    const pending = productAddQueueRef.current.then(() => addExtraFeeToBill(fee));
+    productAddQueueRef.current = pending.catch(() => undefined);
+    try {
+      await pending;
+      setExtraFeeOpen(false);
+      setNotice(t("cashier.extraFee.added"));
+    } catch (caught) {
+      setLocalError(caught instanceof Error ? caught.message : t("cashier.errors.addProduct"));
+    } finally {
+      setIsAddingFee(false);
+    }
+  };
+
   /** Confirm pay prints the bill only when the till asks for it. */
   const choosePrintBillOnConfirm = (value: boolean) => {
     setPrintBillOnConfirm(value);
@@ -2063,7 +2164,7 @@ export function CashierPage() {
             includeTax: billOptions.includeTax,
             includeServiceCharge: billOptions.includeServiceCharge,
           } : {}),
-          items: allocateOrderDiscountToLines(activeOrderLines, orderDiscount),
+          items: allocateOrderDiscountToLines(activeOrderLines, orderDiscount, isFeeLine),
           payments: checkoutPayments,
         });
       }
@@ -2202,7 +2303,9 @@ export function CashierPage() {
    */
   const printKdsDelete = async (lines: SalesOrderLine[]) => {
     if (!kdsDeleteSlips) return null;
-    const printLines = printableLines(lines.filter((line) => !isPendingKdsLine(line)));
+    const printLines = printableLines(
+      lines.filter((line) => !isPendingKdsLine(line) && !isFeeLine(line))
+    );
     if (!printLines.length) return null;
     const title = t("cashier.orderPanel.kdsDeleteTitle");
     try {
@@ -2546,6 +2649,10 @@ export function CashierPage() {
         });
 
         for (const line of activeOrderLines) {
+          if (isFeeLine(line)) {
+            await addExtraFeeLine({ orderId: order.id }, feeOf(line));
+            continue;
+          }
           const variant = variantById[line.variantId];
           const product = variant ? productById[variant.productId] : undefined;
           if (!product) continue;
@@ -2568,7 +2675,10 @@ export function CashierPage() {
         throw new Error(t("cashier.errors.kdsTargetMissing"));
       }
 
-      const unsentOrderLines = pendingKdsLines(displayOrderLines);
+      // Extra fees are nothing for the kitchen.
+      const unsentOrderLines = pendingKdsLines(displayOrderLines).filter(
+        (line) => !isFeeLine(line)
+      );
       if (!unsentOrderLines.length) {
         throw new Error(t("cashier.errors.kdsNothingNew"));
       }
@@ -2912,7 +3022,18 @@ export function CashierPage() {
         onReleaseTable={(tableId) =>
           void handleSeatingChange({ kind: "release", tableId })
         }
+        onAddExtraFee={() => setExtraFeeOpen(true)}
+        isFeeLine={isFeeLine}
       />
+
+      {extraFeeOpen ? (
+        <ExtraFeeDialog
+          fees={extraFees}
+          isBusy={isAddingFee}
+          onConfirm={(fee) => void confirmExtraFee(fee)}
+          onClose={() => setExtraFeeOpen(false)}
+        />
+      ) : null}
 
       {seatingMode && selectedOrderSession ? (
         <TableSeatingDialog

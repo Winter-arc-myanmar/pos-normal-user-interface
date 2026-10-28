@@ -236,6 +236,8 @@ export interface UpsertSalesOrderLineDTO {
     priceDelta: string;
   }>;
   seatNumber?: number;
+  /** Extra fees only: the name on the bill, as typed for "Other". */
+  name?: string;
 }
 
 export type UpdateSalesOrderLineDTO = Partial<UpsertSalesOrderLineDTO>;
@@ -286,6 +288,9 @@ export interface CheckoutRequestDTO {
     variantId: string;
     quantity: string;
     lineDiscount?: string;
+    /** Extra fees only: the amount charged for one, and its name. */
+    unitPrice?: string;
+    name?: string;
   }>;
   payments: CheckoutPaymentEntryDTO[];
 }

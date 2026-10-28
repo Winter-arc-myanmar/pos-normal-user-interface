@@ -53,6 +53,7 @@ import {
   WaitlistEntry,
   CounterOrderDetail,
 } from "../../domain/entities/Cashier";
+import type { ChosenFee } from "../../domain/entities/ExtraFee";
 import { ICashierService } from "../../domain/services/ICashierService";
 import container from "../../infrastructure/di/container";
 import {
@@ -222,6 +223,11 @@ interface UseCashierReturn {
     product: Product,
     variantId?: string,
     quantity?: number,
+    keepSelectedOrderId?: string
+  ) => Promise<SalesOrderLine>;
+  addExtraFeeLine: (
+    target: { orderId: string } | { sessionId: string },
+    fee: ChosenFee,
     keepSelectedOrderId?: string
   ) => Promise<SalesOrderLine>;
   getCounterOrderById: (counterOrderId: string) => Promise<CounterOrderDetail>;
@@ -1390,6 +1396,52 @@ export function useCashier(): UseCashierReturn {
     [cashierService, clearError, ensureVariants]
   );
 
+  /**
+   * Puts an extra fee (a container, delivery) on an open bill or a table's bill,
+   * at the amount and name the cashier chose. A fee is never merged with another.
+   */
+  const addExtraFeeLine = useCallback(
+    async (
+      target: { orderId: string } | { sessionId: string },
+      fee: ChosenFee,
+      keepSelectedOrderId?: string
+    ) => {
+      setIsLoading(true);
+      clearError();
+      try {
+        const payload = {
+          variantId: fee.variantId,
+          quantity: Math.max(1, fee.quantity).toFixed(4),
+          unitPrice: Math.max(0, fee.unitPrice).toFixed(4),
+          lineDiscount: "0.0000",
+          name: fee.name,
+        };
+        if ("orderId" in target) {
+          const created = await cashierService.addSalesOrderLine(target.orderId, payload);
+          const lines = await cashierService.getSalesOrderLines(target.orderId);
+          setSelectedOrderLines(lines);
+          return lines.find((line) => line.id === created.id) || created;
+        }
+        const added = await cashierService.addTableSessionLine(target.sessionId, payload);
+        const line = Object.assign(added, { productName: added.productName || fee.name });
+        if (!keepSelectedOrderId || keepSelectedOrderId === line.salesOrderId) {
+          setSelectedOrderLines((current) => [
+            ...current.filter((item) => item.id !== line.id),
+            line,
+          ]);
+        }
+        return line;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to add the fee";
+        setError(message);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [cashierService, clearError]
+  );
+
   const pickupCounterOrder = useCallback(
     async (counterOrderId: string) => {
       setIsLoading(true);
@@ -1574,6 +1626,7 @@ export function useCashier(): UseCashierReturn {
       updateOrderLine,
       removeOrderLine,
       addProductToTableSession,
+      addExtraFeeLine,
       getCounterOrderById,
       pickupCounterOrder,
       listKdsTickets,
@@ -1655,6 +1708,7 @@ export function useCashier(): UseCashierReturn {
       updateOrderLine,
       removeOrderLine,
       addProductToTableSession,
+      addExtraFeeLine,
       getCounterOrderById,
       pickupCounterOrder,
       listKdsTickets,

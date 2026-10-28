@@ -517,6 +517,40 @@ describe("OrderPanel", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("tags extra fees, keeps differently named ones apart, and opens the fee picker", async () => {
+    const onAddExtraFee = vi.fn();
+    const fee = (id: string, productName: string) =>
+      new SalesOrderLine({
+        ...line,
+        id,
+        variantId: "fee-other",
+        unitPrice: "200.0000",
+        productName,
+      });
+    render(
+      <OrderPanel
+        {...defaultProps}
+        selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
+        selectedOrderLines={[fee("a", "Paper bag"), fee("b", "Delivery")]}
+        isFeeLine={(entry) => entry.variantId === "fee-other"}
+        onAddExtraFee={onAddExtraFee}
+      />
+    );
+
+    expect(screen.getByText("Paper bag")).toBeInTheDocument();
+    expect(screen.getByText("Delivery")).toBeInTheDocument();
+    expect(screen.getAllByText("cashier.extraFee.tag")).toHaveLength(2);
+    expect(screen.queryByLabelText("cashier.orderPanel.kdsPending")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /cashier.extraFee.button/ }));
+    expect(onAddExtraFee).toHaveBeenCalled();
+  });
+
+  it("offers no extra fee on a paid bill", () => {
+    render(<OrderPanel {...defaultProps} onAddExtraFee={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: /cashier.extraFee.button/ })).not.toBeInTheDocument();
+  });
+
   it("names a line from the order itself, not from the menu it has loaded", () => {
     render(
       <OrderPanel

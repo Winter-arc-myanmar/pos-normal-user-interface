@@ -433,6 +433,9 @@ export const API_ENDPOINTS = {
     RUNNING: "/api/v1/promotion-rules/running",
     PREVIEW: "/api/v1/promotion-rules/preview",
   },
+  EXTRA_FEES: {
+    LIST: "/api/v1/extra-fees",
+  },
 
   POS_SYNC: {
     PULL_SETTINGS: "/api/v1/pos-sync/settings/pull",

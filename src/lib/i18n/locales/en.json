@@ -812,6 +812,23 @@
     }
   },
   "cashier": {
+    "extraFee": {
+      "title": "Add an extra fee",
+      "hint": "Charged on this bill as its own line. No tax, service charge or promotions.",
+      "other": "Other",
+      "typeIt": "Type name and amount",
+      "none": "No extra fees are set up. An owner adds them in Admin under Extra fees.",
+      "name": "Name",
+      "namePlaceholder": "e.g. Paper bag",
+      "amount": "Amount",
+      "quantity": "Quantity",
+      "add": "Add to bill",
+      "nameRequired": "Type what the fee is for.",
+      "amountRequired": "Enter an amount of 0 or more.",
+      "button": "Extra fee",
+      "added": "Extra fee added.",
+      "tag": "Fee"
+    },
     "seating": {
       "changeTable": "Change table",
       "combine": "Combine",

@@ -57,27 +57,44 @@ export function isFocLine(line: {
   return gross > 0 && toAmount(line.lineDiscount) >= gross - 0.009;
 }
 
+/**
+ * The checkout items, with the order discount spread over them in order. An
+ * extra fee takes none of it, and carries its own amount and name.
+ */
 export function allocateOrderDiscountToLines<
   T extends {
     variantId: string;
     quantity: string | number;
     unitPrice?: string | number;
     lineDiscount?: string | number;
+    productName?: string;
   },
 >(
   lines: T[],
-  orderDiscount: number
-): Array<{ variantId: string; quantity: string; lineDiscount: string }> {
+  orderDiscount: number,
+  isFee: (line: T) => boolean = () => false
+): Array<{
+  variantId: string;
+  quantity: string;
+  lineDiscount: string;
+  unitPrice?: string;
+  name?: string;
+}> {
   let remaining = Math.max(0, toAmount(orderDiscount));
   return lines.map((line) => {
+    const fee = isFee(line);
     const existing = Math.max(0, toAmount(line.lineDiscount));
-    const available = Math.max(0, lineGrossAmount(line) - existing);
+    const available = fee ? 0 : Math.max(0, lineGrossAmount(line) - existing);
     const extra = Math.min(remaining, available);
     remaining -= extra;
     return {
       variantId: line.variantId,
       quantity: toMoney(Math.max(0.0001, toAmount(line.quantity) || 1)),
       lineDiscount: toMoney(existing + extra),
+      ...(fee && {
+        unitPrice: toMoney(line.unitPrice),
+        ...(line.productName ? { name: line.productName } : {}),
+      }),
     };
   });
 }
