@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { KdsTicket } from "@/core/domain/entities/Cashier";
 import type { KdsTicketStatus } from "@/core/application/dtos/CashierDTO";
@@ -52,6 +52,9 @@ export function CounterOrdersPage() {
   const [localError, setLocalError] = useState<string | null>(null);
   const [detailTicket, setDetailTicket] = useState<KdsTicket | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  // A ticket opened later (or the dialog being closed) makes an earlier detail
+  // response stale; it must not replace what is on screen.
+  const detailRequestRef = useRef(0);
 
   const loadTickets = useCallback(async () => {
     const result = await listKdsTickets({
@@ -113,20 +116,32 @@ export function CounterOrdersPage() {
 
   const unlinkedCount = tickets.filter((ticket) => !ticket.stationId).length;
 
+  const closeTicketDetails = () => {
+    detailRequestRef.current += 1;
+    setDetailTicket(null);
+    setDetailLoading(false);
+  };
+
   const openTicketDetails = async (ticket: KdsTicket) => {
+    const requestId = ++detailRequestRef.current;
     setLocalError(null);
     setDetailTicket(ticket);
-    if (!ticket.id) return;
+    if (!ticket.id) {
+      setDetailLoading(false);
+      return;
+    }
     setDetailLoading(true);
     try {
       const detail = await getKdsTicketById(ticket.id);
+      if (detailRequestRef.current !== requestId) return;
       setDetailTicket(detail);
     } catch (caught) {
+      if (detailRequestRef.current !== requestId) return;
       setLocalError(
         caught instanceof Error ? caught.message : t("counterOrders.ticketFailed")
       );
     } finally {
-      setDetailLoading(false);
+      if (detailRequestRef.current === requestId) setDetailLoading(false);
     }
   };
 
@@ -346,7 +361,7 @@ export function CounterOrdersPage() {
               <button
                 type="button"
                 aria-label={t("counterOrders.closeDetails")}
-                onClick={() => setDetailTicket(null)}
+                onClick={closeTicketDetails}
                 className="grid h-8 w-8 place-items-center rounded text-slate-500 hover:bg-slate-100"
               >
                 ×
@@ -392,7 +407,7 @@ export function CounterOrdersPage() {
             <div className="flex justify-end gap-2 border-t border-slate-200 px-4 py-3">
               <button
                 type="button"
-                onClick={() => setDetailTicket(null)}
+                onClick={closeTicketDetails}
                 className="min-h-9 rounded-lg px-3 text-sm text-slate-600 hover:bg-slate-100"
               >
                 {t("counterOrders.closeDetails")}

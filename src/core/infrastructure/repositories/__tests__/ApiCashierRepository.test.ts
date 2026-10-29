@@ -134,6 +134,79 @@ describe("ApiCashierRepository", () => {
     expect(lines[2].categoryId).toBe("cat-tea");
   });
 
+  it("keeps modifiers, tax and promotion fields on a reloaded order line", async () => {
+    // The till reads these back from a line it already rang up: the order panel
+    // merges a plain tap only into lines without modifiers, prints the
+    // modifiers on the bill, and copies tax/promotion when a line moves.
+    const httpClient = {
+      get: vi.fn().mockResolvedValue({
+        success: true,
+        data: [
+          {
+            id: "line-1",
+            salesOrderId: "order-1",
+            variantId: "variant-1",
+            quantity: "1.0000",
+            unitPrice: "10000.0000",
+            lineDiscount: "1000.0000",
+            taxRateId: "tax-1",
+            taxAmount: "900.0000",
+            taxInclusive: true,
+            appliedPromotionId: "promo-1",
+            voidReasonId: "void-1",
+            compReasonId: "comp-1",
+            courseType: "MAIN",
+            selectedModifiers: [
+              { modifierId: "mod-1", name: "Oat milk", priceDelta: "1500.0000" },
+            ],
+            updatedAt: "2026-10-23T10:00:00.000Z",
+          },
+          {
+            id: "line-2",
+            salesOrderId: "order-1",
+            variantId: "variant-2",
+            quantity: "2.0000",
+            unitPrice: "5000.0000",
+            selectedModifiers: {
+              "mod-2": { modifierId: "mod-2", name: "No ice" },
+            },
+          },
+          {
+            id: "line-3",
+            salesOrderId: "order-1",
+            variantId: "variant-3",
+            quantity: "1.0000",
+            unitPrice: "5000.0000",
+            selectedModifiers: [],
+          },
+        ],
+      }),
+    };
+    const repository = new ApiCashierRepository(
+      httpClient as unknown as HttpClient
+    );
+
+    const lines = await repository.getSalesOrderLines("order-1");
+
+    expect(lines[0]).toMatchObject({
+      taxRateId: "tax-1",
+      taxAmount: "900.0000",
+      taxInclusive: true,
+      appliedPromotionId: "promo-1",
+      voidReasonId: "void-1",
+      compReasonId: "comp-1",
+      courseType: "MAIN",
+      updatedAt: "2026-10-23T10:00:00.000Z",
+    });
+    expect(lines[0].selectedModifiers).toEqual([
+      { modifierId: "mod-1", name: "Oat milk", priceDelta: "1500.0000" },
+    ]);
+    expect(lines[1].selectedModifiers).toEqual({
+      "mod-2": { modifierId: "mod-2", name: "No ice" },
+    });
+    expect(lines[2].selectedModifiers).toBeUndefined();
+  });
+
   it("normalizes nested paginated list responses", async () => {
     const httpClient = {
       get: vi.fn().mockResolvedValue({
@@ -742,6 +815,16 @@ describe("ApiCashierRepository", () => {
     expect(post).toHaveBeenLastCalledWith("/api/v1/table-sessions/session-1/merge", {
       sourceSessionId: "session-2",
       keepTable: true,
+    });
+
+    await repository.changeTableSeating("session-1", {
+      kind: "split",
+      targetSessionId: "session-3",
+      lines: [{ lineId: "line-1", quantity: 2 }],
+    });
+    expect(post).toHaveBeenLastCalledWith("/api/v1/table-sessions/session-1/split", {
+      targetSessionId: "session-3",
+      lines: [{ lineId: "line-1", quantity: 2 }],
     });
 
     await repository.changeTableSeating("session-1", {

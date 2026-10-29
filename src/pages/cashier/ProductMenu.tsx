@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import {
@@ -162,6 +162,9 @@ export function ProductMenu({
   const [needsVariantChoice, setNeedsVariantChoice] = useState(false);
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [localError, setLocalError] = useState<string | null>(null);
+  // Tapping a second product while the first one's variants are still loading
+  // must not let the first response open or add the wrong product.
+  const selectedProductIdRef = useRef("");
 
   const categoryOf = useCallback(
     (product: Product) => product.categoryName || t("cashier.productMenu.otherCategory"),
@@ -203,6 +206,7 @@ export function ProductMenu({
   const optionGroups = optionGroupsOf(selectedProduct);
 
   const closeVariantModal = () => {
+    selectedProductIdRef.current = "";
     setNeedsVariantChoice(false);
     setSelectedOptions([]);
     setSelectedProduct(null);
@@ -249,6 +253,7 @@ export function ProductMenu({
       setLocalError(t("cashier.productMenu.unavailable"));
       return;
     }
+    selectedProductIdRef.current = product.id;
     setSelectedProduct(product);
     setQuantity(1);
     setLocalError(null);
@@ -257,6 +262,7 @@ export function ProductMenu({
 
     try {
       const loaded = await loadVariants(product);
+      if (selectedProductIdRef.current !== product.id) return;
       const defaultVariantId = loaded[0]?.id || "";
       setSelectedVariantId(defaultVariantId);
       setVariantOptions(loaded);
@@ -275,6 +281,7 @@ export function ProductMenu({
 
       await addProduct(product, defaultVariantId, 1);
     } catch (caught) {
+      if (selectedProductIdRef.current !== product.id) return;
       setLocalError(
         caught instanceof Error ? caught.message : t("cashier.errors.loadVariants")
       );

@@ -11,6 +11,7 @@ import {
   OrderStatus,
   ServiceType,
   SplitPaymentTenderDTO,
+  SplitLineDTO,
   TableSeatingChangeDTO,
   TableSessionState,
   toApiServiceType,
@@ -30,6 +31,7 @@ import { CashierBoard } from "./cashier/CashierBoard";
 import { MultiOrderingView } from "./cashier/MultiOrderingView";
 import { OrderPanel } from "./cashier/OrderPanel";
 import { TableSeatingDialog } from "./cashier/TableSeatingDialog";
+import { SplitItemsDialog, SplitTarget } from "./cashier/SplitItemsDialog";
 import { PaymentView } from "./cashier/PaymentView";
 import { ProductMenu } from "./cashier/ProductMenu";
 import { TableChargesBar } from "./cashier/TableChargesBar";
@@ -196,7 +198,9 @@ export function CashierPage() {
   const [directCartLines, setDirectCartLines] = useState<typeof selectedOrderLines>([]);
   const [isDirectCheckoutMode, setIsDirectCheckoutMode] = useState(false);
   const [activeTableId, setActiveTableId] = useState<string | null>(null);
-  const [seatingMode, setSeatingMode] = useState<"move" | "combine" | null>(
+  const [seatingMode, setSeatingMode] = useState<
+    "move" | "combine" | "split" | null
+  >(
     null
   );
   const [tableOrderIds, setTableOrderIds] = useState<string[]>([]);
@@ -2594,8 +2598,11 @@ export function CashierPage() {
       }
       const kitchenLines = printableLines(unsentOrderLines);
 
+      // A table session can outlive several KDS sends. Target the current sales
+      // order when it exists so a later send only evaluates that order's new
+      // lines instead of rebuilding the session's earlier batch.
       await fireToKds(
-        sessionId ? { sessionId } : { salesOrderId: salesOrderId! }
+        salesOrderId ? { salesOrderId } : { sessionId: sessionId! }
       );
 
       let kitchenPrintError: string | null = null;
@@ -2704,7 +2711,9 @@ export function CashierPage() {
     }
   };
 
-  const handleSeatingChange = async (change: TableSeatingChangeDTO) => {
+  const handleSeatingChange = async (
+    change: Exclude<TableSeatingChangeDTO, { kind: "split" }>
+  ) => {
     const session = selectedOrderSession;
     if (!session) return;
     const tableNumber = (tableId: string) =>
@@ -2737,6 +2746,59 @@ export function CashierPage() {
             : "cashier.seating.released",
           { table: tableNumber(change.tableId) }
         )
+      );
+    } catch (caught) {
+      setLocalError(
+        caught instanceof Error ? caught.message : t("cashier.seating.failed")
+      );
+    }
+  };
+
+  const handleSplitToTable = async (
+    target: SplitTarget,
+    lines: SplitLineDTO[]
+  ) => {
+    const session = selectedOrderSession;
+    if (!session) return;
+    setLocalError(null);
+    setNotice(null);
+    try {
+      let targetSessionId = "sessionId" in target ? target.sessionId : "";
+      let tableId =
+        "tableId" in target
+          ? target.tableId
+          : tableSessions.find((open) => open.id === targetSessionId)?.tableId;
+      if ("tableId" in target) {
+        const context = await requireCashierContext();
+        const opened = await openTableSession({
+          tenantId: context.tenantId,
+          tableId: target.tableId,
+          locationId: context.locationId,
+          guestCount: 1,
+          posRegisterId: context.posRegisterId,
+          openedByPosSessionId: context.posSessionId,
+          salesChannel: "POS",
+        });
+        targetSessionId = opened.id;
+        if (opened.salesOrderId) {
+          writeTableOrderIds(target.tableId, [opened.salesOrderId]);
+        }
+        tableId = target.tableId;
+      }
+      await changeTableSeating(session.id, {
+        kind: "split",
+        targetSessionId,
+        lines,
+      });
+      setSeatingMode(null);
+      if (selectedOrder) await selectOrderById(selectedOrder.id);
+      await refreshMultiOrderLines(tableOrderIds);
+      setNotice(
+        t("cashier.seating.splitDone", {
+          table:
+            diningTables.find((table) => table.id === tableId)?.tableNumber ||
+            "",
+        })
       );
     } catch (caught) {
       setLocalError(
@@ -2926,12 +2988,27 @@ export function CashierPage() {
             ? () => setSeatingMode("combine")
             : undefined
         }
+        onSplitItems={
+          selectedOrderSession && !isSettledSalesOrder(selectedOrder)
+            ? () => setSeatingMode("split")
+            : undefined
+        }
         onReleaseTable={(tableId) =>
           void handleSeatingChange({ kind: "release", tableId })
         }
       />
 
-      {seatingMode && selectedOrderSession ? (
+      {seatingMode === "split" && selectedOrderSession ? (
+        <SplitItemsDialog
+          session={selectedOrderSession}
+          lines={selectedOrderLines}
+          tables={diningTables}
+          sessions={tableSessions}
+          isBusy={isLoading}
+          onConfirm={(target, lines) => void handleSplitToTable(target, lines)}
+          onClose={() => setSeatingMode(null)}
+        />
+      ) : seatingMode && seatingMode !== "split" && selectedOrderSession ? (
         <TableSeatingDialog
           mode={seatingMode}
           session={selectedOrderSession}

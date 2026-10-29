@@ -12,6 +12,9 @@
     "save": "Save",
     "cancel": "Cancel",
     "loading": "Loading...",
+    "dismiss": "Dismiss",
+    "previous": "Previous",
+    "next": "Next",
     "clearSearch": "Clear search",
     "preparingWorkspace": "Preparing your workspace."
   },
@@ -728,6 +731,11 @@
       "qtyFirst": "Quantity first",
       "price": "Price",
       "modifiers": "Modifiers",
+      "deleteSlip": {
+        "title": "KDS delete slip",
+        "description": "Print a DELETE slip on the station printer when a sent item is removed or an open order is cancelled. This applies to every POS at this shop.",
+        "saving": "Saving…"
+      },
       "productRemarks": "Product remarks",
       "bilingual": "Bilingual",
       "categorySubtotal": "Category subtotal",
@@ -756,11 +764,6 @@
     },
     "kdsStation": {
       "newStation": "New station",
-      "deleteSlip": {
-        "title": "KDS delete slip",
-        "description": "Print a DELETE slip on the station printer when a sent item is removed or an open order is cancelled. This applies to every POS at this shop.",
-        "saving": "Saving…"
-      },
       "name": "Station name",
       "color": "Display color",
       "printers": "Printers",
@@ -810,8 +813,8 @@
   },
   "cashier": {
     "seating": {
-      "changeTable": "Change table",
-      "combine": "Combine",
+      "changeTable": "Move",
+      "combine": "Merge",
       "joinedTables": "Joined tables",
       "release": "Release table {{table}}",
       "withTable": "with {{table}}",
@@ -833,7 +836,21 @@
       "combined": "Bills combined.",
       "joined": "Table {{table}} joined.",
       "released": "Table {{table}} released.",
-      "failed": "Could not change the table."
+      "failed": "Could not change the table.",
+      "split": "Split",
+      "splitTitle": "Split items from table {{table}}",
+      "splitHint": "Pick the items and how many, then the table they go to. They come off this bill and onto that table's.",
+      "itemsToMove": "Items to move",
+      "onBill": "{{count}} on this bill",
+      "all": "All",
+      "noItems": "No items on this bill yet. Send them first.",
+      "moveItemsTo": "Move them to",
+      "openBill": "Open bill",
+      "freeTable": "Free table",
+      "noOtherTables": "No other table is free or open.",
+      "moveItems_one": "Move {{count}} item",
+      "moveItems_other": "Move {{count}} items",
+      "splitDone": "Items moved to table {{table}}."
     },
     "newOrder": "+ New",
     "location": "Location",
@@ -1086,6 +1103,9 @@
       "quickCheckout": "Quick Checkout",
       "tableStatus": "Table status",
       "tableStatusLabel": "Table",
+      "tableControls": "Table & session",
+      "expandTableControls": "Expand table and session controls",
+      "collapseTableControls": "Collapse table and session controls",
       "tableStatusOption": "Table: {{status}}",
       "tableStatuses": {
         "AVAILABLE": "Available",
@@ -1115,6 +1135,7 @@
       "decreaseQuantity": "Decrease quantity",
       "increaseQuantity": "Increase quantity",
       "lineQuantity": "Quantity {{count}}",
+      "kdsPending": "Not sent to KDS",
       "expandItem": "Expand {{name}} details",
       "collapseItem": "Collapse {{name}} details",
       "remove": "Remove",

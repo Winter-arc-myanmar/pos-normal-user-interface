@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CounterOrdersPage } from "../CounterOrdersPage";
 
@@ -133,6 +133,61 @@ describe("CounterOrdersPage integration", () => {
         ]
       );
     });
+  });
+
+  it("ignores a stale ticket detail response after the dialog is closed and another ticket is opened", async () => {
+    const secondTicket = {
+      ...ticket,
+      id: "ticket-10",
+      ticketNumber: "KDS-10",
+    };
+    const pending = new Map<string, (value: unknown) => void>();
+    mocks.listTickets.mockResolvedValue({
+      tickets: [ticket, secondTicket],
+      total: 2,
+      page: 1,
+      limit: 50,
+      totalPages: 1,
+    });
+    mocks.getTicket.mockImplementation(
+      (id: string) =>
+        new Promise((resolve) => {
+          pending.set(id, resolve);
+        })
+    );
+
+    render(<CounterOrdersPage />);
+    await screen.findByRole("button", { name: "Print KDS-9" });
+    const detailsButtons = screen.getAllByRole("button", { name: "Details" });
+
+    fireEvent.click(detailsButtons[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Close" })[0]);
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+    );
+
+    fireEvent.click(detailsButtons[1]);
+    expect(await screen.findByText("Loading")).toBeInTheDocument();
+
+    await act(async () => {
+      pending.get("ticket-10")?.({
+        ...secondTicket,
+        lines: [{ name: "Second order line", quantity: "1.0000" }],
+      });
+    });
+    expect(screen.getByText("Second order line")).toBeInTheDocument();
+    expect(screen.getByText("KDS-10")).toBeInTheDocument();
+
+    await act(async () => {
+      pending.get("ticket-9")?.({
+        ...ticket,
+        lines: [{ name: "First order line", quantity: "1.0000" }],
+      });
+    });
+
+    expect(screen.queryByText("First order line")).not.toBeInTheDocument();
+    expect(screen.getByText("Second order line")).toBeInTheDocument();
+    expect(screen.getByText("KDS-10")).toBeInTheDocument();
   });
 
   it("opens ticket details with the returned items", async () => {

@@ -3,9 +3,32 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PrintTemplateSettingsPanel } from "../PrintTemplateSettingsPanel";
 
 const createTemplate = vi.fn();
+const saveKdsDeleteSlip = vi.fn();
+
+vi.mock("@/core/presentation/hooks/useKdsDeleteSlipShopSetting", () => ({
+  useKdsDeleteSlipShopSetting: () => ({
+    canWrite: true,
+    enabled: true,
+    isSaving: false,
+    error: null,
+    save: saveKdsDeleteSlip,
+  }),
+}));
 
 vi.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string) => {
+      const labels: Record<string, string> = {
+        "settings.printTemplate.contact": "Phone",
+        "settings.printTemplate.email": "Email",
+        "settings.printTemplate.logo": "Logo",
+        "settings.printTemplate.deleteSlip.title": "KDS delete slip",
+        "settings.printTemplate.deleteSlip.description": "KDS delete slip description",
+        "settings.printTemplate.deleteSlip.saving": "Saving…",
+      };
+      return labels[key] || key;
+    },
+  }),
 }));
 
 vi.mock("@/core/presentation/hooks/usePosWorkspace", () => ({
@@ -147,7 +170,7 @@ describe("PrintTemplateSettingsPanel", () => {
     expect(preview).toHaveTextContent("hello@grandspa.com");
     expect(screen.getByRole("img", { name: "Phone" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("checkbox", { name: "settings.printTemplate.email" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Email" }));
     expect(preview).not.toHaveTextContent("hello@grandspa.com");
     expect(preview).toHaveTextContent("09 123");
   });
@@ -181,5 +204,15 @@ describe("PrintTemplateSettingsPanel", () => {
     expect(select).toHaveValue("1H1W");
     fireEvent.change(select, { target: { value: "2H1W" } });
     expect(select).toHaveValue("2H1W");
+  });
+
+  it("shows the KDS delete slip setting in Print Template and saves it", async () => {
+    render(<PrintTemplateSettingsPanel />);
+
+    const toggle = await screen.findByRole("switch", { name: "KDS delete slip" });
+    expect(toggle).toBeChecked();
+
+    fireEvent.click(toggle);
+    expect(saveKdsDeleteSlip).toHaveBeenCalledWith(false);
   });
 });

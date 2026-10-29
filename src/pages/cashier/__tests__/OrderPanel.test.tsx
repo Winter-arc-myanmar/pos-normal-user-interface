@@ -2,7 +2,7 @@ import { createRef, type ComponentProps } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { DiningTable, PaymentMethod, SalesOrder, SalesOrderLine } from "@/core/domain/entities/Cashier";
+import { DiningTable, PaymentMethod, SalesOrder, SalesOrderLine, TableSession } from "@/core/domain/entities/Cashier";
 import type { RunningPromotion } from "@/core/domain/entities/Promotion";
 import { OrderPanel } from "../OrderPanel";
 
@@ -75,6 +75,62 @@ const promotion: RunningPromotion = {
 };
 
 describe("OrderPanel", () => {
+  it("keeps table controls compact until the cashier expands them", () => {
+    const onChangeTable = vi.fn();
+    const onCombineTables = vi.fn();
+    render(
+      <OrderPanel
+        {...defaultProps}
+        selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
+        selectedTable={
+          new DiningTable({
+            id: "table-1",
+            tableNumber: "T-05",
+            status: "OCCUPIED",
+          })
+        }
+        selectedSession={
+          new TableSession({
+            id: "session-1",
+            tableId: "table-1",
+            salesOrderId: "order-1",
+            sessionState: "ORDERING",
+          })
+        }
+        onChangeTable={onChangeTable}
+        onCombineTables={onCombineTables}
+      />
+    );
+
+    const toggle = screen.getByRole("button", {
+      name: "cashier.orderPanel.expandTableControls",
+    });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveTextContent("T-05");
+    expect(toggle).not.toHaveTextContent("cashier.orderPanel.tableStatuses.OCCUPIED");
+    expect(toggle).toHaveTextContent("cashier.orderPanel.sessionStates.ORDERING");
+    expect(screen.queryByLabelText("cashier.orderPanel.tableStatus")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "cashier.seating.changeTable" })).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+
+    expect(
+      screen.getByRole("button", { name: "cashier.orderPanel.collapseTableControls" })
+    ).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByLabelText("cashier.orderPanel.tableStatus")).toBeInTheDocument();
+    expect(screen.getByLabelText("cashier.orderPanel.sessionState")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "cashier.seating.changeTable" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "cashier.seating.combine" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "cashier.seating.split" })).toBeDisabled();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "cashier.orderPanel.collapseTableControls" })
+    );
+    expect(
+      screen.getByRole("button", { name: "cashier.orderPanel.expandTableControls" })
+    ).toHaveAttribute("aria-expanded", "false");
+  });
+
   it.each([
     [true, false, "11.00"],
     [true, true, "10.00"],
@@ -129,6 +185,9 @@ describe("OrderPanel", () => {
     expect(toggle).toHaveTextContent("Cola");
     expect(toggle).toHaveTextContent("3×");
     expect(toggle).toHaveTextContent("30.00");
+    expect(screen.getByLabelText("cashier.orderPanel.kdsPending")).toHaveClass(
+      "bg-emerald-500"
+    );
     fireEvent.click(toggle);
     fireEvent.click(
       screen.getByRole("button", { name: "cashier.orderPanel.remove" })
@@ -145,6 +204,30 @@ describe("OrderPanel", () => {
   it("blocks finance printing while a bill quote is unavailable", () => {
     render(<OrderPanel {...defaultProps} isPayView checkoutBlocked onPrintFinance={vi.fn()} />);
     expect(screen.getByRole("button", { name: "cashier.printFinance" })).toBeDisabled();
+  });
+
+  it("marks pending KDS lines green and hides the marker after they are sent", () => {
+    render(
+      <OrderPanel
+        {...defaultProps}
+        selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
+        selectedOrderLines={[
+          new SalesOrderLine({ ...line, productName: "Pending coffee" }),
+          new SalesOrderLine({
+            ...line,
+            id: "line-sent",
+            variantId: "variant-2",
+            productName: "Sent coffee",
+            firedAt: "2026-10-28T10:00:00.000Z",
+          }),
+        ]}
+      />
+    );
+
+    expect(screen.getByLabelText("cashier.orderPanel.kdsPending")).toHaveClass(
+      "bg-emerald-500"
+    );
+    expect(screen.getAllByLabelText("cashier.orderPanel.kdsPending")).toHaveLength(1);
   });
 
   it("starts with compact summaries and reveals details only when expanded", async () => {

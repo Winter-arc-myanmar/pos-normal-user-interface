@@ -230,6 +230,20 @@ describe("usePrinterConnection paid bill copies", () => {
     });
     expect(printed()).toEqual([["Till", "Top-up", "CHECKOUT"]]);
   });
+
+  it("prints a customer bill once when the same printer has two bindings", async () => {
+    bind("Till duplicate", ["CHECKOUT"]);
+    const { result } = renderConnection();
+    await act(async () => {
+      await result.current.printReceipt({
+        title: "Customer bill",
+        lines: [],
+        total: "1000",
+      });
+    });
+
+    expect(printed()).toEqual([["Till", "Customer bill", "CHECKOUT"]]);
+  });
 });
 
 describe("usePrinterConnection KDS ticket modifiers", () => {
