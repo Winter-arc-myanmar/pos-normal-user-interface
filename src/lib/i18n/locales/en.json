@@ -1230,6 +1230,7 @@
       "discountReasonRequired": "Choose a discount reason before applying a discount.",
       "discountTooLarge": "Discount cannot be greater than the order subtotal.",
       "tableChargesFinalize": "Unable to finalize table charges. Refresh and try again.",
+      "tableHasSelectedMenu": "Finish or cancel the current order before selecting another table.",
       "billUpdated": "The table bill changed to {{amount}} after finalizing its charges. Review the new total, then confirm payment again."
     },
     "tableCharges": {

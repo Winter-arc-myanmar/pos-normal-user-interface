@@ -68,6 +68,7 @@ import { promotionPreviewItems } from "@/lib/pos/promotions";
 import {
   findOpenTableSession,
   isOpenTableSession,
+  normalizeDiningTableStatus,
 } from "@/lib/pos/tableSession";
 import {
   clearTableOrderIds,
@@ -1306,15 +1307,29 @@ export function CashierPage() {
   const handleTableTap = async (tableId: string) => {
     setLocalError(null);
     setNotice(null);
+    const table = diningTables.find((item) => item.id === tableId);
+    if (!table) return;
+
+    const currentTableId = activeTableId || selectedOrderSession?.tableId || null;
+    const hasSelectedMenu = displayOrderLines.length > 0;
+    const targetIsAvailable =
+      normalizeDiningTableStatus(table.status) === "AVAILABLE";
+    if (
+      hasSelectedMenu &&
+      currentTableId &&
+      currentTableId !== table.id &&
+      targetIsAvailable
+    ) {
+      setNotice(t("cashier.errors.tableHasSelectedMenu"));
+      return;
+    }
+
     const pendingLines = isDirectCheckoutMode ? [...directCartLines] : [];
     if (!pendingLines.length) {
       setIsDirectCheckoutMode(false);
       setDirectCartLines([]);
     }
-    const table = diningTables.find((item) => item.id === tableId);
-    if (!table) return;
 
-    const currentTableId = activeTableId || selectedOrderSession?.tableId || null;
     if (currentTableId && currentTableId !== table.id) {
       clearOrderSelection();
       setTableOrderIds([]);
