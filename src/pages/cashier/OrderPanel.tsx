@@ -46,11 +46,16 @@ export type GroupedSalesOrderLine = SalesOrderLine & {
  * bill lines so the kitchen receives them, while the cashier still sees a
  * single combined quantity.
  */
-export function groupOrderLines(lines: SalesOrderLine[]): GroupedSalesOrderLine[] {
+export function groupOrderLines(
+  lines: SalesOrderLine[],
+  isFee: (line: SalesOrderLine) => boolean = () => false
+): GroupedSalesOrderLine[] {
   const groups = new Map<string, SalesOrderLine[]>();
   for (const line of lines) {
     const key = JSON.stringify([
       line.variantId,
+      // Two "Other" fees with different names stay apart.
+      isFee(line) ? line.productName ?? "" : "",
       Number(line.unitPrice || 0).toFixed(4),
       Number(line.lineDiscount || 0).toFixed(4),
       line.selectedModifiers ?? null,
@@ -150,6 +155,9 @@ interface OrderPanelProps {
   onCombineTables?: () => void;
   onSplitItems?: () => void;
   onReleaseTable?: (tableId: string) => void;
+  /** Opens the extra fee picker; no button without it. */
+  onAddExtraFee?: () => void;
+  isFeeLine?: (line: SalesOrderLine) => boolean;
 }
 
 const SEATING_ICON_PATHS = {
@@ -244,6 +252,8 @@ export function OrderPanel({
   onTableStatusChange,
   onSessionStateChange,
   joinedTables = [],
+  onAddExtraFee,
+  isFeeLine,
   onChangeTable,
   onCombineTables,
   onSplitItems,
@@ -259,8 +269,8 @@ export function OrderPanel({
   const lineDetailsId = useId();
   const tableControlsId = useId();
   const groupedOrderLines = useMemo(
-    () => groupOrderLines(selectedOrderLines),
-    [selectedOrderLines]
+    () => groupOrderLines(selectedOrderLines, isFeeLine),
+    [isFeeLine, selectedOrderLines]
   );
   const variants = Object.values(variantsByProductId).flat();
   const hasActiveOrder = !!selectedOrder || selectedOrderLines.length > 0;
@@ -430,6 +440,7 @@ export function OrderPanel({
                   expandedLine?.lineId === line.id;
                 const detailsId = `${lineDetailsId}-${line.id}`;
                 const isPendingKds = isPendingKdsLine(line);
+                const isFee = isFeeLine?.(line) ?? false;
                 return (
                   <div
                     key={line.id}
@@ -451,7 +462,7 @@ export function OrderPanel({
                         }
                       )}
                     >
-                      {isPendingKds ? (
+                      {!isFee && isPendingKds ? (
                         <span
                           className="h-2.5 w-2.5 shrink-0 rounded-full border-2 border-emerald-500 bg-emerald-500"
                           aria-label={t("cashier.orderPanel.kdsPending")}
@@ -471,6 +482,11 @@ export function OrderPanel({
                             title={promoLabel}
                           >
                             {t("cashier.orderPanel.promo")}
+                          </span>
+                        ) : null}
+                        {isFee ? (
+                          <span className="shrink-0 rounded bg-amber-100 px-1 text-[10px] font-semibold text-amber-800">
+                            {t("cashier.extraFee.tag")}
                           </span>
                         ) : null}
                         {isFocLine(line) ? (
@@ -582,6 +598,16 @@ export function OrderPanel({
                 </div>
               ) : null}
             </div>
+            {onAddExtraFee && !isSettledOrder ? (
+              <button
+                type="button"
+                className="mb-3 inline-flex min-h-10 items-center gap-1 rounded border border-dashed border-slate-300 px-3 text-sm font-medium text-slate-600 hover:border-blue-500 hover:text-blue-700 disabled:opacity-50"
+                disabled={isLoading}
+                onClick={onAddExtraFee}
+              >
+                + {t("cashier.extraFee.button")}
+              </button>
+            ) : null}
           </>
         ) : (
           <div className="flex h-full min-h-48 items-center justify-center text-center">

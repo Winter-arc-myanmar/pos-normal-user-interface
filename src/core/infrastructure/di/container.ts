@@ -57,6 +57,7 @@ import { IKtvService } from "../../domain/services/IKtvService";
 import { KtvService } from "../../application/services/KtvService";
 import { ISpaRepository } from "../../domain/repositories/ISpaRepository";
 import { ApiPromotionRepository } from "../repositories/ApiPromotionRepository";
+import { ApiExtraFeeRepository } from "../repositories/ApiExtraFeeRepository";
 import { ApiHostessRepository } from "../repositories/ApiHostessRepository";
 import { ApiShiftRepository } from "../repositories/ApiShiftRepository";
 import { ApiTableChargeRepository } from "../repositories/ApiTableChargeRepository";
@@ -165,6 +166,10 @@ class Container {
     this.register<ApiPromotionRepository>(
       "promotionRepository",
       new ApiPromotionRepository(this.resolve("httpClient"))
+    );
+    this.register<ApiExtraFeeRepository>(
+      "extraFeeRepository",
+      new ApiExtraFeeRepository(this.resolve("httpClient"))
     );
     this.register<ApiHostessRepository>(
       "hostessRepository",

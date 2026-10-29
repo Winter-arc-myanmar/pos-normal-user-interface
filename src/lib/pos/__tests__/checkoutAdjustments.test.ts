@@ -61,6 +61,28 @@ describe("checkoutAdjustments", () => {
     ]);
   });
 
+  it("gives an extra fee none of the order discount and sends its amount and name", () => {
+    expect(
+      allocateOrderDiscountToLines(
+        [
+          { variantId: "fee", quantity: "2.0000", unitPrice: "300.0000", productName: "Paper bag" },
+          { variantId: "rice", quantity: "1.0000", unitPrice: "1000.0000" },
+        ],
+        100,
+        (line) => line.variantId === "fee"
+      )
+    ).toEqual([
+      {
+        variantId: "fee",
+        quantity: "2.0000",
+        lineDiscount: "0.0000",
+        unitPrice: "300.0000",
+        name: "Paper bag",
+      },
+      { variantId: "rice", quantity: "1.0000", lineDiscount: "100.0000" },
+    ]);
+  });
+
   it("sends the picked options with an item for the server to price", () => {
     expect(
       allocateOrderDiscountToLines(

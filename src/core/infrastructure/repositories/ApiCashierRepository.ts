@@ -126,6 +126,7 @@ const normalizeUpsertLinePayload = (
         }
       : {}),
     ...(payload.seatNumber !== undefined ? { seatNumber: payload.seatNumber } : {}),
+    ...(payload.name ? { name: payload.name } : {}),
   };
 };
 
@@ -158,6 +159,7 @@ const normalizeSalesOrderLinePayload = (
         }
       : {}),
     ...(payload.seatNumber !== undefined ? { seatNumber: payload.seatNumber } : {}),
+    ...(payload.name ? { name: payload.name } : {}),
   };
 };
 
