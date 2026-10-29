@@ -1,3 +1,5 @@
+import { modifierRefs } from "@/lib/modifiers/choices";
+
 const toAmount = (value: unknown): number => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -63,21 +65,29 @@ export function allocateOrderDiscountToLines<
     quantity: string | number;
     unitPrice?: string | number;
     lineDiscount?: string | number;
+    selectedModifiers?: unknown;
   },
 >(
   lines: T[],
   orderDiscount: number
-): Array<{ variantId: string; quantity: string; lineDiscount: string }> {
+): Array<{
+  variantId: string;
+  quantity: string;
+  lineDiscount: string;
+  selectedModifiers?: Array<{ modifierId: string }>;
+}> {
   let remaining = Math.max(0, toAmount(orderDiscount));
   return lines.map((line) => {
     const existing = Math.max(0, toAmount(line.lineDiscount));
     const available = Math.max(0, lineGrossAmount(line) - existing);
     const extra = Math.min(remaining, available);
     remaining -= extra;
+    const modifiers = modifierRefs(line.selectedModifiers);
     return {
       variantId: line.variantId,
       quantity: toMoney(Math.max(0.0001, toAmount(line.quantity) || 1)),
       lineDiscount: toMoney(existing + extra),
+      ...(modifiers.length ? { selectedModifiers: modifiers } : {}),
     };
   });
 }

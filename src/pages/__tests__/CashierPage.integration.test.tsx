@@ -569,6 +569,7 @@ describe("CashierPage integration", () => {
         productState,
         "variant-1",
         1,
+        undefined,
         undefined
       )
     );
@@ -623,7 +624,8 @@ describe("CashierPage integration", () => {
         productState,
         "variant-1",
         1,
-        undefined
+        undefined,
+        []
       )
     );
     expect(mocks.updateOrderLine).not.toHaveBeenCalled();

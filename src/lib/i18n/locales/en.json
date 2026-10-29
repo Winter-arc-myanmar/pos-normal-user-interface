@@ -1044,7 +1044,13 @@
       "selectTableOptionalHint": "Pick a table for seated dine-in, or add items without a table.",
       "selectPrompt": "Tap a product to add it to the order.",
       "otherCategory": "Other",
-      "unavailable": "Unavailable"
+      "unavailable": "Unavailable",
+      "chooseOptions": "Choose options",
+      "pickOne": "Pick 1",
+      "pickAny": "Pick any",
+      "pickUpTo": "Pick up to {{count}}",
+      "required": "Required",
+      "pickFrom": "Pick from {{name}} first."
     },
     "payment": {
       "options": "Options",

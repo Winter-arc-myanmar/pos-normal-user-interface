@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { Product, ProductVariant } from "@/core/domain/entities/Cashier";
 import { ProductMenu } from "../ProductMenu";
 
@@ -60,7 +60,7 @@ describe("ProductMenu", () => {
     fireEvent.click(screen.getByRole("button", { name: /Coffee/ }));
 
     await waitFor(() =>
-      expect(onAdd).toHaveBeenCalledWith(coffee, "variant-1", 1)
+      expect(onAdd).toHaveBeenCalledWith(coffee, "variant-1", 1, undefined)
     );
     expect(
       screen.queryByRole("button", { name: "cashier.productMenu.add" })
@@ -113,7 +113,7 @@ describe("ProductMenu", () => {
     );
 
     await waitFor(() =>
-      expect(onAdd).toHaveBeenCalledWith(soup, "variant-l", 1)
+      expect(onAdd).toHaveBeenCalledWith(soup, "variant-l", 1, undefined)
     );
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
@@ -189,7 +189,7 @@ describe("ProductMenu", () => {
       screen.getByRole("button", { name: "cashier.productMenu.add" })
     );
     await waitFor(() =>
-      expect(onAdd).toHaveBeenCalledWith(soup, "variant-l", 1)
+      expect(onAdd).toHaveBeenCalledWith(soup, "variant-l", 1, undefined)
     );
   });
 
@@ -212,6 +212,106 @@ describe("ProductMenu", () => {
     expect(onAdd).not.toHaveBeenCalled();
     expect(screen.getAllByText("cashier.productMenu.unavailable").length).toBeGreaterThan(
       0
+    );
+  });
+  it("lets the cashier pick several options from one group", async () => {
+    const onAdd = vi.fn().mockResolvedValue(undefined);
+    const noodles = new Product({
+      id: "product-3",
+      tenantId: "t1",
+      name: "Noodles",
+      basePrice: "3000.0000",
+      modifierGroups: [
+        {
+          id: "add-ons",
+          name: "Add-ons",
+          minSelection: 0,
+          maxSelection: 2,
+          isRequired: false,
+          modifiers: [
+            { id: "egg", name: "Egg", priceDelta: "500.0000", isDefault: false },
+            { id: "cheese", name: "Cheese", priceDelta: "700.0000", isDefault: false },
+            { id: "bacon", name: "Bacon", priceDelta: "900.0000", isDefault: false },
+          ],
+        },
+      ],
+    });
+    const noodlesVariant = new ProductVariant({ id: "variant-n", productId: "product-3" });
+
+    render(
+      <ProductMenu
+        products={[noodles]}
+        variantsByProductId={{ "product-3": [noodlesVariant] }}
+        onLoadVariants={vi.fn()}
+        onAdd={onAdd}
+        onClose={vi.fn()}
+        offerOptions
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Noodles/ }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("checkbox", { name: /Egg/ }));
+    fireEvent.click(within(dialog).getByRole("checkbox", { name: /Cheese/ }));
+    expect(within(dialog).getByRole("checkbox", { name: /Bacon/ })).toBeDisabled();
+    fireEvent.click(within(dialog).getByRole("button", { name: "cashier.productMenu.add" }));
+
+    await waitFor(() =>
+      expect(onAdd).toHaveBeenCalledWith(noodles, "variant-n", 1, [
+        { modifierId: "egg", name: "Egg", priceDelta: "500.0000" },
+        { modifierId: "cheese", name: "Cheese", priceDelta: "700.0000" },
+      ])
+    );
+  });
+
+  it("asks for a required group before adding", async () => {
+    const onAdd = vi.fn().mockResolvedValue(undefined);
+    const tea = new Product({
+      id: "product-4",
+      tenantId: "t1",
+      name: "Tea",
+      basePrice: "1000.0000",
+      modifierGroups: [
+        {
+          id: "sugar",
+          name: "Sugar",
+          minSelection: 1,
+          maxSelection: 1,
+          isRequired: true,
+          modifiers: [
+            { id: "less", name: "Less", priceDelta: "0", isDefault: false },
+            { id: "normal", name: "Normal", priceDelta: "0", isDefault: false },
+          ],
+        },
+      ],
+    });
+
+    render(
+      <ProductMenu
+        products={[tea]}
+        variantsByProductId={{
+          "product-4": [new ProductVariant({ id: "variant-t", productId: "product-4" })],
+        }}
+        onLoadVariants={vi.fn()}
+        onAdd={onAdd}
+        onClose={vi.fn()}
+        offerOptions
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Tea/ }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "cashier.productMenu.add" }));
+    expect(within(dialog).getByText("cashier.productMenu.pickFrom")).toBeInTheDocument();
+    expect(onAdd).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole("radio", { name: /Less/ }));
+    fireEvent.click(within(dialog).getByRole("radio", { name: /Normal/ }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "cashier.productMenu.add" }));
+    await waitFor(() =>
+      expect(onAdd).toHaveBeenCalledWith(tea, "variant-t", 1, [
+        { modifierId: "normal", name: "Normal", priceDelta: "0" },
+      ])
     );
   });
 });
