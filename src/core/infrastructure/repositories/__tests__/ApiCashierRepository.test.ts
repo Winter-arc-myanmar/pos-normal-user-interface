@@ -818,6 +818,16 @@ describe("ApiCashierRepository", () => {
     });
 
     await repository.changeTableSeating("session-1", {
+      kind: "split",
+      targetSessionId: "session-3",
+      lines: [{ lineId: "line-1", quantity: 2 }],
+    });
+    expect(post).toHaveBeenLastCalledWith("/api/v1/table-sessions/session-1/split", {
+      targetSessionId: "session-3",
+      lines: [{ lineId: "line-1", quantity: 2 }],
+    });
+
+    await repository.changeTableSeating("session-1", {
       kind: "join",
       tableId: "table-6",
     });

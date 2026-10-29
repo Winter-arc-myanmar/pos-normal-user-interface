@@ -147,7 +147,38 @@ interface OrderPanelProps {
   joinedTables?: DiningTable[];
   onChangeTable?: () => void;
   onCombineTables?: () => void;
+  onSplitItems?: () => void;
   onReleaseTable?: (tableId: string) => void;
+}
+
+const SEATING_ICON_PATHS = {
+  move: ["m16 3 4 4-4 4", "M20 7H4", "m8 21-4-4 4-4", "M4 17h16"],
+  split: [
+    "M16 3h5v5",
+    "M8 3H3v5",
+    "M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3",
+    "m15 9 6-6",
+  ],
+  merge: ["m8 6 4-4 4 4", "M12 2v10.3a4 4 0 0 1-1.172 2.872L4 22", "m20 22-5-5"],
+} as const;
+
+function SeatingIcon({ name }: { name: keyof typeof SEATING_ICON_PATHS }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {SEATING_ICON_PATHS[name].map((d) => (
+        <path key={d} d={d} />
+      ))}
+    </svg>
+  );
 }
 
 export function OrderPanel({
@@ -214,6 +245,7 @@ export function OrderPanel({
   joinedTables = [],
   onChangeTable,
   onCombineTables,
+  onSplitItems,
   onReleaseTable,
 }: OrderPanelProps) {
   const { t } = useTranslation();
@@ -707,23 +739,26 @@ export function OrderPanel({
 
                   {selectedSession && onChangeTable && onCombineTables ? (
                     <div className="space-y-2">
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          disabled={isLoading}
-                          onClick={onChangeTable}
-                          className="min-h-11 rounded border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-800 transition-colors hover:border-blue-500 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {t("cashier.seating.changeTable")}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isLoading}
-                          onClick={onCombineTables}
-                          className="min-h-11 rounded border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-800 transition-colors hover:border-blue-500 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {t("cashier.seating.combine")}
-                        </button>
+                      <div className="grid grid-cols-3 gap-2">
+                        {(
+                          [
+                            ["move", onChangeTable, "cashier.seating.changeTable"],
+                            ["split", onSplitItems, "cashier.seating.split"],
+                            ["merge", onCombineTables, "cashier.seating.combine"],
+                          ] as const
+                        ).map(([icon, onClick, label]) => (
+                          <button
+                            key={icon}
+                            type="button"
+                            disabled={isLoading || !onClick}
+                            onClick={onClick}
+                            title={t(label)}
+                            className="flex min-h-14 flex-col items-center justify-center gap-1 rounded border border-slate-300 bg-white px-1 text-[11px] font-semibold text-slate-800 transition-colors hover:border-blue-500 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <SeatingIcon name={icon} />
+                            {t(label)}
+                          </button>
+                        ))}
                       </div>
                       {joinedTables.length && onReleaseTable ? (
                         <div className="flex flex-wrap items-center gap-2 text-xs">

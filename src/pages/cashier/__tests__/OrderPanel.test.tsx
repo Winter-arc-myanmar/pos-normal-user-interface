@@ -121,6 +121,7 @@ describe("OrderPanel", () => {
     expect(screen.getByLabelText("cashier.orderPanel.sessionState")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "cashier.seating.changeTable" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "cashier.seating.combine" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "cashier.seating.split" })).toBeDisabled();
 
     fireEvent.click(
       screen.getByRole("button", { name: "cashier.orderPanel.collapseTableControls" })
