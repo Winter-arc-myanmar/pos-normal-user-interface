@@ -14,7 +14,7 @@ interface TableSeatingDialogProps {
   tables: DiningTable[];
   sessions: TableSession[];
   isBusy?: boolean;
-  onConfirm: (change: TableSeatingChangeDTO) => void;
+  onConfirm: (change: Exclude<TableSeatingChangeDTO, { kind: "split" }>) => void;
   onClose: () => void;
 }
 

@@ -415,6 +415,13 @@ export class CashierService implements ICashierService {
       if (!change.sourceSessionId?.trim()) {
         throw new Error("Choose the table to combine");
       }
+    } else if (change.kind === "split") {
+      if (!change.targetSessionId?.trim()) {
+        throw new Error("Choose a table");
+      }
+      if (!change.lines.some((line) => line.quantity > 0)) {
+        throw new Error("Choose the items to move");
+      }
     } else if (!change.tableId?.trim()) {
       throw new Error("Choose a table");
     }

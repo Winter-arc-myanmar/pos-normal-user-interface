@@ -14,8 +14,10 @@ import { useAuth } from "@/core/presentation/hooks/useAuth";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
 import { printCompanyFor } from "@/core/presentation/hooks/usePrinterConnection";
 import { useVenueSetting } from "@/core/presentation/hooks/useVenueSetting";
+import { useKdsDeleteSlipShopSetting } from "@/core/presentation/hooks/useKdsDeleteSlipShopSetting";
 import type { ShiftSummary } from "@/core/domain/entities/Shift";
 import { usePrintTemplateManagement } from "@/core/presentation/hooks/usePrintTemplateManagement";
+import { SettingsToggleRow } from "./settingsUi";
 import {
   PrintLine,
   itemTextScaleOf,
@@ -218,6 +220,7 @@ export function PrintTemplateSettingsPanel() {
   const { activeLocationId } = usePosWorkspace();
   const { user } = useAuth();
   const { currency } = useVenueSetting();
+  const kdsDeleteSlip = useKdsDeleteSlipShopSetting();
   const [company, setCompany] = useState<PrintCompany | null>(null);
   const [logo, setLogo] = useState<PrintImage | null>(null);
   const {
@@ -401,6 +404,25 @@ export function PrintTemplateSettingsPanel() {
   return (
     <form onSubmit={(event) => void save(event)} className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
       <div className="space-y-4">
+        {kdsDeleteSlip.canWrite ? (
+          <section className="rounded-xl bg-white p-4 shadow-sm">
+            <SettingsToggleRow
+              title={t("settings.printTemplate.deleteSlip.title")}
+              description={t("settings.printTemplate.deleteSlip.description")}
+              checked={kdsDeleteSlip.enabled}
+              onChange={(enabled) => void kdsDeleteSlip.save(enabled)}
+              disabled={kdsDeleteSlip.isSaving}
+            />
+            {kdsDeleteSlip.isSaving ? (
+              <p className="mt-2 text-xs text-slate-500">
+                {t("settings.printTemplate.deleteSlip.saving")}
+              </p>
+            ) : null}
+            {kdsDeleteSlip.error ? (
+              <p className="mt-2 text-sm text-red-600">{kdsDeleteSlip.error}</p>
+            ) : null}
+          </section>
+        ) : null}
         <section className="rounded-xl bg-white p-4 shadow-sm">
           <h2 className="font-semibold text-slate-900">
             {t("settings.printTemplate.howTitle")}

@@ -3,6 +3,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PrintTemplateSettingsPanel } from "../PrintTemplateSettingsPanel";
 
 const createTemplate = vi.fn();
+const saveKdsDeleteSlip = vi.fn();
+
+vi.mock("@/core/presentation/hooks/useKdsDeleteSlipShopSetting", () => ({
+  useKdsDeleteSlipShopSetting: () => ({
+    canWrite: true,
+    enabled: true,
+    isSaving: false,
+    error: null,
+    save: saveKdsDeleteSlip,
+  }),
+}));
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -11,6 +22,9 @@ vi.mock("react-i18next", () => ({
         "settings.printTemplate.contact": "Phone",
         "settings.printTemplate.email": "Email",
         "settings.printTemplate.logo": "Logo",
+        "settings.printTemplate.deleteSlip.title": "KDS delete slip",
+        "settings.printTemplate.deleteSlip.description": "KDS delete slip description",
+        "settings.printTemplate.deleteSlip.saving": "Saving…",
       };
       return labels[key] || key;
     },
@@ -190,5 +204,15 @@ describe("PrintTemplateSettingsPanel", () => {
     expect(select).toHaveValue("1H1W");
     fireEvent.change(select, { target: { value: "2H1W" } });
     expect(select).toHaveValue("2H1W");
+  });
+
+  it("shows the KDS delete slip setting in Print Template and saves it", async () => {
+    render(<PrintTemplateSettingsPanel />);
+
+    const toggle = await screen.findByRole("switch", { name: "KDS delete slip" });
+    expect(toggle).toBeChecked();
+
+    fireEvent.click(toggle);
+    expect(saveKdsDeleteSlip).toHaveBeenCalledWith(false);
   });
 });
