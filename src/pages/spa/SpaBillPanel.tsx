@@ -6,6 +6,7 @@ import type { RoomKind } from "@/core/presentation/hooks/useRoomPos";
 import { useRoomText } from "@/core/presentation/hooks/useRoomText";
 import { getKtvWarning } from "@/lib/ktv/session";
 import { estimateCardCharge } from "@/lib/spa/payment";
+import { groupBillLines } from "@/lib/spa/billLines";
 import { bookedSessions } from "@/lib/spa/session";
 import {
   focPending,
@@ -69,7 +70,8 @@ export function SpaBillPanel({
   onTogglePause: () => void;
   onChangeQuantity: (line: SalesOrderLine, delta: number) => void;
   onAddAnother: (line: SalesOrderLine) => void;
-  onRemoveLine: (line: SalesOrderLine) => void;
+  /** Removes a row: every line it shows. */
+  onRemoveLine: (lines: SalesOrderLine[]) => void;
   pending: PendingItem[];
   onPendingChange: (variantId: string, delta: number) => void;
   onClearPending: () => void;
@@ -96,8 +98,10 @@ export function SpaBillPanel({
   const prepaid = Boolean(quote?.prepaid);
   // Time is bought (paid now, or on the bill to pay at the end), never run up on a clock.
   const canExtend = prepaid || quote?.paymentTiming === "PAY_AT_END";
-  const visibleLines = lines.filter(
-    (line) => !["VOIDED", "COMPED"].includes(String(line.status || "").toUpperCase())
+  const visibleLines = groupBillLines(
+    lines.filter(
+      (line) => !["VOIDED", "COMPED"].includes(String(line.status || "").toUpperCase())
+    )
   );
 
   const timeLine = [
@@ -211,16 +215,17 @@ export function SpaBillPanel({
         {visibleLines.length === 0 ? (
           <p className="py-3 text-xs text-slate-500">{tr("noLines")}</p>
         ) : (
-          visibleLines.map((line) => {
-            const quantity = Number(line.quantity || 0);
+          visibleLines.map((group) => {
+            const [line] = group.lines;
+            const newest = group.lines[group.lines.length - 1];
+            const { quantity, total } = group;
             const unitPrice = Number(line.unitPrice || 0);
-            const total = quantity * unitPrice - Number(line.lineDiscount || 0);
             const isPackage = Boolean(packageVariantIds?.has(line.variantId));
             const isTreatment = line.variantId === room?.rateVariantId || isPackage;
             const isFoc = Boolean(line.compReasonId);
             const editable = !billClosed && !isTreatment;
             return (
-              <div key={line.id} className="flex items-center gap-2 py-2 text-sm">
+              <div key={group.key} className="flex items-center gap-2 py-2 text-sm">
                 <div className="min-w-0 flex-1">
                   <p className="break-words font-medium leading-snug">
                     {isFoc ? (
@@ -270,7 +275,7 @@ export function SpaBillPanel({
                       aria-label={tr("decrease")}
                       className="h-7 w-7 text-base disabled:opacity-40"
                       disabled={isBusy}
-                      onClick={() => onChangeQuantity(line, -1)}
+                      onClick={() => onChangeQuantity(newest, -1)}
                     >
                       −
                     </button>
@@ -304,7 +309,7 @@ export function SpaBillPanel({
                     aria-label={prepaid && !isFoc ? tr("refundLine") : tr("removeLine")}
                     className="h-7 w-6 shrink-0 rounded text-slate-500 hover:bg-red-950/60 hover:text-red-300 disabled:opacity-40"
                     disabled={isBusy}
-                    onClick={() => onRemoveLine(line)}
+                    onClick={() => onRemoveLine(group.lines)}
                   >
                     ✕
                   </button>

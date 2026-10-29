@@ -280,6 +280,7 @@ const toSalesOrderLine = (
         ? (item.selectedModifiers as Record<string, unknown>)
         : undefined,
     seatNumber: typeof item.seatNumber === "number" ? item.seatNumber : undefined,
+    hostessId: item.hostessId ? String(item.hostessId) : undefined,
     productName: catalog.productName,
     variantName: catalog.variantName,
     sku: catalog.sku,
