@@ -2806,6 +2806,10 @@ export function CashierPage() {
     status: (typeof diningTables)[number]["status"]
   ) => {
     if (!selectedOrderTable) return;
+    if (status === "AVAILABLE" && displayOrderLines.length > 0) {
+      setNotice(t("cashier.errors.tableAvailableWithMenu"));
+      return;
+    }
     setLocalError(null);
     setNotice(null);
     try {

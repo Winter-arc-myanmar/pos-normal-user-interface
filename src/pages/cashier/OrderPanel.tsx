@@ -274,6 +274,7 @@ export function OrderPanel({
   );
   const variants = Object.values(variantsByProductId).flat();
   const hasActiveOrder = !!selectedOrder || selectedOrderLines.length > 0;
+  const hasMenuLines = selectedOrderLines.length > 0;
   const isSettledOrder = isSettledSalesOrder(selectedOrder);
   const checkoutReady = isSplitMode
     ? splitTenderCount > 0 && splitRemaining <= 0.009
@@ -729,7 +730,11 @@ export function OrderPanel({
                         >
                           {(["AVAILABLE", "OCCUPIED", "DIRTY", "RESERVED"] as const).map(
                             (status) => (
-                              <option key={status} value={status}>
+                              <option
+                                key={status}
+                                value={status}
+                                disabled={status === "AVAILABLE" && hasMenuLines}
+                              >
                                 {t(`cashier.orderPanel.tableStatuses.${status}`)}
                               </option>
                             )

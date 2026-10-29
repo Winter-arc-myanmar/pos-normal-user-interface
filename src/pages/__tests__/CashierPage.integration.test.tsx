@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { CashierPage } from "../CashierPage";
 
@@ -1161,7 +1161,14 @@ describe("CashierPage integration", () => {
         name: "cashier.orderPanel.expandTableControls",
       })
     );
-    fireEvent.change(screen.getByLabelText("cashier.orderPanel.tableStatus"), {
+    const tableStatusSelect = screen.getByLabelText("cashier.orderPanel.tableStatus");
+    expect(
+      within(tableStatusSelect).getByRole("option", {
+        name: "cashier.orderPanel.tableStatuses.AVAILABLE",
+      })
+    ).toBeDisabled();
+
+    fireEvent.change(tableStatusSelect, {
       target: { value: "DIRTY" },
     });
     fireEvent.change(screen.getByLabelText("cashier.orderPanel.sessionState"), {
@@ -1215,6 +1222,37 @@ describe("CashierPage integration", () => {
     );
     expect(mocks.openTableSession).not.toHaveBeenCalled();
     expect(mocks.updateDiningTableStatus).not.toHaveBeenCalled();
+  });
+
+  it("allows marking a table available when the order has no menu lines", async () => {
+    selectedOrderLinesState = [];
+
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=orders"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "cashier.orderPanel.expandTableControls",
+      })
+    );
+    const tableStatusSelect = screen.getByLabelText("cashier.orderPanel.tableStatus");
+    expect(
+      within(tableStatusSelect).getByRole("option", {
+        name: "cashier.orderPanel.tableStatuses.AVAILABLE",
+      })
+    ).toBeEnabled();
+
+    fireEvent.change(tableStatusSelect, { target: { value: "AVAILABLE" } });
+
+    await waitFor(() =>
+      expect(mocks.updateDiningTableStatus).toHaveBeenCalledWith(
+        "table-1",
+        "AVAILABLE"
+      )
+    );
   });
 
   it("cancels an unpaid order without calling checkout void", async () => {
