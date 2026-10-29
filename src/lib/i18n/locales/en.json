@@ -813,8 +813,8 @@
   },
   "cashier": {
     "seating": {
-      "changeTable": "Change table",
-      "combine": "Combine",
+      "changeTable": "Move",
+      "combine": "Merge",
       "joinedTables": "Joined tables",
       "release": "Release table {{table}}",
       "withTable": "with {{table}}",
@@ -836,7 +836,21 @@
       "combined": "Bills combined.",
       "joined": "Table {{table}} joined.",
       "released": "Table {{table}} released.",
-      "failed": "Could not change the table."
+      "failed": "Could not change the table.",
+      "split": "Split",
+      "splitTitle": "Split items from table {{table}}",
+      "splitHint": "Pick the items and how many, then the table they go to. They come off this bill and onto that table's.",
+      "itemsToMove": "Items to move",
+      "onBill": "{{count}} on this bill",
+      "all": "All",
+      "noItems": "No items on this bill yet. Send them first.",
+      "moveItemsTo": "Move them to",
+      "openBill": "Open bill",
+      "freeTable": "Free table",
+      "noOtherTables": "No other table is free or open.",
+      "moveItems_one": "Move {{count}} item",
+      "moveItems_other": "Move {{count}} items",
+      "splitDone": "Items moved to table {{table}}."
     },
     "newOrder": "+ New",
     "location": "Location",

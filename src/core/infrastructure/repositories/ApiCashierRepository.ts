@@ -1675,14 +1675,19 @@ export class ApiCashierRepository implements ICashierRepository {
                 keepTable: change.keepTable,
               }
             )
-          : change.kind === "join"
+          : change.kind === "split"
             ? await this.httpClient.post<ApiEnvelope<Record<string, unknown>>>(
-                endpoints.TABLES(sessionId),
-                { tableId: change.tableId }
+                endpoints.SPLIT(sessionId),
+                { targetSessionId: change.targetSessionId, lines: change.lines }
               )
-            : await this.httpClient.delete<ApiEnvelope<Record<string, unknown>>>(
-                endpoints.TABLE(sessionId, change.tableId)
-              );
+            : change.kind === "join"
+              ? await this.httpClient.post<ApiEnvelope<Record<string, unknown>>>(
+                  endpoints.TABLES(sessionId),
+                  { tableId: change.tableId }
+                )
+              : await this.httpClient.delete<ApiEnvelope<Record<string, unknown>>>(
+                  endpoints.TABLE(sessionId, change.tableId)
+                );
     return toTableSession(unwrap(response));
   }
 

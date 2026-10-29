@@ -314,10 +314,16 @@ export interface UpdateTableSessionStateDTO {
   sessionState: TableSessionState;
 }
 
-/** Guests changing places: another table, two bills combined, tables joined. */
+export interface SplitLineDTO {
+  lineId: string;
+  quantity: number;
+}
+
+/** Guests changing places: another table, bills combined or split, tables joined. */
 export type TableSeatingChangeDTO =
   | { kind: "move"; tableId: string }
   | { kind: "merge"; sourceSessionId: string; keepTable: boolean }
+  | { kind: "split"; targetSessionId: string; lines: SplitLineDTO[] }
   | { kind: "join"; tableId: string }
   | { kind: "release"; tableId: string };
 

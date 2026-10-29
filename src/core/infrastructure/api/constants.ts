@@ -245,6 +245,7 @@ export const API_ENDPOINTS = {
     CHARGES_STOP: (id: string) => `/api/v1/table-sessions/${id}/charges/stop`,
     MOVE: (id: string) => `/api/v1/table-sessions/${id}/move`,
     MERGE: (id: string) => `/api/v1/table-sessions/${id}/merge`,
+    SPLIT: (id: string) => `/api/v1/table-sessions/${id}/split`,
     TABLES: (id: string) => `/api/v1/table-sessions/${id}/tables`,
     TABLE: (id: string, tableId: string) =>
       `/api/v1/table-sessions/${id}/tables/${tableId}`,
