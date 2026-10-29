@@ -180,6 +180,8 @@ export class SalesOrderLine {
   courseType?: string;
   selectedModifiers?: Record<string, unknown> | ChosenModifier[];
   seatNumber?: number;
+  /** The hostess who gave this service, on a KTV bill. */
+  hostessId?: string;
   productName?: string;
   variantName?: string;
   sku?: string;
