@@ -18,6 +18,7 @@ import {
 import { OrderTabs } from "./OrderTabs";
 import { OrderAdjustments } from "./OrderAdjustments";
 import { isSettledSalesOrder } from "@/lib/pos/orderStatus";
+import { modifierPrintText } from "@/lib/printing/modifierText";
 import { isPendingKdsLine } from "@/lib/pos/kdsLines";
 import { isFocLine } from "@/lib/pos/checkoutAdjustments";
 import type {
@@ -152,10 +153,41 @@ interface OrderPanelProps {
   joinedTables?: DiningTable[];
   onChangeTable?: () => void;
   onCombineTables?: () => void;
+  onSplitItems?: () => void;
   onReleaseTable?: (tableId: string) => void;
   /** Opens the extra fee picker; no button without it. */
   onAddExtraFee?: () => void;
   isFeeLine?: (line: SalesOrderLine) => boolean;
+}
+
+const SEATING_ICON_PATHS = {
+  move: ["m16 3 4 4-4 4", "M20 7H4", "m8 21-4-4 4-4", "M4 17h16"],
+  split: [
+    "M16 3h5v5",
+    "M8 3H3v5",
+    "M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3",
+    "m15 9 6-6",
+  ],
+  merge: ["m8 6 4-4 4 4", "M12 2v10.3a4 4 0 0 1-1.172 2.872L4 22", "m20 22-5-5"],
+} as const;
+
+function SeatingIcon({ name }: { name: keyof typeof SEATING_ICON_PATHS }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {SEATING_ICON_PATHS[name].map((d) => (
+        <path key={d} d={d} />
+      ))}
+    </svg>
+  );
 }
 
 export function OrderPanel({
@@ -224,6 +256,7 @@ export function OrderPanel({
   isFeeLine,
   onChangeTable,
   onCombineTables,
+  onSplitItems,
   onReleaseTable,
 }: OrderPanelProps) {
   const { t } = useTranslation();
@@ -336,6 +369,7 @@ export function OrderPanel({
             <div className="my-3 divide-y divide-slate-200 overflow-hidden rounded border border-slate-200">
               {groupedOrderLines.map((line) => {
                 const lineName = resolveLineName(line);
+                const lineOptions = modifierPrintText(line.selectedModifiers).names;
                 const lineVariant = resolveLineVariant(line);
                 const groupLines = line.groupedLines ?? [line];
                 const pricedLines = groupLines.map(
@@ -428,28 +462,13 @@ export function OrderPanel({
                         }
                       )}
                     >
-                      {isFee ? (
-                        <span className="h-2.5 w-2.5 shrink-0" aria-hidden="true" />
-                      ) : (
+                      {!isFee && isPendingKds ? (
                         <span
-                          className={[
-                            "h-2.5 w-2.5 shrink-0 rounded-full border-2",
-                            isPendingKds
-                              ? "border-emerald-500 bg-emerald-500"
-                              : "border-slate-400 bg-transparent",
-                          ].join(" ")}
-                          aria-label={t(
-                            isPendingKds
-                              ? "cashier.orderPanel.kdsPending"
-                              : "cashier.orderPanel.kdsAlreadySent"
-                          )}
-                          title={t(
-                            isPendingKds
-                              ? "cashier.orderPanel.kdsPending"
-                              : "cashier.orderPanel.kdsAlreadySent"
-                          )}
+                          className="h-2.5 w-2.5 shrink-0 rounded-full border-2 border-emerald-500 bg-emerald-500"
+                          aria-label={t("cashier.orderPanel.kdsPending")}
+                          title={t("cashier.orderPanel.kdsPending")}
                         />
-                      )}
+                      ) : null}
                       <span
                         className="shrink-0 text-xs font-semibold tabular-nums text-slate-500"
                         aria-label={t("cashier.orderPanel.lineQuantity", { count: quantityLabel })}
@@ -489,6 +508,14 @@ export function OrderPanel({
                         <path d="m4 6 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     </button>
+                    {lineOptions ? (
+                      <p
+                        className="truncate px-2 pb-1 text-xs text-slate-500"
+                        title={lineOptions}
+                      >
+                        {lineOptions}
+                      </p>
+                    ) : null}
                     {isExpanded ? (
                       <div id={detailsId} className="border-t border-slate-200 px-2 pb-2 pt-1.5">
                         <p className="break-words text-sm font-medium">{lineName}</p>
@@ -748,23 +775,26 @@ export function OrderPanel({
 
                   {selectedSession && onChangeTable && onCombineTables ? (
                     <div className="space-y-2">
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          disabled={isLoading}
-                          onClick={onChangeTable}
-                          className="min-h-11 rounded border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-800 transition-colors hover:border-blue-500 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {t("cashier.seating.changeTable")}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isLoading}
-                          onClick={onCombineTables}
-                          className="min-h-11 rounded border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-800 transition-colors hover:border-blue-500 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {t("cashier.seating.combine")}
-                        </button>
+                      <div className="grid grid-cols-3 gap-2">
+                        {(
+                          [
+                            ["move", onChangeTable, "cashier.seating.changeTable"],
+                            ["split", onSplitItems, "cashier.seating.split"],
+                            ["merge", onCombineTables, "cashier.seating.combine"],
+                          ] as const
+                        ).map(([icon, onClick, label]) => (
+                          <button
+                            key={icon}
+                            type="button"
+                            disabled={isLoading || !onClick}
+                            onClick={onClick}
+                            title={t(label)}
+                            className="flex min-h-14 flex-col items-center justify-center gap-1 rounded border border-slate-300 bg-white px-1 text-[11px] font-semibold text-slate-800 transition-colors hover:border-blue-500 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <SeatingIcon name={icon} />
+                            {t(label)}
+                          </button>
+                        ))}
                       </div>
                       {joinedTables.length && onReleaseTable ? (
                         <div className="flex flex-wrap items-center gap-2 text-xs">

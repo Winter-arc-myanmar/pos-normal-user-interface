@@ -4,7 +4,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/Button";
 import { GuestCard, GuestWallet } from "@/core/domain/entities/GuestWallet";
 import { KtvSession } from "@/core/domain/entities/Ktv";
-import { Product, ProductVariant } from "@/core/domain/entities/Cashier";
+import { ChosenModifier, Product, ProductVariant } from "@/core/domain/entities/Cashier";
 import { useAuth } from "@/core/presentation/hooks/useAuth";
 import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
 import { useCardCapture } from "@/core/presentation/hooks/useCardCapture";
@@ -17,6 +17,7 @@ import { useSalesOrderManagement } from "@/core/presentation/hooks/useSalesOrder
 import { findMemberCardPaymentMethod } from "@/core/application/services/PosPaymentCatalog";
 import { ProductMenu } from "./cashier/ProductMenu";
 import { modifierPrintText } from "@/lib/printing/modifierText";
+import { modifierExtra } from "@/lib/modifiers/choices";
 import {
   getKtvWarning,
   hasSufficientWalletBalance,
@@ -226,7 +227,8 @@ export function KtvRoomPage() {
   const handleAddProduct = async (
     product: Product,
     variantId: string,
-    quantity: number
+    quantity: number,
+    modifiers?: ChosenModifier[]
   ) => {
     if (!session?.salesOrderId || !wallet) {
       throw new Error(t("ktv.errors.sessionRequired"));
@@ -236,12 +238,15 @@ export function KtvRoomPage() {
       variants.find((item) => item.id === variantId) || variants[0];
     if (!variant) throw new Error(t("cashier.productMenu.noVariant"));
     const unitPrice =
-      Number(product.basePrice || 0) + Number(variant.priceModifier || 0);
+      Number(product.basePrice || 0) +
+      Number(variant.priceModifier || 0) +
+      modifierExtra(modifiers);
     const line = await addOrderLine(session.salesOrderId, {
       variantId: variant.id,
       quantity: Math.max(1, quantity).toFixed(4),
       unitPrice: unitPrice.toFixed(4),
       lineDiscount: "0.0000",
+      ...(modifiers?.length ? { selectedModifiers: modifiers } : {}),
     });
     setLastAddedLineId(line.id);
     const [nextQuote, nextTabletSession] = await Promise.all([
@@ -643,6 +648,7 @@ export function KtvRoomPage() {
               roomMenu.variantsByProductId[productId] || []
             }
             onAdd={handleAddProduct}
+            offerOptions
             onClose={() => setSearchParams({ view: "orders" })}
           />
         ) : (

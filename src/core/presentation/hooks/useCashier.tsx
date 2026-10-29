@@ -52,8 +52,10 @@ import {
   TipPoolAllocation,
   WaitlistEntry,
   CounterOrderDetail,
+  type ChosenModifier,
 } from "../../domain/entities/Cashier";
 import type { ChosenFee } from "../../domain/entities/ExtraFee";
+import { modifierExtra } from "@/lib/modifiers/choices";
 import { ICashierService } from "../../domain/services/ICashierService";
 import container from "../../infrastructure/di/container";
 import {
@@ -210,7 +212,7 @@ interface UseCashierReturn {
     product: Product,
     variantId?: string,
     quantity?: number,
-    options?: { refreshLines?: boolean }
+    options?: { refreshLines?: boolean; modifiers?: ChosenModifier[] }
   ) => Promise<SalesOrderLine>;
   updateOrderLine: (
     orderId: string,
@@ -223,7 +225,8 @@ interface UseCashierReturn {
     product: Product,
     variantId?: string,
     quantity?: number,
-    keepSelectedOrderId?: string
+    keepSelectedOrderId?: string,
+    modifiers?: ChosenModifier[]
   ) => Promise<SalesOrderLine>;
   addExtraFeeLine: (
     target: { orderId: string } | { sessionId: string },
@@ -474,7 +477,7 @@ export function useCashier(): UseCashierReturn {
       product: Product,
       variantId?: string,
       quantity: number = 1,
-      options?: { refreshLines?: boolean }
+      options?: { refreshLines?: boolean; modifiers?: ChosenModifier[] }
     ) => {
       setIsLoading(true);
       clearError();
@@ -488,13 +491,16 @@ export function useCashier(): UseCashierReturn {
         }
 
         const variantModifier = Number(selectedVariant?.priceModifier || 0);
-        const unitPrice = Number(product.basePrice || 0) + variantModifier;
+        const modifiers = options?.modifiers;
+        const unitPrice =
+          Number(product.basePrice || 0) + variantModifier + modifierExtra(modifiers);
 
         const createdLine = await cashierService.addSalesOrderLine(orderId, {
           variantId: selectedVariant.id,
           quantity: Math.max(1, quantity).toFixed(4),
           unitPrice: unitPrice.toFixed(4),
           lineDiscount: "0.0000",
+          ...(modifiers?.length ? { selectedModifiers: modifiers } : {}),
         });
         if (options?.refreshLines !== false) {
           const lines = await cashierService.getSalesOrderLines(orderId);
@@ -1346,7 +1352,8 @@ export function useCashier(): UseCashierReturn {
       product: Product,
       variantId?: string,
       quantity: number = 1,
-      keepSelectedOrderId?: string
+      keepSelectedOrderId?: string,
+      modifiers?: ChosenModifier[]
     ) => {
       setIsLoading(true);
       clearError();
@@ -1360,13 +1367,15 @@ export function useCashier(): UseCashierReturn {
         }
 
         const variantModifier = Number(selectedVariant?.priceModifier || 0);
-        const unitPrice = Number(product.basePrice || 0) + variantModifier;
+        const unitPrice =
+          Number(product.basePrice || 0) + variantModifier + modifierExtra(modifiers);
 
         const line = await cashierService.addTableSessionLine(sessionId, {
           variantId: selectedVariant.id,
           quantity: Math.max(1, quantity).toFixed(4),
           unitPrice: unitPrice.toFixed(4),
           lineDiscount: "0.0000",
+          ...(modifiers?.length ? { selectedModifiers: modifiers } : {}),
         });
 
         if (keepSelectedOrderId && keepSelectedOrderId !== line.salesOrderId) {

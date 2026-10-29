@@ -569,6 +569,7 @@ describe("CashierPage integration", () => {
         productState,
         "variant-1",
         1,
+        undefined,
         undefined
       )
     );
@@ -623,7 +624,8 @@ describe("CashierPage integration", () => {
         productState,
         "variant-1",
         1,
-        undefined
+        undefined,
+        []
       )
     );
     expect(mocks.updateOrderLine).not.toHaveBeenCalled();
@@ -971,6 +973,9 @@ describe("CashierPage integration", () => {
         ...orderLine,
         status: "FIRED",
         firedAt: "2026-10-23T10:00:00.000Z",
+        selectedModifiers: {
+          "modifier-1": { name: "Oat milk", priceDelta: "1.5000" },
+        },
       },
     ];
     mocks.listStations.mockResolvedValue({
@@ -1004,6 +1009,8 @@ describe("CashierPage integration", () => {
           lines: [
             expect.objectContaining({
               name: "Coffee",
+              modifiers: "Oat milk",
+              modifierPrices: "1.5000",
               remarks: "cashier.orderPanel.kdsDeleteTitle",
             }),
           ],

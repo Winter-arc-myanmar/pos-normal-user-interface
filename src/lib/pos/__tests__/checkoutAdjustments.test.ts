@@ -83,6 +83,25 @@ describe("checkoutAdjustments", () => {
     ]);
   });
 
+  it("sends the picked options with an item for the server to price", () => {
+    expect(
+      allocateOrderDiscountToLines(
+        [
+          {
+            variantId: "noodles",
+            quantity: "1.0000",
+            unitPrice: "4200.0000",
+            selectedModifiers: [
+              { modifierId: "egg", name: "Egg", priceDelta: "500.0000" },
+              { modifierId: "cheese", name: "Cheese", priceDelta: "700.0000" },
+            ],
+          },
+        ],
+        0
+      )[0].selectedModifiers
+    ).toEqual([{ modifierId: "egg" }, { modifierId: "cheese" }]);
+  });
+
   it("marks a fully discounted line as FOC", () => {
     expect(
       isFocLine({

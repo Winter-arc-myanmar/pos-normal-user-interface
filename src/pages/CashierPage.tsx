@@ -11,6 +11,7 @@ import {
   OrderStatus,
   ServiceType,
   SplitPaymentTenderDTO,
+  SplitLineDTO,
   TableSeatingChangeDTO,
   TableSessionState,
   toApiServiceType,
@@ -24,6 +25,7 @@ import type { ChosenFee } from "@/core/domain/entities/ExtraFee";
 import { useKdsStationManagement } from "@/core/presentation/hooks/useKdsStationManagement";
 import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
 import { modifierPrintText } from "@/lib/printing/modifierText";
+import { chosenOf, modifierExtra, modifierKey } from "@/lib/modifiers/choices";
 import { sessionPrintTimes } from "@/lib/printing/formatKdsTicket";
 import { menuProductFilter } from "@/lib/pos/menuProducts";
 import { useSalesOrderManagement } from "@/core/presentation/hooks/useSalesOrderManagement";
@@ -32,11 +34,13 @@ import { MultiOrderingView } from "./cashier/MultiOrderingView";
 import { OrderPanel } from "./cashier/OrderPanel";
 import { TableSeatingDialog } from "./cashier/TableSeatingDialog";
 import { ExtraFeeDialog } from "./cashier/ExtraFeeDialog";
+import { SplitItemsDialog, SplitTarget } from "./cashier/SplitItemsDialog";
 import { PaymentView } from "./cashier/PaymentView";
 import { ProductMenu } from "./cashier/ProductMenu";
 import { TableChargesBar } from "./cashier/TableChargesBar";
 import { useTableCharges } from "@/core/presentation/hooks/useTableCharges";
 import {
+  ChosenModifier,
   Product,
   ProductVariant,
   SalesOrderLine,
@@ -211,7 +215,9 @@ export function CashierPage() {
   const [directCartLines, setDirectCartLines] = useState<typeof selectedOrderLines>([]);
   const [isDirectCheckoutMode, setIsDirectCheckoutMode] = useState(false);
   const [activeTableId, setActiveTableId] = useState<string | null>(null);
-  const [seatingMode, setSeatingMode] = useState<"move" | "combine" | null>(
+  const [seatingMode, setSeatingMode] = useState<
+    "move" | "combine" | "split" | null
+  >(
     null
   );
   const [tableOrderIds, setTableOrderIds] = useState<string[]>([]);
@@ -569,7 +575,8 @@ export function CashierPage() {
     ) => {
       const variantModifier = Number(variant?.priceModifier || 0);
       const basePrice = Number(product?.basePrice || line.unitPrice || 0);
-      const unitPrice = basePrice + variantModifier;
+      const unitPrice =
+        basePrice + variantModifier + modifierExtra(line.selectedModifiers);
       const ownRateId = product?.taxRateId;
       const fallback = ownRateId || variant?.taxRate ? null : defaultTaxRate;
       const isPriceInclusive = fallback
@@ -646,7 +653,7 @@ export function CashierPage() {
       taxInclusive?: boolean;
       categoryId?: string;
       categoryName?: string;
-      selectedModifiers?: Record<string, unknown>;
+      selectedModifiers?: unknown;
     }>,
     withoutTax = false
   ) => {
@@ -1222,7 +1229,9 @@ export function CashierPage() {
           session.id,
           product,
           line.variantId,
-          Number(line.quantity || 1)
+          Number(line.quantity || 1),
+          undefined,
+          chosenOf(line.selectedModifiers)
         );
       }
 
@@ -1601,7 +1610,8 @@ export function CashierPage() {
   const addProductToCart = async (
     product: (typeof products)[number],
     variantId: string,
-    quantity: number
+    quantity: number,
+    modifiers?: ChosenModifier[]
   ) => {
     const startFreshCart = isSettledSalesOrder(selectedOrder);
     if (startFreshCart) {
@@ -1623,7 +1633,9 @@ export function CashierPage() {
       (variant) => variant.id === variantId
     );
     const clickedUnitPrice = (
-      Number(product.basePrice || 0) + Number(clickedVariant?.priceModifier || 0)
+      Number(product.basePrice || 0) +
+      Number(clickedVariant?.priceModifier || 0) +
+      modifierExtra(modifiers)
     ).toFixed(4);
     const hasModifiers = (line: (typeof activeOrderLines)[number]) => {
       const modifiers = line.selectedModifiers;
@@ -1636,7 +1648,8 @@ export function CashierPage() {
     for (const line of [...activeOrderLinesRef.current, ...tableLines]) {
       if (!candidates.has(line.id)) candidates.set(line.id, line);
     }
-    const matchingLines = startFreshCart
+    // A line with options stays its own line, even for the same item.
+    const matchingLines = startFreshCart || modifiers?.length
       ? []
       : [...candidates.values()].filter(
           (line) =>
@@ -1741,7 +1754,8 @@ export function CashierPage() {
         product,
         variantId,
         quantity,
-        tableOrderIds.length > 1 ? selectedOrder?.id : undefined
+        tableOrderIds.length > 1 ? selectedOrder?.id : undefined,
+        modifiers
       );
       rememberAddedLine(line);
       if (selectedOrderSession.sessionState === "SEATED") {
@@ -1771,7 +1785,8 @@ export function CashierPage() {
         selectedOrder.id,
         product,
         variantId,
-        quantity
+        quantity,
+        { modifiers }
       );
       rememberAddedLine(line);
     } else if (!requiresTableSelection || isDirectCheckoutMode || startFreshCart) {
@@ -1779,7 +1794,9 @@ export function CashierPage() {
       setDirectCartLines((current) => {
         const variants = variantsByProductId[product.id] || [];
         const variant = variants.find((item) => item.id === variantId);
-        const existing = current.find((line) => line.variantId === variantId);
+        const key = modifierKey(modifiers);
+        const lineId = key ? `direct-${variantId}-${key}` : `direct-${variantId}`;
+        const existing = current.find((line) => line.id === lineId);
         if (existing) {
           const updated = buildDirectLine(
             {
@@ -1791,11 +1808,11 @@ export function CashierPage() {
             product,
             variant
           );
-          return current.map((line) => (line.variantId === variantId ? updated : line));
+          return current.map((line) => (line.id === lineId ? updated : line));
         }
         const nextLine = buildDirectLine(
           {
-            id: `direct-${variantId}`,
+            id: lineId,
             salesOrderId: "direct-checkout",
             variantId,
             quantity: Math.max(1, quantity).toFixed(4),
@@ -1803,6 +1820,7 @@ export function CashierPage() {
             lineDiscount: "0.0000",
             taxAmount: "0.0000",
             status: "PENDING",
+            ...(modifiers?.length ? { selectedModifiers: modifiers } : {}),
           },
           product,
           variant
@@ -1820,10 +1838,11 @@ export function CashierPage() {
   const handleAddProduct = (
     product: (typeof products)[number],
     variantId: string,
-    quantity: number
+    quantity: number,
+    modifiers?: ChosenModifier[]
   ) => {
     const pendingAdd = productAddQueueRef.current.then(() =>
-      addProductToCart(product, variantId, quantity)
+      addProductToCart(product, variantId, quantity, modifiers)
     );
     productAddQueueRef.current = pendingAdd.catch(() => undefined);
     return pendingAdd;
@@ -2554,7 +2573,12 @@ export function CashierPage() {
         if (!product) {
           throw new Error(t("cashier.errors.addProduct"));
         }
-        await handleAddProduct(product, line.variantId, 1);
+        await handleAddProduct(
+          product,
+          line.variantId,
+          1,
+          chosenOf(line.selectedModifiers)
+        );
         setNotice(t("cashier.orderPanel.itemUpdated"));
         return;
       }
@@ -2662,7 +2686,7 @@ export function CashierPage() {
             product,
             line.variantId,
             Number(line.quantity || 1),
-            { refreshLines: false }
+            { refreshLines: false, modifiers: chosenOf(line.selectedModifiers) }
           );
         }
 
@@ -2797,7 +2821,9 @@ export function CashierPage() {
     }
   };
 
-  const handleSeatingChange = async (change: TableSeatingChangeDTO) => {
+  const handleSeatingChange = async (
+    change: Exclude<TableSeatingChangeDTO, { kind: "split" }>
+  ) => {
     const session = selectedOrderSession;
     if (!session) return;
     const tableNumber = (tableId: string) =>
@@ -2830,6 +2856,59 @@ export function CashierPage() {
             : "cashier.seating.released",
           { table: tableNumber(change.tableId) }
         )
+      );
+    } catch (caught) {
+      setLocalError(
+        caught instanceof Error ? caught.message : t("cashier.seating.failed")
+      );
+    }
+  };
+
+  const handleSplitToTable = async (
+    target: SplitTarget,
+    lines: SplitLineDTO[]
+  ) => {
+    const session = selectedOrderSession;
+    if (!session) return;
+    setLocalError(null);
+    setNotice(null);
+    try {
+      let targetSessionId = "sessionId" in target ? target.sessionId : "";
+      let tableId =
+        "tableId" in target
+          ? target.tableId
+          : tableSessions.find((open) => open.id === targetSessionId)?.tableId;
+      if ("tableId" in target) {
+        const context = await requireCashierContext();
+        const opened = await openTableSession({
+          tenantId: context.tenantId,
+          tableId: target.tableId,
+          locationId: context.locationId,
+          guestCount: 1,
+          posRegisterId: context.posRegisterId,
+          openedByPosSessionId: context.posSessionId,
+          salesChannel: "POS",
+        });
+        targetSessionId = opened.id;
+        if (opened.salesOrderId) {
+          writeTableOrderIds(target.tableId, [opened.salesOrderId]);
+        }
+        tableId = target.tableId;
+      }
+      await changeTableSeating(session.id, {
+        kind: "split",
+        targetSessionId,
+        lines,
+      });
+      setSeatingMode(null);
+      if (selectedOrder) await selectOrderById(selectedOrder.id);
+      await refreshMultiOrderLines(tableOrderIds);
+      setNotice(
+        t("cashier.seating.splitDone", {
+          table:
+            diningTables.find((table) => table.id === tableId)?.tableNumber ||
+            "",
+        })
       );
     } catch (caught) {
       setLocalError(
@@ -3019,6 +3098,11 @@ export function CashierPage() {
             ? () => setSeatingMode("combine")
             : undefined
         }
+        onSplitItems={
+          selectedOrderSession && !isSettledSalesOrder(selectedOrder)
+            ? () => setSeatingMode("split")
+            : undefined
+        }
         onReleaseTable={(tableId) =>
           void handleSeatingChange({ kind: "release", tableId })
         }
@@ -3035,7 +3119,17 @@ export function CashierPage() {
         />
       ) : null}
 
-      {seatingMode && selectedOrderSession ? (
+      {seatingMode === "split" && selectedOrderSession ? (
+        <SplitItemsDialog
+          session={selectedOrderSession}
+          lines={selectedOrderLines}
+          tables={diningTables}
+          sessions={tableSessions}
+          isBusy={isLoading}
+          onConfirm={(target, lines) => void handleSplitToTable(target, lines)}
+          onClose={() => setSeatingMode(null)}
+        />
+      ) : seatingMode && seatingMode !== "split" && selectedOrderSession ? (
         <TableSeatingDialog
           mode={seatingMode}
           session={selectedOrderSession}
@@ -3075,6 +3169,7 @@ export function CashierPage() {
                 onLoadVariants={fetchProductVariants}
                 onAdd={handleAddProduct}
                 onClose={handleCloseMenu}
+                offerOptions
                 toolbar={
                   menuCategories.length ? (
                     <div className="mt-2 min-[1100px]:hidden">
