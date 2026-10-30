@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { CashierPage } from "../CashierPage";
+import { writeTableOrderIds } from "@/lib/pos/multiOrdering";
 
 const mocks = vi.hoisted(() => ({
   addTableCharge: vi.fn(),
@@ -532,6 +533,43 @@ describe("CashierPage integration", () => {
       expect(secondBill).not.toHaveProperty("includeTax");
       expect(secondBill).not.toHaveProperty("includeServiceCharge");
     });
+  });
+
+  it("adds a new line for an item removed from a table bill", async () => {
+    writeTableOrderIds("table-1", ["order-1"]);
+    mocks.fetchManagedOrderLines.mockResolvedValue({
+      lines: [orderLine],
+      total: 1,
+      page: 1,
+      limit: 100,
+      totalPages: 1,
+    });
+    mocks.removeOrderLine.mockImplementation(async () => {
+      selectedOrderLinesState = [];
+    });
+    mocks.addProductToTableSession.mockResolvedValue({ ...orderLine, id: "line-new" });
+    const { rerender } = render(
+      <MemoryRouter initialEntries={["/cashier?view=orders"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^T1/ }));
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText("cashier.productMenu.search")).toBeInTheDocument()
+    );
+    expect(mocks.fetchManagedOrderLines).toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.removeItem" }));
+    await waitFor(() => expect(mocks.removeOrderLine).toHaveBeenCalledWith("order-1", "line-1"));
+    rerender(
+      <MemoryRouter initialEntries={["/cashier?view=orders"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Coffee/ }));
+
+    await waitFor(() => expect(mocks.addProductToTableSession).toHaveBeenCalled());
+    expect(mocks.updateOrderLine).not.toHaveBeenCalled();
   });
 
   it("increments an existing product line instead of adding a duplicate", async () => {
