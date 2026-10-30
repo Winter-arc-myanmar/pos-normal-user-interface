@@ -491,6 +491,41 @@ describe("SpaBoardPage", () => {
     expect(mocks.lookupCard).not.toHaveBeenCalled();
   });
 
+  it("shows promotion-split copies of one menu item as one combined quantity", async () => {
+    lines = [
+      {
+        id: "line-1",
+        salesOrderId: "order-1",
+        variantId: "variant-scrub",
+        productName: "Foot Scrub",
+        quantity: "1.0000",
+        unitPrice: "6000.0000",
+        lineDiscount: "600.0000",
+        appliedPromotionId: "promo-1",
+        status: "PENDING",
+      },
+      {
+        id: "line-2",
+        salesOrderId: "order-1",
+        variantId: "variant-scrub",
+        productName: "Foot Scrub",
+        quantity: "1.0000",
+        unitPrice: "6000.0000",
+        lineDiscount: "6000.0000",
+        appliedPromotionId: "promo-1",
+        status: "PENDING",
+      },
+    ];
+    await openRunningRoom();
+
+    // One product-card label plus one combined bill row, not two bill rows.
+    expect(screen.getAllByText("Foot Scrub")).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: "spa.decrease" }));
+    await waitFor(() =>
+      expect(mocks.deleteOrderLine).toHaveBeenCalledWith("order-1", "line-2")
+    );
+  });
+
   it("gives items free with a reason and no card tap", async () => {
     mocks.giveFree.mockResolvedValue({ charged: "0", balanceAfter: "120000", quote });
     await openRunningRoom();

@@ -1267,6 +1267,15 @@ describe("CashierPage integration", () => {
       })
     ).toBeDisabled();
 
+    // An open order keeps its table: neither guard lets it go available.
+    fireEvent.change(tableStatusSelect, {
+      target: { value: "AVAILABLE" },
+    });
+    expect(
+      await screen.findByText("cashier.errors.tableAvailableWithMenu")
+    ).toBeInTheDocument();
+    expect(mocks.updateDiningTableStatus).not.toHaveBeenCalled();
+
     fireEvent.change(tableStatusSelect, {
       target: { value: "DIRTY" },
     });
@@ -1303,8 +1312,9 @@ describe("CashierPage integration", () => {
     expect(mocks.updateDiningTableStatus).not.toHaveBeenCalled();
   });
 
-  it("allows marking a table available when the order has no menu lines", async () => {
+  it("allows marking a table available when the order has no menu lines and is settled", async () => {
     selectedOrderLinesState = [];
+    selectedOrderState = { ...order, status: "COMPLETED" };
 
     render(
       <MemoryRouter initialEntries={["/cashier?view=orders"]}>
@@ -1330,6 +1340,28 @@ describe("CashierPage integration", () => {
         "AVAILABLE"
       )
     );
+  });
+
+  it("blocks marking a table available while its order is still open", async () => {
+    selectedOrderLinesState = [];
+
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=orders"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /cashier.billOptions.titleWithTable/ })
+    );
+    fireEvent.change(screen.getByLabelText("cashier.orderPanel.tableStatus"), {
+      target: { value: "AVAILABLE" },
+    });
+
+    expect(
+      await screen.findByText("cashier.errors.tableHasActiveOrder")
+    ).toBeInTheDocument();
+    expect(mocks.updateDiningTableStatus).not.toHaveBeenCalled();
   });
 
   it("cancels an unpaid order without calling checkout void", async () => {

@@ -31,7 +31,8 @@ describe("BrowserPrinterClient", () => {
     expect(printDialog).toHaveBeenCalledWith(
       expect.arrayContaining(["PRINTER TEST", "Kitchen"]),
       "printer-test",
-      80
+      80,
+      undefined
     );
   });
 
@@ -55,7 +56,8 @@ describe("BrowserPrinterClient", () => {
     expect(printDialog).toHaveBeenCalledWith(
       expect.arrayContaining(["PRINTER TEST", "Kitchen"]),
       "printer-test",
-      80
+      80,
+      undefined
     );
   });
 
@@ -85,7 +87,8 @@ describe("BrowserPrinterClient", () => {
     expect(printDialog).toHaveBeenCalledWith(
       expect.any(Array),
       "Customer bill",
-      58
+      58,
+      expect.objectContaining({ rows: expect.any(Array) })
     );
   });
 

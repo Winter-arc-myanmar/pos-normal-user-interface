@@ -220,6 +220,9 @@ export function SpaBillPanel({
             const newest = group.lines[group.lines.length - 1];
             const { quantity, total } = group;
             const unitPrice = Number(line.unitPrice || 0);
+            // A promotion can split one item into several copies of its own line,
+            // so the promo badge belongs to whichever copy carries it.
+            const promotedLine = group.lines.find((item) => item.appliedPromotionId);
             const isPackage = Boolean(packageVariantIds?.has(line.variantId));
             const isTreatment = line.variantId === room?.rateVariantId || isPackage;
             const isFoc = Boolean(line.compReasonId);
@@ -232,10 +235,10 @@ export function SpaBillPanel({
                       <span className="mr-1.5 rounded border border-slate-500 px-1 text-[10px] font-semibold tracking-wide text-slate-300">
                         {tr("foc")}
                       </span>
-                    ) : line.appliedPromotionId ? (
+                    ) : promotedLine ? (
                       <span
                         className="mr-1.5 rounded border border-emerald-600 px-1 text-[10px] font-semibold tracking-wide text-emerald-300"
-                        title={promotionName(line.appliedPromotionId)}
+                        title={promotionName(promotedLine.appliedPromotionId)}
                       >
                         {tr("promo")}
                       </span>
@@ -246,8 +249,8 @@ export function SpaBillPanel({
                   </p>
                   <p className="text-xs text-slate-500">
                     {money(unitPrice)}
-                    {line.appliedPromotionId && promotionName(line.appliedPromotionId)
-                      ? ` · ${promotionName(line.appliedPromotionId)}`
+                    {promotedLine && promotionName(promotedLine.appliedPromotionId)
+                      ? ` · ${promotionName(promotedLine.appliedPromotionId)}`
                       : ""}
                   </p>
                 </div>
