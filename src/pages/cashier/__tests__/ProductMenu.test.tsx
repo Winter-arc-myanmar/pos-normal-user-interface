@@ -108,12 +108,20 @@ describe("ProductMenu", () => {
     expect(onAdd).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "SOUP-L" }));
+    const decrease = screen.getByRole("button", {
+      name: "cashier.orderPanel.decreaseQuantity",
+    });
+    expect(decrease).toBeDisabled();
+    fireEvent.click(
+      screen.getByRole("button", { name: "cashier.orderPanel.increaseQuantity" })
+    );
+    expect(decrease).toBeEnabled();
     fireEvent.click(
       screen.getByRole("button", { name: "cashier.productMenu.add" })
     );
 
     await waitFor(() =>
-      expect(onAdd).toHaveBeenCalledWith(soup, "variant-l", 1, undefined)
+      expect(onAdd).toHaveBeenCalledWith(soup, "variant-l", 2, undefined)
     );
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });

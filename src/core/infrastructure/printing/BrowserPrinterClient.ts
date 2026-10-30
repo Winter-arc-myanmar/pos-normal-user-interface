@@ -7,11 +7,14 @@ import {
   buildPrinterTestLines,
   buildSaleReceiptLines,
   formatKitchenSlip,
+  kitchenSlipPreview,
   kdsTicketSlip,
   formatPrinterTest,
   formatSaleReceipt,
+  saleReceiptPreview,
   KitchenSlip,
   SaleReceipt,
+  SlipPreview,
 } from "@/lib/printing/formatKdsTicket";
 import { canSendRawEscPos } from "@/lib/printing/printerCapabilities";
 import {
@@ -117,7 +120,8 @@ export class BrowserPrinterClient implements IPrinterClient {
     escPos: string,
     pdfLines: string[],
     pdfTitle: string,
-    paperWidth?: PrintPaperWidth
+    paperWidth?: PrintPaperWidth,
+    preview?: SlipPreview
   ): Promise<void> {
     if (canSendRawEscPos(binding)) {
       try {
@@ -130,7 +134,8 @@ export class BrowserPrinterClient implements IPrinterClient {
     await printLinesWithBrowserDialog(
       pdfLines,
       pdfTitle,
-      paperWidth === "MM58" ? 58 : 80
+      paperWidth === "MM58" ? 58 : 80,
+      preview
     );
   }
 
@@ -155,7 +160,8 @@ export class BrowserPrinterClient implements IPrinterClient {
       escPos,
       buildKitchenSlipLines(slip),
       slip.title || "kitchen",
-      slip.paperWidth
+      slip.paperWidth,
+      kitchenSlipPreview(slip)
     );
   }
 
@@ -166,7 +172,8 @@ export class BrowserPrinterClient implements IPrinterClient {
       escPos,
       buildSaleReceiptLines(receipt),
       receipt.title || "receipt",
-      receipt.paperWidth
+      receipt.paperWidth,
+      saleReceiptPreview(receipt)
     );
   }
 }

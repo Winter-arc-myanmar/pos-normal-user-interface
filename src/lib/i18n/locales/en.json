@@ -1217,6 +1217,7 @@
       "pickupFailed": "Unable to mark pickup.",
       "checkoutEmpty": "Add at least one item before checkout",
       "updateTableStatus": "Unable to update table status",
+      "tableHasActiveOrder": "Complete or cancel the sale order before marking this table available.",
       "updateTableSession": "Unable to update table session",
       "loadVariants": "Unable to load variants",
       "emptyOrder": "Add at least one item before sending to KDS.",

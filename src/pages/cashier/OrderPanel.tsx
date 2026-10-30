@@ -57,8 +57,9 @@ export function groupOrderLines(
       // Two "Other" fees with different names stay apart.
       isFee(line) ? line.productName ?? "" : "",
       Number(line.unitPrice || 0).toFixed(4),
-      Number(line.lineDiscount || 0).toFixed(4),
       line.selectedModifiers ?? null,
+      // A free item remains separate from the paid quantity of the same item.
+      line.compReasonId ? "FOC" : "",
       line.status === "VOIDED" || line.status === "COMPED" ? line.status : "",
     ]);
     groups.set(key, [...(groups.get(key) || []), line]);
@@ -100,6 +101,7 @@ interface OrderPanelProps {
   feedback?: string | null;
   errorMessage?: string | null;
   tableOrderIds?: string[];
+  hasActiveTableOrder?: boolean;
   onCreateOrder: () => void;
   onSelectTableOrder?: (orderId: string) => void;
   onAddTableOrder?: () => void;
@@ -209,6 +211,7 @@ export function OrderPanel({
   feedback,
   errorMessage,
   tableOrderIds = [],
+  hasActiveTableOrder = false,
   onCreateOrder,
   onSelectTableOrder,
   onAddTableOrder,
@@ -729,7 +732,11 @@ export function OrderPanel({
                         >
                           {(["AVAILABLE", "OCCUPIED", "DIRTY", "RESERVED"] as const).map(
                             (status) => (
-                              <option key={status} value={status}>
+                              <option
+                                key={status}
+                                value={status}
+                                disabled={status === "AVAILABLE" && hasActiveTableOrder}
+                              >
                                 {t(`cashier.orderPanel.tableStatuses.${status}`)}
                               </option>
                             )

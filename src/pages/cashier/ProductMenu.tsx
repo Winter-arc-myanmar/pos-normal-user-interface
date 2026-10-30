@@ -466,19 +466,29 @@ export function ProductMenu({
               />
             ))}
 
-            <label className="mt-4 block text-xs text-slate-300">
-              {t("cashier.productMenu.quantity")}
-              <input
-                type="number"
-                min={1}
-                step={1}
-                value={quantity}
-                onChange={(event) =>
-                  setQuantity(Math.max(1, Number(event.target.value) || 1))
-                }
-                className="mt-1 min-h-10 w-full rounded border border-slate-600 bg-slate-800 px-2 text-sm"
-              />
-            </label>
+            <div className="mt-4 text-xs text-slate-300">
+              <span className="block">{t("cashier.productMenu.quantity")}</span>
+              <div className="mt-1 flex h-11 items-center gap-2">
+                <button
+                  type="button"
+                  className="h-11 w-11 rounded-md border border-slate-700 bg-slate-900 text-lg disabled:opacity-40"
+                  aria-label={t("cashier.orderPanel.decreaseQuantity")}
+                  disabled={quantity <= 1}
+                  onClick={() => setQuantity((value) => Math.max(1, value - 1))}
+                >
+                  -
+                </button>
+                <span className="min-w-10 text-center text-sm tabular-nums">{quantity}</span>
+                <button
+                  type="button"
+                  className="h-11 w-11 rounded-md border border-slate-700 bg-slate-900 text-lg"
+                  aria-label={t("cashier.orderPanel.increaseQuantity")}
+                  onClick={() => setQuantity((value) => value + 1)}
+                >
+                  +
+                </button>
+              </div>
+            </div>
 
             {localError ? (
               <p className="mt-3 text-xs text-red-300">{localError}</p>

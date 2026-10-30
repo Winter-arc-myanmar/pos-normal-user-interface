@@ -1153,6 +1153,14 @@ describe("CashierPage integration", () => {
       })
     );
     fireEvent.change(screen.getByLabelText("cashier.orderPanel.tableStatus"), {
+      target: { value: "AVAILABLE" },
+    });
+    expect(
+      await screen.findByText("cashier.errors.tableHasActiveOrder")
+    ).toBeInTheDocument();
+    expect(mocks.updateDiningTableStatus).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText("cashier.orderPanel.tableStatus"), {
       target: { value: "DIRTY" },
     });
     fireEvent.change(screen.getByLabelText("cashier.orderPanel.sessionState"), {

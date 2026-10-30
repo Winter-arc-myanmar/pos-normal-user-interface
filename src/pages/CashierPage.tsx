@@ -2793,6 +2793,14 @@ export function CashierPage() {
     if (!selectedOrderTable) return;
     setLocalError(null);
     setNotice(null);
+    if (
+      status === "AVAILABLE" &&
+      selectedOrder &&
+      !isSettledSalesOrder(selectedOrder)
+    ) {
+      setLocalError(t("cashier.errors.tableHasActiveOrder"));
+      return;
+    }
     try {
       await updateDiningTableStatus(selectedOrderTable.id, status);
       setNotice(t("cashier.orderPanel.tableStatusUpdated", { status }));
@@ -3010,6 +3018,9 @@ export function CashierPage() {
         feedback={notice}
         errorMessage={localError || error}
         tableOrderIds={tableOrderIds}
+        hasActiveTableOrder={Boolean(
+          selectedOrder && !isSettledSalesOrder(selectedOrder)
+        )}
         onCreateOrder={() => void handleCreateOrder()}
         onSelectTableOrder={(orderId) => void handleSelectTableOrder(orderId)}
         onAddTableOrder={() => void handleAddTableOrder()}
