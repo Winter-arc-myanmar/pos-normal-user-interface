@@ -342,7 +342,9 @@ export function ProductMenu({
         </div>
       ) : null}
 
-      <div className="pos-scroll-hint mt-2 min-h-0 flex-1 overflow-y-auto p-1">
+      {/* pos-pane-scroll: Android WebView only dispatches touch drags to a list
+          with a zero flex basis and pan-y touch-action, not to its grid parent. */}
+      <div className="pos-pane-scroll pos-scroll-hint mt-2 min-h-0 flex-1 overflow-y-auto p-1">
         <div className="grid content-start grid-cols-[repeat(auto-fill,minmax(min(9.5rem,calc(50%_-_0.25rem)),1fr))] gap-2">
           {visibleProducts.map((product) => {
             const orderedQty = Number(orderedProductQuantities[product.id] || 0);
