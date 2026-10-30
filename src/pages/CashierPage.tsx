@@ -2433,45 +2433,6 @@ export function CashierPage() {
     });
   };
 
-  const handleToggleFoc = async (line: SalesOrderLine) => {
-    setLocalError(null);
-    setNotice(null);
-    try {
-      if (isSettledSalesOrder(selectedOrder) && !isDirectCheckoutMode) {
-        throw new Error(t("cashier.errors.orderAlreadyPaid"));
-      }
-      const nextDiscount = isFocLine(line) ? "0.0000" : lineFocDiscount(line);
-      if (isDirectCheckoutMode) {
-        setDirectCartLines((current) => {
-          const target = current.find((entry) => entry.id === line.id);
-          if (!target) return current;
-          const variant = variantById[target.variantId];
-          const product = variant ? productById[variant.productId] : undefined;
-          const updated = buildDirectLine(
-            { ...target, lineDiscount: nextDiscount },
-            product,
-            variant
-          );
-          return current.map((entry) => (entry.id === line.id ? updated : entry));
-        });
-        return;
-      }
-      if (!selectedOrder) return;
-      await updateOrderLine(selectedOrder.id, line.id, {
-        variantId: line.variantId,
-        quantity: line.quantity,
-        unitPrice: line.unitPrice || "0.0000",
-        lineDiscount: nextDiscount,
-        taxAmount: line.taxAmount || "0.0000",
-        seatNumber: line.seatNumber,
-      });
-    } catch (caught) {
-      setLocalError(
-        caught instanceof Error ? caught.message : t("cashier.errors.updateOrderLine")
-      );
-    }
-  };
-
   const menuPriceOf = (line: SalesOrderLine) => {
     if (isFeeLine(line)) return undefined;
     const variant = variantById[line.variantId];
@@ -2484,27 +2445,44 @@ export function CashierPage() {
     );
   };
 
-  const handleChangeLinePrice = async (
+  const handleEditLine = async (
     line: GroupedSalesOrderLine,
-    price: number
+    edit: { unitPrice: number; foc: boolean }
   ) => {
     setLocalError(null);
     setNotice(null);
-    const unitPrice = formatAmount(price);
+    const fee = isFeeLine(line);
     const lines = line.groupedLines ?? [line];
+    const priceFor = (entry: SalesOrderLine) =>
+      fee ? entry.unitPrice || "0.0000" : formatAmount(edit.unitPrice);
+    const discountFor = (entry: SalesOrderLine, unitPrice: string) => {
+      if (edit.foc) return lineFocDiscount({ quantity: entry.quantity, unitPrice });
+      return isFocLine(entry) ? "0.0000" : entry.lineDiscount || "0.0000";
+    };
+    const unchanged = (entry: SalesOrderLine) =>
+      Number(priceFor(entry)) === Number(entry.unitPrice || 0) &&
+      edit.foc === isFocLine(entry);
     try {
       if (isSettledSalesOrder(selectedOrder) && !isDirectCheckoutMode) {
         throw new Error(t("cashier.errors.orderAlreadyPaid"));
       }
       if (isDirectCheckoutMode) {
         const ids = new Set(lines.map((entry) => entry.id));
+        const menu = menuPriceOf(line);
         setDirectCartLines((current) =>
           current.map((entry) => {
-            if (!ids.has(entry.id)) return entry;
+            if (!ids.has(entry.id) || unchanged(entry)) return entry;
+            const unitPrice = priceFor(entry);
             const variant = variantById[entry.variantId];
             const product = variant ? productById[variant.productId] : undefined;
+            const repriced =
+              !fee && (menu === undefined || Math.abs(menu - edit.unitPrice) >= 0.0001);
             return buildDirectLine(
-              { ...entry, priceOverride: unitPrice },
+              {
+                ...entry,
+                priceOverride: repriced ? unitPrice : undefined,
+                lineDiscount: discountFor(entry, unitPrice),
+              },
               product,
               variant
             );
@@ -2514,11 +2492,13 @@ export function CashierPage() {
       }
       if (!selectedOrder) return;
       for (const entry of lines) {
+        if (unchanged(entry)) continue;
+        const unitPrice = priceFor(entry);
         await updateOrderLine(entry.salesOrderId || selectedOrder.id, entry.id, {
           variantId: entry.variantId,
           quantity: entry.quantity,
           unitPrice,
-          lineDiscount: entry.lineDiscount || "0.0000",
+          lineDiscount: discountFor(entry, unitPrice),
           taxAmount: entry.taxAmount || "0.0000",
           seatNumber: entry.seatNumber,
         });
@@ -3103,8 +3083,7 @@ export function CashierPage() {
         onIncreaseLineQuantity={(line) => void handleIncreaseLineQuantity(line)}
         onDecreaseLineQuantity={(line) => void handleDecreaseLineQuantity(line)}
         onRemoveLine={(line) => void handleRemoveLine(line)}
-        onToggleFoc={(line) => void handleToggleFoc(line)}
-        onChangeLinePrice={(line, price) => void handleChangeLinePrice(line, price)}
+        onEditLine={(line, edit) => void handleEditLine(line, edit)}
         menuPrice={menuPriceOf}
         promotions={promotions.running}
         promotionDiscounts={isDirectCheckoutMode ? promotions.discounts : undefined}

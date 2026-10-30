@@ -1,5 +1,5 @@
 import { createRef, type ComponentProps } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { DiningTable, PaymentMethod, SalesOrder, SalesOrderLine, TableSession } from "@/core/domain/entities/Cashier";
@@ -33,6 +33,9 @@ const line = new SalesOrderLine({
   quantity: "1.0000",
   unitPrice: "10.0000",
 });
+
+/** The bill row of the default line, named after its variant id. */
+const row = (name = "variant-") => screen.getByRole("group", { name });
 
 const defaultProps: ComponentProps<typeof OrderPanel> = {
   selectedOrder: paidOrder,
@@ -139,7 +142,7 @@ describe("OrderPanel", () => {
   ])("displays row amounts for includeTax=%s inclusive=%s", (includeTax, taxInclusive, expected) => {
     render(<OrderPanel {...defaultProps} includeTax={includeTax}
       selectedOrderLines={[new SalesOrderLine({ ...line, taxAmount: "1.0000", taxInclusive })]} />);
-    expect(screen.getByRole("button", { name: "cashier.orderPanel.expandItem" })).toHaveTextContent(expected);
+    expect(row()).toHaveTextContent(expected);
   });
 
   it("uses bill-priced lines for display without changing action payloads", () => {
@@ -148,9 +151,8 @@ describe("OrderPanel", () => {
       selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
       billLines={[new SalesOrderLine({ ...line, lineDiscount: "2.0000" })]}
       onRemoveLine={onRemoveLine} />);
-    expect(screen.getByRole("button", { name: "cashier.orderPanel.expandItem" })).toHaveTextContent("8.00");
-    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.expandItem" }));
-    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.remove" }));
+    expect(row()).toHaveTextContent("8.00");
+    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.removeItem" }));
     expect(onRemoveLine).toHaveBeenCalledWith(line);
   });
 
@@ -179,18 +181,13 @@ describe("OrderPanel", () => {
       />
     );
 
-    const toggle = screen.getByRole("button", {
-      name: "cashier.orderPanel.expandItem",
-    });
-    expect(toggle).toHaveTextContent("Cola");
-    expect(toggle).toHaveTextContent("3×");
-    expect(toggle).toHaveTextContent("30.00");
+    expect(row("Cola")).toHaveTextContent("30.00");
+    expect(screen.getByLabelText("cashier.orderPanel.lineQuantity")).toHaveTextContent("3");
     expect(screen.getByLabelText("cashier.orderPanel.kdsPending")).toHaveClass(
       "bg-emerald-500"
     );
-    fireEvent.click(toggle);
     fireEvent.click(
-      screen.getByRole("button", { name: "cashier.orderPanel.remove" })
+      screen.getByRole("button", { name: "cashier.orderPanel.removeItem" })
     );
     expect(onRemoveLine).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -230,8 +227,7 @@ describe("OrderPanel", () => {
     expect(screen.getAllByLabelText("cashier.orderPanel.kdsPending")).toHaveLength(1);
   });
 
-  it("starts with compact summaries and reveals details only when expanded", async () => {
-    const user = userEvent.setup();
+  it("shows the price, variant and actions on the row itself", () => {
     render(
       <OrderPanel
         {...defaultProps}
@@ -239,53 +235,39 @@ describe("OrderPanel", () => {
         selectedOrderLines={[
           new SalesOrderLine({ ...line, productName: "Coffee", variantName: "Large", quantity: "2.0000" }),
         ]}
+        onEditLine={vi.fn()}
       />
     );
 
-    const toggle = screen.getByRole("button", { name: "cashier.orderPanel.expandItem" });
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(toggle).toHaveTextContent("Coffee");
-    expect(toggle).toHaveTextContent("2×");
-    expect(toggle).toHaveTextContent("20.00");
-    expect(screen.queryByText("Large")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "cashier.orderPanel.remove" })).not.toBeInTheDocument();
-
-    toggle.focus();
-    await user.keyboard("{Enter}");
-    expect(toggle).toHaveAttribute("aria-expanded", "true");
-    expect(document.getElementById(toggle.getAttribute("aria-controls")!)).toBeInTheDocument();
-    expect(screen.getByText("Large")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "cashier.orderPanel.remove" })).toBeInTheDocument();
-
-    await user.keyboard(" ");
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByText("Large")).not.toBeInTheDocument();
+    const coffee = row("Coffee");
+    expect(coffee).toHaveTextContent("@ 10.00");
+    expect(coffee).toHaveTextContent("Large");
+    expect(coffee).toHaveTextContent("20.00");
+    expect(within(coffee).getByLabelText("cashier.orderPanel.lineQuantity")).toHaveTextContent("2");
+    for (const action of ["decreaseQuantity", "increaseQuantity", "editItem", "removeItem"]) {
+      expect(within(coffee).getByRole("button", { name: `cashier.orderPanel.${action}` })).toBeEnabled();
+    }
   });
 
-  it("opens only one item at a time and collapses when switching orders", () => {
+  it("closes the edit box when the cashier switches orders", () => {
     const props = {
       ...defaultProps,
       selectedOrder: new SalesOrder({ ...paidOrder, status: "DRAFT" }),
-      selectedOrderLines: [line, new SalesOrderLine({ ...line, id: "line-2", variantId: "variant-2", productName: "Tea", variantName: "Small" })],
+      onEditLine: vi.fn(),
     };
     const { rerender } = render(<OrderPanel {...props} />);
 
-    fireEvent.click(screen.getAllByRole("button", { name: "cashier.orderPanel.expandItem" })[0]);
-    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.expandItem" }));
-    expect(screen.getAllByRole("button", { name: "cashier.orderPanel.collapseItem" })).toHaveLength(1);
-    expect(screen.getAllByRole("button", { name: "cashier.orderPanel.remove" })).toHaveLength(1);
-    expect(screen.getByText("Small")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.editItem" }));
+    expect(screen.getByRole("dialog", { name: "cashier.lineEdit.title" })).toBeInTheDocument();
 
     rerender(<OrderPanel {...props} selectedOrder={new SalesOrder({ ...props.selectedOrder, id: "order-2" })} />);
-    expect(screen.queryByRole("button", { name: "cashier.orderPanel.collapseItem" })).not.toBeInTheDocument();
-    expect(screen.queryByText("Small")).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("preserves line actions inside the expanded row", () => {
+  it("runs the row actions on the line", () => {
     const onIncreaseLineQuantity = vi.fn();
     const onDecreaseLineQuantity = vi.fn();
     const onRemoveLine = vi.fn();
-    const onToggleFoc = vi.fn();
     render(
       <OrderPanel
         {...defaultProps}
@@ -293,31 +275,27 @@ describe("OrderPanel", () => {
         onIncreaseLineQuantity={onIncreaseLineQuantity}
         onDecreaseLineQuantity={onDecreaseLineQuantity}
         onRemoveLine={onRemoveLine}
-        onToggleFoc={onToggleFoc}
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.expandItem" }));
-    for (const action of ["increaseQuantity", "decreaseQuantity", "foc", "remove"]) {
+    for (const action of ["increaseQuantity", "decreaseQuantity", "removeItem"]) {
       fireEvent.click(screen.getByRole("button", { name: `cashier.orderPanel.${action}` }));
     }
-    for (const callback of [onIncreaseLineQuantity, onDecreaseLineQuantity, onToggleFoc, onRemoveLine]) {
+    for (const callback of [onIncreaseLineQuantity, onDecreaseLineQuantity, onRemoveLine]) {
       expect(callback).toHaveBeenCalledExactlyOnceWith(line);
     }
-    expect(screen.getByRole("button", { name: "cashier.orderPanel.collapseItem" })).toHaveAttribute("aria-expanded", "true");
   });
 
-  it.each([{ isLoading: true }, { selectedOrder: paidOrder }])("keeps expanded line actions disabled for %j", (overrides) => {
+  it.each([{ isLoading: true }, { selectedOrder: paidOrder }])("keeps line actions disabled for %j", (overrides) => {
     render(
       <OrderPanel
         {...defaultProps}
         selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
-        onToggleFoc={vi.fn()}
+        onEditLine={vi.fn()}
         {...overrides}
       />
     );
-    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.expandItem" }));
-    for (const action of ["increaseQuantity", "decreaseQuantity", "foc", "remove"]) {
+    for (const action of ["increaseQuantity", "decreaseQuantity", "editItem", "removeItem"]) {
       expect(screen.getByRole("button", { name: `cashier.orderPanel.${action}` })).toBeDisabled();
     }
   });
@@ -397,7 +375,7 @@ describe("OrderPanel", () => {
   it("lets cashiers edit checkout adjustments and mark a line FOC", () => {
     const onDiscountAmountChange = vi.fn();
     const onRemoveDiscount = vi.fn();
-    const onToggleFoc = vi.fn();
+    const onEditLine = vi.fn();
 
     render(
       <OrderPanel
@@ -414,7 +392,7 @@ describe("OrderPanel", () => {
         onTipAmountChange={vi.fn()}
         onMemberCardUidChange={vi.fn()}
         onLookupMemberCard={vi.fn()}
-        onToggleFoc={onToggleFoc}
+        onEditLine={onEditLine}
       />
     );
 
@@ -430,9 +408,10 @@ describe("OrderPanel", () => {
       screen.getByRole("button", { name: "cashier.orderPanel.removeDiscount" })
     );
     expect(onRemoveDiscount).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.expandItem" }));
-    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.foc" }));
-    expect(onToggleFoc).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.editItem" }));
+    fireEvent.click(screen.getByRole("switch", { name: "cashier.lineEdit.foc" }));
+    fireEvent.click(screen.getByRole("button", { name: "cashier.lineEdit.save" }));
+    expect(onEditLine).toHaveBeenCalledExactlyOnceWith(line, { unitPrice: 10, foc: true });
   });
 
   it("collapses checkout adjustments until the cashier opens them", () => {
@@ -480,13 +459,14 @@ describe("OrderPanel", () => {
         ]}
         promotions={[promotion]}
         promotionName={(id) => (id === "promo-1" ? "Special Menu" : undefined)}
+        onEditLine={vi.fn()}
       />
     );
 
     expect(screen.getByText("cashier.orderPanel.promotionsNow")).toBeInTheDocument();
     expect(screen.getByText("Special Menu (10%)")).toBeInTheDocument();
     expect(screen.getByText("cashier.orderPanel.promo")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.expandItem" }));
+    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.editItem" }));
     expect(screen.getByText("cashier.orderPanel.promoSaving")).toBeInTheDocument();
     expect(screen.getByText("cashier.orderPanel.promotionDiscount")).toBeInTheDocument();
     expect(screen.getByText("−1.00")).toBeInTheDocument();
@@ -502,11 +482,12 @@ describe("OrderPanel", () => {
         selectedOrderLines={[line]}
         promotions={[promotion]}
         promotionDiscounts={{ "variant-1": { discount: 1, names: ["Special Menu"] } }}
+        onEditLine={vi.fn()}
       />
     );
 
     expect(screen.getByText("cashier.orderPanel.promo")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.expandItem" }));
+    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.editItem" }));
     expect(screen.getByText("cashier.orderPanel.promoSaving")).toBeInTheDocument();
     // 10.00 on the line, 1.00 of promotion still to come off.
     expect(screen.getByText("9.00")).toBeInTheDocument();
@@ -584,8 +565,7 @@ describe("OrderPanel", () => {
     );
 
     expect(screen.getByText("Coffee")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.expandItem" }));
-    expect(screen.getByText("Large")).toBeInTheDocument();
+    expect(row("Coffee")).toHaveTextContent("Large");
   });
 
   it("shows money with two decimals", () => {
@@ -624,63 +604,97 @@ describe("OrderPanel", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.expandItem" }));
-    expect(screen.getByText("Large")).toBeInTheDocument();
+    expect(row("COFFEE-LARGE")).toHaveTextContent("Large");
   });
 
   it("changes a line's price for this bill only", async () => {
     const user = userEvent.setup();
-    const onChangeLinePrice = vi.fn();
+    const onEditLine = vi.fn();
     render(
       <OrderPanel
         {...defaultProps}
         selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
-        onChangeLinePrice={onChangeLinePrice}
+        selectedOrderLines={[new SalesOrderLine({ ...line, quantity: "2.0000" })]}
+        onEditLine={onEditLine}
         menuPrice={() => 10}
       />
     );
 
-    await user.click(screen.getByRole("button", { name: "cashier.orderPanel.expandItem" }));
-    await user.click(screen.getByRole("button", { name: "cashier.orderPanel.changePrice" }));
-    const input = screen.getByLabelText("cashier.orderPanel.newPrice");
+    await user.click(screen.getByRole("button", { name: "cashier.orderPanel.editItem" }));
+    const dialog = screen.getByRole("dialog", { name: "cashier.lineEdit.title" });
+    const input = within(dialog).getByLabelText("cashier.lineEdit.price");
     await user.clear(input);
     await user.type(input, "7.5");
-    await user.click(screen.getByRole("button", { name: "cashier.orderPanel.savePrice" }));
+    expect(dialog).toHaveTextContent("15.00");
+    await user.click(within(dialog).getByRole("button", { name: "cashier.lineEdit.save" }));
 
-    expect(onChangeLinePrice).toHaveBeenCalledWith(
+    expect(onEditLine).toHaveBeenCalledWith(
       expect.objectContaining({ id: "line-1" }),
-      7.5
+      { unitPrice: 7.5, foc: false }
     );
-    expect(screen.queryByLabelText("cashier.orderPanel.newPrice")).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("marks a changed price and offers the menu price back", async () => {
     const user = userEvent.setup();
-    const onChangeLinePrice = vi.fn();
+    const onEditLine = vi.fn();
     render(
       <OrderPanel
         {...defaultProps}
         selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
         selectedOrderLines={[new SalesOrderLine({ ...line, unitPrice: "8.0000" })]}
-        onChangeLinePrice={onChangeLinePrice}
+        onEditLine={onEditLine}
         menuPrice={() => 10}
       />
     );
 
     expect(screen.getByText("cashier.orderPanel.priceChanged")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "cashier.orderPanel.expandItem" }));
-    await user.click(screen.getByRole("button", { name: "cashier.orderPanel.changePrice" }));
-    await user.click(screen.getByRole("button", { name: "cashier.orderPanel.useMenuPrice" }));
+    await user.click(screen.getByRole("button", { name: "cashier.orderPanel.editItem" }));
+    await user.click(screen.getByRole("button", { name: "cashier.lineEdit.menuPrice" }));
+    await user.click(screen.getByRole("button", { name: "cashier.lineEdit.save" }));
 
-    expect(onChangeLinePrice).toHaveBeenCalledWith(
+    expect(onEditLine).toHaveBeenCalledWith(
       expect.objectContaining({ id: "line-1" }),
-      10
+      { unitPrice: 10, foc: false }
     );
   });
 
-  it("does not change the price on a paid bill", () => {
-    render(<OrderPanel {...defaultProps} onChangeLinePrice={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.expandItem" }));
-    expect(screen.getByRole("button", { name: "cashier.orderPanel.changePrice" })).toBeDisabled();
+  it("refuses an empty price and removes the item from the edit box", async () => {
+    const user = userEvent.setup();
+    const onEditLine = vi.fn();
+    const onRemoveLine = vi.fn();
+    render(
+      <OrderPanel
+        {...defaultProps}
+        selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
+        onEditLine={onEditLine}
+        onRemoveLine={onRemoveLine}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "cashier.orderPanel.editItem" }));
+    await user.clear(screen.getByLabelText("cashier.lineEdit.price"));
+    await user.click(screen.getByRole("button", { name: "cashier.lineEdit.save" }));
+    expect(screen.getByText("cashier.lineEdit.priceRequired")).toBeInTheDocument();
+    expect(onEditLine).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "cashier.lineEdit.remove" }));
+    expect(onRemoveLine).toHaveBeenCalledExactlyOnceWith(line);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("keeps an extra fee's amount out of the edit box", async () => {
+    render(
+      <OrderPanel
+        {...defaultProps}
+        selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
+        isFeeLine={() => true}
+        onEditLine={vi.fn()}
+      />
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.editItem" }));
+    expect(screen.queryByLabelText("cashier.lineEdit.price")).not.toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "cashier.lineEdit.foc" })).toBeInTheDocument();
   });
 });

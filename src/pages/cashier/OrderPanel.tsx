@@ -17,6 +17,7 @@ import {
 } from "@/core/domain/entities/Cashier";
 import { OrderTabs } from "./OrderTabs";
 import { OrderAdjustments } from "./OrderAdjustments";
+import { LineEditDialog, type LineEdit } from "./LineEditDialog";
 import { isSettledSalesOrder } from "@/lib/pos/orderStatus";
 import { modifierPrintText } from "@/lib/printing/modifierText";
 import { isPendingKdsLine } from "@/lib/pos/kdsLines";
@@ -107,9 +108,8 @@ interface OrderPanelProps {
   onIncreaseLineQuantity: (line: SalesOrderLine) => void;
   onDecreaseLineQuantity: (line: SalesOrderLine) => void;
   onRemoveLine: (line: SalesOrderLine) => void;
-  onToggleFoc?: (line: SalesOrderLine) => void;
-  /** Charge a different price for this item on this bill only. */
-  onChangeLinePrice?: (line: GroupedSalesOrderLine, price: number) => void;
+  /** Save an item's details: its price on this bill only, and FOC. */
+  onEditLine?: (line: GroupedSalesOrderLine, edit: LineEdit) => void;
   /** What the menu charges for a line, to show when the bill charges something else. */
   menuPrice?: (line: SalesOrderLine) => number | undefined;
   /** Promotions running at this till, as the server tells them. */
@@ -173,7 +173,25 @@ const SEATING_ICON_PATHS = {
     "m15 9 6-6",
   ],
   merge: ["m8 6 4-4 4 4", "M12 2v10.3a4 4 0 0 1-1.172 2.872L4 22", "m20 22-5-5"],
+  minus: ["M5 12h14"],
+  plus: ["M5 12h14", "M12 5v14"],
+  edit: [
+    "M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z",
+    "m15 5 4 4",
+  ],
+  remove: [
+    "M3 6h18",
+    "M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6",
+    "M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2",
+    "M10 11v6",
+    "M14 11v6",
+  ],
 } as const;
+
+const lineIconBase =
+  "grid h-9 w-9 shrink-0 place-items-center rounded-md border focus-visible:outline-blue-500 disabled:opacity-40 min-[1100px]:h-10 min-[1100px]:w-10";
+const lineIconButton = `${lineIconBase} border-slate-300 text-slate-700 hover:bg-slate-100`;
+const lineRemoveButton = `${lineIconBase} border-red-200 text-red-600 hover:bg-red-50`;
 
 function SeatingIcon({ name }: { name: keyof typeof SEATING_ICON_PATHS }) {
   return (
@@ -220,8 +238,7 @@ export function OrderPanel({
   onIncreaseLineQuantity,
   onDecreaseLineQuantity,
   onRemoveLine,
-  onToggleFoc,
-  onChangeLinePrice,
+  onEditLine,
   menuPrice = () => undefined,
   promotions = [],
   promotionDiscounts = {},
@@ -268,15 +285,11 @@ export function OrderPanel({
   const { t } = useTranslation();
   const [confirmCancelOrder, setConfirmCancelOrder] = useState(false);
   const [tableControlsExpanded, setTableControlsExpanded] = useState(false);
-  const [expandedLine, setExpandedLine] = useState<{
+  const [editing, setEditing] = useState<{
     orderId: string | undefined;
     lineId: string;
+    promo?: string;
   } | null>(null);
-  const [priceDraft, setPriceDraft] = useState<{
-    lineId: string;
-    value: string;
-  } | null>(null);
-  const lineDetailsId = useId();
   const tableControlsId = useId();
   const groupedOrderLines = useMemo(
     () => groupOrderLines(selectedOrderLines, isFeeLine),
@@ -320,6 +333,11 @@ export function OrderPanel({
     const variant = variants.find((item) => item.id === line.variantId);
     return variantDisplayName(line) || variantDisplayName(variant ?? {});
   };
+
+  const editingLine =
+    editing && editing.orderId === selectedOrder?.id && !isSettledOrder
+      ? groupedOrderLines.find((line) => line.id === editing.lineId)
+      : undefined;
 
   return (
     <aside className="flex min-h-0 min-w-0 flex-col overflow-y-auto border-r border-slate-200 bg-white p-3 text-slate-900 min-[1100px]:p-4">
@@ -446,42 +464,16 @@ export function OrderPanel({
                   (saving ? t("cashier.orderPanel.promo") : "");
                 // A previewed saving is not on the bill yet, so take it off here.
                 const lineDue = lineTotal - previewSaving;
-                const isExpanded =
-                  expandedLine?.orderId === selectedOrder?.id &&
-                  expandedLine?.lineId === line.id;
-                const detailsId = `${lineDetailsId}-${line.id}`;
                 const isPendingKds = isPendingKdsLine(line);
                 const isFee = isFeeLine?.(line) ?? false;
                 const listPrice = menuPrice(line);
                 const priceChanged =
                   listPrice !== undefined &&
                   Math.abs(listPrice - Number(line.unitPrice || 0)) >= 0.0001;
-                const isEditingPrice = isExpanded && priceDraft?.lineId === line.id;
-                const savePrice = (price: number) => {
-                  onChangeLinePrice?.(line, price);
-                  setPriceDraft(null);
-                };
+                const isLocked = isLoading || isSettledOrder;
                 return (
-                  <div
-                    key={line.id}
-                    className={isExpanded ? "bg-slate-50" : "bg-white"}
-                  >
-                    <button
-                      type="button"
-                      className="flex min-h-11 w-full min-w-0 items-center gap-2 px-2 text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
-                      aria-expanded={isExpanded}
-                      aria-controls={detailsId}
-                      aria-label={t(
-                        isExpanded ? "cashier.orderPanel.collapseItem" : "cashier.orderPanel.expandItem",
-                        { name: lineName }
-                      )}
-                      onClick={() => setExpandedLine(
-                        isExpanded ? null : {
-                          orderId: selectedOrder?.id,
-                          lineId: line.id,
-                        }
-                      )}
-                    >
+                  <div key={line.id} role="group" aria-label={lineName} className="bg-white px-2 py-1.5">
+                    <div className="flex min-w-0 items-center gap-1.5">
                       {!isFee && isPendingKds ? (
                         <span
                           className="h-2.5 w-2.5 shrink-0 rounded-full border-2 border-emerald-500 bg-emerald-500"
@@ -489,13 +481,8 @@ export function OrderPanel({
                           title={t("cashier.orderPanel.kdsPending")}
                         />
                       ) : null}
-                      <span
-                        className="shrink-0 text-xs font-semibold tabular-nums text-slate-500"
-                        aria-label={t("cashier.orderPanel.lineQuantity", { count: quantityLabel })}
-                      >
-                        {quantityLabel}×
-                      </span>
                       <span className="flex min-w-0 flex-1 items-center gap-1.5 text-sm font-medium">
+                        <span className="min-w-0 truncate" title={lineName}>{lineName}</span>
                         {saving ? (
                           <span
                             className="shrink-0 rounded border border-emerald-600 px-1 text-[10px] font-semibold tracking-wide text-emerald-700"
@@ -519,192 +506,93 @@ export function OrderPanel({
                             {t("cashier.orderPanel.priceChanged")}
                           </span>
                         ) : null}
-                        <span className="min-w-0 truncate" title={lineName}>{lineName}</span>
                       </span>
-                      <span className="shrink-0 text-sm tabular-nums">
+                      <span className="shrink-0 text-sm font-semibold tabular-nums">
                         {formatPosMoney(lineDue)}
                       </span>
-                      <svg
-                        aria-hidden="true"
-                        viewBox="0 0 16 16"
-                        fill="none"
-                        className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform duration-150 motion-reduce:transition-none ${isExpanded ? "rotate-180" : ""}`}
-                      >
-                        <path d="m4 6 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                    {lineOptions ? (
-                      <p
-                        className="truncate px-2 pb-1 text-xs text-slate-500"
-                        title={lineOptions}
-                      >
-                        {lineOptions}
-                      </p>
-                    ) : null}
-                    {isExpanded ? (
-                      <div id={detailsId} className="border-t border-slate-200 px-2 pb-2 pt-1.5">
-                        <p className="break-words text-sm font-medium">{lineName}</p>
-                        {lineVariant && lineVariant !== lineName ? (
-                          <p className="mt-0.5 break-words text-xs text-slate-500">
-                            {lineVariant}
-                          </p>
-                        ) : null}
-                        <p className="mt-0.5 text-xs tabular-nums text-slate-600">
-                          {priceChanged ? (
-                            <span
-                              className="mr-1 text-slate-400 line-through"
-                              aria-label={t("cashier.orderPanel.menuPriceWas", {
-                                amount: formatPosMoney(listPrice),
-                              })}
-                            >
-                              {formatPosMoney(listPrice)}
-                            </span>
-                          ) : null}
-                          <span className={saving ? "text-slate-400 line-through" : ""}>
-                            {formatPosMoney(line.unitPrice)}
-                          </span>
-                          {saving && promoLabel ? ` · ${promoLabel}` : ""}
-                        </p>
-                        {saving ? (
-                          <p className="mt-0.5 text-xs font-medium text-emerald-700">
-                            {t("cashier.orderPanel.promoSaving", {
-                              name: promoLabel,
-                              amount: formatPosMoney(saving.amount),
-                            })}
-                          </p>
-                        ) : null}
-                        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-                          <button
-                            type="button"
-                            className="min-h-11 min-w-11 rounded border border-slate-300 px-2 font-semibold leading-none hover:bg-slate-100 focus-visible:outline-blue-500 disabled:opacity-50"
-                            aria-label={t("cashier.orderPanel.decreaseQuantity")}
-                            onClick={() => onDecreaseLineQuantity(line)}
-                            disabled={isLoading || isSettledOrder}
-                          >
-                            -
-                          </button>
-                          <span
-                            className="min-w-[2ch] text-center font-medium tabular-nums"
-                            aria-label={t("cashier.orderPanel.lineQuantity", {
-                              count: quantityLabel,
-                            })}
-                          >
-                            {quantityLabel}
-                          </span>
-                          <button
-                            type="button"
-                            className="min-h-11 min-w-11 rounded border border-slate-300 px-2 font-semibold leading-none hover:bg-slate-100 focus-visible:outline-blue-500 disabled:opacity-50"
-                            aria-label={t("cashier.orderPanel.increaseQuantity")}
-                            onClick={() => onIncreaseLineQuantity(line)}
-                            disabled={isLoading || isSettledOrder}
-                          >
-                            +
-                          </button>
-                          <button
-                            type="button"
-                            className="min-h-11 rounded border border-slate-300 px-2 py-1 font-medium hover:bg-slate-100 focus-visible:outline-blue-500 disabled:opacity-50"
-                            onClick={() => onToggleFoc?.(line)}
-                            disabled={isLoading || isSettledOrder || !onToggleFoc}
-                          >
-                            {isFocLine(line)
-                              ? t("cashier.orderPanel.undoFoc")
-                              : t("cashier.orderPanel.foc")}
-                          </button>
-                          <button
-                            type="button"
-                            className="min-h-11 rounded border border-slate-300 px-2 py-1 font-medium hover:bg-slate-100 focus-visible:outline-blue-500 disabled:opacity-50"
-                            aria-expanded={isEditingPrice}
-                            onClick={() =>
-                              setPriceDraft(
-                                isEditingPrice
-                                  ? null
-                                  : {
-                                      lineId: line.id,
-                                      value: String(Number(line.unitPrice || 0)),
-                                    }
-                              )
-                            }
-                            disabled={
-                              isLoading ||
-                              isSettledOrder ||
-                              !onChangeLinePrice ||
-                              isFee ||
-                              isFocLine(line)
-                            }
-                          >
-                            {t("cashier.orderPanel.changePrice")}
-                          </button>
-                          <button
-                            type="button"
-                            className="min-h-11 rounded border border-red-300 px-2 py-1 font-medium text-red-700 hover:bg-red-50 focus-visible:outline-blue-500 disabled:opacity-50"
-                            onClick={() => onRemoveLine(line)}
-                            disabled={isLoading || isSettledOrder}
-                          >
-                            {t("cashier.orderPanel.remove")}
-                          </button>
-                        </div>
-                        {isEditingPrice && priceDraft ? (
-                          <form
-                            className="mt-2 rounded border border-slate-200 bg-white p-2"
-                            onSubmit={(event) => {
-                              event.preventDefault();
-                              const price = Number(priceDraft.value);
-                              if (priceDraft.value.trim() === "" || !Number.isFinite(price) || price < 0) return;
-                              savePrice(price);
-                            }}
-                          >
-                            <label
-                              className="block text-xs font-medium text-slate-600"
-                              htmlFor={`${detailsId}-price`}
-                            >
-                              {t("cashier.orderPanel.newPrice")}
-                            </label>
-                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-                              <input
-                                id={`${detailsId}-price`}
-                                type="number"
-                                inputMode="decimal"
-                                min="0"
-                                step="any"
-                                autoFocus
-                                className="min-h-11 w-32 rounded border border-slate-300 px-2 text-sm tabular-nums focus-visible:outline-blue-500"
-                                value={priceDraft.value}
-                                onChange={(event) =>
-                                  setPriceDraft({ lineId: line.id, value: event.target.value })
-                                }
-                              />
-                              <button
-                                type="submit"
-                                className="min-h-11 rounded bg-blue-600 px-3 font-semibold text-white hover:bg-blue-700 focus-visible:outline-blue-500 disabled:opacity-50"
-                                disabled={isLoading}
-                              >
-                                {t("cashier.orderPanel.savePrice")}
-                              </button>
-                              {priceChanged ? (
-                                <button
-                                  type="button"
-                                  className="min-h-11 rounded border border-slate-300 px-2 font-medium hover:bg-slate-100 focus-visible:outline-blue-500 disabled:opacity-50"
-                                  disabled={isLoading}
-                                  onClick={() => savePrice(listPrice)}
-                                >
-                                  {t("cashier.orderPanel.useMenuPrice")}
-                                </button>
-                              ) : null}
-                              <button
-                                type="button"
-                                className="min-h-11 rounded px-2 font-medium text-slate-600 hover:bg-slate-100 focus-visible:outline-blue-500"
-                                onClick={() => setPriceDraft(null)}
-                              >
-                                {t("common.cancel")}
-                              </button>
-                            </div>
-                            <p className="mt-1 text-xs text-slate-500">
-                              {t("cashier.orderPanel.priceHint")}
-                            </p>
-                          </form>
-                        ) : null}
+                    </div>
+                    <p
+                      className="mt-0.5 truncate text-xs tabular-nums text-slate-500"
+                      title={[lineVariant !== lineName ? lineVariant : "", lineOptions].filter(Boolean).join(" · ")}
+                    >
+                      {"@ "}
+                      {formatPosMoney(line.unitPrice)}
+                      {priceChanged ? (
+                        <span
+                          className="ml-1 text-slate-400 line-through"
+                          aria-label={t("cashier.orderPanel.menuPriceWas", {
+                            amount: formatPosMoney(listPrice),
+                          })}
+                        >
+                          {formatPosMoney(listPrice)}
+                        </span>
+                      ) : null}
+                      {lineVariant && lineVariant !== lineName ? ` · ${lineVariant}` : ""}
+                      {lineOptions ? ` · ${lineOptions}` : ""}
+                    </p>
+                    <div className="mt-1 flex items-center justify-between gap-1">
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          className={lineIconButton}
+                          aria-label={t("cashier.orderPanel.decreaseQuantity")}
+                          onClick={() => onDecreaseLineQuantity(line)}
+                          disabled={isLocked}
+                        >
+                          <SeatingIcon name="minus" />
+                        </button>
+                        <span
+                          className="min-w-[2.5ch] text-center text-sm font-semibold tabular-nums"
+                          aria-label={t("cashier.orderPanel.lineQuantity", {
+                            count: quantityLabel,
+                          })}
+                        >
+                          {quantityLabel}
+                        </span>
+                        <button
+                          type="button"
+                          className={lineIconButton}
+                          aria-label={t("cashier.orderPanel.increaseQuantity")}
+                          onClick={() => onIncreaseLineQuantity(line)}
+                          disabled={isLocked}
+                        >
+                          <SeatingIcon name="plus" />
+                        </button>
                       </div>
-                    ) : null}
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          className={lineIconButton}
+                          aria-label={t("cashier.orderPanel.editItem", { name: lineName })}
+                          title={t("cashier.lineEdit.title")}
+                          onClick={() =>
+                            setEditing({
+                              orderId: selectedOrder?.id,
+                              lineId: line.id,
+                              promo: saving
+                                ? t("cashier.orderPanel.promoSaving", {
+                                    name: promoLabel,
+                                    amount: formatPosMoney(saving.amount),
+                                  })
+                                : undefined,
+                            })
+                          }
+                          disabled={isLocked || !onEditLine}
+                        >
+                          <SeatingIcon name="edit" />
+                        </button>
+                        <button
+                          type="button"
+                          className={lineRemoveButton}
+                          aria-label={t("cashier.orderPanel.removeItem", { name: lineName })}
+                          title={t("cashier.orderPanel.remove")}
+                          onClick={() => onRemoveLine(line)}
+                          disabled={isLocked}
+                        >
+                          <SeatingIcon name="remove" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 );
               })}
@@ -1114,6 +1002,30 @@ export function OrderPanel({
             </p>
           ) : null}
         </div>
+      ) : null}
+      {editingLine ? (
+        <LineEditDialog
+          key={editingLine.id}
+          name={resolveLineName(editingLine)}
+          variant={resolveLineVariant(editingLine)}
+          options={modifierPrintText(editingLine.selectedModifiers).names}
+          promo={editing?.promo}
+          quantity={Number(editingLine.quantity || 0)}
+          unitPrice={Number(editingLine.unitPrice || 0)}
+          menuPrice={menuPrice(editingLine)}
+          isFoc={isFocLine(editingLine)}
+          isFee={isFeeLine?.(editingLine) ?? false}
+          isBusy={isLoading}
+          onSave={(edit) => {
+            onEditLine?.(editingLine, edit);
+            setEditing(null);
+          }}
+          onRemove={() => {
+            onRemoveLine(editingLine);
+            setEditing(null);
+          }}
+          onClose={() => setEditing(null)}
+        />
       ) : null}
     </aside>
   );
