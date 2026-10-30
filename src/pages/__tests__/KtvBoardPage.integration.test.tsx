@@ -38,6 +38,7 @@ let venueState: {
 
 const mocks = vi.hoisted(() => ({
   fetchBoard: vi.fn(),
+  fetchOrderBill: vi.fn(),
   getQuote: vi.fn(),
   openSession: vi.fn(),
   extendSession: vi.fn(),
@@ -226,7 +227,11 @@ vi.mock("@/core/presentation/hooks/useSalesOrderManagement", () => ({
     updateOrderLine: mocks.noop,
     deleteOrderLine: mocks.noop,
     settleOrder: mocks.noop,
+    fetchOrderBill: mocks.fetchOrderBill,
   }),
+}));
+vi.mock("@/core/presentation/hooks/useExtraFees", () => ({
+  useExtraFees: () => ({ fees: [], isFeeLine: () => false }),
 }));
 vi.mock("@/core/presentation/hooks/useGuestWalletManagement", () => ({
   useGuestWalletManagement: () => ({ lookupCard: mocks.lookupCard, getWallet: mocks.getWallet }),

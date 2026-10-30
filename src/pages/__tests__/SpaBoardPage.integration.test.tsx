@@ -31,6 +31,8 @@ let venueState: {
 
 const mocks = vi.hoisted(() => ({
   fetchBoard: vi.fn(),
+  fetchOrderBill: vi.fn(),
+  addExtraFeeLine: vi.fn(),
   getQuote: vi.fn(),
   closeSession: vi.fn(),
   openSession: vi.fn(),
@@ -216,6 +218,7 @@ vi.mock("@/core/presentation/hooks/useKtvManagement", () => ({
 
 vi.mock("@/core/presentation/hooks/useCashier", () => ({
   useCashier: () => ({
+    addExtraFeeLine: mocks.addExtraFeeLine,
     products: [scrub, beer, roomRate, thaiPackageProduct, ktvRoomProduct],
     variantsByProductId: {
       "product-scrub": [scrubVariant],
@@ -242,6 +245,13 @@ vi.mock("@/core/presentation/hooks/useSalesOrderManagement", () => ({
     updateOrderLine: mocks.updateOrderLine,
     deleteOrderLine: mocks.deleteOrderLine,
     settleOrder: mocks.settleOrder,
+    fetchOrderBill: mocks.fetchOrderBill,
+  }),
+}));
+vi.mock("@/core/presentation/hooks/useExtraFees", () => ({
+  useExtraFees: () => ({
+    fees: [{ id: "fee-box", name: "Plastic container", amount: 500, variantId: "variant-fee", isActive: true, isOther: false }],
+    isFeeLine: () => false,
   }),
 }));
 
@@ -802,7 +812,18 @@ describe("SpaBoardPage", () => {
       amountDue: "53000.0000",
     });
 
+    // The server's bill: before close only the lines; at close the room's time too.
+    let roomClosed = false;
+    const serverBill = (grandTotal: string) => ({
+      orderId: "order-1", subtotal: grandTotal, totalDiscount: "0.0000", addedTax: "0.0000",
+      totalTax: "0.0000", serviceCharge: "0.0000", serviceChargeTax: "0.0000", grandTotal,
+    });
+
     beforeEach(() => {
+      roomClosed = false;
+      mocks.fetchOrderBill.mockImplementation(async () =>
+        serverBill(roomClosed ? "53000.0000" : "0.0000")
+      );
       venueState = { paymentTiming: "PAY_AT_END" };
       quote = atEndQuote();
       mocks.chargeItems.mockResolvedValue({ charged: "0.0000", balanceAfter: "0", quote });
@@ -866,14 +887,16 @@ describe("SpaBoardPage", () => {
 
     it("closes the room, then takes cash for the whole bill ", async () => {
       venueState = { paymentTiming: "PAY_AT_END" };
-      mocks.closeSession.mockResolvedValue({ ...atEndQuote(), state: "CLOSED" });
+      mocks.closeSession.mockImplementation(async () => {
+        roomClosed = true;
+        return { ...atEndQuote(), state: "CLOSED" };
+      });
       await openRunningRoom();
       fireEvent.click(screen.getByRole("button", { name: "spa.goToPay" }));
 
-      expect(await screen.findByText("spa.payOtherTitle")).toBeInTheDocument();
+      fireEvent.click(await screen.findByRole("button", { name: "CASH" }));
       expect(screen.queryByPlaceholderText("spa.cardUid")).not.toBeInTheDocument();
-      fireEvent.click(screen.getByRole("button", { name: "Cash" }));
-      fireEvent.click(screen.getByRole("button", { name: "spa.payWith" }));
+      fireEvent.click(screen.getByRole("button", { name: "spa.confirmPay" }));
 
       await waitFor(() =>
         expect(mocks.settleOrder).toHaveBeenCalledWith(
@@ -884,8 +907,62 @@ describe("SpaBoardPage", () => {
           })
         )
       );
+      expect(mocks.settleOrder.mock.calls[0][1]).not.toHaveProperty("includeTax");
       expect(mocks.closeSession.mock.invocationCallOrder[0]).toBeLessThan(
         mocks.settleOrder.mock.invocationCallOrder[0]
+      );
+    });
+
+    it("adds an extra fee to the room's bill", async () => {
+      await openRunningRoom();
+      fireEvent.click(screen.getByRole("button", { name: "+ cashier.extraFee.button" }));
+      fireEvent.click(await screen.findByRole("button", { name: /Plastic container/ }));
+      fireEvent.click(screen.getByRole("button", { name: "cashier.extraFee.add" }));
+
+      await waitFor(() =>
+        expect(mocks.addExtraFeeLine).toHaveBeenCalledWith(
+          { orderId: "order-1" },
+          expect.objectContaining({ variantId: "variant-fee", unitPrice: 500, quantity: 1 })
+        )
+      );
+    });
+
+    it("splits the bill between cash and the guest card, without tax", async () => {
+      mocks.closeSession.mockImplementation(async () => {
+        roomClosed = true;
+        return { ...atEndQuote(), state: "CLOSED" };
+      });
+      await openRunningRoom();
+      fireEvent.click(screen.getByRole("button", { name: "spa.goToPay" }));
+
+      fireEvent.click(await screen.findByRole("button", { name: "cashier.payment.options" }));
+      fireEvent.click(screen.getByRole("checkbox", { name: "cashier.payment.includeTax" }));
+      await waitFor(() =>
+        expect(mocks.fetchOrderBill).toHaveBeenCalledWith("order-1", expect.objectContaining({ includeTax: false }))
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "cashier.payment.split" }));
+      fireEvent.click(screen.getByRole("button", { name: "CASH" }));
+      fireEvent.change(screen.getByLabelText("cashier.payment.splitAmount"), { target: { value: "20000" } });
+      fireEvent.click(screen.getByRole("button", { name: "cashier.payment.addTender" }));
+
+      fireEvent.click(screen.getByRole("button", { name: "cashier.payment.memberCard" }));
+      await tapCard();
+      fireEvent.click(await screen.findByRole("button", { name: "cashier.payment.addTender" }));
+      fireEvent.click(screen.getByRole("button", { name: "spa.confirmPay" }));
+
+      await waitFor(() =>
+        expect(mocks.settleOrder).toHaveBeenCalledWith(
+          "order-1",
+          expect.objectContaining({
+            payments: [
+              { paymentMethodId: "cash-method", amount: "20000.0000" },
+              { paymentMethodId: "card-method", guestCardId: "card-1" },
+            ],
+            includeTax: false,
+            includeServiceCharge: true,
+          })
+        )
       );
     });
   });
