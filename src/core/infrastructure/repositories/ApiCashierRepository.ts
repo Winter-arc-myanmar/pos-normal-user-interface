@@ -127,6 +127,7 @@ const normalizeUpsertLinePayload = (
       : {}),
     ...(payload.seatNumber !== undefined ? { seatNumber: payload.seatNumber } : {}),
     ...(payload.name ? { name: payload.name } : {}),
+    ...(payload.hostessId !== undefined ? { hostessId: payload.hostessId } : {}),
   };
 };
 
@@ -160,6 +161,7 @@ const normalizeSalesOrderLinePayload = (
       : {}),
     ...(payload.seatNumber !== undefined ? { seatNumber: payload.seatNumber } : {}),
     ...(payload.name ? { name: payload.name } : {}),
+    ...(payload.hostessId !== undefined ? { hostessId: payload.hostessId } : {}),
   };
 };
 
@@ -195,6 +197,7 @@ const normalizeSalesOrderPartialLinePayload = (
       priceDelta: toDecimalString(toNumber(modifier.priceDelta) ?? 0),
     }));
   }
+  if (payload.hostessId !== undefined) normalized.hostessId = payload.hostessId;
 
   return normalized;
 };
@@ -1505,6 +1508,7 @@ export class ApiCashierRepository implements ICashierRepository {
         categoryId: readLineCategoryId(item),
         categoryName: asName(item.categoryName) || asName(asRecord(item.product)?.categoryName),
         menuPrice: readLineMenuPrice(item),
+        hostessId: item.hostessId ? String(item.hostessId) : undefined,
         ...names,
       });
     });

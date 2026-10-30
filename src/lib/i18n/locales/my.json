@@ -1191,7 +1191,9 @@
       "priceNote": {
         "discount": "{{name}} (လျှော့ဈေး)",
         "changed": "{{name}} (ဈေးပြင်ထား)"
-      }
+      },
+      "orderedBy": "{{name}} မှာထားသည်",
+      "aHostess": "Hostess"
     },
     "lineEdit": {
       "title": "ပစ္စည်း ပြင်ရန်",
@@ -1204,7 +1206,9 @@
       "priceRequired": "ဈေးနှုန်း 0 သို့မဟုတ် အထက် ထည့်ပါ။",
       "howMany": "အရေအတွက်",
       "ofTotal": "{{count}} ခုအနက်",
-      "restStay": "{{count}} × {{price}} မူလအတိုင်း ကျန်မည်"
+      "restStay": "{{count}} × {{price}} မူလအတိုင်း ကျန်မည်",
+      "orderedBy": "မှာသူ",
+      "customer": "ဧည့်သည်"
     },
     "billOptions": {
       "title": "ဘောက်ချာ ရွေးချယ်စရာ",

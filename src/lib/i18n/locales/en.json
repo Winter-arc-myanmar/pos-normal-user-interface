@@ -1191,7 +1191,9 @@
       "priceNote": {
         "discount": "{{name}} (Discount)",
         "changed": "{{name}} (Price changed)"
-      }
+      },
+      "orderedBy": "Ordered by {{name}}",
+      "aHostess": "a hostess"
     },
     "lineEdit": {
       "title": "Edit item",
@@ -1204,7 +1206,9 @@
       "priceRequired": "Enter a price of 0 or more.",
       "howMany": "How many",
       "ofTotal": "of {{count}}",
-      "restStay": "{{count}} × {{price}} stay as they are"
+      "restStay": "{{count}} × {{price}} stay as they are",
+      "orderedBy": "Ordered by",
+      "customer": "Customer"
     },
     "billOptions": {
       "title": "Bill options",

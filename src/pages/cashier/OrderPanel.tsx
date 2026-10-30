@@ -63,6 +63,8 @@ export function groupOrderLines(
       isFee(line) ? line.productName ?? "" : "",
       Number(line.unitPrice || 0).toFixed(4),
       line.selectedModifiers ?? null,
+      // Each hostess's items stay hers.
+      line.hostessId ?? "",
       // A free item remains separate from the paid quantity of the same item.
       line.compReasonId ? "FOC" : "",
       line.status === "VOIDED" || line.status === "COMPED" ? line.status : "",
@@ -126,6 +128,10 @@ interface OrderPanelProps {
   onEditLine?: (line: GroupedSalesOrderLine, edit: LineEdit) => void;
   /** What the menu charges for a line, to show when the bill charges something else. */
   menuPrice?: (line: SalesOrderLine) => number | undefined;
+  /** Hostesses working now, who may have ordered an item. */
+  orderers?: { id: string; name: string }[];
+  /** The hostess a line names, and whether she gave it (a service) or ordered it. */
+  lineHostess?: (line: SalesOrderLine) => { name: string; gave: boolean } | undefined;
   /** Promotions running at this till, as the server tells them. */
   promotions?: RunningPromotion[];
   /** What the running promotions take off the lines they have not priced yet. */
@@ -269,6 +275,8 @@ export function OrderPanel({
   onEditLine,
   chargeOptions,
   menuPrice = () => undefined,
+  orderers = [],
+  lineHostess = () => undefined,
   promotions = [],
   promotionDiscounts = {},
   promotionName = () => undefined,
@@ -647,6 +655,7 @@ export function OrderPanel({
                 const listPrice = menuPrice(line);
                 const priceNote = isFee ? undefined : linePriceNote(line.unitPrice, listPrice);
                 const priceChanged = priceNote !== undefined;
+                const hostess = lineHostess(line);
                 const shownName = priceNote
                   ? t(`cashier.orderPanel.priceNote.${priceNote}`, { name: lineName })
                   : lineName;
@@ -704,7 +713,13 @@ export function OrderPanel({
                       ) : null}
                       {lineVariant && lineVariant !== lineName ? ` · ${lineVariant}` : ""}
                       {lineOptions ? ` · ${lineOptions}` : ""}
+                      {hostess?.gave ? ` · ${hostess.name}` : ""}
                     </p>
+                    {hostess && !hostess.gave ? (
+                      <p className="truncate text-xs font-medium text-pink-700">
+                        {t("cashier.orderPanel.orderedBy", { name: hostess.name })}
+                      </p>
+                    ) : null}
                     <div className="mt-1 flex items-center justify-between gap-1">
                       <div className="flex items-center gap-1">
                         <button
@@ -1089,6 +1104,10 @@ export function OrderPanel({
           menuPrice={menuPrice(editingLine)}
           isFoc={isFocLine(editingLine)}
           isFee={isFeeLine?.(editingLine) ?? false}
+          orderers={
+            isFeeLine?.(editingLine) || lineHostess(editingLine)?.gave ? undefined : orderers
+          }
+          orderedBy={editingLine.hostessId}
           isBusy={isLoading}
           onSave={(edit) => {
             onEditLine?.(editingLine, edit);

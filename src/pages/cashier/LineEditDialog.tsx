@@ -8,6 +8,8 @@ export interface LineEdit {
   quantity: number;
   unitPrice: number;
   foc: boolean;
+  /** Who ordered it: a hostess's id, or null for the customer. Left out when not asked. */
+  orderedBy?: string | null;
 }
 
 interface LineEditDialogProps {
@@ -21,6 +23,9 @@ interface LineEditDialogProps {
   isFoc: boolean;
   /** An extra fee keeps the amount it was added with. */
   isFee?: boolean;
+  /** Hostesses who may have ordered it; none hides the choice. */
+  orderers?: { id: string; name: string }[];
+  orderedBy?: string;
   isBusy?: boolean;
   onSave: (edit: LineEdit) => void;
   onRemove: () => void;
@@ -41,6 +46,8 @@ export function LineEditDialog({
   menuPrice,
   isFoc,
   isFee = false,
+  orderers,
+  orderedBy,
   isBusy = false,
   onSave,
   onRemove,
@@ -49,6 +56,7 @@ export function LineEditDialog({
   const { t } = useTranslation();
   const [price, setPrice] = useState(String(unitPrice));
   const [foc, setFoc] = useState(isFoc);
+  const [orderer, setOrderer] = useState<string | null>(orderedBy ?? null);
   // Part of an item can be priced on its own only in whole units.
   const canSplit = quantity > 1 && Number.isInteger(quantity);
   const [count, setCount] = useState(quantity);
@@ -65,7 +73,12 @@ export function LineEditDialog({
       setError(t("cashier.lineEdit.priceRequired"));
       return;
     }
-    onSave({ quantity: count, unitPrice: value, foc });
+    onSave({
+      quantity: count,
+      unitPrice: value,
+      foc,
+      ...(orderers?.length ? { orderedBy: orderer } : {}),
+    });
   };
 
   return (
@@ -177,6 +190,29 @@ export function LineEditDialog({
             className="relative h-6 w-11 shrink-0 rounded-full bg-slate-700 transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-transform peer-checked:bg-blue-600 peer-checked:after:translate-x-5 peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 motion-reduce:after:transition-none"
           />
         </label>
+
+        {orderers?.length ? (
+          <div className="space-y-2">
+            <p className="text-sm text-slate-300">{t("cashier.lineEdit.orderedBy")}</p>
+            <div className="flex flex-wrap gap-2">
+              {[{ id: null, name: t("cashier.lineEdit.customer") }, ...orderers].map((option) => (
+                <button
+                  key={option.id ?? "customer"}
+                  type="button"
+                  aria-pressed={orderer === option.id}
+                  onClick={() => setOrderer(option.id)}
+                  className={`min-h-11 rounded-md border px-3 text-sm ${
+                    orderer === option.id
+                      ? "border-pink-400 bg-pink-500/20 text-pink-100"
+                      : "border-slate-700 text-slate-300"
+                  }`}
+                >
+                  {option.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <div className="space-y-1 border-t border-slate-800 pt-3 text-sm">
           <div className="flex items-baseline justify-between">
