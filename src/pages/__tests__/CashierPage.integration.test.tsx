@@ -557,6 +557,34 @@ describe("CashierPage integration", () => {
     });
   });
 
+  it("saves a new price and FOC for a table line in one update", async () => {
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=menu"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.editItem" }));
+    fireEvent.change(screen.getByLabelText("cashier.lineEdit.price"), {
+      target: { value: "8" },
+    });
+    fireEvent.click(screen.getByRole("switch", { name: "cashier.lineEdit.foc" }));
+    fireEvent.click(screen.getByRole("button", { name: "cashier.lineEdit.save" }));
+
+    await waitFor(() =>
+      expect(mocks.updateOrderLine).toHaveBeenCalledExactlyOnceWith(
+        "order-1",
+        "line-1",
+        expect.objectContaining({
+          variantId: "variant-1",
+          quantity: "1.0000",
+          unitPrice: "8.0000",
+          lineDiscount: "8.0000",
+        })
+      )
+    );
+  });
+
   it("adds a new pending line after Send KDS so the kitchen receives it", async () => {
     selectedOrderLinesState = [{ ...orderLine, status: "FIRED" }];
     mocks.addProductToTableSession.mockResolvedValue({
@@ -620,9 +648,6 @@ describe("CashierPage integration", () => {
       </MemoryRouter>
     );
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "cashier.orderPanel.expandItem" })
-    );
     fireEvent.click(
       screen.getByRole("button", { name: "cashier.orderPanel.increaseQuantity" })
     );
@@ -1005,10 +1030,7 @@ describe("CashierPage integration", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: "cashier.orderPanel.expandItem" })
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "cashier.orderPanel.remove" })
+      screen.getByRole("button", { name: "cashier.orderPanel.removeItem" })
     );
 
     await waitFor(() =>
@@ -1046,10 +1068,7 @@ describe("CashierPage integration", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: "cashier.orderPanel.expandItem" })
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "cashier.orderPanel.remove" })
+      screen.getByRole("button", { name: "cashier.orderPanel.removeItem" })
     );
 
     await waitFor(() =>
@@ -1109,10 +1128,7 @@ describe("CashierPage integration", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: "cashier.orderPanel.expandItem" })
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "cashier.orderPanel.remove" })
+      screen.getByRole("button", { name: "cashier.orderPanel.removeItem" })
     );
 
     await waitFor(() =>
