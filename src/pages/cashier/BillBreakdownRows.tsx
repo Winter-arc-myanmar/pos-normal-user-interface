@@ -5,7 +5,7 @@ import { formatPosMoney } from "@/lib/pos/orderListDisplay";
 const shown = (amount: number) => Math.abs(amount) >= 0.005;
 
 /** The lines between a bill's subtotal and its total; rows that come to nothing are left out. */
-export function BillBreakdownRows({ breakdown }: { breakdown: BillBreakdown }) {
+export function BillBreakdownRows({ breakdown, dark = false }: { breakdown: BillBreakdown; dark?: boolean }) {
   const { t } = useTranslation();
   const rows: { label: string; amount: number; tone?: "saving" | "note" }[] = [
     { label: t("cashier.breakdown.subtotal"), amount: breakdown.subtotal },
@@ -31,7 +31,11 @@ export function BillBreakdownRows({ breakdown }: { breakdown: BillBreakdown }) {
             key={row.label}
             className={[
               "flex items-center justify-between gap-2",
-              row.tone === "saving" ? "text-emerald-700" : row.tone === "note" ? "text-xs text-slate-400" : "text-slate-600",
+              row.tone === "saving"
+                ? dark ? "text-emerald-400" : "text-emerald-700"
+                : row.tone === "note"
+                  ? dark ? "text-xs text-slate-500" : "text-xs text-slate-400"
+                  : dark ? "text-slate-300" : "text-slate-600",
             ].join(" ")}
           >
             <dt>{row.label}</dt>

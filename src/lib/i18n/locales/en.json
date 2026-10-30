@@ -1623,7 +1623,8 @@
       "extend": "Unable to extend this treatment.",
       "foc": "Could not give the items free",
       "packages": "Couldn't load the service packages: {{message}}",
-      "tipMethod": "Choose how the tip is paid"
+      "tipMethod": "Choose how the tip is paid",
+      "oneCardPerBill": "Only one member card can pay a bill. Split the rest with other methods."
     },
     "item": "Item",
     "treatmentSoFar": "Treatment so far",

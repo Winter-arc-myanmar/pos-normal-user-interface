@@ -16,6 +16,8 @@ import {
   pendingTotal,
 } from "@/lib/spa/pending";
 import type { PromotionDiscount, RunningPromotion } from "@/core/domain/entities/Promotion";
+import type { BillBreakdown } from "@/lib/pos/billBreakdown";
+import { BillBreakdownRows } from "../cashier/BillBreakdownRows";
 
 const money = (value: string | number | undefined) =>
   Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -51,6 +53,9 @@ export function SpaBillPanel({
   pendingDiscounts = {},
   promotionName = () => undefined,
   packageVariantIds,
+  breakdown,
+  extraFeeLabel,
+  onAddExtraFee,
 }: {
   kind?: RoomKind;
   room: SpaRoom | null;
@@ -84,6 +89,10 @@ export function SpaBillPanel({
   promotionName?: (id: string | undefined) => string | undefined;
   /** SPA package lines: booked treatments, shown by name and never edited. */
   packageVariantIds?: Set<string>;
+  /** A bill paid at the end: how its total is made up, as on the cashier. */
+  breakdown?: BillBreakdown;
+  extraFeeLabel?: string;
+  onAddExtraFee?: () => void;
 }) {
   const tr = useRoomText(kind);
   const warning = getKtvWarning(session.endsAt, nowMs);
@@ -323,6 +332,17 @@ export function SpaBillPanel({
         )}
       </section>
 
+      {onAddExtraFee ? (
+        <button
+          type="button"
+          className="inline-flex min-h-10 shrink-0 items-center gap-1 self-start rounded border border-dashed border-slate-600 px-3 text-sm font-medium text-slate-300 hover:border-blue-400 hover:text-blue-300 disabled:opacity-50"
+          disabled={isBusy}
+          onClick={onAddExtraFee}
+        >
+          + {extraFeeLabel}
+        </button>
+      ) : null}
+
       {pending.length ? (
         <section className="flex shrink-0 flex-col gap-1 rounded border border-slate-700 bg-slate-900/70 p-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
@@ -428,6 +448,15 @@ export function SpaBillPanel({
         </section>
       ) : null}
 
+      {breakdown ? (
+        <section className="shrink-0 space-y-1 text-sm">
+          <BillBreakdownRows breakdown={breakdown} dark />
+          <p className="flex justify-between border-t border-slate-800 pt-1.5 text-base font-bold">
+            <span>{tr("estimatedTotal")}</span>
+            <span>{money(breakdown.total)}</span>
+          </p>
+        </section>
+      ) : (
       <section className="shrink-0 space-y-0.5 text-sm">
         <p className="flex justify-between text-slate-300">
           <span>{billClosed ? tr("treatmentCharge") : tr("treatmentSoFar")}</span>
@@ -465,6 +494,7 @@ export function SpaBillPanel({
           </>
         ) : null}
       </section>
+      )}
 
       {!billClosed ? (
         <div className={`grid shrink-0 gap-2 ${canExtend ? "grid-cols-3" : "grid-cols-2"}`}>

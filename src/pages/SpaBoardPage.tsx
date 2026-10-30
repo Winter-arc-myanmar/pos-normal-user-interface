@@ -9,6 +9,12 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/lib/toast";
 import { SettleSalesOrderResultDTO } from "@/core/application/dtos/SalesOrderDTO";
+import type { SplitPaymentTenderDTO } from "@/core/application/dtos/CashierDTO";
+import type { ChosenFee } from "@/core/domain/entities/ExtraFee";
+import { useBillOptions } from "@/core/presentation/hooks/useBillOptions";
+import { useExtraFees } from "@/core/presentation/hooks/useExtraFees";
+import { billBreakdown } from "@/lib/pos/billBreakdown";
+import { remainingReceivable } from "@/lib/pos/splitPayments";
 import {
   findMemberCardPaymentMethod,
   LOCAL_MEMBER_CARD_METHOD_ID,
@@ -64,6 +70,8 @@ import {
   sessionMinutes,
 } from "@/lib/spa/session";
 import { ProductMenu } from "./cashier/ProductMenu";
+import { ExtraFeeDialog } from "./cashier/ExtraFeeDialog";
+import { PaymentView } from "./cashier/PaymentView";
 import { CardTapDialog } from "./spa/CardTapDialog";
 import { SpaBillPanel } from "./spa/SpaBillPanel";
 import { PackagePicker } from "./spa/PackagePicker";
@@ -146,6 +154,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     fetchProductVariants,
     fetchPaymentMethods,
     listKdsTickets,
+    addExtraFeeLine,
   } = useCashier();
   const {
     orderLines,
@@ -154,6 +163,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     updateOrderLine,
     deleteOrderLine,
     settleOrder,
+    fetchOrderBill,
   } = useSalesOrderManagement();
   const { lookupCard, getWallet } = useGuestWalletManagement();
   const { user } = useAuth();
@@ -185,6 +195,13 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const [tip, setTip] = useState("");
   const [splitCash, setSplitCash] = useState(false);
   const [cashAmount, setCashAmount] = useState("");
+  const { fees: extraFees } = useExtraFees();
+  const [extraFeeOpen, setExtraFeeOpen] = useState(false);
+  const [isAddingFee, setIsAddingFee] = useState(false);
+  const [payMethodId, setPayMethodId] = useState("");
+  const [payAmount, setPayAmount] = useState("");
+  const [isSplitMode, setIsSplitMode] = useState(false);
+  const [splitTenders, setSplitTenders] = useState<SplitPaymentTenderDTO[]>([]);
   const [paid, setPaid] = useState<SettleSalesOrderResultDTO | null>(null);
   const [isPaying, setIsPaying] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
@@ -253,6 +270,64 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     tip: tipValue,
     cash: cashValue,
   });
+  // A bill paid at the end is paid like a cashier bill: the server prices it,
+  // with or without tax and service charge, and it may be split across methods.
+  const endBillOrderId = atEnd && !quote?.prepaid ? session?.salesOrderId : undefined;
+  const chargedLines = orderLines.filter(
+    (line) => !["VOIDED", "COMPED"].includes(String(line.status || "").toUpperCase())
+  );
+  const billOptions = useBillOptions({
+    billKey: endBillOrderId || "none",
+    orderId: endBillOrderId,
+    discount: "0.0000",
+    revision: JSON.stringify([
+      chargedLines.map((line) => [line.id, line.quantity, line.unitPrice, line.lineDiscount]),
+      billClosed,
+    ]),
+    fetchBill: fetchOrderBill,
+  });
+  const serverBill = billOptions.bill ?? billOptions.quote;
+  // Clock time not yet written to a line; the room's close writes it.
+  const timeNotOnLines = billClosed
+    ? 0
+    : Math.max(
+        0,
+        Number(quote?.runningTotal || 0) -
+          chargedLines.reduce(
+            (sum, line) =>
+              sum + Number(line.quantity || 0) * Number(line.unitPrice || 0) - Number(line.lineDiscount || 0),
+            0
+          )
+      );
+  const endBillDue = serverBill
+    ? Number(serverBill.grandTotal) + timeNotOnLines
+    : Number(quote?.amountDue || quote?.runningTotal || 0);
+  const endBillTotal = endBillDue + tipValue;
+  const endBreakdown = endBillOrderId
+    ? billBreakdown({
+        lines: chargedLines,
+        menuPrice: () => undefined,
+        itemsTotal: serverBill ? Number(serverBill.subtotal) + timeNotOnLines : endBillDue,
+        billDiscount: 0,
+        serviceCharge: serverBill ? Number(serverBill.serviceCharge) : 0,
+        tax: serverBill ? Number(serverBill.addedTax) + Number(serverBill.serviceChargeTax) : 0,
+        includedTax: serverBill
+          ? Number(serverBill.totalTax) - Number(serverBill.addedTax) - Number(serverBill.serviceChargeTax)
+          : 0,
+        tip: tipValue,
+        total: endBillTotal,
+      })
+    : undefined;
+  const endPayMethods = [
+    ...(cardMethod && cardMethod.id !== LOCAL_MEMBER_CARD_METHOD_ID ? [cardMethod] : []),
+    ...otherMethods,
+  ];
+  const endPayMethodId =
+    endPayMethods.find((method) => method.id === payMethodId)?.id ||
+    (card && cardMethod ? cardMethod.id : endPayMethods.find((method) => method.id !== cardMethod?.id)?.id) ||
+    "";
+  const isCardMethod = (methodId: string) => Boolean(cardMethod && methodId === cardMethod.id);
+
   const itemNames = useMemo(() => {
     const names: Record<string, string> = {};
     for (const product of products) {
@@ -958,7 +1033,10 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     if (action === "add") void commitPending(payer, payerCard);
     else if (action === "open") void openTreatment(payer, payerCard);
     else if (action === "extend") void extendTreatment(payer, payerCard);
-    else setStep("pay");
+    else {
+      if (cardMethod) setPayMethodId(cardMethod.id);
+      setStep("pay");
+    }
   };
 
   /** Pays the prompt's order another way than the card: cash, a transfer, and so on. */
@@ -1390,13 +1468,187 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     }
   };
 
+  const confirmRoomFee = async (fee: ChosenFee) => {
+    if (!session?.salesOrderId) return;
+    setActionError(null);
+    setIsAddingFee(true);
+    try {
+      await addExtraFeeLine({ orderId: session.salesOrderId }, fee);
+      await refreshBill(session);
+      setExtraFeeOpen(false);
+      setNotice(t("cashier.extraFee.added"));
+    } catch (caught) {
+      setActionError(caught instanceof Error ? caught.message : t("cashier.errors.addProduct"));
+    } finally {
+      setIsAddingFee(false);
+    }
+  };
+
+  const resetSplit = () => {
+    setIsSplitMode(false);
+    setSplitTenders([]);
+  };
+
+  const chooseEndPayMethod = (methodId: string) => {
+    setPayMethodId(methodId);
+    if (isCardMethod(methodId) && !card) requestCard("pay");
+  };
+
+  const chooseEndBillOption = (field: "includeTax" | "includeServiceCharge", value: boolean) => {
+    billOptions.choose(field, value);
+    resetSplit();
+    setActionError(null);
+  };
+
+  const openEndSplit = () => {
+    if (isSplitMode) return;
+    setIsSplitMode(true);
+    setSplitTenders([]);
+    setPayAmount(endBillTotal.toFixed(4));
+  };
+
+  const addEndTender = () => {
+    setActionError(null);
+    if (!endPayMethodId) {
+      setActionError(t("cashier.errors.paymentMethodRequired"));
+      return;
+    }
+    if (isCardMethod(endPayMethodId)) {
+      if (!card || !wallet) {
+        requestCard("pay");
+        return;
+      }
+      if (splitTenders.some((tender) => isCardMethod(tender.paymentMethodId))) {
+        setActionError(tr("errors.oneCardPerBill"));
+        return;
+      }
+    }
+    const amount = Number(payAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setActionError(t("cashier.errors.splitAmount"));
+      return;
+    }
+    const tenderAmount = Math.min(amount, remainingReceivable(endBillTotal, splitTenders));
+    if (tenderAmount <= 0) {
+      setActionError(t("cashier.errors.splitComplete"));
+      return;
+    }
+    const next = [
+      ...splitTenders,
+      {
+        id: `split-${Date.now()}-${splitTenders.length}`,
+        paymentMethodId: endPayMethodId,
+        amount: tenderAmount.toFixed(4),
+      },
+    ];
+    setSplitTenders(next);
+    setPayAmount(remainingReceivable(endBillTotal, next).toFixed(4));
+  };
+
+  const removeEndTender = (tenderId: string) => {
+    const next = splitTenders.filter((tender) => tender.id !== tenderId);
+    setSplitTenders(next);
+    setPayAmount(remainingReceivable(endBillTotal, next).toFixed(4));
+  };
+
+  /**
+   * Pays a bill paid at the end, as the cashier pays one: one method or a split.
+   * The room is closed first, which writes its time; if that changes the total,
+   * the new one is shown and the cashier confirms again.
+   */
+  const handleEndBillPay = async () => {
+    if (!session?.salesOrderId) return;
+    const tenders = isSplitMode
+      ? splitTenders
+      : endPayMethodId
+        ? [{ id: "single", paymentMethodId: endPayMethodId, amount: endBillTotal.toFixed(4) }]
+        : [];
+    if (!tenders.length) {
+      setActionError(t("cashier.errors.paymentMethodRequired"));
+      return;
+    }
+    if (isSplitMode && remainingReceivable(endBillTotal, splitTenders) > 0.009) {
+      setActionError(t("cashier.payment.splitTenderCount", { count: splitTenders.length }));
+      return;
+    }
+    const usesCard = tenders.some((tender) => isCardMethod(tender.paymentMethodId));
+    if (usesCard && (!card || !wallet)) {
+      requestCard("pay");
+      return;
+    }
+    setActionError(null);
+    setIsPaying(true);
+    try {
+      const context = await requireCashierContext();
+      let endAt = session.closedAt || session.endsAt || "";
+      if (!billClosed) {
+        const closed = await closeSession(session.id, {});
+        endAt = closed.asOf || new Date().toISOString();
+        setSession({ ...session, sessionState: "CLOSED" });
+      }
+      const finalBill = await fetchOrderBill(session.salesOrderId, billOptions.query);
+      if (billOptions.changed) billOptions.acceptBill(finalBill);
+      const finalTotal = Number(finalBill.grandTotal) + tipValue;
+      if (Math.abs(finalTotal - endBillTotal) > 0.009) {
+        resetSplit();
+        await refreshBill({ ...session, sessionState: "CLOSED" });
+        setActionError(t("cashier.errors.billUpdated", { amount: money(finalTotal) }));
+        return;
+      }
+      const names = tenders
+        .map((tender) => endPayMethods.find((method) => method.id === tender.paymentMethodId)?.name)
+        .filter(Boolean)
+        .join(" + ");
+      const result =
+        Number(finalBill.grandTotal) > 0
+          ? await settleOrder(session.salesOrderId, {
+              // The card pays what the others leave, after its member discount.
+              payments: withOrderTipOnFirstPayment(
+                tenders.map((tender) =>
+                  isCardMethod(tender.paymentMethodId)
+                    ? { paymentMethodId: tender.paymentMethodId, guestCardId: card!.id }
+                    : { paymentMethodId: tender.paymentMethodId, amount: tender.amount }
+                ),
+                tipValue
+              ),
+              posSessionId: context.posSessionId,
+              ...(tipValue > 0 ? { tipAmount: tipValue.toFixed(4) } : {}),
+              ...(billOptions.changed
+                ? {
+                    includeTax: billOptions.includeTax,
+                    includeServiceCharge: billOptions.includeServiceCharge,
+                  }
+                : {}),
+              idempotencyKey: spaSettleKey(session.id),
+            })
+          : {
+              orderId: session.salesOrderId,
+              orderNumber: "",
+              grandTotal: "0.0000",
+              totalPaid: "0.0000",
+              change: "0.0000",
+              status: "COMPLETED",
+            };
+      await printPaid(result, endAt, names || "Payment");
+      setPaid(result);
+      resetSplit();
+      writeResume(kind, null);
+      if (usesCard && wallet) setWallet(await getWallet(wallet.id));
+      await fetchBoard();
+    } catch (caught) {
+      setActionError(caught instanceof Error ? caught.message : tr("errors.pay"));
+    } finally {
+      setIsPaying(false);
+    }
+  };
+
   const goToPay = () => {
     if (pending.length) {
       setActionError(tr("errors.pendingItems"));
       return;
     }
-    // When other methods are allowed, the cashier chooses on the pay screen first.
-    if (atEnd && otherMethods.length > 0) setStep("pay");
+    // A bill paid at the end opens the pay screen; the card is tapped there if chosen.
+    if (atEnd && !quote?.prepaid) setStep("pay");
     else requestCard("pay");
   };
 
@@ -1824,6 +2076,9 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             pendingDiscounts={promotions.discounts}
             promotionName={promotions.promotionName}
             packageVariantIds={packageVariantIds}
+            breakdown={endBreakdown}
+            extraFeeLabel={t("cashier.extraFee.button")}
+            onAddExtraFee={endBillOrderId && !paid ? () => setExtraFeeOpen(true) : undefined}
           />
 
           {step === "menu" && !menuAllowed && isSpa ? (
@@ -1893,6 +2148,73 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               <Button className="mt-4" onClick={backToBoard}>
                 {tr("nextGuest")}
               </Button>
+            </div>
+          ) : endBillOrderId ? (
+            <div className="flex min-h-[32rem] flex-col overflow-hidden rounded-lg border border-slate-700 lg:min-h-0">
+              <div className="min-h-0 flex-1">
+                <PaymentView
+                  methods={endPayMethods}
+                  selectedMethodId={endPayMethodId}
+                  paymentAmount={isSplitMode ? payAmount : endBillTotal.toFixed(4)}
+                  total={endBillTotal.toFixed(4)}
+                  breakdown={endBreakdown}
+                  billOptions={{
+                    includeTax: billOptions.includeTax,
+                    includeServiceCharge: billOptions.includeServiceCharge,
+                    isLoading: billOptions.isLoading,
+                    disabled: isPaying,
+                    error: billOptions.error,
+                    onChange: chooseEndBillOption,
+                  }}
+                  isSplitMode={isSplitMode}
+                  splitTenders={splitTenders}
+                  isLoading={isPaying || billOptions.isLoading || Boolean(billOptions.error)}
+                  onSelectMethod={chooseEndPayMethod}
+                  onPaymentAmountChange={setPayAmount}
+                  onOpenSplit={openEndSplit}
+                  onClosePay={() => {
+                    resetSplit();
+                    if (!billClosed) setStep("menu");
+                  }}
+                  onAddTender={addEndTender}
+                  onRemoveTender={removeEndTender}
+                />
+              </div>
+              <div className="grid shrink-0 gap-2 border-t border-white/10 bg-[#202020] p-3 sm:grid-cols-[minmax(0,12rem)_1fr_auto] sm:items-end">
+                <label className="block text-sm">
+                  {tr("tip")}
+                  <input
+                    type="number"
+                    min={0}
+                    value={tip}
+                    onChange={(event) => {
+                      setTip(event.target.value);
+                      resetSplit();
+                    }}
+                    className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2"
+                  />
+                </label>
+                {card && wallet ? (
+                  <p className="text-xs text-slate-400">
+                    {tr("balance", { amount: money(wallet.balance) })}
+                    {wallet.discountBpsSnapshot
+                      ? ` · ${tr("memberDiscount", {
+                          tier: wallet.tierNameSnapshot,
+                          percent: wallet.discountBpsSnapshot / 100,
+                        })}`
+                      : ""}
+                  </p>
+                ) : (
+                  <span />
+                )}
+                <Button
+                  isLoading={isPaying}
+                  disabled={billOptions.isLoading || Boolean(billOptions.error)}
+                  onClick={() => void handleEndBillPay()}
+                >
+                  {billClosed ? tr("retryPay") : tr("confirmPay")}
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="space-y-4 rounded-lg border border-slate-700 p-5">
@@ -1987,6 +2309,15 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             </div>
           )}
         </div>
+      ) : null}
+
+      {extraFeeOpen ? (
+        <ExtraFeeDialog
+          fees={extraFees}
+          isBusy={isAddingFee}
+          onConfirm={(fee) => void confirmRoomFee(fee)}
+          onClose={() => setExtraFeeOpen(false)}
+        />
       ) : null}
 
       {hostessFor ? (
