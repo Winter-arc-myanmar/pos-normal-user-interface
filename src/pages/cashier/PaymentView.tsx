@@ -207,9 +207,13 @@ export function PaymentView({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [cardLookupOpen, confirmClose, optionsOpen, requestClosePay, showMemberCardLookup]);
 
+  // Below 1100px the bill, the split rail and the methods stack in one column and
+  // that whole column scrolls: a fixed grid row (with a 38% bill box) squeezed the
+  // payment methods into blank slivers and cut the bill in half on a phone held
+  // sideways (900x405). The desktop panes keep their own scrolling at >=1100px.
   return (
-    <section className="grid h-full min-h-0 grid-cols-1 grid-rows-[minmax(0,1fr)_auto_auto] overflow-hidden bg-[#202020] text-white min-[1100px]:grid-cols-[minmax(11rem,16rem)_4.5rem_minmax(0,1fr)] min-[1100px]:grid-rows-none">
-      <aside className="order-3 flex min-h-0 max-h-[38%] flex-col overflow-y-auto border-t border-white/10 p-2 min-[1100px]:order-none min-[1100px]:max-h-none min-[1100px]:border-r min-[1100px]:border-t-0">
+    <section className="flex h-full min-h-0 flex-col overflow-y-auto bg-[#202020] text-white min-[1100px]:grid min-[1100px]:grid-cols-[minmax(11rem,16rem)_4.5rem_minmax(0,1fr)] min-[1100px]:grid-rows-none min-[1100px]:overflow-hidden">
+      <aside className="order-3 flex shrink-0 flex-col border-t border-white/10 p-2 min-[1100px]:order-none min-[1100px]:min-h-0 min-[1100px]:shrink min-[1100px]:overflow-y-auto min-[1100px]:border-r min-[1100px]:border-t-0">
         <div className="rounded bg-white p-3 text-slate-900">
           <p className="text-sm font-semibold">{t("cashier.payment.bill")}</p>
           {breakdown ? (
@@ -346,7 +350,7 @@ export function PaymentView({
         ) : null}
       </aside>
 
-      <div className="order-2 flex min-h-0 flex-row items-stretch gap-1 overflow-x-auto border-t border-white/10 bg-[#171717] p-1 min-[1100px]:order-none min-[1100px]:flex-col min-[1100px]:overflow-y-auto min-[1100px]:border-r min-[1100px]:border-t-0">
+      <div className="order-2 flex shrink-0 flex-row items-stretch gap-1 overflow-x-auto border-t border-white/10 bg-[#171717] p-1 min-[1100px]:order-none min-[1100px]:min-h-0 min-[1100px]:flex-col min-[1100px]:overflow-y-auto min-[1100px]:border-r min-[1100px]:border-t-0">
         <button
           type="button"
           onClick={() => {
@@ -376,7 +380,7 @@ export function PaymentView({
         </button>
       </div>
 
-      <div className="order-1 flex min-h-0 min-w-0 flex-col overflow-y-auto p-2 min-[1100px]:order-none">
+      <div className="order-1 flex min-w-0 shrink-0 flex-col p-2 min-[1100px]:order-none min-[1100px]:min-h-0 min-[1100px]:overflow-y-auto">
         <div
           className={[
             "flex min-h-12 items-center rounded px-3 text-sm font-semibold",
@@ -500,7 +504,7 @@ export function PaymentView({
             {t("cashier.payment.reopenCardLookup")}
           </button>
         ) : null}
-        <div className="mt-2 grid min-h-40 shrink-0 flex-1 grid-cols-2 content-start gap-2 overflow-y-auto">
+        <div className="mt-2 grid grid-cols-2 content-start gap-2 min-[1100px]:min-h-40 min-[1100px]:flex-1 min-[1100px]:shrink-0 min-[1100px]:overflow-y-auto">
           {sortedMethods.map((method) => {
             const selected = selectedMethodId === method.id;
             const memberCard = isMemberCardPaymentMethod(method);
