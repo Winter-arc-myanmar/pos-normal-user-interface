@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/Button";
 import { formatPosMoney } from "@/lib/pos/orderListDisplay";
 
 export interface LineEdit {
+  /** How many of the item the price and FOC are for; the rest stay as they are. */
+  quantity: number;
   unitPrice: number;
   foc: boolean;
 }
@@ -47,19 +49,23 @@ export function LineEditDialog({
   const { t } = useTranslation();
   const [price, setPrice] = useState(String(unitPrice));
   const [foc, setFoc] = useState(isFoc);
+  // Part of an item can be priced on its own only in whole units.
+  const canSplit = quantity > 1 && Number.isInteger(quantity);
+  const [count, setCount] = useState(quantity);
   const [error, setError] = useState<string | null>(null);
   const value = Number(price);
   const valid = price.trim() !== "" && Number.isFinite(value) && value >= 0;
   const shownPrice = valid ? value : unitPrice;
-  const total = foc ? 0 : quantity * shownPrice;
-  const quantityLabel = Number.isInteger(quantity) ? String(quantity) : quantity.toFixed(2);
+  const total = foc ? 0 : count * shownPrice;
+  const countLabel = Number.isInteger(count) ? String(count) : count.toFixed(2);
+  const rest = quantity - count;
 
   const save = () => {
     if (!valid) {
       setError(t("cashier.lineEdit.priceRequired"));
       return;
     }
-    onSave({ unitPrice: value, foc });
+    onSave({ quantity: count, unitPrice: value, foc });
   };
 
   return (
@@ -83,6 +89,41 @@ export function LineEditDialog({
           {options ? <p className="mt-0.5 text-xs text-slate-400">{options}</p> : null}
           {promo ? <p className="mt-0.5 text-xs font-medium text-emerald-400">{promo}</p> : null}
         </div>
+
+        {canSplit ? (
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="text-slate-300">{t("cashier.lineEdit.howMany")}</span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                className="h-9 w-9 rounded-md border border-slate-700 bg-slate-900 text-lg disabled:opacity-40"
+                aria-label={t("cashier.orderPanel.decreaseQuantity")}
+                disabled={count <= 1}
+                onClick={() => setCount((value) => Math.max(1, value - 1))}
+              >
+                −
+              </button>
+              <span
+                className="w-8 text-center font-semibold tabular-nums"
+                aria-label={t("cashier.lineEdit.howMany")}
+              >
+                {count}
+              </span>
+              <button
+                type="button"
+                className="h-9 w-9 rounded-md border border-slate-700 bg-slate-900 text-lg disabled:opacity-40"
+                aria-label={t("cashier.orderPanel.increaseQuantity")}
+                disabled={count >= quantity}
+                onClick={() => setCount((value) => Math.min(quantity, value + 1))}
+              >
+                +
+              </button>
+              <span className="ml-1 text-slate-400">
+                {t("cashier.lineEdit.ofTotal", { count: quantity })}
+              </span>
+            </div>
+          </div>
+        ) : null}
 
         {isFee ? null : (
           <div className="space-y-1 text-sm">
@@ -137,12 +178,22 @@ export function LineEditDialog({
           />
         </label>
 
-        <div className="flex items-baseline justify-between border-t border-slate-800 pt-3 text-sm">
-          <span className="tabular-nums text-slate-400">
-            {quantityLabel} × {formatPosMoney(shownPrice)}
-            {foc ? ` · ${t("cashier.orderPanel.foc")}` : ""}
-          </span>
-          <span className="text-base font-semibold tabular-nums">{formatPosMoney(total)}</span>
+        <div className="space-y-1 border-t border-slate-800 pt-3 text-sm">
+          <div className="flex items-baseline justify-between">
+            <span className="tabular-nums text-slate-400">
+              {countLabel} × {formatPosMoney(shownPrice)}
+              {foc ? ` · ${t("cashier.orderPanel.foc")}` : ""}
+            </span>
+            <span className="text-base font-semibold tabular-nums">{formatPosMoney(total)}</span>
+          </div>
+          {rest > 0 ? (
+            <p className="text-xs tabular-nums text-slate-500">
+              {t("cashier.lineEdit.restStay", {
+                count: rest,
+                price: formatPosMoney(unitPrice),
+              })}
+            </p>
+          ) : null}
         </div>
 
         {error ? <p className="text-sm text-red-400">{error}</p> : null}

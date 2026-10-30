@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState, type RefObject } from "react";
+import { useEffect, useMemo, useState, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import {
@@ -18,10 +18,12 @@ import {
 import { OrderTabs } from "./OrderTabs";
 import { OrderAdjustments } from "./OrderAdjustments";
 import { LineEditDialog, type LineEdit } from "./LineEditDialog";
+import { BillOptionsDialog } from "./BillOptionsDialog";
 import { isSettledSalesOrder } from "@/lib/pos/orderStatus";
 import { modifierPrintText } from "@/lib/printing/modifierText";
 import { isPendingKdsLine } from "@/lib/pos/kdsLines";
 import { isFocLine } from "@/lib/pos/checkoutAdjustments";
+import { linePriceNote } from "@/lib/pos/linePrice";
 import type {
   PromotionDiscount,
   RunningPromotion,
@@ -173,6 +175,12 @@ const SEATING_ICON_PATHS = {
     "m15 9 6-6",
   ],
   merge: ["m8 6 4-4 4 4", "M12 2v10.3a4 4 0 0 1-1.172 2.872L4 22", "m20 22-5-5"],
+  options: [
+    "M20 7h-9",
+    "M14 17H5",
+    "M17 14a3 3 0 1 0 0 6 3 3 0 1 0 0-6z",
+    "M7 4a3 3 0 1 0 0 6 3 3 0 1 0 0-6z",
+  ],
   minus: ["M5 12h14"],
   plus: ["M5 12h14", "M12 5v14"],
   edit: [
@@ -189,16 +197,22 @@ const SEATING_ICON_PATHS = {
 } as const;
 
 const lineIconBase =
-  "grid h-9 w-9 shrink-0 place-items-center rounded-md border focus-visible:outline-blue-500 disabled:opacity-40 min-[1100px]:h-10 min-[1100px]:w-10";
+  "grid h-8 w-8 shrink-0 place-items-center rounded-md border focus-visible:outline-blue-500 disabled:opacity-40";
 const lineIconButton = `${lineIconBase} border-slate-300 text-slate-700 hover:bg-slate-100`;
 const lineRemoveButton = `${lineIconBase} border-red-200 text-red-600 hover:bg-red-50`;
 
-function SeatingIcon({ name }: { name: keyof typeof SEATING_ICON_PATHS }) {
+function SeatingIcon({
+  name,
+  className = "h-5 w-5",
+}: {
+  name: keyof typeof SEATING_ICON_PATHS;
+  className?: string;
+}) {
   return (
     <svg
       aria-hidden="true"
       viewBox="0 0 24 24"
-      className="h-5 w-5"
+      className={className}
       fill="none"
       stroke="currentColor"
       strokeWidth={2}
@@ -284,13 +298,14 @@ export function OrderPanel({
 }: OrderPanelProps) {
   const { t } = useTranslation();
   const [confirmCancelOrder, setConfirmCancelOrder] = useState(false);
-  const [tableControlsExpanded, setTableControlsExpanded] = useState(false);
+  const [billOptions, setBillOptions] = useState<{
+    orderId: string | undefined;
+  } | null>(null);
   const [editing, setEditing] = useState<{
     orderId: string | undefined;
     lineId: string;
     promo?: string;
   } | null>(null);
-  const tableControlsId = useId();
   const groupedOrderLines = useMemo(
     () => groupOrderLines(selectedOrderLines, isFeeLine),
     [isFeeLine, selectedOrderLines]
@@ -308,10 +323,6 @@ export function OrderPanel({
   useEffect(() => {
     if (!hasActiveOrder) setConfirmCancelOrder(false);
   }, [hasActiveOrder]);
-
-  useEffect(() => {
-    setTableControlsExpanded(false);
-  }, [selectedOrder?.id, selectedSession?.id, selectedTable?.id]);
 
   const resolveLineName = (line: SalesOrderLine) => {
     const variant = variants.find((item) => item.id === line.variantId);
@@ -333,6 +344,148 @@ export function OrderPanel({
     const variant = variants.find((item) => item.id === line.variantId);
     return variantDisplayName(line) || variantDisplayName(variant ?? {});
   };
+
+  const hasTable = Boolean(selectedTable || selectedSession);
+  const canAdjustBill = Boolean(onDiscountAmountChange && onTipAmountChange);
+  const showBillOptions =
+    billOptions !== null && billOptions.orderId === selectedOrder?.id;
+  const billOptionsTitle = t(
+    hasTable ? "cashier.billOptions.titleWithTable" : "cashier.billOptions.title"
+  );
+  const billOptionsSummary = [
+    Number(discountAmount) > 0 ? `−${formatPosMoney(discountAmount)}` : null,
+    Number(tipAmount) > 0
+      ? t("cashier.billOptions.tipSummary", { amount: formatPosMoney(tipAmount) })
+      : null,
+    selectedTable?.tableNumber || null,
+    selectedSession
+      ? t(`cashier.orderPanel.sessionStates.${selectedSession.sessionState}`)
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const tableControls = hasTable ? (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-2">
+        {selectedTable ? (
+          <label
+            className={[
+              "min-w-0 space-y-1",
+              selectedSession ? "" : "col-span-2",
+            ].join(" ")}
+          >
+            <span className="text-xs text-slate-300">
+              {t("cashier.orderPanel.tableStatusLabel")}
+            </span>
+            <select
+              aria-label={t("cashier.orderPanel.tableStatus")}
+              value={selectedTable.status}
+              onChange={(event) =>
+                onTableStatusChange(event.target.value as DiningTableStatus)
+              }
+              className="min-h-11 w-full min-w-0 rounded-md border border-slate-700 bg-slate-900 px-2 text-sm text-slate-100 focus:border-blue-500 focus:outline-none"
+            >
+              {(["AVAILABLE", "OCCUPIED", "DIRTY", "RESERVED"] as const).map(
+                (status) => (
+                  <option
+                    key={status}
+                    value={status}
+                    disabled={status === "AVAILABLE" && hasMenuLines}
+                  >
+                    {t(`cashier.orderPanel.tableStatuses.${status}`)}
+                  </option>
+                )
+              )}
+            </select>
+          </label>
+        ) : null}
+        {selectedSession ? (
+          <label
+            className={[
+              "min-w-0 space-y-1",
+              selectedTable ? "" : "col-span-2",
+            ].join(" ")}
+          >
+            <span className="text-xs text-slate-300">
+              {t("cashier.orderPanel.sessionStateLabel")}
+            </span>
+            <select
+              aria-label={t("cashier.orderPanel.sessionState")}
+              value={selectedSession.sessionState}
+              onChange={(event) =>
+                onSessionStateChange(event.target.value as TableSessionState)
+              }
+              className="min-h-11 w-full min-w-0 rounded-md border border-slate-700 bg-slate-900 px-2 text-sm text-slate-100 focus:border-blue-500 focus:outline-none"
+            >
+              {(
+                [
+                  "SEATED",
+                  "ORDERING",
+                  "SERVED",
+                  "PAYMENT_PENDING",
+                  "CLOSED",
+                ] as const
+              ).map((state) => (
+                <option key={state} value={state}>
+                  {t(`cashier.orderPanel.sessionStates.${state}`)}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+      </div>
+
+      {selectedSession && onChangeTable && onCombineTables ? (
+        <div className="space-y-2">
+          <div className="grid grid-cols-3 gap-2">
+            {(
+              [
+                ["move", onChangeTable, "cashier.seating.changeTable"],
+                ["split", onSplitItems, "cashier.seating.split"],
+                ["merge", onCombineTables, "cashier.seating.combine"],
+              ] as const
+            ).map(([icon, onClick, label]) => (
+              <button
+                key={icon}
+                type="button"
+                disabled={isLoading || !onClick}
+                onClick={onClick}
+                title={t(label)}
+                className="flex min-h-14 flex-col items-center justify-center gap-1 rounded border border-slate-700 bg-slate-900 px-1 text-[11px] font-semibold text-slate-100 transition-colors hover:border-blue-500 hover:bg-blue-600/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <SeatingIcon name={icon} />
+                {t(label)}
+              </button>
+            ))}
+          </div>
+          {joinedTables.length && onReleaseTable ? (
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-slate-400">
+                {t("cashier.seating.joinedTables")}:
+              </span>
+              {joinedTables.map((table) => (
+                <button
+                  key={table.id}
+                  type="button"
+                  disabled={isLoading}
+                  onClick={() => onReleaseTable(table.id)}
+                  title={t("cashier.seating.release", {
+                    table: table.tableNumber,
+                  })}
+                  aria-label={t("cashier.seating.release", {
+                    table: table.tableNumber,
+                  })}
+                  className="min-h-11 rounded-full border border-slate-700 bg-slate-900 px-3 font-semibold text-slate-200 transition-colors hover:border-red-400 hover:bg-red-950/40 hover:text-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {table.tableNumber} ×
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  ) : null;
 
   const editingLine =
     editing && editing.orderId === selectedOrder?.id && !isSettledOrder
@@ -467,12 +620,14 @@ export function OrderPanel({
                 const isPendingKds = isPendingKdsLine(line);
                 const isFee = isFeeLine?.(line) ?? false;
                 const listPrice = menuPrice(line);
-                const priceChanged =
-                  listPrice !== undefined &&
-                  Math.abs(listPrice - Number(line.unitPrice || 0)) >= 0.0001;
+                const priceNote = isFee ? undefined : linePriceNote(line.unitPrice, listPrice);
+                const priceChanged = priceNote !== undefined;
+                const shownName = priceNote
+                  ? t(`cashier.orderPanel.priceNote.${priceNote}`, { name: lineName })
+                  : lineName;
                 const isLocked = isLoading || isSettledOrder;
                 return (
-                  <div key={line.id} role="group" aria-label={lineName} className="bg-white px-2 py-1.5">
+                  <div key={line.id} role="group" aria-label={shownName} className="bg-white px-2 py-1.5">
                     <div className="flex min-w-0 items-center gap-1.5">
                       {!isFee && isPendingKds ? (
                         <span
@@ -482,7 +637,7 @@ export function OrderPanel({
                         />
                       ) : null}
                       <span className="flex min-w-0 flex-1 items-center gap-1.5 text-sm font-medium">
-                        <span className="min-w-0 truncate" title={lineName}>{lineName}</span>
+                        <span className="min-w-0 truncate" title={shownName}>{shownName}</span>
                         {saving ? (
                           <span
                             className="shrink-0 rounded border border-emerald-600 px-1 text-[10px] font-semibold tracking-wide text-emerald-700"
@@ -499,11 +654,6 @@ export function OrderPanel({
                         {isFocLine(line) ? (
                           <span className="shrink-0 rounded bg-slate-100 px-1 text-[10px] font-semibold text-slate-600">
                             {t("cashier.orderPanel.foc")}
-                          </span>
-                        ) : null}
-                        {priceChanged ? (
-                          <span className="shrink-0 rounded bg-blue-50 px-1 text-[10px] font-semibold text-blue-700">
-                            {t("cashier.orderPanel.priceChanged")}
                           </span>
                         ) : null}
                       </span>
@@ -539,7 +689,7 @@ export function OrderPanel({
                           onClick={() => onDecreaseLineQuantity(line)}
                           disabled={isLocked}
                         >
-                          <SeatingIcon name="minus" />
+                          <SeatingIcon name="minus" className="h-4 w-4" />
                         </button>
                         <span
                           className="min-w-[2.5ch] text-center text-sm font-semibold tabular-nums"
@@ -556,7 +706,7 @@ export function OrderPanel({
                           onClick={() => onIncreaseLineQuantity(line)}
                           disabled={isLocked}
                         >
-                          <SeatingIcon name="plus" />
+                          <SeatingIcon name="plus" className="h-4 w-4" />
                         </button>
                       </div>
                       <div className="flex items-center gap-1">
@@ -579,7 +729,7 @@ export function OrderPanel({
                           }
                           disabled={isLocked || !onEditLine}
                         >
-                          <SeatingIcon name="edit" />
+                          <SeatingIcon name="edit" className="h-4 w-4" />
                         </button>
                         <button
                           type="button"
@@ -589,7 +739,7 @@ export function OrderPanel({
                           onClick={() => onRemoveLine(line)}
                           disabled={isLocked}
                         >
-                          <SeatingIcon name="remove" />
+                          <SeatingIcon name="remove" className="h-4 w-4" />
                         </button>
                       </div>
                     </div>
@@ -640,26 +790,6 @@ export function OrderPanel({
             <span>{t("cashier.total")}</span>
             <span className="tabular-nums">{formatPosMoney(total)}</span>
           </div>
-          {onDiscountAmountChange && onTipAmountChange ? (
-            <OrderAdjustments
-              discountAmount={discountAmount}
-              discountReasonId={discountReasonId}
-              discountReasons={discountReasons}
-              serviceCharge={serviceCharge}
-              tipAmount={tipAmount}
-              memberCardUid={memberCardUid}
-              memberPointsLabel={memberPointsLabel}
-              memberCardError={memberCardError}
-              isMemberCardLoading={isMemberCardLoading}
-              disabled={isLoading || isSettledOrder}
-              onDiscountAmountChange={onDiscountAmountChange}
-              onDiscountReasonChange={onDiscountReasonChange || (() => undefined)}
-              onRemoveDiscount={onRemoveDiscount || (() => undefined)}
-              onTipAmountChange={onTipAmountChange}
-              onMemberCardUidChange={onMemberCardUidChange || (() => undefined)}
-              onLookupMemberCard={onLookupMemberCard || (() => undefined)}
-            />
-          ) : null}
           {isSplitMode || isPayView ? (
             <p className="text-xs text-slate-500">
               {isSplitMode
@@ -671,173 +801,12 @@ export function OrderPanel({
                 : t("cashier.payment.chooseMethod")}
             </p>
           ) : null}
-          {selectedTable || selectedSession ? (
-            <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-              <button
-                type="button"
-                className="flex min-h-11 w-full items-center gap-2 px-3 text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
-                aria-expanded={tableControlsExpanded}
-                aria-controls={tableControlsId}
-                aria-label={t(
-                  tableControlsExpanded
-                    ? "cashier.orderPanel.collapseTableControls"
-                    : "cashier.orderPanel.expandTableControls"
-                )}
-                onClick={() => setTableControlsExpanded((expanded) => !expanded)}
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                    {t("cashier.orderPanel.tableControls")}
-                  </span>
-                  <span className="block truncate text-xs font-medium text-slate-800">
-                    {[
-                      selectedTable
-                        ? selectedTable.tableNumber ||
-                          t(`cashier.orderPanel.tableStatuses.${selectedTable.status}`)
-                        : null,
-                      selectedSession
-                        ? t(`cashier.orderPanel.sessionStates.${selectedSession.sessionState}`)
-                        : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </span>
-                </span>
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  className={`h-4 w-4 shrink-0 text-slate-500 transition-transform duration-200 motion-reduce:transition-none ${tableControlsExpanded ? "rotate-180" : ""}`}
-                >
-                  <path d="m4 6 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-
-              {tableControlsExpanded ? (
-                <div id={tableControlsId} className="space-y-2 border-t border-slate-200 bg-slate-50 p-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    {selectedTable ? (
-                      <label
-                        className={[
-                          "min-w-0 space-y-1",
-                          selectedSession ? "" : "col-span-2",
-                        ].join(" ")}
-                      >
-                        <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                          {t("cashier.orderPanel.tableStatusLabel")}
-                        </span>
-                        <select
-                          aria-label={t("cashier.orderPanel.tableStatus")}
-                          value={selectedTable.status}
-                          onChange={(event) =>
-                            onTableStatusChange(event.target.value as DiningTableStatus)
-                          }
-                          className="min-h-11 w-full min-w-0 rounded border border-slate-300 bg-white px-2 text-xs focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                        >
-                          {(["AVAILABLE", "OCCUPIED", "DIRTY", "RESERVED"] as const).map(
-                            (status) => (
-                              <option
-                                key={status}
-                                value={status}
-                                disabled={status === "AVAILABLE" && hasMenuLines}
-                              >
-                                {t(`cashier.orderPanel.tableStatuses.${status}`)}
-                              </option>
-                            )
-                          )}
-                        </select>
-                      </label>
-                    ) : null}
-                    {selectedSession ? (
-                      <label
-                        className={[
-                          "min-w-0 space-y-1",
-                          selectedTable ? "" : "col-span-2",
-                        ].join(" ")}
-                      >
-                        <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                          {t("cashier.orderPanel.sessionStateLabel")}
-                        </span>
-                        <select
-                          aria-label={t("cashier.orderPanel.sessionState")}
-                          value={selectedSession.sessionState}
-                          onChange={(event) =>
-                            onSessionStateChange(event.target.value as TableSessionState)
-                          }
-                          className="min-h-11 w-full min-w-0 rounded border border-slate-300 bg-white px-2 text-xs focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                        >
-                          {(
-                            [
-                              "SEATED",
-                              "ORDERING",
-                              "SERVED",
-                              "PAYMENT_PENDING",
-                              "CLOSED",
-                            ] as const
-                          ).map((state) => (
-                            <option key={state} value={state}>
-                              {t(`cashier.orderPanel.sessionStates.${state}`)}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    ) : null}
-                  </div>
-
-                  {selectedSession && onChangeTable && onCombineTables ? (
-                    <div className="space-y-2">
-                      <div className="grid grid-cols-3 gap-2">
-                        {(
-                          [
-                            ["move", onChangeTable, "cashier.seating.changeTable"],
-                            ["split", onSplitItems, "cashier.seating.split"],
-                            ["merge", onCombineTables, "cashier.seating.combine"],
-                          ] as const
-                        ).map(([icon, onClick, label]) => (
-                          <button
-                            key={icon}
-                            type="button"
-                            disabled={isLoading || !onClick}
-                            onClick={onClick}
-                            title={t(label)}
-                            className="flex min-h-14 flex-col items-center justify-center gap-1 rounded border border-slate-300 bg-white px-1 text-[11px] font-semibold text-slate-800 transition-colors hover:border-blue-500 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            <SeatingIcon name={icon} />
-                            {t(label)}
-                          </button>
-                        ))}
-                      </div>
-                      {joinedTables.length && onReleaseTable ? (
-                        <div className="flex flex-wrap items-center gap-2 text-xs">
-                          <span className="text-slate-500">
-                            {t("cashier.seating.joinedTables")}:
-                          </span>
-                          {joinedTables.map((table) => (
-                            <button
-                              key={table.id}
-                              type="button"
-                              disabled={isLoading}
-                              onClick={() => onReleaseTable(table.id)}
-                              title={t("cashier.seating.release", {
-                                table: table.tableNumber,
-                              })}
-                              aria-label={t("cashier.seating.release", {
-                                table: table.tableNumber,
-                              })}
-                              className="min-h-11 rounded-full border border-slate-300 bg-white px-3 font-semibold text-slate-700 transition-colors hover:border-red-400 hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              {table.tableNumber} ×
-                            </button>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-            </section>
-          ) : null}
-          <div className="grid grid-cols-2 gap-2">
+          <div
+            className={[
+              "grid gap-2",
+              selectedOrder?.serviceType === "PICK_UP" ? "grid-cols-3" : "grid-cols-2",
+            ].join(" ")}
+          >
             <Button
               variant="secondary"
               disabled={
@@ -855,6 +824,26 @@ export function OrderPanel({
             >
               {t("cashier.orderPanel.sendKds")}
             </Button>
+            {canAdjustBill || hasTable ? (
+              <button
+                type="button"
+                className="flex min-h-11 min-w-0 flex-col items-center justify-center rounded-md border border-slate-300 bg-white px-2 text-sm font-semibold text-slate-800 transition-colors hover:border-blue-500 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                aria-haspopup="dialog"
+                onClick={() => setBillOptions({ orderId: selectedOrder?.id })}
+              >
+                <span className="flex max-w-full items-center gap-1.5">
+                  <SeatingIcon name="options" className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{billOptionsTitle}</span>
+                </span>
+                {billOptionsSummary ? (
+                  <span className="max-w-full truncate text-[11px] font-medium text-slate-500">
+                    {billOptionsSummary}
+                  </span>
+                ) : null}
+              </button>
+            ) : (
+              <span />
+            )}
             {selectedOrder?.serviceType === "PICK_UP" ? (
               <Button
                 variant="secondary"
@@ -863,9 +852,7 @@ export function OrderPanel({
               >
                 {t("cashier.orderPanel.pickedUp")}
               </Button>
-            ) : (
-              <span />
-            )}
+            ) : null}
           </div>
           {isPayView && canTakePayment ? (
             <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs font-medium text-slate-700">
@@ -1002,6 +989,39 @@ export function OrderPanel({
             </p>
           ) : null}
         </div>
+      ) : null}
+      {showBillOptions ? (
+        <BillOptionsDialog
+          title={billOptionsTitle}
+          bill={onDiscountAmountChange && onTipAmountChange ? (
+            <OrderAdjustments
+              discountAmount={discountAmount}
+              discountReasonId={discountReasonId}
+              discountReasons={discountReasons}
+              serviceCharge={serviceCharge}
+              tipAmount={tipAmount}
+              memberCardUid={memberCardUid}
+              memberPointsLabel={memberPointsLabel}
+              memberCardError={memberCardError}
+              isMemberCardLoading={isMemberCardLoading}
+              disabled={isLoading || isSettledOrder}
+              onDiscountAmountChange={onDiscountAmountChange}
+              onDiscountReasonChange={onDiscountReasonChange || (() => undefined)}
+              onRemoveDiscount={onRemoveDiscount || (() => undefined)}
+              onTipAmountChange={onTipAmountChange}
+              onMemberCardUidChange={onMemberCardUidChange || (() => undefined)}
+              onLookupMemberCard={onLookupMemberCard || (() => undefined)}
+            />
+          ) : undefined}
+          table={tableControls}
+          tableTitle={[
+            t("cashier.billOptions.table"),
+            selectedTable?.tableNumber,
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          onClose={() => setBillOptions(null)}
+        />
       ) : null}
       {editingLine ? (
         <LineEditDialog

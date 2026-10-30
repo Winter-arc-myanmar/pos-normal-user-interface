@@ -1120,9 +1120,6 @@
       "quickCheckout": "အမြန်ငွေရှင်း",
       "tableStatus": "စားပွဲအခြေအနေ",
       "tableStatusLabel": "စားပွဲ",
-      "tableControls": "စားပွဲနှင့် ဆက်ရှင်",
-      "expandTableControls": "စားပွဲနှင့် ဆက်ရှင် ထိန်းချုပ်မှုများကို ဖြန့်မည်",
-      "collapseTableControls": "စားပွဲနှင့် ဆက်ရှင် ထိန်းချုပ်မှုများကို ခေါက်မည်",
       "tableStatusOption": "စားပွဲ: {{status}}",
       "tableStatuses": {
         "AVAILABLE": "လွတ်သည်",
@@ -1157,7 +1154,6 @@
       "itemUpdated": "ပစ္စည်းအရေအတွက် ပြင်ဆင်ပြီး။",
       "itemRemoved": "အော်ဒါမှ ပစ္စည်း ဖယ်ပြီး။",
       "kdsDeleteTitle": "ဖျက်သည်။",
-      "adjustments": "ချိန်ညှိမှုများ",
       "discount": "လျှော့စျေး",
       "discountReason": "လျှော့စျေးအကြောင်းရင်း",
       "selectDiscountReason": "လျှော့စျေးအကြောင်းရင်း ရွေးပါ",
@@ -1165,7 +1161,6 @@
       "serviceCharge": "ဝန်ဆောင်ခ (အခွန်ပါ)",
       "tip": "တိပ်",
       "foc": "FOC",
-      "priceChanged": "ဈေးပြင်ထား",
       "menuPriceWas": "မီနူးဈေး {{amount}}",
       "memberPoints": "အဖွဲ့ဝင်ပွိုင့်",
       "memberCardUid": "ကတ် UID",
@@ -1192,7 +1187,11 @@
       "promoSaving": "{{name}} ဖြင့် {{amount}} လျှော့",
       "promotionDiscount": "ပရိုမိုးရှင်း လျှော့စျေး",
       "editItem": "{{name}} ပြင်မည်",
-      "removeItem": "{{name}} ဖယ်မည်"
+      "removeItem": "{{name}} ဖယ်မည်",
+      "priceNote": {
+        "discount": "{{name}} (လျှော့ဈေး)",
+        "changed": "{{name}} (ဈေးပြင်ထား)"
+      }
     },
     "lineEdit": {
       "title": "ပစ္စည်း ပြင်ရန်",
@@ -1202,7 +1201,18 @@
       "foc": "အခမဲ့ (FOC)",
       "save": "ပြင်ဆင်ချက် သိမ်းမည်",
       "remove": "ပစ္စည်း ဖယ်မည်",
-      "priceRequired": "ဈေးနှုန်း 0 သို့မဟုတ် အထက် ထည့်ပါ။"
+      "priceRequired": "ဈေးနှုန်း 0 သို့မဟုတ် အထက် ထည့်ပါ။",
+      "howMany": "အရေအတွက်",
+      "ofTotal": "{{count}} ခုအနက်",
+      "restStay": "{{count}} × {{price}} မူလအတိုင်း ကျန်မည်"
+    },
+    "billOptions": {
+      "title": "ဘောက်ချာ ရွေးချယ်စရာ",
+      "titleWithTable": "ဘောက်ချာနှင့် စားပွဲ",
+      "bill": "ဘောက်ချာ",
+      "table": "စားပွဲ",
+      "done": "ပြီးပါပြီ",
+      "tipSummary": "လက်ဆောင်ငွေ {{amount}}"
     },
     "errors": {
       "missingContext": "ဆိုင် သို့မဟုတ် ကုန်လက်ကျန် တည်နေရာ အချက်အလက် ပျောက်နေသည်။ ဆိုင်တွင် ကုန်လက်ကျန် တည်နေရာ အနည်းဆုံး တစ်ခု ပြင်ဆင်ထားကြောင်း စစ်ပါ။",

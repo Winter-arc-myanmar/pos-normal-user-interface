@@ -105,33 +105,24 @@ describe("OrderPanel", () => {
       />
     );
 
-    const toggle = screen.getByRole("button", {
-      name: "cashier.orderPanel.expandTableControls",
-    });
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(toggle).toHaveTextContent("T-05");
-    expect(toggle).not.toHaveTextContent("cashier.orderPanel.tableStatuses.OCCUPIED");
-    expect(toggle).toHaveTextContent("cashier.orderPanel.sessionStates.ORDERING");
+    const options = screen.getByRole("button", { name: /cashier.billOptions.titleWithTable/ });
+    expect(options).toHaveTextContent("T-05");
+    expect(options).toHaveTextContent("cashier.orderPanel.sessionStates.ORDERING");
     expect(screen.queryByLabelText("cashier.orderPanel.tableStatus")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "cashier.seating.changeTable" })).not.toBeInTheDocument();
 
-    fireEvent.click(toggle);
+    fireEvent.click(options);
 
-    expect(
-      screen.getByRole("button", { name: "cashier.orderPanel.collapseTableControls" })
-    ).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByLabelText("cashier.orderPanel.tableStatus")).toBeInTheDocument();
-    expect(screen.getByLabelText("cashier.orderPanel.sessionState")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "cashier.seating.changeTable" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "cashier.seating.combine" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "cashier.seating.split" })).toBeDisabled();
+    const dialog = screen.getByRole("dialog", { name: "cashier.billOptions.titleWithTable" });
+    expect(within(dialog).getByText("cashier.billOptions.table T-05")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("cashier.orderPanel.tableStatus")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("cashier.orderPanel.sessionState")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "cashier.seating.changeTable" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "cashier.seating.combine" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "cashier.seating.split" })).toBeDisabled();
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "cashier.orderPanel.collapseTableControls" })
-    );
-    expect(
-      screen.getByRole("button", { name: "cashier.orderPanel.expandTableControls" })
-    ).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(within(dialog).getByRole("button", { name: "cashier.billOptions.done" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it.each([
@@ -396,10 +387,10 @@ describe("OrderPanel", () => {
       />
     );
 
-    expect(
-      screen.getByRole("button", { name: "cashier.orderPanel.adjustments" })
-    ).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText("cashier.orderPanel.adjustments")).toBeInTheDocument();
+    const options = screen.getByRole("button", { name: /cashier.billOptions.title/ });
+    expect(options).toHaveTextContent("−5.00");
+    fireEvent.click(options);
+    expect(screen.getByText("cashier.billOptions.bill")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("cashier.orderPanel.discount"), {
       target: { value: "8.0000" },
     });
@@ -408,13 +399,14 @@ describe("OrderPanel", () => {
       screen.getByRole("button", { name: "cashier.orderPanel.removeDiscount" })
     );
     expect(onRemoveDiscount).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "cashier.billOptions.done" }));
     fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.editItem" }));
     fireEvent.click(screen.getByRole("switch", { name: "cashier.lineEdit.foc" }));
     fireEvent.click(screen.getByRole("button", { name: "cashier.lineEdit.save" }));
-    expect(onEditLine).toHaveBeenCalledExactlyOnceWith(line, { unitPrice: 10, foc: true });
+    expect(onEditLine).toHaveBeenCalledExactlyOnceWith(line, { quantity: 1, unitPrice: 10, foc: true });
   });
 
-  it("collapses checkout adjustments until the cashier opens them", () => {
+  it("keeps the bill options out of the panel until the cashier opens them", () => {
     render(
       <OrderPanel
         {...defaultProps}
@@ -434,15 +426,15 @@ describe("OrderPanel", () => {
       />
     );
 
-    const toggle = screen.getByRole("button", {
-      name: "cashier.orderPanel.adjustments",
-    });
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByLabelText("cashier.orderPanel.discount")).not.toBeInTheDocument();
+    const options = screen.getByRole("button", { name: "cashier.billOptions.title" });
+    expect(options.parentElement).toContainElement(
+      screen.getByRole("button", { name: "cashier.orderPanel.sendKds" })
+    );
 
-    fireEvent.click(toggle);
-    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(options);
     expect(screen.getByLabelText("cashier.orderPanel.discount")).toBeInTheDocument();
+    expect(screen.queryByText("cashier.billOptions.table")).not.toBeInTheDocument();
   });
 
   it("shows the promotions running and the discount the server already took", () => {
@@ -630,7 +622,7 @@ describe("OrderPanel", () => {
 
     expect(onEditLine).toHaveBeenCalledWith(
       expect.objectContaining({ id: "line-1" }),
-      { unitPrice: 7.5, foc: false }
+      { quantity: 2, unitPrice: 7.5, foc: false }
     );
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
@@ -648,14 +640,46 @@ describe("OrderPanel", () => {
       />
     );
 
-    expect(screen.getByText("cashier.orderPanel.priceChanged")).toBeInTheDocument();
+    expect(row("cashier.orderPanel.priceNote.discount")).toHaveTextContent("8.00");
     await user.click(screen.getByRole("button", { name: "cashier.orderPanel.editItem" }));
     await user.click(screen.getByRole("button", { name: "cashier.lineEdit.menuPrice" }));
     await user.click(screen.getByRole("button", { name: "cashier.lineEdit.save" }));
 
     expect(onEditLine).toHaveBeenCalledWith(
       expect.objectContaining({ id: "line-1" }),
-      { unitPrice: 10, foc: false }
+      { quantity: 1, unitPrice: 10, foc: false }
+    );
+  });
+
+  it("prices part of an item on its own", async () => {
+    const user = userEvent.setup();
+    const onEditLine = vi.fn();
+    render(
+      <OrderPanel
+        {...defaultProps}
+        selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
+        selectedOrderLines={[new SalesOrderLine({ ...line, quantity: "4.0000", unitPrice: "2000.0000" })]}
+        onEditLine={onEditLine}
+        menuPrice={() => 2000}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "cashier.orderPanel.editItem" }));
+    const dialog = screen.getByRole("dialog", { name: "cashier.lineEdit.title" });
+    expect(within(dialog).getByLabelText("cashier.lineEdit.howMany")).toHaveTextContent("4");
+    for (let i = 0; i < 3; i += 1) {
+      await user.click(within(dialog).getByRole("button", { name: "cashier.orderPanel.decreaseQuantity" }));
+    }
+    const input = within(dialog).getByLabelText("cashier.lineEdit.price");
+    await user.clear(input);
+    await user.type(input, "1500");
+    expect(dialog).toHaveTextContent("1,500.00");
+    expect(within(dialog).getByText("cashier.lineEdit.restStay")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "cashier.lineEdit.save" }));
+
+    expect(onEditLine).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "line-1" }),
+      { quantity: 1, unitPrice: 1500, foc: false }
     );
   });
 
@@ -695,6 +719,7 @@ describe("OrderPanel", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.editItem" }));
     expect(screen.queryByLabelText("cashier.lineEdit.price")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("cashier.lineEdit.howMany")).not.toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "cashier.lineEdit.foc" })).toBeInTheDocument();
   });
 });

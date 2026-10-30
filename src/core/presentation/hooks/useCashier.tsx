@@ -218,6 +218,11 @@ interface UseCashierReturn {
       unitPrice?: string;
     }
   ) => Promise<SalesOrderLine>;
+  splitOrderLine: (
+    orderId: string,
+    lineId: string,
+    quantity: string
+  ) => Promise<SalesOrderLine>;
   updateOrderLine: (
     orderId: string,
     lineId: string,
@@ -539,6 +544,23 @@ export function useCashier(): UseCashierReturn {
         setSelectedOrderLines(lines);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to update order line";
+        setError(message);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [cashierService, clearError]
+  );
+
+  const splitOrderLine = useCallback(
+    async (orderId: string, lineId: string, quantity: string) => {
+      setIsLoading(true);
+      clearError();
+      try {
+        return await cashierService.splitSalesOrderLine(orderId, lineId, quantity);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to split order line";
         setError(message);
         throw err;
       } finally {
@@ -1644,6 +1666,7 @@ export function useCashier(): UseCashierReturn {
       selectOrderById,
       createOrder,
       addProductToOrder,
+      splitOrderLine,
       updateOrderLine,
       removeOrderLine,
       addProductToTableSession,
@@ -1726,6 +1749,7 @@ export function useCashier(): UseCashierReturn {
       selectOrderById,
       createOrder,
       addProductToOrder,
+      splitOrderLine,
       updateOrderLine,
       removeOrderLine,
       addProductToTableSession,

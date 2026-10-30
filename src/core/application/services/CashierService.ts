@@ -240,6 +240,23 @@ export class CashierService implements ICashierService {
     return this.cashierRepository.updateSalesOrderLine(salesOrderId, lineId, payload);
   }
 
+  async splitSalesOrderLine(
+    salesOrderId: string,
+    lineId: string,
+    quantity: string
+  ): Promise<SalesOrderLine> {
+    if (!salesOrderId?.trim()) {
+      throw new Error("Sales order ID is required");
+    }
+    if (!lineId?.trim()) {
+      throw new Error("Sales order line ID is required");
+    }
+    if (!(Number(quantity) > 0)) {
+      throw new Error("Quantity must be greater than zero");
+    }
+    return this.cashierRepository.splitSalesOrderLine(salesOrderId, lineId, quantity);
+  }
+
   async deleteSalesOrderLine(salesOrderId: string, lineId: string): Promise<void> {
     if (!salesOrderId?.trim()) {
       throw new Error("Sales order ID is required");
