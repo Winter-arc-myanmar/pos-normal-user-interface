@@ -192,6 +192,8 @@ export class SalesOrderLine {
    */
   categoryId?: string;
   categoryName?: string;
+  /** A price the cashier set for this sale only, on a cart line not saved yet. */
+  priceOverride?: string;
   createdAt?: string;
   updatedAt?: string;
 

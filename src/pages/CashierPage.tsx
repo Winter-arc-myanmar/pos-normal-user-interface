@@ -31,7 +31,7 @@ import { menuProductFilter } from "@/lib/pos/menuProducts";
 import { useSalesOrderManagement } from "@/core/presentation/hooks/useSalesOrderManagement";
 import { CashierBoard } from "./cashier/CashierBoard";
 import { MultiOrderingView } from "./cashier/MultiOrderingView";
-import { OrderPanel } from "./cashier/OrderPanel";
+import { OrderPanel, type GroupedSalesOrderLine } from "./cashier/OrderPanel";
 import { TableSeatingDialog } from "./cashier/TableSeatingDialog";
 import { ExtraFeeDialog } from "./cashier/ExtraFeeDialog";
 import { SplitItemsDialog, SplitTarget } from "./cashier/SplitItemsDialog";
@@ -576,8 +576,9 @@ export function CashierPage() {
     ) => {
       const variantModifier = Number(variant?.priceModifier || 0);
       const basePrice = Number(product?.basePrice || line.unitPrice || 0);
-      const unitPrice =
-        basePrice + variantModifier + modifierExtra(line.selectedModifiers);
+      const unitPrice = line.priceOverride
+        ? Number(line.priceOverride)
+        : basePrice + variantModifier + modifierExtra(line.selectedModifiers);
       const ownRateId = product?.taxRateId;
       const fallback = ownRateId || variant?.taxRate ? null : defaultTaxRate;
       const isPriceInclusive = fallback
@@ -1232,7 +1233,8 @@ export function CashierPage() {
           line.variantId,
           Number(line.quantity || 1),
           undefined,
-          chosenOf(line.selectedModifiers)
+          chosenOf(line.selectedModifiers),
+          line.priceOverride
         );
       }
 
@@ -2470,6 +2472,64 @@ export function CashierPage() {
     }
   };
 
+  const menuPriceOf = (line: SalesOrderLine) => {
+    if (isFeeLine(line)) return undefined;
+    const variant = variantById[line.variantId];
+    const product = variant ? productById[variant.productId] : undefined;
+    if (!product) return undefined;
+    return (
+      Number(product.basePrice || 0) +
+      Number(variant?.priceModifier || 0) +
+      modifierExtra(line.selectedModifiers)
+    );
+  };
+
+  const handleChangeLinePrice = async (
+    line: GroupedSalesOrderLine,
+    price: number
+  ) => {
+    setLocalError(null);
+    setNotice(null);
+    const unitPrice = formatAmount(price);
+    const lines = line.groupedLines ?? [line];
+    try {
+      if (isSettledSalesOrder(selectedOrder) && !isDirectCheckoutMode) {
+        throw new Error(t("cashier.errors.orderAlreadyPaid"));
+      }
+      if (isDirectCheckoutMode) {
+        const ids = new Set(lines.map((entry) => entry.id));
+        setDirectCartLines((current) =>
+          current.map((entry) => {
+            if (!ids.has(entry.id)) return entry;
+            const variant = variantById[entry.variantId];
+            const product = variant ? productById[variant.productId] : undefined;
+            return buildDirectLine(
+              { ...entry, priceOverride: unitPrice },
+              product,
+              variant
+            );
+          })
+        );
+        return;
+      }
+      if (!selectedOrder) return;
+      for (const entry of lines) {
+        await updateOrderLine(entry.salesOrderId || selectedOrder.id, entry.id, {
+          variantId: entry.variantId,
+          quantity: entry.quantity,
+          unitPrice,
+          lineDiscount: entry.lineDiscount || "0.0000",
+          taxAmount: entry.taxAmount || "0.0000",
+          seatNumber: entry.seatNumber,
+        });
+      }
+    } catch (caught) {
+      setLocalError(
+        caught instanceof Error ? caught.message : t("cashier.errors.updateOrderLine")
+      );
+    }
+  };
+
   const closePayView = () => {
     const nextView =
       payReturnViewRef.current && payReturnViewRef.current !== "pay"
@@ -2701,7 +2761,11 @@ export function CashierPage() {
             product,
             line.variantId,
             Number(line.quantity || 1),
-            { refreshLines: false, modifiers: chosenOf(line.selectedModifiers) }
+            {
+              refreshLines: false,
+              modifiers: chosenOf(line.selectedModifiers),
+              unitPrice: line.priceOverride,
+            }
           );
         }
 
@@ -3040,6 +3104,8 @@ export function CashierPage() {
         onDecreaseLineQuantity={(line) => void handleDecreaseLineQuantity(line)}
         onRemoveLine={(line) => void handleRemoveLine(line)}
         onToggleFoc={(line) => void handleToggleFoc(line)}
+        onChangeLinePrice={(line, price) => void handleChangeLinePrice(line, price)}
+        menuPrice={menuPriceOf}
         promotions={promotions.running}
         promotionDiscounts={isDirectCheckoutMode ? promotions.discounts : undefined}
         promotionName={promotions.promotionName}
