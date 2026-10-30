@@ -447,6 +447,14 @@ const readSalesOrderLineNames = (item: Record<string, unknown>) => {
   };
 };
 
+/** The menu price for one that came with a line: its product's price and its variant's. */
+const readLineMenuPrice = (item: Record<string, unknown>) => {
+  const variant = asRecord(item.variant);
+  const basePrice = asRecord(variant?.product)?.basePrice;
+  if (basePrice === undefined || basePrice === null) return undefined;
+  return String(Number(basePrice) + Number(variant?.priceModifier ?? 0));
+};
+
 /**
  * The modifiers a sold line carries, in whichever shape the API returns them:
  * the array this till posts to add/update a line, or an object keyed by
@@ -1496,6 +1504,7 @@ export class ApiCashierRepository implements ICashierRepository {
         updatedAt: item.updatedAt ? String(item.updatedAt) : undefined,
         categoryId: readLineCategoryId(item),
         categoryName: asName(item.categoryName) || asName(asRecord(item.product)?.categoryName),
+        menuPrice: readLineMenuPrice(item),
         ...names,
       });
     });

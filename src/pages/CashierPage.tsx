@@ -645,6 +645,25 @@ export function CashierPage() {
     };
   };
 
+  /** What the menu charges for one of a line, from the loaded menu or what the server sent with the line. */
+  const menuPriceFor = (line: {
+    variantId: string;
+    menuPrice?: string;
+    selectedModifiers?: unknown;
+  }) => {
+    if (isFeeLine(line)) return undefined;
+    const variant = variantById[line.variantId];
+    const product = variant ? productById[variant.productId] : undefined;
+    const listPrice = product
+      ? Number(product.basePrice || 0) + Number(variant?.priceModifier || 0)
+      : line.menuPrice !== undefined
+        ? Number(line.menuPrice)
+        : undefined;
+    return listPrice === undefined
+      ? undefined
+      : listPrice + modifierExtra(line.selectedModifiers);
+  };
+
   const printableLines = (
     lines: Array<{
       voidedAt?: string | null;
@@ -658,6 +677,7 @@ export function CashierPage() {
       categoryId?: string;
       categoryName?: string;
       selectedModifiers?: unknown;
+      menuPrice?: string;
     }>,
     withoutTax = false,
     // On a bill the guest gets, a repriced item says so: "Water (Discount)".
@@ -674,15 +694,9 @@ export function CashierPage() {
           ? toMoney(Number(line.unitPrice || 0) - Number(line.taxAmount || 0) / quantity)
           : line.unitPrice?.trim();
         const name = line.productName || product?.name || line.variantName || "Item";
-        const note =
-          notePrices && product && !isFeeLine(line)
-            ? linePriceNote(
-                line.unitPrice,
-                Number(product.basePrice || 0) +
-                  Number(variant?.priceModifier || 0) +
-                  modifierExtra(line.selectedModifiers)
-              )
-            : undefined;
+        const note = notePrices
+          ? linePriceNote(line.unitPrice, menuPriceFor(line))
+          : undefined;
         return {
           variantId: line.variantId,
           name: note ? t(`cashier.orderPanel.priceNote.${note}`, { name }) : name,
@@ -724,10 +738,17 @@ export function CashierPage() {
   const displayOrderLines = useMemo(() => {
     if (isDirectCheckoutMode) return activeOrderLines;
 
+    // A saved line keeps the price it was saved with, which the cashier may
+    // have changed for this bill; only its tax is worked out here.
     return selectedOrderLines.map((line) => {
       const variant = variantById[line.variantId];
       const product = variant ? productById[variant.productId] : undefined;
-      return product || variant ? buildDirectLine(line, product, variant) : line;
+      return product || variant
+        ? {
+            ...buildDirectLine({ ...line, priceOverride: line.unitPrice }, product, variant),
+            priceOverride: undefined,
+          }
+        : line;
     });
   }, [
     activeOrderLines,
@@ -2467,17 +2488,7 @@ export function CashierPage() {
     });
   };
 
-  const menuPriceOf = (line: SalesOrderLine) => {
-    if (isFeeLine(line)) return undefined;
-    const variant = variantById[line.variantId];
-    const product = variant ? productById[variant.productId] : undefined;
-    if (!product) return undefined;
-    return (
-      Number(product.basePrice || 0) +
-      Number(variant?.priceModifier || 0) +
-      modifierExtra(line.selectedModifiers)
-    );
-  };
+  const menuPriceOf = (line: SalesOrderLine) => menuPriceFor(line);
 
   const handleEditLine = async (
     line: GroupedSalesOrderLine,
