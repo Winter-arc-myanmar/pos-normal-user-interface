@@ -1676,7 +1676,11 @@
     "freePackageAdded": "+{{count}} {{package}} အခမဲ့ · {{name}}",
     "roomChargeFree": "{{count}} အခမဲ့",
     "tipPaidWith": "ဆုငွေ ပေးချေမည့်နည်း",
-    "totalWithTip": "ဆုငွေအပါ စုစုပေါင်း {{amount}}"
+    "totalWithTip": "ဆုငွေအပါ စုစုပေါင်း {{amount}}",
+    "orderedByLabel": "မှာသူ",
+    "customer": "ဧည့်သည်",
+    "orderedBy": "{{name}} မှာထားသည်",
+    "aHostess": "Hostess"
   },
   "statusBadge": {
     "verified": "အတည်ပြုပြီး",

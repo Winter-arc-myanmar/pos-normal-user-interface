@@ -498,6 +498,38 @@ describe("KtvBoardPage", () => {
       );
     });
 
+    it("sends the hostess who ordered a drink with it", async () => {
+      rooms = [busyRoom];
+      mocks.chargeItems.mockResolvedValue({
+        charged: "25000.0000",
+        balanceAfter: "175000.0000",
+        quote: paidQuote,
+      });
+      renderPage();
+      fireEvent.click(screen.getByRole("button", { name: /K1/ }));
+      fireEvent.click(await screen.findByRole("button", { name: /Hostess per hour/ }));
+      fireEvent.click(await screen.findByRole("button", { name: /Snow/ }));
+      fireEvent.click(await screen.findByRole("button", { name: /Myanmar Beer/ }));
+
+      const customer = await screen.findByRole("button", { name: /customer$/ });
+      expect(customer).toHaveAttribute("aria-pressed", "true");
+      fireEvent.click(screen.getByRole("button", { name: "Snow" }));
+      fireEvent.click(screen.getByRole("button", { name: /ktvPos.addToBill/ }));
+      await tapCard();
+
+      await waitFor(() =>
+        expect(mocks.chargeItems).toHaveBeenCalledWith(
+          "ktv-session-1",
+          expect.objectContaining({
+            items: expect.arrayContaining([
+              expect.objectContaining({ variantId: "variant-hostess", hostessId: "hostess-snow" }),
+              expect.objectContaining({ variantId: "variant-beer", hostessId: "hostess-snow" }),
+            ]),
+          })
+        )
+      );
+    });
+
     it("keeps products sold only at the SPA off the KTV menu", async () => {
       rooms = [busyRoom];
       renderPage();

@@ -1724,7 +1724,11 @@
     "freePackageAdded": "+{{count}} free {{package}} · {{name}}",
     "roomChargeFree": "{{count}} free",
     "tipPaidWith": "Tip paid with",
-    "totalWithTip": "Total with tip {{amount}}"
+    "totalWithTip": "Total with tip {{amount}}",
+    "orderedByLabel": "Ordered by",
+    "customer": "Customer",
+    "orderedBy": "Ordered by {{name}}",
+    "aHostess": "a hostess"
   },
   "statusBadge": {
     "verified": "Verified",
