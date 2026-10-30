@@ -761,7 +761,7 @@ export function CashierPage() {
   const billOptions = useBillOptions({
     billKey: `${isDirectCheckoutMode ? "direct" : selectedOrder?.id || "empty"}:${billGeneration}`,
     orderId: !isDirectCheckoutMode ? selectedOrder?.id : undefined,
-    discount: discountAmount,
+    discount: discountAmount.trim() || "0.0000",
     revision: billRevision,
     fetchBill: fetchOrderBill,
   });
