@@ -108,6 +108,10 @@ interface OrderPanelProps {
   onDecreaseLineQuantity: (line: SalesOrderLine) => void;
   onRemoveLine: (line: SalesOrderLine) => void;
   onToggleFoc?: (line: SalesOrderLine) => void;
+  /** Charge a different price for this item on this bill only. */
+  onChangeLinePrice?: (line: GroupedSalesOrderLine, price: number) => void;
+  /** What the menu charges for a line, to show when the bill charges something else. */
+  menuPrice?: (line: SalesOrderLine) => number | undefined;
   /** Promotions running at this till, as the server tells them. */
   promotions?: RunningPromotion[];
   /** What the running promotions take off the lines they have not priced yet. */
@@ -217,6 +221,8 @@ export function OrderPanel({
   onDecreaseLineQuantity,
   onRemoveLine,
   onToggleFoc,
+  onChangeLinePrice,
+  menuPrice = () => undefined,
   promotions = [],
   promotionDiscounts = {},
   promotionName = () => undefined,
@@ -265,6 +271,10 @@ export function OrderPanel({
   const [expandedLine, setExpandedLine] = useState<{
     orderId: string | undefined;
     lineId: string;
+  } | null>(null);
+  const [priceDraft, setPriceDraft] = useState<{
+    lineId: string;
+    value: string;
   } | null>(null);
   const lineDetailsId = useId();
   const tableControlsId = useId();
@@ -442,6 +452,15 @@ export function OrderPanel({
                 const detailsId = `${lineDetailsId}-${line.id}`;
                 const isPendingKds = isPendingKdsLine(line);
                 const isFee = isFeeLine?.(line) ?? false;
+                const listPrice = menuPrice(line);
+                const priceChanged =
+                  listPrice !== undefined &&
+                  Math.abs(listPrice - Number(line.unitPrice || 0)) >= 0.0001;
+                const isEditingPrice = isExpanded && priceDraft?.lineId === line.id;
+                const savePrice = (price: number) => {
+                  onChangeLinePrice?.(line, price);
+                  setPriceDraft(null);
+                };
                 return (
                   <div
                     key={line.id}
@@ -495,6 +514,11 @@ export function OrderPanel({
                             {t("cashier.orderPanel.foc")}
                           </span>
                         ) : null}
+                        {priceChanged ? (
+                          <span className="shrink-0 rounded bg-blue-50 px-1 text-[10px] font-semibold text-blue-700">
+                            {t("cashier.orderPanel.priceChanged")}
+                          </span>
+                        ) : null}
                         <span className="min-w-0 truncate" title={lineName}>{lineName}</span>
                       </span>
                       <span className="shrink-0 text-sm tabular-nums">
@@ -526,6 +550,16 @@ export function OrderPanel({
                           </p>
                         ) : null}
                         <p className="mt-0.5 text-xs tabular-nums text-slate-600">
+                          {priceChanged ? (
+                            <span
+                              className="mr-1 text-slate-400 line-through"
+                              aria-label={t("cashier.orderPanel.menuPriceWas", {
+                                amount: formatPosMoney(listPrice),
+                              })}
+                            >
+                              {formatPosMoney(listPrice)}
+                            </span>
+                          ) : null}
                           <span className={saving ? "text-slate-400 line-through" : ""}>
                             {formatPosMoney(line.unitPrice)}
                           </span>
@@ -578,6 +612,30 @@ export function OrderPanel({
                           </button>
                           <button
                             type="button"
+                            className="min-h-11 rounded border border-slate-300 px-2 py-1 font-medium hover:bg-slate-100 focus-visible:outline-blue-500 disabled:opacity-50"
+                            aria-expanded={isEditingPrice}
+                            onClick={() =>
+                              setPriceDraft(
+                                isEditingPrice
+                                  ? null
+                                  : {
+                                      lineId: line.id,
+                                      value: String(Number(line.unitPrice || 0)),
+                                    }
+                              )
+                            }
+                            disabled={
+                              isLoading ||
+                              isSettledOrder ||
+                              !onChangeLinePrice ||
+                              isFee ||
+                              isFocLine(line)
+                            }
+                          >
+                            {t("cashier.orderPanel.changePrice")}
+                          </button>
+                          <button
+                            type="button"
                             className="min-h-11 rounded border border-red-300 px-2 py-1 font-medium text-red-700 hover:bg-red-50 focus-visible:outline-blue-500 disabled:opacity-50"
                             onClick={() => onRemoveLine(line)}
                             disabled={isLoading || isSettledOrder}
@@ -585,6 +643,66 @@ export function OrderPanel({
                             {t("cashier.orderPanel.remove")}
                           </button>
                         </div>
+                        {isEditingPrice && priceDraft ? (
+                          <form
+                            className="mt-2 rounded border border-slate-200 bg-white p-2"
+                            onSubmit={(event) => {
+                              event.preventDefault();
+                              const price = Number(priceDraft.value);
+                              if (priceDraft.value.trim() === "" || !Number.isFinite(price) || price < 0) return;
+                              savePrice(price);
+                            }}
+                          >
+                            <label
+                              className="block text-xs font-medium text-slate-600"
+                              htmlFor={`${detailsId}-price`}
+                            >
+                              {t("cashier.orderPanel.newPrice")}
+                            </label>
+                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                              <input
+                                id={`${detailsId}-price`}
+                                type="number"
+                                inputMode="decimal"
+                                min="0"
+                                step="any"
+                                autoFocus
+                                className="min-h-11 w-32 rounded border border-slate-300 px-2 text-sm tabular-nums focus-visible:outline-blue-500"
+                                value={priceDraft.value}
+                                onChange={(event) =>
+                                  setPriceDraft({ lineId: line.id, value: event.target.value })
+                                }
+                              />
+                              <button
+                                type="submit"
+                                className="min-h-11 rounded bg-blue-600 px-3 font-semibold text-white hover:bg-blue-700 focus-visible:outline-blue-500 disabled:opacity-50"
+                                disabled={isLoading}
+                              >
+                                {t("cashier.orderPanel.savePrice")}
+                              </button>
+                              {priceChanged ? (
+                                <button
+                                  type="button"
+                                  className="min-h-11 rounded border border-slate-300 px-2 font-medium hover:bg-slate-100 focus-visible:outline-blue-500 disabled:opacity-50"
+                                  disabled={isLoading}
+                                  onClick={() => savePrice(listPrice)}
+                                >
+                                  {t("cashier.orderPanel.useMenuPrice")}
+                                </button>
+                              ) : null}
+                              <button
+                                type="button"
+                                className="min-h-11 rounded px-2 font-medium text-slate-600 hover:bg-slate-100 focus-visible:outline-blue-500"
+                                onClick={() => setPriceDraft(null)}
+                              >
+                                {t("common.cancel")}
+                              </button>
+                            </div>
+                            <p className="mt-1 text-xs text-slate-500">
+                              {t("cashier.orderPanel.priceHint")}
+                            </p>
+                          </form>
+                        ) : null}
                       </div>
                     ) : null}
                   </div>

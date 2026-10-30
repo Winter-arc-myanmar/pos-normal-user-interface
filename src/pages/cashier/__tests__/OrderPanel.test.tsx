@@ -627,4 +627,60 @@ describe("OrderPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.expandItem" }));
     expect(screen.getByText("Large")).toBeInTheDocument();
   });
+
+  it("changes a line's price for this bill only", async () => {
+    const user = userEvent.setup();
+    const onChangeLinePrice = vi.fn();
+    render(
+      <OrderPanel
+        {...defaultProps}
+        selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
+        onChangeLinePrice={onChangeLinePrice}
+        menuPrice={() => 10}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "cashier.orderPanel.expandItem" }));
+    await user.click(screen.getByRole("button", { name: "cashier.orderPanel.changePrice" }));
+    const input = screen.getByLabelText("cashier.orderPanel.newPrice");
+    await user.clear(input);
+    await user.type(input, "7.5");
+    await user.click(screen.getByRole("button", { name: "cashier.orderPanel.savePrice" }));
+
+    expect(onChangeLinePrice).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "line-1" }),
+      7.5
+    );
+    expect(screen.queryByLabelText("cashier.orderPanel.newPrice")).not.toBeInTheDocument();
+  });
+
+  it("marks a changed price and offers the menu price back", async () => {
+    const user = userEvent.setup();
+    const onChangeLinePrice = vi.fn();
+    render(
+      <OrderPanel
+        {...defaultProps}
+        selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
+        selectedOrderLines={[new SalesOrderLine({ ...line, unitPrice: "8.0000" })]}
+        onChangeLinePrice={onChangeLinePrice}
+        menuPrice={() => 10}
+      />
+    );
+
+    expect(screen.getByText("cashier.orderPanel.priceChanged")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "cashier.orderPanel.expandItem" }));
+    await user.click(screen.getByRole("button", { name: "cashier.orderPanel.changePrice" }));
+    await user.click(screen.getByRole("button", { name: "cashier.orderPanel.useMenuPrice" }));
+
+    expect(onChangeLinePrice).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "line-1" }),
+      10
+    );
+  });
+
+  it("does not change the price on a paid bill", () => {
+    render(<OrderPanel {...defaultProps} onChangeLinePrice={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.expandItem" }));
+    expect(screen.getByRole("button", { name: "cashier.orderPanel.changePrice" })).toBeDisabled();
+  });
 });

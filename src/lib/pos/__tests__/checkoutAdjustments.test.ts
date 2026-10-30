@@ -115,6 +115,18 @@ describe("checkoutAdjustments", () => {
     );
   });
 
+  it("sends the price the cashier changed, and only then", () => {
+    const items = allocateOrderDiscountToLines(
+      [
+        { variantId: "a", quantity: "1.0000", unitPrice: "8.0000", priceOverride: "8.0000" },
+        { variantId: "b", quantity: "1.0000", unitPrice: "10.0000" },
+      ],
+      0
+    );
+    expect(items[0].unitPrice).toBe("8.0000");
+    expect(items[1]).not.toHaveProperty("unitPrice");
+  });
+
   it("attaches tipAmount to the first checkout payment only", () => {
     expect(
       withOrderTipOnFirstPayment(
