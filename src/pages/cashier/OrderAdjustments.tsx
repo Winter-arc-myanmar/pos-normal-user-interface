@@ -22,6 +22,9 @@ interface OrderAdjustmentsProps {
   onLookupMemberCard: () => void;
 }
 
+// No amount shows as an empty box: typing 5000 after "0.0000" made it 0.00005000.
+const shownAmount = (value: string) => (value === "0.0000" ? "" : value);
+
 const inputClass =
   "min-h-11 w-full min-w-0 rounded-md border border-slate-700 bg-slate-900 px-3 text-sm text-slate-100 focus:border-blue-500 focus:outline-none disabled:opacity-50";
 
@@ -55,9 +58,11 @@ export function OrderAdjustments({
           </span>
           <input
             inputMode="decimal"
-            value={discountAmount}
+            value={shownAmount(discountAmount)}
+            placeholder="0"
             disabled={disabled}
             aria-label={t("cashier.orderPanel.discount")}
+            onFocus={(event) => event.currentTarget.select()}
             onChange={(event) => onDiscountAmountChange(event.target.value)}
             className={inputClass}
           />
@@ -106,9 +111,11 @@ export function OrderAdjustments({
         </span>
         <input
           inputMode="decimal"
-          value={tipAmount}
+          value={shownAmount(tipAmount)}
+          placeholder="0"
           disabled={disabled}
           aria-label={t("cashier.orderPanel.tip")}
+          onFocus={(event) => event.currentTarget.select()}
           onChange={(event) => onTipAmountChange(event.target.value)}
           className={inputClass}
         />

@@ -437,6 +437,29 @@ describe("OrderPanel", () => {
     expect(screen.queryByText("cashier.billOptions.table")).not.toBeInTheDocument();
   });
 
+  it("starts the discount and tip boxes empty so typed amounts are not added after 0.0000", async () => {
+    const user = userEvent.setup();
+    const onDiscountAmountChange = vi.fn();
+    render(
+      <OrderPanel
+        {...defaultProps}
+        selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
+        discountAmount="0.0000"
+        tipAmount="0.0000"
+        onDiscountAmountChange={onDiscountAmountChange}
+        onTipAmountChange={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: /cashier.billOptions.title/ }));
+    const discount = screen.getByLabelText("cashier.orderPanel.discount");
+    expect(discount).toHaveValue("");
+    expect(discount).toHaveAttribute("placeholder", "0");
+    expect(screen.getByLabelText("cashier.orderPanel.tip")).toHaveValue("");
+    await user.type(discount, "5");
+    expect(onDiscountAmountChange).toHaveBeenLastCalledWith("5");
+  });
+
   it("chooses tax and service charge for the bill from Bill options", () => {
     const onChange = vi.fn();
     render(
