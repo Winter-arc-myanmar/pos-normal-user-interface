@@ -927,6 +927,38 @@ describe("SpaBoardPage", () => {
       );
     });
 
+    it("adjusts the room's bill from the panel before paying", async () => {
+      await openRunningRoom();
+      fireEvent.click(
+        screen.getByRole("button", { name: "cashier.billOptions.titleWithTable" })
+      );
+      expect(
+        screen.getByRole("button", { name: "cashier.billOptions.done" })
+      ).toBeInTheDocument();
+      // Pause keeps its place beside it.
+      expect(screen.getByRole("button", { name: "spa.pause" })).toBeInTheDocument();
+
+      fireEvent.click(
+        screen.getByRole("checkbox", { name: "cashier.payment.includeTax" })
+      );
+      await waitFor(() =>
+        expect(mocks.fetchOrderBill).toHaveBeenCalledWith(
+          "order-1",
+          expect.objectContaining({ includeTax: false })
+        )
+      );
+
+      fireEvent.change(screen.getByLabelText("cashier.orderPanel.discount"), {
+        target: { value: "5000" },
+      });
+      await waitFor(() =>
+        expect(mocks.fetchOrderBill).toHaveBeenCalledWith(
+          "order-1",
+          expect.objectContaining({ discount: "5000" })
+        )
+      );
+    });
+
     it("splits the bill between cash and the guest card, without tax", async () => {
       mocks.closeSession.mockImplementation(async () => {
         roomClosed = true;

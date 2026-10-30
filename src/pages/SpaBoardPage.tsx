@@ -72,6 +72,8 @@ import {
 import { ProductMenu } from "./cashier/ProductMenu";
 import { ExtraFeeDialog } from "./cashier/ExtraFeeDialog";
 import { PaymentView } from "./cashier/PaymentView";
+import { BillOptionsDialog } from "./cashier/BillOptionsDialog";
+import { OrderAdjustments } from "./cashier/OrderAdjustments";
 import { CardTapDialog } from "./spa/CardTapDialog";
 import { SpaBillPanel } from "./spa/SpaBillPanel";
 import { PackagePicker } from "./spa/PackagePicker";
@@ -193,6 +195,10 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [tip, setTip] = useState("");
+  // Bill & table for a room: the same bill-level choices the cashier takes.
+  const [billDiscount, setBillDiscount] = useState("0.0000");
+  const [billDiscountReasonId, setBillDiscountReasonId] = useState("");
+  const [billOptionsOpen, setBillOptionsOpen] = useState(false);
   const [splitCash, setSplitCash] = useState(false);
   const [cashAmount, setCashAmount] = useState("");
   const { fees: extraFees } = useExtraFees();
@@ -279,7 +285,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const billOptions = useBillOptions({
     billKey: endBillOrderId || "none",
     orderId: endBillOrderId,
-    discount: "0.0000",
+    discount: billDiscount,
     revision: JSON.stringify([
       chargedLines.map((line) => [line.id, line.quantity, line.unitPrice, line.lineDiscount]),
       billClosed,
@@ -308,7 +314,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         lines: chargedLines,
         menuPrice: () => undefined,
         itemsTotal: serverBill ? Number(serverBill.subtotal) + timeNotOnLines : endBillDue,
-        billDiscount: 0,
+        billDiscount: serverBill ? Number(serverBill.totalDiscount) : 0,
         serviceCharge: serverBill ? Number(serverBill.serviceCharge) : 0,
         tax: serverBill ? Number(serverBill.addedTax) + Number(serverBill.serviceChargeTax) : 0,
         includedTax: serverBill
@@ -1558,6 +1564,11 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
    */
   const handleEndBillPay = async () => {
     if (!session?.salesOrderId) return;
+    const orderDiscount = Math.max(0, Number(billDiscount) || 0);
+    if (orderDiscount > 0 && discountReasons.length && !billDiscountReasonId) {
+      setActionError(t("cashier.errors.discountReasonRequired"));
+      return;
+    }
     const tenders = isSplitMode
       ? splitTenders
       : endPayMethodId
@@ -1613,6 +1624,10 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               ),
               posSessionId: context.posSessionId,
               ...(tipValue > 0 ? { tipAmount: tipValue.toFixed(4) } : {}),
+              ...(orderDiscount > 0
+                ? { totalDiscount: orderDiscount.toFixed(4) }
+                : {}),
+              ...(billDiscountReasonId ? { discountReasonId: billDiscountReasonId } : {}),
               ...(billOptions.changed
                 ? {
                     includeTax: billOptions.includeTax,
@@ -2061,6 +2076,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               setShowExtend(true);
             }}
             onTogglePause={() => void togglePause()}
+            onOpenBill={endBillOrderId ? () => setBillOptionsOpen(true) : undefined}
             onChangeQuantity={(line) => void reduceLine(line)}
             onAddAnother={addAnother}
             onRemoveLine={(group) => void removeLines(group)}
@@ -2309,6 +2325,71 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             </div>
           )}
         </div>
+      ) : null}
+
+      {billOptionsOpen && endBillOrderId && session ? (
+        <BillOptionsDialog
+          title={t("cashier.billOptions.titleWithTable")}
+          bill={
+            <>
+              <fieldset
+                className="space-y-1 rounded-md border border-slate-800 bg-slate-900/60 p-2"
+                disabled={isPaying || billOptions.isLoading || billClosed}
+              >
+                <legend className="sr-only">{t("cashier.payment.options")}</legend>
+                {(["includeTax", "includeServiceCharge"] as const).map((field) => (
+                  <label
+                    key={field}
+                    className="flex min-h-11 cursor-pointer items-center gap-3 px-1 text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={billOptions[field]}
+                      onChange={(event) => chooseEndBillOption(field, event.target.checked)}
+                      className="h-5 w-5 accent-blue-500"
+                    />
+                    {t(`cashier.payment.${field}`)}
+                  </label>
+                ))}
+                <p className="px-1 pb-1 text-xs text-slate-400">
+                  {t("cashier.payment.optionsHint")}
+                </p>
+              </fieldset>
+              <OrderAdjustments
+                discountAmount={billDiscount}
+                discountReasonId={billDiscountReasonId}
+                discountReasons={discountReasons}
+                serviceCharge={String(
+                  serverBill?.serviceCharge ?? quote?.servicesCharge ?? "0"
+                )}
+                tipAmount={tip}
+                disabled={isPaying || billOptions.isLoading || billClosed}
+                onDiscountAmountChange={(value) => {
+                  setBillDiscount(value);
+                  resetSplit();
+                }}
+                onDiscountReasonChange={setBillDiscountReasonId}
+                onRemoveDiscount={() => {
+                  setBillDiscount("0.0000");
+                  setBillDiscountReasonId("");
+                  resetSplit();
+                }}
+                onTipAmountChange={(value) => {
+                  setTip(value);
+                  resetSplit();
+                }}
+              />
+              {billOptions.error ? (
+                <p className="text-xs text-red-400">{billOptions.error}</p>
+              ) : null}
+              <p className="flex justify-between border-t border-slate-800 pt-2 text-base font-bold">
+                <span>{tr("estimatedTotal")}</span>
+                <span>{money(endBillTotal)}</span>
+              </p>
+            </>
+          }
+          onClose={() => setBillOptionsOpen(false)}
+        />
       ) : null}
 
       {extraFeeOpen ? (
