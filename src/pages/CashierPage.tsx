@@ -2232,15 +2232,19 @@ export function CashierPage() {
             includeServiceCharge: billOptions.includeServiceCharge,
           } : {}),
         });
-      } else if (billOptions.changed && selectedOrder && !isDirectCheckoutMode) {
+      } else if (selectedOrder && !isDirectCheckoutMode && !isMultiOrderSecondary) {
+        // A saved order is paid as it stands, at the prices on its lines. The
+        // quick-sale checkout would open a second order and price it from the menu.
         await settleOrder(selectedOrder.id, {
           payments: checkoutPayments,
           posSessionId: context.posSessionId,
           ...(tip > 0 ? { tipAmount: toMoney(tip) } : {}),
           ...(orderDiscount > 0 ? { totalDiscount: toMoney(orderDiscount) } : {}),
           ...(discountReasonId ? { discountReasonId } : {}),
-          includeTax: billOptions.includeTax,
-          includeServiceCharge: billOptions.includeServiceCharge,
+          ...(billOptions.changed ? {
+            includeTax: billOptions.includeTax,
+            includeServiceCharge: billOptions.includeServiceCharge,
+          } : {}),
         });
       } else if (isMultiOrderSecondary && selectedOrder) {
         for (const payment of checkoutPayments) {
