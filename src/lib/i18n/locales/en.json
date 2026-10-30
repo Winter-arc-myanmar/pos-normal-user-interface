@@ -77,7 +77,8 @@
     "expandSidebar": "Expand sidebar",
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
-    "drawerNotConfigured": "Cash drawer API is not configured"
+    "drawerNotConfigured": "Cash drawer API is not configured",
+    "hostessesTitle": "Hostesses"
   },
   "login": {
     "title": "Sign in",
@@ -1936,7 +1937,21 @@
     "noHostesses": "No hostesses are working now. Add them in admin under Hostesses.",
     "hostessFree": "Free",
     "hostessInRoom": "In room {{room}}",
-    "hostessInRoomUntil": "In room {{room}} until {{time}}"
+    "hostessInRoomUntil": "In room {{room}} until {{time}}",
+    "hostessesTitle": "Hostesses",
+    "hostessesSummary": "Hostesses: {{working}} working · {{inRooms}} in rooms · {{free}} free",
+    "hostessUntilClose": "until close",
+    "hostessTimeUp": "Time up",
+    "hostessLeft": "{{time}} left",
+    "hostessesInRoom": "Hostess: {{names}}",
+    "hostessStatusTitle": "Hostess status",
+    "hostessColumn": "Hostess",
+    "statusColumn": "Status",
+    "roomColumn": "Room",
+    "sinceColumn": "Since",
+    "timeLeftColumn": "Time left",
+    "hostessInRoomStatus": "In room",
+    "openHostessRoom": "{{name}}: open her room"
   },
   "diningTables": {
     "title": "Dining tables",

@@ -189,6 +189,21 @@ vi.mock("@/core/presentation/hooks/useWorkingHostesses", () => ({
     load: mocks.loadHostesses,
   }),
 }));
+vi.mock("@/core/presentation/hooks/useHostessBoard", () => ({
+  useHostessBoard: () => ({
+    hostesses: [
+      { id: "hostess-lily", name: "Lily", nickname: null, inRoom: null },
+      {
+        id: "hostess-snow",
+        name: "Ma Hnin",
+        nickname: "Snow",
+        inRoom: { roomNumber: "K1", roomId: "ktv-1", until: new Date(Date.now() + 5 * 60000).toISOString() },
+      },
+    ],
+    error: null,
+    loaded: true,
+  }),
+}));
 vi.mock("@/core/presentation/hooks/useCashier", () => ({
   useCashier: () => ({
     products: [
@@ -528,6 +543,21 @@ describe("KtvBoardPage", () => {
           })
         )
       );
+    });
+
+    it("shows each hostess with her room and time left, and opens her room", async () => {
+      rooms = [busyRoom];
+      renderPage();
+
+      expect(await screen.findByText(/ktvPos.hostessesSummary/)).toBeInTheDocument();
+      expect(screen.getByText("ktvPos.hostessesInRoom")).toBeInTheDocument();
+      const snow = screen.getByRole("button", { name: "ktvPos.openHostessRoom" });
+      expect(snow).toHaveTextContent("● K1");
+      expect(snow).toHaveTextContent("⚠ ktvPos.hostessLeft");
+      expect(screen.getByRole("button", { name: "Lily" })).toBeDisabled();
+
+      fireEvent.click(snow);
+      expect(await screen.findByRole("button", { name: /Myanmar Beer/ })).toBeInTheDocument();
     });
 
     it("keeps products sold only at the SPA off the KTV menu", async () => {

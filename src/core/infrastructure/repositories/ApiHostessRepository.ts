@@ -32,6 +32,8 @@ export class ApiHostessRepository {
         inRoom: inRoom.roomNumber
           ? {
               roomNumber: String(inRoom.roomNumber),
+              ...(inRoom.roomId ? { roomId: String(inRoom.roomId) } : {}),
+              ...(inRoom.since ? { since: String(inRoom.since) } : {}),
               until: inRoom.until ? String(inRoom.until) : null,
             }
           : null,

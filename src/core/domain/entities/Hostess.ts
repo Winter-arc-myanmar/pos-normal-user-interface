@@ -4,5 +4,12 @@ export interface Hostess {
   name: string;
   nickname: string | null;
   /** The room she is in now. Shown, not enforced: she can still be picked. */
-  inRoom: { roomNumber: string; until: string | null } | null;
+  inRoom: {
+    roomNumber: string;
+    roomId?: string;
+    /** When she went in: her latest service there. */
+    since?: string;
+    /** When her paid time ends; null for a service sold each, which lasts until the room closes. */
+    until: string | null;
+  } | null;
 }
