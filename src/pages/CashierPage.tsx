@@ -3305,6 +3305,10 @@ export function CashierPage() {
           tables={diningTables}
           sessions={tableSessions}
           isBusy={isLoading}
+          menuName={(line) => {
+            const variant = variantById[line.variantId];
+            return (variant ? productById[variant.productId]?.name : undefined) || variant?.variantSku;
+          }}
           onConfirm={(target, lines) => void handleSplitToTable(target, lines)}
           onClose={() => setSeatingMode(null)}
         />

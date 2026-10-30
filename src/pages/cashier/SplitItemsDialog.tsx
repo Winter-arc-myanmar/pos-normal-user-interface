@@ -21,6 +21,8 @@ interface SplitItemsDialogProps {
   tables: DiningTable[];
   sessions: TableSession[];
   isBusy?: boolean;
+  /** An item's name from the loaded menu, for a line saved without one. */
+  menuName?: (line: SalesOrderLine) => string | undefined;
   onConfirm: (target: SplitTarget, lines: SplitLineDTO[]) => void;
   onClose: () => void;
 }
@@ -30,10 +32,9 @@ const tileClass =
 const stepClass =
   "h-11 w-11 rounded-md border border-slate-700 bg-slate-900 text-lg disabled:opacity-40";
 
-const lineName = (line: SalesOrderLine) =>
+const savedName = (line: SalesOrderLine) =>
   [line.productName, line.variantName].filter(Boolean).join(" · ") ||
-  line.sku ||
-  "?";
+  line.sku;
 
 export function SplitItemsDialog({
   session,
@@ -41,6 +42,7 @@ export function SplitItemsDialog({
   tables,
   sessions,
   isBusy = false,
+  menuName,
   onConfirm,
   onClose,
 }: SplitItemsDialogProps) {
@@ -139,7 +141,7 @@ export function SplitItemsDialog({
                   <li key={line.id} className="flex items-center gap-3 p-2 text-sm">
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-semibold">
-                        {lineName(line)}
+                        {savedName(line) || menuName?.(line) || "?"}
                       </span>
                       <span className="text-xs text-slate-400">
                         {t("cashier.seating.onBill", { count: max })}
