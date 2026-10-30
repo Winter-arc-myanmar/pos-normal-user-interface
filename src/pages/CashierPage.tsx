@@ -3155,6 +3155,11 @@ export function CashierPage() {
         onDecreaseLineQuantity={(line) => void handleDecreaseLineQuantity(line)}
         onRemoveLine={(line) => void handleRemoveLine(line)}
         onEditLine={(line, edit) => void handleEditLine(line, edit)}
+        chargeOptions={{
+          includeTax: billOptions.includeTax,
+          includeServiceCharge: billOptions.includeServiceCharge,
+          onChange: chooseBillOption,
+        }}
         menuPrice={menuPriceOf}
         promotions={promotions.running}
         promotionDiscounts={isDirectCheckoutMode ? promotions.discounts : undefined}

@@ -110,6 +110,12 @@ interface OrderPanelProps {
   onIncreaseLineQuantity: (line: SalesOrderLine) => void;
   onDecreaseLineQuantity: (line: SalesOrderLine) => void;
   onRemoveLine: (line: SalesOrderLine) => void;
+  /** Whether this bill charges tax and service charge, as on the pay screen. */
+  chargeOptions?: {
+    includeTax: boolean;
+    includeServiceCharge: boolean;
+    onChange: (field: "includeTax" | "includeServiceCharge", value: boolean) => void;
+  };
   /** Save an item's details: its price on this bill only, and FOC. */
   onEditLine?: (line: GroupedSalesOrderLine, edit: LineEdit) => void;
   /** What the menu charges for a line, to show when the bill charges something else. */
@@ -253,6 +259,7 @@ export function OrderPanel({
   onDecreaseLineQuantity,
   onRemoveLine,
   onEditLine,
+  chargeOptions,
   menuPrice = () => undefined,
   promotions = [],
   promotionDiscounts = {},
@@ -353,11 +360,19 @@ export function OrderPanel({
     hasTable ? "cashier.billOptions.titleWithTable" : "cashier.billOptions.title"
   );
   const billOptionsSummary = [
+    chargeOptions && !chargeOptions.includeTax ? t("cashier.billOptions.noTax") : null,
+    chargeOptions && !chargeOptions.includeServiceCharge
+      ? t("cashier.billOptions.noServiceCharge")
+      : null,
     Number(discountAmount) > 0 ? `−${formatPosMoney(discountAmount)}` : null,
     Number(tipAmount) > 0
       ? t("cashier.billOptions.tipSummary", { amount: formatPosMoney(tipAmount) })
       : null,
-    selectedTable?.tableNumber || null,
+    memberPointsLabel || null,
+    selectedTable
+      ? selectedTable.tableNumber ||
+        t(`cashier.orderPanel.tableStatuses.${selectedTable.status}`)
+      : null,
     selectedSession
       ? t(`cashier.orderPanel.sessionStates.${selectedSession.sessionState}`)
       : null,
@@ -994,24 +1009,51 @@ export function OrderPanel({
         <BillOptionsDialog
           title={billOptionsTitle}
           bill={onDiscountAmountChange && onTipAmountChange ? (
-            <OrderAdjustments
-              discountAmount={discountAmount}
-              discountReasonId={discountReasonId}
-              discountReasons={discountReasons}
-              serviceCharge={serviceCharge}
-              tipAmount={tipAmount}
-              memberCardUid={memberCardUid}
-              memberPointsLabel={memberPointsLabel}
-              memberCardError={memberCardError}
-              isMemberCardLoading={isMemberCardLoading}
-              disabled={isLoading || isSettledOrder}
-              onDiscountAmountChange={onDiscountAmountChange}
-              onDiscountReasonChange={onDiscountReasonChange || (() => undefined)}
-              onRemoveDiscount={onRemoveDiscount || (() => undefined)}
-              onTipAmountChange={onTipAmountChange}
-              onMemberCardUidChange={onMemberCardUidChange || (() => undefined)}
-              onLookupMemberCard={onLookupMemberCard || (() => undefined)}
-            />
+            <>
+              {chargeOptions ? (
+                <fieldset
+                  className="space-y-1 rounded-md border border-slate-800 bg-slate-900/60 p-2"
+                  disabled={isLoading || isSettledOrder}
+                >
+                  <legend className="sr-only">{t("cashier.payment.options")}</legend>
+                  {(["includeTax", "includeServiceCharge"] as const).map((field) => (
+                    <label
+                      key={field}
+                      className="flex min-h-11 cursor-pointer items-center gap-3 px-1 text-sm"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={chargeOptions[field]}
+                        onChange={(event) => chargeOptions.onChange(field, event.target.checked)}
+                        className="h-5 w-5 accent-blue-500"
+                      />
+                      {t(`cashier.payment.${field}`)}
+                    </label>
+                  ))}
+                  <p className="px-1 pb-1 text-xs text-slate-400">
+                    {t("cashier.payment.optionsHint")}
+                  </p>
+                </fieldset>
+              ) : null}
+              <OrderAdjustments
+                discountAmount={discountAmount}
+                discountReasonId={discountReasonId}
+                discountReasons={discountReasons}
+                serviceCharge={serviceCharge}
+                tipAmount={tipAmount}
+                memberCardUid={memberCardUid}
+                memberPointsLabel={memberPointsLabel}
+                memberCardError={memberCardError}
+                isMemberCardLoading={isMemberCardLoading}
+                disabled={isLoading || isSettledOrder}
+                onDiscountAmountChange={onDiscountAmountChange}
+                onDiscountReasonChange={onDiscountReasonChange || (() => undefined)}
+                onRemoveDiscount={onRemoveDiscount || (() => undefined)}
+                onTipAmountChange={onTipAmountChange}
+                onMemberCardUidChange={onMemberCardUidChange || (() => undefined)}
+                onLookupMemberCard={onLookupMemberCard || (() => undefined)}
+              />
+            </>
           ) : undefined}
           table={tableControls}
           tableTitle={[
