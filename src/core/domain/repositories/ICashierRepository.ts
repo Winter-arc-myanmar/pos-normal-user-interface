@@ -101,6 +101,12 @@ export interface ICashierRepository {
     lineId: string,
     payload: UpdateSalesOrderLineDTO
   ): Promise<SalesOrderLine>;
+  /** Takes `quantity` off a line onto a new line of the same bill, as sent to the kitchen. */
+  splitSalesOrderLine(
+    salesOrderId: string,
+    lineId: string,
+    quantity: string
+  ): Promise<SalesOrderLine>;
   deleteSalesOrderLine(salesOrderId: string, lineId: string): Promise<void>;
   getSalesOrderLines(salesOrderId: string): Promise<SalesOrderLine[]>;
   createOrderPayment(

@@ -32,6 +32,7 @@ import { useSalesOrderManagement } from "@/core/presentation/hooks/useSalesOrder
 import { CashierBoard } from "./cashier/CashierBoard";
 import { MultiOrderingView } from "./cashier/MultiOrderingView";
 import { OrderPanel, type GroupedSalesOrderLine } from "./cashier/OrderPanel";
+import { linePriceNote } from "@/lib/pos/linePrice";
 import { TableSeatingDialog } from "./cashier/TableSeatingDialog";
 import { ExtraFeeDialog } from "./cashier/ExtraFeeDialog";
 import { SplitItemsDialog, SplitTarget } from "./cashier/SplitItemsDialog";
@@ -154,6 +155,7 @@ export function CashierPage() {
     selectOrderById,
     createOrder,
     addProductToOrder,
+    splitOrderLine,
     updateOrderLine,
     removeOrderLine,
     addProductToTableSession,
@@ -657,7 +659,9 @@ export function CashierPage() {
       categoryName?: string;
       selectedModifiers?: unknown;
     }>,
-    withoutTax = false
+    withoutTax = false,
+    // On a bill the guest gets, a repriced item says so: "Water (Discount)".
+    notePrices = false
   ) => {
     const printable = lines
       .filter((line) => !line.voidedAt)
@@ -669,9 +673,19 @@ export function CashierPage() {
         const unitPrice = withoutTax && line.taxInclusive && quantity > 0
           ? toMoney(Number(line.unitPrice || 0) - Number(line.taxAmount || 0) / quantity)
           : line.unitPrice?.trim();
+        const name = line.productName || product?.name || line.variantName || "Item";
+        const note =
+          notePrices && product && !isFeeLine(line)
+            ? linePriceNote(
+                line.unitPrice,
+                Number(product.basePrice || 0) +
+                  Number(variant?.priceModifier || 0) +
+                  modifierExtra(line.selectedModifiers)
+              )
+            : undefined;
         return {
           variantId: line.variantId,
-          name: line.productName || product?.name || line.variantName || "Item",
+          name: note ? t(`cashier.orderPanel.priceNote.${note}`, { name }) : name,
           quantity: String(line.quantity || "1"),
           unitPrice: unitPrice || undefined,
           // The category the server recorded on the line routes it to its
@@ -2118,7 +2132,7 @@ export function CashierPage() {
         showPrices: true,
         receiptId: selectedOrder?.orderNumber,
         ...receiptParty(true),
-        lines: printableLines(paymentBillLines, !billOptions.includeTax),
+        lines: printableLines(paymentBillLines, !billOptions.includeTax, true),
         subtotal: receiptSubtotal,
         discount: Number(receiptDiscount) > 0 ? receiptDiscount : undefined,
         tax: Number(receiptTax) > 0 ? receiptTax : undefined,
@@ -2447,7 +2461,7 @@ export function CashierPage() {
 
   const handleEditLine = async (
     line: GroupedSalesOrderLine,
-    edit: { unitPrice: number; foc: boolean }
+    edit: { quantity: number; unitPrice: number; foc: boolean }
   ) => {
     setLocalError(null);
     setNotice(null);
@@ -2462,44 +2476,80 @@ export function CashierPage() {
     const unchanged = (entry: SalesOrderLine) =>
       Number(priceFor(entry)) === Number(entry.unitPrice || 0) &&
       edit.foc === isFocLine(entry);
+    // The newest lines take the change first; a line only partly covered is
+    // split, so the rest of it keeps its price (3 waters at 2,000, 1 at 1,500).
+    let left = edit.quantity;
+    const plan: Array<{ entry: SalesOrderLine; take: number }> = [];
+    for (const entry of [...lines].reverse()) {
+      if (left <= 0) break;
+      const take = Math.min(left, Number(entry.quantity || 0));
+      if (take > 0) plan.push({ entry, take });
+      left -= take;
+    }
+    const isPart = (entry: SalesOrderLine, take: number) =>
+      take < Number(entry.quantity || 0) - 0.00005;
     try {
       if (isSettledSalesOrder(selectedOrder) && !isDirectCheckoutMode) {
         throw new Error(t("cashier.errors.orderAlreadyPaid"));
       }
       if (isDirectCheckoutMode) {
-        const ids = new Set(lines.map((entry) => entry.id));
         const menu = menuPriceOf(line);
+        const repriced =
+          !fee && (menu === undefined || Math.abs(menu - edit.unitPrice) >= 0.0001);
+        const edited = (entry: SalesOrderLine) => {
+          const unitPrice = priceFor(entry);
+          const variant = variantById[entry.variantId];
+          const product = variant ? productById[variant.productId] : undefined;
+          return buildDirectLine(
+            {
+              ...entry,
+              priceOverride: repriced ? unitPrice : undefined,
+              lineDiscount: discountFor(entry, unitPrice),
+            },
+            product,
+            variant
+          );
+        };
+        const takes = new Map(plan.map(({ entry, take }) => [entry.id, take]));
         setDirectCartLines((current) =>
-          current.map((entry) => {
-            if (!ids.has(entry.id) || unchanged(entry)) return entry;
-            const unitPrice = priceFor(entry);
-            const variant = variantById[entry.variantId];
-            const product = variant ? productById[variant.productId] : undefined;
-            const repriced =
-              !fee && (menu === undefined || Math.abs(menu - edit.unitPrice) >= 0.0001);
-            return buildDirectLine(
-              {
+          current.flatMap((entry) => {
+            const take = takes.get(entry.id);
+            if (take === undefined || unchanged(entry)) return [entry];
+            if (!isPart(entry, take)) return [edited(entry)];
+            const kept = (Number(entry.quantity || 0) - take).toFixed(4);
+            const keptDiscount = isFocLine(entry)
+              ? lineFocDiscount({ quantity: kept, unitPrice: entry.unitPrice })
+              : entry.lineDiscount;
+            return [
+              { ...entry, quantity: kept, lineDiscount: keptDiscount },
+              edited({
                 ...entry,
-                priceOverride: repriced ? unitPrice : undefined,
-                lineDiscount: discountFor(entry, unitPrice),
-              },
-              product,
-              variant
-            );
+                id: `${entry.id}-part-${Date.now()}`,
+                quantity: take.toFixed(4),
+                lineDiscount: isFocLine(entry) ? "0.0000" : entry.lineDiscount,
+              }),
+            ];
           })
         );
         return;
       }
       if (!selectedOrder) return;
-      for (const entry of lines) {
+      for (const { entry, take } of plan) {
         if (unchanged(entry)) continue;
-        const unitPrice = priceFor(entry);
-        await updateOrderLine(entry.salesOrderId || selectedOrder.id, entry.id, {
+        const orderId = entry.salesOrderId || selectedOrder.id;
+        const target = isPart(entry, take)
+          ? await splitOrderLine(orderId, entry.id, take.toFixed(4))
+          : entry;
+        const unitPrice = priceFor(target);
+        await updateOrderLine(orderId, target.id, {
           variantId: entry.variantId,
-          quantity: entry.quantity,
+          quantity: take.toFixed(4),
           unitPrice,
-          lineDiscount: discountFor(entry, unitPrice),
-          taxAmount: entry.taxAmount || "0.0000",
+          lineDiscount: discountFor(
+            { ...target, quantity: take.toFixed(4), unitPrice: entry.unitPrice },
+            unitPrice
+          ),
+          taxAmount: target.taxAmount || "0.0000",
           seatNumber: entry.seatNumber,
         });
       }
@@ -3135,7 +3185,7 @@ export function CashierPage() {
             showPrices: true,
             receiptId: selectedOrder?.orderNumber,
             ...receiptParty(),
-            lines: printableLines(paymentBillLines, !billOptions.includeTax),
+            lines: printableLines(paymentBillLines, !billOptions.includeTax, true),
             subtotal: receiptSubtotal,
             discount: Number(receiptDiscount) > 0 ? receiptDiscount : undefined,
             tax: Number(receiptTax) > 0 ? receiptTax : undefined,

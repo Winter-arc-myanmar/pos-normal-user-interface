@@ -1434,6 +1434,30 @@ export class ApiCashierRepository implements ICashierRepository {
     });
   }
 
+  async splitSalesOrderLine(
+    salesOrderId: string,
+    lineId: string,
+    quantity: string
+  ): Promise<SalesOrderLine> {
+    const response = await this.httpClient.post<ApiEnvelope<Record<string, unknown>>>(
+      API_ENDPOINTS.SALES_ORDERS.LINES(salesOrderId).SPLIT(lineId),
+      { quantity }
+    );
+    const item = unwrap(response);
+    return new SalesOrderLine({
+      id: String(item.id),
+      salesOrderId: String(item.salesOrderId || salesOrderId),
+      variantId: String(item.variantId || ""),
+      quantity: String(item.quantity || quantity),
+      unitPrice: String(item.unitPrice || "0"),
+      lineDiscount: item.lineDiscount !== undefined ? String(item.lineDiscount) : undefined,
+      taxAmount: item.taxAmount ? String(item.taxAmount) : undefined,
+      status: item.status ? String(item.status) : undefined,
+      firedAt: item.firedAt ? String(item.firedAt) : undefined,
+      seatNumber: typeof item.seatNumber === "number" ? item.seatNumber : undefined,
+    });
+  }
+
   async deleteSalesOrderLine(salesOrderId: string, lineId: string): Promise<void> {
     await this.httpClient.delete(
       API_ENDPOINTS.SALES_ORDERS.LINES(salesOrderId).DELETE(lineId)

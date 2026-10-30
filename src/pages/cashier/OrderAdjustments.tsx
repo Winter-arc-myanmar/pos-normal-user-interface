@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { AdjustmentReason } from "@/core/domain/entities/Cashier";
@@ -23,6 +22,9 @@ interface OrderAdjustmentsProps {
   onLookupMemberCard: () => void;
 }
 
+const inputClass =
+  "min-h-11 w-full min-w-0 rounded-md border border-slate-700 bg-slate-900 px-3 text-sm text-slate-100 focus:border-blue-500 focus:outline-none disabled:opacity-50";
+
 export function OrderAdjustments({
   discountAmount,
   discountReasonId,
@@ -43,62 +45,49 @@ export function OrderAdjustments({
 }: OrderAdjustmentsProps) {
   const { t } = useTranslation();
   const hasDiscount = Number(discountAmount) > 0;
-  const hasValues =
-    hasDiscount ||
-    Number(serviceCharge) > 0 ||
-    Number(tipAmount) > 0 ||
-    memberCardUid.trim().length > 0 ||
-    Boolean(memberPointsLabel);
-  const [expanded, setExpanded] = useState(hasValues);
 
   return (
-    <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
-      <button
-        type="button"
-        className="flex w-full items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-slate-500"
-        aria-expanded={expanded}
-        onClick={() => setExpanded((current) => !current)}
-      >
-        <span>{t("cashier.orderPanel.adjustments")}</span>
-        <span aria-hidden="true" className="text-xs">
-          {expanded ? "▾" : "▸"}
-        </span>
-      </button>
-      {expanded ? (
-        <>
-      <label className="block space-y-1">
-        <span className="text-xs text-slate-600">
-          {t("cashier.orderPanel.discount")}
-        </span>
-        <input
-          inputMode="decimal"
-          value={discountAmount}
-          disabled={disabled}
-          aria-label={t("cashier.orderPanel.discount")}
-          onChange={(event) => onDiscountAmountChange(event.target.value)}
-          className="min-h-9 w-full rounded border border-slate-300 px-2 text-sm focus:border-blue-500 focus:outline-none"
-        />
-      </label>
-      {discountReasons.length ? (
-        <select
-          value={discountReasonId}
-          disabled={disabled}
-          aria-label={t("cashier.orderPanel.discountReason")}
-          onChange={(event) => onDiscountReasonChange(event.target.value)}
-          className="min-h-9 w-full rounded border border-slate-300 px-2 text-sm"
-        >
-          <option value="">{t("cashier.orderPanel.selectDiscountReason")}</option>
-          {discountReasons.map((reason) => (
-            <option key={reason.id} value={reason.id}>
-              {reason.name}
-            </option>
-          ))}
-        </select>
-      ) : null}
+    <div className="space-y-3 text-sm">
+      <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
+        <label className="block space-y-1">
+          <span className="text-xs text-slate-300">
+            {t("cashier.orderPanel.discount")}
+          </span>
+          <input
+            inputMode="decimal"
+            value={discountAmount}
+            disabled={disabled}
+            aria-label={t("cashier.orderPanel.discount")}
+            onChange={(event) => onDiscountAmountChange(event.target.value)}
+            className={inputClass}
+          />
+        </label>
+        {discountReasons.length ? (
+          <label className="block space-y-1">
+            <span className="text-xs text-slate-300">
+              {t("cashier.orderPanel.discountReason")}
+            </span>
+            <select
+              value={discountReasonId}
+              disabled={disabled}
+              aria-label={t("cashier.orderPanel.discountReason")}
+              onChange={(event) => onDiscountReasonChange(event.target.value)}
+              className={inputClass}
+            >
+              <option value="">{t("cashier.orderPanel.selectDiscountReason")}</option>
+              {discountReasons.map((reason) => (
+                <option key={reason.id} value={reason.id}>
+                  {reason.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+      </div>
       {hasDiscount ? (
         <Button
           size="sm"
-          variant="secondary"
+          variant="outline"
           disabled={disabled}
           onClick={onRemoveDiscount}
         >
@@ -106,13 +95,13 @@ export function OrderAdjustments({
         </Button>
       ) : null}
       {Number(serviceCharge) > 0 ? (
-        <div className="flex items-center justify-between text-xs text-slate-600">
+        <div className="flex items-center justify-between text-xs text-slate-300">
           <span>{t("cashier.orderPanel.serviceCharge")}</span>
-          <span className="font-medium text-slate-800">{formatPosMoney(serviceCharge)}</span>
+          <span className="font-medium tabular-nums text-slate-100">{formatPosMoney(serviceCharge)}</span>
         </div>
       ) : null}
       <label className="block space-y-1">
-        <span className="text-xs text-slate-600">
+        <span className="text-xs text-slate-300">
           {t("cashier.orderPanel.tip")}
         </span>
         <input
@@ -121,26 +110,25 @@ export function OrderAdjustments({
           disabled={disabled}
           aria-label={t("cashier.orderPanel.tip")}
           onChange={(event) => onTipAmountChange(event.target.value)}
-          className="min-h-9 w-full rounded border border-slate-300 px-2 text-sm focus:border-blue-500 focus:outline-none"
+          className={inputClass}
         />
       </label>
       <div className="space-y-1">
-        <span className="text-xs text-slate-600">
+        <span className="text-xs text-slate-300">
           {t("cashier.orderPanel.memberPoints")}
         </span>
-        <div className="flex flex-col gap-2 min-[420px]:flex-row">
+        <div className="flex gap-2">
           <input
             value={memberCardUid}
             disabled={disabled || isMemberCardLoading}
             aria-label={t("cashier.orderPanel.memberPoints")}
             placeholder={t("cashier.orderPanel.memberCardUid")}
             onChange={(event) => onMemberCardUidChange(event.target.value)}
-            className="min-h-9 min-w-0 w-full rounded border border-slate-300 px-2 text-sm focus:border-blue-500 focus:outline-none"
+            className={inputClass}
           />
           <Button
-            size="sm"
-            variant="secondary"
-            className="w-full shrink-0 min-[420px]:w-auto"
+            variant="outline"
+            className="shrink-0"
             disabled={disabled || isMemberCardLoading || !memberCardUid.trim()}
             isLoading={isMemberCardLoading}
             onClick={onLookupMemberCard}
@@ -149,14 +137,12 @@ export function OrderAdjustments({
           </Button>
         </div>
         {memberPointsLabel ? (
-          <p className="text-xs font-medium text-slate-700">{memberPointsLabel}</p>
+          <p className="text-xs font-medium text-slate-200">{memberPointsLabel}</p>
         ) : null}
         {memberCardError ? (
-          <p className="text-xs text-red-700">{memberCardError}</p>
+          <p className="text-xs text-red-400">{memberCardError}</p>
         ) : null}
       </div>
-        </>
-      ) : null}
     </div>
   );
 }

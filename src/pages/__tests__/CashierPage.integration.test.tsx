@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   stopTableCharges: vi.fn(),
   addProductToTableSession: vi.fn(),
   updateOrderLine: vi.fn(),
+  splitOrderLine: vi.fn(),
   removeOrderLine: vi.fn(),
   checkoutTableSession: vi.fn(),
   closePosSession: vi.fn(),
@@ -263,6 +264,7 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
     createOrder: vi.fn(),
     addProductToOrder: vi.fn(),
     updateOrderLine: mocks.updateOrderLine,
+    splitOrderLine: mocks.splitOrderLine,
     removeOrderLine: mocks.removeOrderLine,
     addProductToTableSession: mocks.addProductToTableSession,
     getCounterOrderById: mocks.getCounterOrderById,
@@ -447,11 +449,11 @@ describe("CashierPage integration", () => {
     }) => {
       productState = { ...product, basePrice: inclusive ? "110.0000" : "100.0000", taxRate: 10, isPriceInclusive: inclusive };
       await startDirectBill();
-      const adjustments = screen.getByRole("button", { name: "cashier.orderPanel.adjustments" });
-      if (adjustments.getAttribute("aria-expanded") !== "true") fireEvent.click(adjustments);
+      fireEvent.click(screen.getByRole("button", { name: /cashier.billOptions.title/ }));
       fireEvent.change(screen.getByRole("textbox", { name: "cashier.orderPanel.discount" }), {
         target: { value: inclusive ? "11" : "10" },
       });
+      fireEvent.click(screen.getByRole("button", { name: "cashier.billOptions.done" }));
       fireEvent.click(screen.getByRole("button", { name: "cashier.payment.options" }));
       const taxCheckbox = screen.getByRole("checkbox", { name: "cashier.payment.includeTax" });
       const serviceCheckbox = screen.getByRole("checkbox", { name: "cashier.payment.includeServiceCharge" });
@@ -583,6 +585,47 @@ describe("CashierPage integration", () => {
         })
       )
     );
+  });
+
+  it("splits one water off a sent line of 4 and prices it on its own", async () => {
+    selectedOrderLinesState = [
+      { ...orderLine, quantity: "4.0000", unitPrice: "2000.0000", status: "FIRED" },
+    ];
+    mocks.splitOrderLine.mockResolvedValue({
+      ...orderLine,
+      id: "line-part",
+      quantity: "1.0000",
+      unitPrice: "2000.0000",
+      status: "FIRED",
+    });
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=menu"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.editItem" }));
+    for (let i = 0; i < 3; i += 1) {
+      fireEvent.click(
+        within(screen.getByRole("dialog")).getByRole("button", {
+          name: "cashier.orderPanel.decreaseQuantity",
+        })
+      );
+    }
+    fireEvent.change(screen.getByLabelText("cashier.lineEdit.price"), {
+      target: { value: "1500" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "cashier.lineEdit.save" }));
+
+    await waitFor(() =>
+      expect(mocks.updateOrderLine).toHaveBeenCalledExactlyOnceWith(
+        "order-1",
+        "line-part",
+        expect.objectContaining({ quantity: "1.0000", unitPrice: "1500.0000" })
+      )
+    );
+    expect(mocks.splitOrderLine).toHaveBeenCalledExactlyOnceWith("order-1", "line-1", "1.0000");
+    expect(mocks.addProductToTableSession).not.toHaveBeenCalled();
   });
 
   it("adds a new pending line after Send KDS so the kitchen receives it", async () => {
@@ -1173,9 +1216,7 @@ describe("CashierPage integration", () => {
     ).toBeInTheDocument();
 
     fireEvent.click(
-      screen.getByRole("button", {
-        name: "cashier.orderPanel.expandTableControls",
-      })
+      screen.getByRole("button", { name: /cashier.billOptions.titleWithTable/ })
     );
     const tableStatusSelect = screen.getByLabelText("cashier.orderPanel.tableStatus");
     expect(
@@ -1209,7 +1250,7 @@ describe("CashierPage integration", () => {
       </MemoryRouter>
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /T1/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^T1/ }));
 
     await waitFor(() => {
       expect(
@@ -1250,9 +1291,7 @@ describe("CashierPage integration", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", {
-        name: "cashier.orderPanel.expandTableControls",
-      })
+      screen.getByRole("button", { name: /cashier.billOptions.titleWithTable/ })
     );
     const tableStatusSelect = screen.getByLabelText("cashier.orderPanel.tableStatus");
     expect(
