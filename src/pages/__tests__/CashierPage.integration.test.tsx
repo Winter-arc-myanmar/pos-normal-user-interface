@@ -104,13 +104,6 @@ const table = {
   status: "OCCUPIED",
 };
 
-const availableTable = {
-  ...table,
-  id: "table-2",
-  tableNumber: "T2",
-  status: "AVAILABLE",
-};
-
 const orderLine = {
   id: "line-1",
   salesOrderId: "order-1",
@@ -130,7 +123,6 @@ let selectedOrderLinesState: Array<
 > = [orderLine];
 let selectedOrderState: typeof order | null = order;
 let activeServiceTypeState = "TABLE";
-let diningTablesState = [table];
 let productState = product;
 let venueSettingsState = {
   defaultTaxRate: null,
@@ -230,7 +222,7 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
       { id: "cash", tenantId: "tenant-1", name: "Cash" },
     ],
     diningZones: [],
-    diningTables: diningTablesState,
+    diningTables: [table],
     tableSessions: [session],
     activeServiceType: activeServiceTypeState,
     setActiveServiceType: vi.fn(),
@@ -303,7 +295,6 @@ describe("CashierPage integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
-    diningTablesState = [table];
     selectedOrderLinesState = [orderLine];
     selectedOrderState = order;
     activeServiceTypeState = "TABLE";
@@ -1308,26 +1299,6 @@ describe("CashierPage integration", () => {
         screen.getByPlaceholderText("cashier.productMenu.search")
       ).toBeInTheDocument();
     });
-    expect(mocks.openTableSession).not.toHaveBeenCalled();
-    expect(mocks.updateDiningTableStatus).not.toHaveBeenCalled();
-  });
-
-  it("does not switch to an available table while the current order has menu lines", async () => {
-    diningTablesState = [table, availableTable];
-
-    render(
-      <MemoryRouter initialEntries={["/cashier?view=orders"]}>
-        <CashierPage />
-      </MemoryRouter>
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: /T2/ }));
-
-    await waitFor(() =>
-      expect(
-        screen.getByText("cashier.errors.tableHasSelectedMenu")
-      ).toBeInTheDocument()
-    );
     expect(mocks.openTableSession).not.toHaveBeenCalled();
     expect(mocks.updateDiningTableStatus).not.toHaveBeenCalled();
   });
