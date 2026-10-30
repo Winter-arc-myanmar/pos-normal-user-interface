@@ -75,12 +75,23 @@ describe("PaymentView", () => {
     expect(screen.getByRole("checkbox", { name: "cashier.payment.includeTax" })).toBeDisabled();
   });
 
-  it("keeps payment methods scrollable when the member lookup takes vertical space", () => {
+  it("keeps the payment methods reachable when the member lookup takes vertical space", () => {
     renderPaymentView();
 
     const methodsGrid = screen.getByRole("button", { name: /memberCard/i }).parentElement;
-    expect(methodsGrid).toHaveClass("min-h-40", "overflow-y-auto");
-    expect(methodsGrid?.parentElement).toHaveClass("min-w-0", "overflow-y-auto");
+    // At desktop widths the methods rail keeps its own scrolling…
+    expect(methodsGrid).toHaveClass("min-[1100px]:min-h-40", "min-[1100px]:overflow-y-auto");
+    expect(methodsGrid?.parentElement).toHaveClass(
+      "min-w-0",
+      "min-[1100px]:overflow-y-auto"
+    );
+    // …while a phone stacks the panes in one column that scrolls as a whole, so
+    // the methods are never squeezed into slivers (shrink-0) or cut off.
+    expect(methodsGrid?.parentElement).toHaveClass("shrink-0");
+    expect(methodsGrid?.parentElement?.parentElement).toHaveClass(
+      "flex",
+      "overflow-y-auto"
+    );
   });
 
   it("selects member card and can add a split tender", () => {

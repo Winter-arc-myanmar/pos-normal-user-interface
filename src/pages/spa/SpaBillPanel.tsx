@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { SalesOrderLine } from "@/core/domain/entities/Cashier";
 import { GuestCard, GuestWallet } from "@/core/domain/entities/GuestWallet";
@@ -39,6 +40,7 @@ export function SpaBillPanel({
   onPrimary,
   primaryLabel,
   onTogglePause,
+  onOpenBill,
   onChangeQuantity,
   onAddAnother,
   onRemoveLine,
@@ -76,6 +78,8 @@ export function SpaBillPanel({
   onPrimary: () => void;
   primaryLabel: string;
   onTogglePause: () => void;
+  /** Adjusts the bill as a whole (tax, service charge, discount, tip), as on the cashier. */
+  onOpenBill?: () => void;
   onChangeQuantity: (line: SalesOrderLine, delta: number) => void;
   onAddAnother: (line: SalesOrderLine) => void;
   /** Removes a row: every line it shows. */
@@ -103,6 +107,7 @@ export function SpaBillPanel({
   orderedByName?: (line: SalesOrderLine) => string | undefined;
 }) {
   const tr = useRoomText(kind);
+  const { t } = useTranslation();
   const warning = getKtvWarning(session.endsAt, nowMs);
   const discountBps = wallet?.discountBpsSnapshot || 0;
   const pendingDue = pendingTotal(pending) - pendingSaving(pending, pendingDiscounts);
@@ -115,6 +120,11 @@ export function SpaBillPanel({
   const prepaid = Boolean(quote?.prepaid);
   // Time is bought (paid now, or on the bill to pay at the end), never run up on a clock.
   const canExtend = prepaid || quote?.paymentTiming === "PAY_AT_END";
+  // Bill & table joins the row whenever the bill can still be adjusted; Extend
+  // only when the room's time is bought rather than metered.
+  const actionCount = 1 + (onOpenBill ? 1 : 0) + (canExtend ? 1 : 0) + 1;
+  const actionGrid =
+    actionCount >= 4 ? "grid-cols-4" : actionCount === 3 ? "grid-cols-3" : "grid-cols-2";
   const visibleLines = groupBillLines(
     lines.filter(
       (line) => !["VOIDED", "COMPED"].includes(String(line.status || "").toUpperCase())
@@ -533,16 +543,40 @@ export function SpaBillPanel({
       )}
 
       {!billClosed ? (
-        <div className={`grid shrink-0 gap-2 ${canExtend ? "grid-cols-3" : "grid-cols-2"}`}>
-          <Button variant="secondary" disabled={isBusy} onClick={onTogglePause}>
+        <div className={`grid shrink-0 gap-2 ${actionGrid}`}>
+          {onOpenBill ? (
+            <Button
+              variant="secondary"
+              className="min-w-0 px-2 leading-tight"
+              disabled={isBusy}
+              onClick={onOpenBill}
+            >
+              {t("cashier.billOptions.titleWithTable")}
+            </Button>
+          ) : null}
+          <Button
+            variant="secondary"
+            className="min-w-0 px-2 leading-tight"
+            disabled={isBusy}
+            onClick={onTogglePause}
+          >
             {isPaused ? tr("resume") : tr("pause")}
           </Button>
           {canExtend ? (
-            <Button variant="secondary" disabled={isBusy} onClick={onExtend}>
+            <Button
+              variant="secondary"
+              className="min-w-0 px-2 leading-tight"
+              disabled={isBusy}
+              onClick={onExtend}
+            >
               {tr("extend")}
             </Button>
           ) : null}
-          <Button disabled={isBusy} onClick={onPrimary}>
+          <Button
+            className="min-w-0 px-2 leading-tight"
+            disabled={isBusy}
+            onClick={onPrimary}
+          >
             {primaryLabel}
           </Button>
         </div>

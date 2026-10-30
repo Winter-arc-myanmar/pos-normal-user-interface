@@ -45,6 +45,18 @@ describe("the kitchen slip", () => {
     ).toBe("Pickup A12");
   });
 
+  it("names a lounge room after the tenant, not a fixed brand", () => {
+    const lounge = ticket({
+      place: { kind: "KTV_ROOM", number: "101", name: null, guestCount: null },
+    });
+    expect(kdsTicketPlace(lounge, "Private VIP Lounge")).toBe(
+      "Private VIP Lounge 101"
+    );
+    // Until the company loads, the slip still says where the food goes.
+    expect(kdsTicketPlace(lounge)).toBe("VIP Lounge 101");
+    expect(kdsTicketPlace(lounge, "   ")).toBe("VIP Lounge 101");
+  });
+
   it("says who sent it", () => {
     expect(
       kdsTicketSender(

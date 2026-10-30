@@ -9,7 +9,8 @@ interface OrderAdjustmentsProps {
   discountReasons: AdjustmentReason[];
   serviceCharge: string;
   tipAmount: string;
-  memberCardUid: string;
+  /** Member points are a cashier concept; a room bill simply omits them. */
+  memberCardUid?: string;
   memberPointsLabel?: string;
   memberCardError?: string | null;
   isMemberCardLoading?: boolean;
@@ -18,8 +19,8 @@ interface OrderAdjustmentsProps {
   onDiscountReasonChange: (value: string) => void;
   onRemoveDiscount: () => void;
   onTipAmountChange: (value: string) => void;
-  onMemberCardUidChange: (value: string) => void;
-  onLookupMemberCard: () => void;
+  onMemberCardUidChange?: (value: string) => void;
+  onLookupMemberCard?: () => void;
 }
 
 // No amount shows as an empty box: typing 5000 after "0.0000" made it 0.00005000.
@@ -34,7 +35,7 @@ export function OrderAdjustments({
   discountReasons,
   serviceCharge,
   tipAmount,
-  memberCardUid,
+  memberCardUid = "",
   memberPointsLabel,
   memberCardError,
   isMemberCardLoading = false,
@@ -120,36 +121,38 @@ export function OrderAdjustments({
           className={inputClass}
         />
       </label>
-      <div className="space-y-1">
-        <span className="text-xs text-slate-300">
-          {t("cashier.orderPanel.memberPoints")}
-        </span>
-        <div className="flex gap-2">
-          <input
-            value={memberCardUid}
-            disabled={disabled || isMemberCardLoading}
-            aria-label={t("cashier.orderPanel.memberPoints")}
-            placeholder={t("cashier.orderPanel.memberCardUid")}
-            onChange={(event) => onMemberCardUidChange(event.target.value)}
-            className={inputClass}
-          />
-          <Button
-            variant="outline"
-            className="shrink-0"
-            disabled={disabled || isMemberCardLoading || !memberCardUid.trim()}
-            isLoading={isMemberCardLoading}
-            onClick={onLookupMemberCard}
-          >
-            {t("cashier.orderPanel.lookupCard")}
-          </Button>
+      {onMemberCardUidChange && onLookupMemberCard ? (
+        <div className="space-y-1">
+          <span className="text-xs text-slate-300">
+            {t("cashier.orderPanel.memberPoints")}
+          </span>
+          <div className="flex gap-2">
+            <input
+              value={memberCardUid}
+              disabled={disabled || isMemberCardLoading}
+              aria-label={t("cashier.orderPanel.memberPoints")}
+              placeholder={t("cashier.orderPanel.memberCardUid")}
+              onChange={(event) => onMemberCardUidChange(event.target.value)}
+              className={inputClass}
+            />
+            <Button
+              variant="outline"
+              className="shrink-0"
+              disabled={disabled || isMemberCardLoading || !memberCardUid.trim()}
+              isLoading={isMemberCardLoading}
+              onClick={() => onLookupMemberCard()}
+            >
+              {t("cashier.orderPanel.lookupCard")}
+            </Button>
+          </div>
+          {memberPointsLabel ? (
+            <p className="text-xs font-medium text-slate-200">{memberPointsLabel}</p>
+          ) : null}
+          {memberCardError ? (
+            <p className="text-xs text-red-400">{memberCardError}</p>
+          ) : null}
         </div>
-        {memberPointsLabel ? (
-          <p className="text-xs font-medium text-slate-200">{memberPointsLabel}</p>
-        ) : null}
-        {memberCardError ? (
-          <p className="text-xs text-red-400">{memberCardError}</p>
-        ) : null}
-      </div>
+      ) : null}
     </div>
   );
 }
