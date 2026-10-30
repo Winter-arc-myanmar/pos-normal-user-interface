@@ -982,6 +982,22 @@ describe("CashierPage integration", () => {
     expect(mocks.processCheckout).not.toHaveBeenCalled();
   });
 
+  it("pays a saved take-away order by settling it at its own line prices", async () => {
+    selectedOrderState = { ...order, id: "order-2", serviceType: "TAKEAWAY", grandTotal: "0.0000", subtotal: "0.0000" };
+    selectedOrderLinesState = [{ ...orderLine, salesOrderId: "order-2", unitPrice: "8.0000" }];
+    activeServiceTypeState = "TAKE_AWAY";
+    mocks.settleOrder.mockResolvedValue({ orderId: "order-2" });
+    render(<MemoryRouter initialEntries={["/cashier?view=pay"]}><CashierPage /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByRole("button", { name: "cashier.confirmPay" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+
+    await waitFor(() => expect(mocks.settleOrder).toHaveBeenCalledWith("order-2", expect.objectContaining({
+      payments: [expect.objectContaining({ paymentMethodId: "cash", amount: "8.4000" })],
+    })));
+    expect(mocks.settleOrder.mock.calls[0][1]).not.toHaveProperty("includeTax");
+    expect(mocks.processCheckout).not.toHaveBeenCalled();
+  });
+
   it("shows the server's subtotal and tax for a saved bill before any option is changed", async () => {
     render(<MemoryRouter initialEntries={["/cashier?view=pay"]}><CashierPage /></MemoryRouter>);
     await waitFor(() => expect(mocks.fetchOrderBill).toHaveBeenCalledWith("order-1", {
