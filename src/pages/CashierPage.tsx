@@ -1190,6 +1190,25 @@ export function CashierPage() {
     [fetchManagedOrderLines]
   );
 
+  /**
+   * Drops removed lines from what this till remembers of the bill, so adding the
+   * same item again makes a new line instead of updating one that is gone.
+   */
+  const forgetLines = useCallback((ids: string[]) => {
+    const gone = new Set(ids);
+    activeOrderLinesRef.current = activeOrderLinesRef.current.filter(
+      (line) => !gone.has(line.id)
+    );
+    setMultiOrderLines((current) =>
+      Object.fromEntries(
+        Object.entries(current).map(([orderId, lines]) => [
+          orderId,
+          lines.filter((line) => !gone.has(line.id)),
+        ])
+      )
+    );
+  }, []);
+
   const bindOrdersToTable = useCallback(
     async (tableId: string, primaryOrderId: string) => {
       const orderIds = mergeTableOrderIds(tableId, primaryOrderId);
@@ -2432,6 +2451,7 @@ export function CashierPage() {
     if (!selectedOrder) return;
     if (quantity <= 0) {
       await removeOrderLine(selectedOrder.id, lineId);
+      forgetLines([lineId]);
       const deletePrintError = await printKdsDelete([targetLine]);
       if (deletePrintError) setLocalError(deletePrintError);
       return;
@@ -2728,6 +2748,7 @@ export function CashierPage() {
         }
         for (const entry of lines) {
           await removeOrderLine(selectedOrder.id, entry.id);
+          forgetLines([entry.id]);
         }
         const deletePrintError = await printKdsDelete(lines);
         if (deletePrintError) setLocalError(deletePrintError);
