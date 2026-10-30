@@ -1120,9 +1120,6 @@
       "quickCheckout": "Quick Checkout",
       "tableStatus": "Table status",
       "tableStatusLabel": "Table",
-      "tableControls": "Table & session",
-      "expandTableControls": "Expand table and session controls",
-      "collapseTableControls": "Collapse table and session controls",
       "tableStatusOption": "Table: {{status}}",
       "tableStatuses": {
         "AVAILABLE": "Available",
@@ -1153,13 +1150,10 @@
       "increaseQuantity": "Increase quantity",
       "lineQuantity": "Quantity {{count}}",
       "kdsPending": "Not sent to KDS",
-      "expandItem": "Expand {{name}} details",
-      "collapseItem": "Collapse {{name}} details",
       "remove": "Remove",
       "itemUpdated": "Item quantity updated.",
       "itemRemoved": "Item removed from order.",
       "kdsDeleteTitle": "DELETE",
-      "adjustments": "Adjustments",
       "discount": "Discount",
       "discountReason": "Discount reason",
       "selectDiscountReason": "Select discount reason",
@@ -1167,7 +1161,7 @@
       "serviceCharge": "Service charge (incl. its tax)",
       "tip": "Tip",
       "foc": "FOC",
-      "undoFoc": "Undo FOC",
+      "menuPriceWas": "Menu price {{amount}}",
       "memberPoints": "Member points",
       "memberCardUid": "Card UID",
       "lookupCard": "Lookup",
@@ -1191,7 +1185,36 @@
       "promo": "PROMO",
       "promoFreeTime": "buy {{buy}}, get {{free}} free",
       "promoSaving": "{{name}} −{{amount}}",
-      "promotionDiscount": "Promotion discount"
+      "promotionDiscount": "Promotion discount",
+      "editItem": "Edit {{name}}",
+      "removeItem": "Remove {{name}}",
+      "priceNote": {
+        "discount": "{{name}} (Discount)",
+        "changed": "{{name}} (Price changed)"
+      }
+    },
+    "lineEdit": {
+      "title": "Edit item",
+      "price": "Price for one",
+      "priceHint": "Only this bill. The menu and other orders keep the menu price.",
+      "menuPrice": "Menu price {{amount}}",
+      "foc": "Free of charge (FOC)",
+      "save": "Save changes",
+      "remove": "Remove item",
+      "priceRequired": "Enter a price of 0 or more.",
+      "howMany": "How many",
+      "ofTotal": "of {{count}}",
+      "restStay": "{{count}} × {{price}} stay as they are"
+    },
+    "billOptions": {
+      "title": "Bill options",
+      "titleWithTable": "Bill & table",
+      "bill": "Bill",
+      "table": "Table",
+      "done": "Done",
+      "tipSummary": "Tip {{amount}}",
+      "noTax": "No tax",
+      "noServiceCharge": "No service charge"
     },
     "errors": {
       "missingContext": "Missing tenant or inventory location context. Ensure your tenant has at least one inventory location configured.",
@@ -1231,6 +1254,7 @@
       "discountReasonRequired": "Choose a discount reason before applying a discount.",
       "discountTooLarge": "Discount cannot be greater than the order subtotal.",
       "tableChargesFinalize": "Unable to finalize table charges. Refresh and try again.",
+      "tableAvailableWithMenu": "Finish or cancel the order before marking the table available.",
       "billUpdated": "The table bill changed to {{amount}} after finalizing its charges. Review the new total, then confirm payment again."
     },
     "tableCharges": {

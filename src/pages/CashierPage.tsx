@@ -31,7 +31,8 @@ import { menuProductFilter } from "@/lib/pos/menuProducts";
 import { useSalesOrderManagement } from "@/core/presentation/hooks/useSalesOrderManagement";
 import { CashierBoard } from "./cashier/CashierBoard";
 import { MultiOrderingView } from "./cashier/MultiOrderingView";
-import { OrderPanel } from "./cashier/OrderPanel";
+import { OrderPanel, type GroupedSalesOrderLine } from "./cashier/OrderPanel";
+import { linePriceNote } from "@/lib/pos/linePrice";
 import { TableSeatingDialog } from "./cashier/TableSeatingDialog";
 import { ExtraFeeDialog } from "./cashier/ExtraFeeDialog";
 import { SplitItemsDialog, SplitTarget } from "./cashier/SplitItemsDialog";
@@ -153,6 +154,7 @@ export function CashierPage() {
     selectOrderById,
     createOrder,
     addProductToOrder,
+    splitOrderLine,
     updateOrderLine,
     removeOrderLine,
     addProductToTableSession,
@@ -575,8 +577,9 @@ export function CashierPage() {
     ) => {
       const variantModifier = Number(variant?.priceModifier || 0);
       const basePrice = Number(product?.basePrice || line.unitPrice || 0);
-      const unitPrice =
-        basePrice + variantModifier + modifierExtra(line.selectedModifiers);
+      const unitPrice = line.priceOverride
+        ? Number(line.priceOverride)
+        : basePrice + variantModifier + modifierExtra(line.selectedModifiers);
       const ownRateId = product?.taxRateId;
       const fallback = ownRateId || variant?.taxRate ? null : defaultTaxRate;
       const isPriceInclusive = fallback
@@ -641,6 +644,25 @@ export function CashierPage() {
     };
   };
 
+  /** What the menu charges for one of a line, from the loaded menu or what the server sent with the line. */
+  const menuPriceFor = (line: {
+    variantId: string;
+    menuPrice?: string;
+    selectedModifiers?: unknown;
+  }) => {
+    if (isFeeLine(line)) return undefined;
+    const variant = variantById[line.variantId];
+    const product = variant ? productById[variant.productId] : undefined;
+    const listPrice = product
+      ? Number(product.basePrice || 0) + Number(variant?.priceModifier || 0)
+      : line.menuPrice !== undefined
+        ? Number(line.menuPrice)
+        : undefined;
+    return listPrice === undefined
+      ? undefined
+      : listPrice + modifierExtra(line.selectedModifiers);
+  };
+
   const printableLines = (
     lines: Array<{
       voidedAt?: string | null;
@@ -654,8 +676,11 @@ export function CashierPage() {
       categoryId?: string;
       categoryName?: string;
       selectedModifiers?: unknown;
+      menuPrice?: string;
     }>,
-    withoutTax = false
+    withoutTax = false,
+    // On a bill the guest gets, a repriced item says so: "Water (Discount)".
+    notePrices = false
   ) => {
     const printable = lines
       .filter((line) => !line.voidedAt)
@@ -667,9 +692,13 @@ export function CashierPage() {
         const unitPrice = withoutTax && line.taxInclusive && quantity > 0
           ? toMoney(Number(line.unitPrice || 0) - Number(line.taxAmount || 0) / quantity)
           : line.unitPrice?.trim();
+        const name = line.productName || product?.name || line.variantName || "Item";
+        const note = notePrices
+          ? linePriceNote(line.unitPrice, menuPriceFor(line))
+          : undefined;
         return {
           variantId: line.variantId,
-          name: line.productName || product?.name || line.variantName || "Item",
+          name: note ? t(`cashier.orderPanel.priceNote.${note}`, { name }) : name,
           quantity: String(line.quantity || "1"),
           unitPrice: unitPrice || undefined,
           // The category the server recorded on the line routes it to its
@@ -708,10 +737,17 @@ export function CashierPage() {
   const displayOrderLines = useMemo(() => {
     if (isDirectCheckoutMode) return activeOrderLines;
 
+    // A saved line keeps the price it was saved with, which the cashier may
+    // have changed for this bill; only its tax is worked out here.
     return selectedOrderLines.map((line) => {
       const variant = variantById[line.variantId];
       const product = variant ? productById[variant.productId] : undefined;
-      return product || variant ? buildDirectLine(line, product, variant) : line;
+      return product || variant
+        ? {
+            ...buildDirectLine({ ...line, priceOverride: line.unitPrice }, product, variant),
+            priceOverride: undefined,
+          }
+        : line;
     });
   }, [
     activeOrderLines,
@@ -745,7 +781,7 @@ export function CashierPage() {
   const billOptions = useBillOptions({
     billKey: `${isDirectCheckoutMode ? "direct" : selectedOrder?.id || "empty"}:${billGeneration}`,
     orderId: !isDirectCheckoutMode ? selectedOrder?.id : undefined,
-    discount: discountAmount,
+    discount: discountAmount.trim() || "0.0000",
     revision: billRevision,
     fetchBill: fetchOrderBill,
   });
@@ -1174,6 +1210,25 @@ export function CashierPage() {
     [fetchManagedOrderLines]
   );
 
+  /**
+   * Drops removed lines from what this till remembers of the bill, so adding the
+   * same item again makes a new line instead of updating one that is gone.
+   */
+  const forgetLines = useCallback((ids: string[]) => {
+    const gone = new Set(ids);
+    activeOrderLinesRef.current = activeOrderLinesRef.current.filter(
+      (line) => !gone.has(line.id)
+    );
+    setMultiOrderLines((current) =>
+      Object.fromEntries(
+        Object.entries(current).map(([orderId, lines]) => [
+          orderId,
+          lines.filter((line) => !gone.has(line.id)),
+        ])
+      )
+    );
+  }, []);
+
   const bindOrdersToTable = useCallback(
     async (tableId: string, primaryOrderId: string) => {
       const orderIds = mergeTableOrderIds(tableId, primaryOrderId);
@@ -1231,7 +1286,8 @@ export function CashierPage() {
           line.variantId,
           Number(line.quantity || 1),
           undefined,
-          chosenOf(line.selectedModifiers)
+          chosenOf(line.selectedModifiers),
+          line.priceOverride
         );
       }
 
@@ -2101,7 +2157,7 @@ export function CashierPage() {
         showPrices: true,
         receiptId: selectedOrder?.orderNumber,
         ...receiptParty(true),
-        lines: printableLines(paymentBillLines, !billOptions.includeTax),
+        lines: printableLines(paymentBillLines, !billOptions.includeTax, true),
         subtotal: receiptSubtotal,
         discount: Number(receiptDiscount) > 0 ? receiptDiscount : undefined,
         tax: Number(receiptTax) > 0 ? receiptTax : undefined,
@@ -2401,6 +2457,7 @@ export function CashierPage() {
     if (!selectedOrder) return;
     if (quantity <= 0) {
       await removeOrderLine(selectedOrder.id, lineId);
+      forgetLines([lineId]);
       const deletePrintError = await printKdsDelete([targetLine]);
       if (deletePrintError) setLocalError(deletePrintError);
       return;
@@ -2416,38 +2473,102 @@ export function CashierPage() {
     });
   };
 
-  const handleToggleFoc = async (line: SalesOrderLine) => {
+  const menuPriceOf = (line: SalesOrderLine) => menuPriceFor(line);
+
+  const handleEditLine = async (
+    line: GroupedSalesOrderLine,
+    edit: { quantity: number; unitPrice: number; foc: boolean }
+  ) => {
     setLocalError(null);
     setNotice(null);
+    const fee = isFeeLine(line);
+    const lines = line.groupedLines ?? [line];
+    const priceFor = (entry: SalesOrderLine) =>
+      fee ? entry.unitPrice || "0.0000" : formatAmount(edit.unitPrice);
+    const discountFor = (entry: SalesOrderLine, unitPrice: string) => {
+      if (edit.foc) return lineFocDiscount({ quantity: entry.quantity, unitPrice });
+      return isFocLine(entry) ? "0.0000" : entry.lineDiscount || "0.0000";
+    };
+    const unchanged = (entry: SalesOrderLine) =>
+      Number(priceFor(entry)) === Number(entry.unitPrice || 0) &&
+      edit.foc === isFocLine(entry);
+    // The newest lines take the change first; a line only partly covered is
+    // split, so the rest of it keeps its price (3 waters at 2,000, 1 at 1,500).
+    let left = edit.quantity;
+    const plan: Array<{ entry: SalesOrderLine; take: number }> = [];
+    for (const entry of [...lines].reverse()) {
+      if (left <= 0) break;
+      const take = Math.min(left, Number(entry.quantity || 0));
+      if (take > 0) plan.push({ entry, take });
+      left -= take;
+    }
+    const isPart = (entry: SalesOrderLine, take: number) =>
+      take < Number(entry.quantity || 0) - 0.00005;
     try {
       if (isSettledSalesOrder(selectedOrder) && !isDirectCheckoutMode) {
         throw new Error(t("cashier.errors.orderAlreadyPaid"));
       }
-      const nextDiscount = isFocLine(line) ? "0.0000" : lineFocDiscount(line);
       if (isDirectCheckoutMode) {
-        setDirectCartLines((current) => {
-          const target = current.find((entry) => entry.id === line.id);
-          if (!target) return current;
-          const variant = variantById[target.variantId];
+        const menu = menuPriceOf(line);
+        const repriced =
+          !fee && (menu === undefined || Math.abs(menu - edit.unitPrice) >= 0.0001);
+        const edited = (entry: SalesOrderLine) => {
+          const unitPrice = priceFor(entry);
+          const variant = variantById[entry.variantId];
           const product = variant ? productById[variant.productId] : undefined;
-          const updated = buildDirectLine(
-            { ...target, lineDiscount: nextDiscount },
+          return buildDirectLine(
+            {
+              ...entry,
+              priceOverride: repriced ? unitPrice : undefined,
+              lineDiscount: discountFor(entry, unitPrice),
+            },
             product,
             variant
           );
-          return current.map((entry) => (entry.id === line.id ? updated : entry));
-        });
+        };
+        const takes = new Map(plan.map(({ entry, take }) => [entry.id, take]));
+        setDirectCartLines((current) =>
+          current.flatMap((entry) => {
+            const take = takes.get(entry.id);
+            if (take === undefined || unchanged(entry)) return [entry];
+            if (!isPart(entry, take)) return [edited(entry)];
+            const kept = (Number(entry.quantity || 0) - take).toFixed(4);
+            const keptDiscount = isFocLine(entry)
+              ? lineFocDiscount({ quantity: kept, unitPrice: entry.unitPrice })
+              : entry.lineDiscount;
+            return [
+              { ...entry, quantity: kept, lineDiscount: keptDiscount },
+              edited({
+                ...entry,
+                id: `${entry.id}-part-${Date.now()}`,
+                quantity: take.toFixed(4),
+                lineDiscount: isFocLine(entry) ? "0.0000" : entry.lineDiscount,
+              }),
+            ];
+          })
+        );
         return;
       }
       if (!selectedOrder) return;
-      await updateOrderLine(selectedOrder.id, line.id, {
-        variantId: line.variantId,
-        quantity: line.quantity,
-        unitPrice: line.unitPrice || "0.0000",
-        lineDiscount: nextDiscount,
-        taxAmount: line.taxAmount || "0.0000",
-        seatNumber: line.seatNumber,
-      });
+      for (const { entry, take } of plan) {
+        if (unchanged(entry)) continue;
+        const orderId = entry.salesOrderId || selectedOrder.id;
+        const target = isPart(entry, take)
+          ? await splitOrderLine(orderId, entry.id, take.toFixed(4))
+          : entry;
+        const unitPrice = priceFor(target);
+        await updateOrderLine(orderId, target.id, {
+          variantId: entry.variantId,
+          quantity: take.toFixed(4),
+          unitPrice,
+          lineDiscount: discountFor(
+            { ...target, quantity: take.toFixed(4), unitPrice: entry.unitPrice },
+            unitPrice
+          ),
+          taxAmount: target.taxAmount || "0.0000",
+          seatNumber: entry.seatNumber,
+        });
+      }
     } catch (caught) {
       setLocalError(
         caught instanceof Error ? caught.message : t("cashier.errors.updateOrderLine")
@@ -2623,6 +2744,7 @@ export function CashierPage() {
         }
         for (const entry of lines) {
           await removeOrderLine(selectedOrder.id, entry.id);
+          forgetLines([entry.id]);
         }
         const deletePrintError = await printKdsDelete(lines);
         if (deletePrintError) setLocalError(deletePrintError);
@@ -2686,7 +2808,11 @@ export function CashierPage() {
             product,
             line.variantId,
             Number(line.quantity || 1),
-            { refreshLines: false, modifiers: chosenOf(line.selectedModifiers) }
+            {
+              refreshLines: false,
+              modifiers: chosenOf(line.selectedModifiers),
+              unitPrice: line.priceOverride,
+            }
           );
         }
 
@@ -2791,6 +2917,10 @@ export function CashierPage() {
     status: (typeof diningTables)[number]["status"]
   ) => {
     if (!selectedOrderTable) return;
+    if (status === "AVAILABLE" && displayOrderLines.length > 0) {
+      setNotice(t("cashier.errors.tableAvailableWithMenu"));
+      return;
+    }
     setLocalError(null);
     setNotice(null);
     if (
@@ -3031,7 +3161,13 @@ export function CashierPage() {
         onIncreaseLineQuantity={(line) => void handleIncreaseLineQuantity(line)}
         onDecreaseLineQuantity={(line) => void handleDecreaseLineQuantity(line)}
         onRemoveLine={(line) => void handleRemoveLine(line)}
-        onToggleFoc={(line) => void handleToggleFoc(line)}
+        onEditLine={(line, edit) => void handleEditLine(line, edit)}
+        chargeOptions={{
+          includeTax: billOptions.includeTax,
+          includeServiceCharge: billOptions.includeServiceCharge,
+          onChange: chooseBillOption,
+        }}
+        menuPrice={menuPriceOf}
         promotions={promotions.running}
         promotionDiscounts={isDirectCheckoutMode ? promotions.discounts : undefined}
         promotionName={promotions.promotionName}
@@ -3082,7 +3218,7 @@ export function CashierPage() {
             showPrices: true,
             receiptId: selectedOrder?.orderNumber,
             ...receiptParty(),
-            lines: printableLines(paymentBillLines, !billOptions.includeTax),
+            lines: printableLines(paymentBillLines, !billOptions.includeTax, true),
             subtotal: receiptSubtotal,
             discount: Number(receiptDiscount) > 0 ? receiptDiscount : undefined,
             tax: Number(receiptTax) > 0 ? receiptTax : undefined,

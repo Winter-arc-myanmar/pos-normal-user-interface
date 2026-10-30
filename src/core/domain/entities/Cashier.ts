@@ -180,6 +180,8 @@ export class SalesOrderLine {
   courseType?: string;
   selectedModifiers?: Record<string, unknown> | ChosenModifier[];
   seatNumber?: number;
+  /** The hostess who gave this service, on a KTV bill. */
+  hostessId?: string;
   productName?: string;
   variantName?: string;
   sku?: string;
@@ -190,6 +192,10 @@ export class SalesOrderLine {
    */
   categoryId?: string;
   categoryName?: string;
+  /** The menu price for one, before options, as the server sent it with the line. */
+  menuPrice?: string;
+  /** A price the cashier set for this sale only, on a cart line not saved yet. */
+  priceOverride?: string;
   createdAt?: string;
   updatedAt?: string;
 

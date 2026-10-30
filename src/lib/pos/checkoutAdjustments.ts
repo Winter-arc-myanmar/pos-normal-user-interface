@@ -61,7 +61,8 @@ export function isFocLine(line: {
 
 /**
  * The checkout items, with the order discount spread over them in order. An
- * extra fee takes none of it, and carries its own amount and name.
+ * extra fee takes none of it, and carries its own amount and name; an item the
+ * cashier repriced carries its price.
  */
 export function allocateOrderDiscountToLines<
   T extends {
@@ -71,6 +72,7 @@ export function allocateOrderDiscountToLines<
     lineDiscount?: string | number;
     productName?: string;
     selectedModifiers?: unknown;
+    priceOverride?: string;
   },
 >(
   lines: T[],
@@ -100,6 +102,7 @@ export function allocateOrderDiscountToLines<
         unitPrice: toMoney(line.unitPrice),
         ...(line.productName ? { name: line.productName } : {}),
       }),
+      ...(!fee && line.priceOverride ? { unitPrice: toMoney(line.priceOverride) } : {}),
       ...(modifiers.length ? { selectedModifiers: modifiers } : {}),
     };
   });

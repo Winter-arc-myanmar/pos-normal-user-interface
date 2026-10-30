@@ -87,6 +87,31 @@ describe("ApiCashierRepository", () => {
     expect(lines[3].sku).toBe("GUINNESS-01");
   });
 
+  it("reads the menu price the server sends with a line", async () => {
+    const httpClient = {
+      get: vi.fn().mockResolvedValue({
+        success: true,
+        data: [
+          {
+            id: "line-1",
+            salesOrderId: "order-1",
+            variantId: "variant-1",
+            quantity: "1.0000",
+            unitPrice: "1500.0000",
+            variant: { priceModifier: "500.0000", product: { name: "Water", basePrice: "1500.0000" } },
+          },
+          { id: "line-2", salesOrderId: "order-1", variantId: "variant-2", quantity: "1.0000", unitPrice: "1.0000" },
+        ],
+      }),
+    };
+    const repository = new ApiCashierRepository(httpClient as unknown as HttpClient);
+
+    const lines = await repository.getSalesOrderLines("order-1");
+
+    expect(lines[0].menuPrice).toBe("2000");
+    expect(lines[1].menuPrice).toBeUndefined();
+  });
+
   it("keeps the category a line was sold under, however the API nests it", async () => {
     const httpClient = {
       get: vi.fn().mockResolvedValue({

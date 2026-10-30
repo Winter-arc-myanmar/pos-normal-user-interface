@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState, type RefObject } from "react";
+import { useEffect, useMemo, useState, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import {
@@ -17,10 +17,13 @@ import {
 } from "@/core/domain/entities/Cashier";
 import { OrderTabs } from "./OrderTabs";
 import { OrderAdjustments } from "./OrderAdjustments";
+import { LineEditDialog, type LineEdit } from "./LineEditDialog";
+import { BillOptionsDialog } from "./BillOptionsDialog";
 import { isSettledSalesOrder } from "@/lib/pos/orderStatus";
 import { modifierPrintText } from "@/lib/printing/modifierText";
 import { isPendingKdsLine } from "@/lib/pos/kdsLines";
 import { isFocLine } from "@/lib/pos/checkoutAdjustments";
+import { linePriceNote } from "@/lib/pos/linePrice";
 import type {
   PromotionDiscount,
   RunningPromotion,
@@ -109,7 +112,16 @@ interface OrderPanelProps {
   onIncreaseLineQuantity: (line: SalesOrderLine) => void;
   onDecreaseLineQuantity: (line: SalesOrderLine) => void;
   onRemoveLine: (line: SalesOrderLine) => void;
-  onToggleFoc?: (line: SalesOrderLine) => void;
+  /** Whether this bill charges tax and service charge, as on the pay screen. */
+  chargeOptions?: {
+    includeTax: boolean;
+    includeServiceCharge: boolean;
+    onChange: (field: "includeTax" | "includeServiceCharge", value: boolean) => void;
+  };
+  /** Save an item's details: its price on this bill only, and FOC. */
+  onEditLine?: (line: GroupedSalesOrderLine, edit: LineEdit) => void;
+  /** What the menu charges for a line, to show when the bill charges something else. */
+  menuPrice?: (line: SalesOrderLine) => number | undefined;
   /** Promotions running at this till, as the server tells them. */
   promotions?: RunningPromotion[];
   /** What the running promotions take off the lines they have not priced yet. */
@@ -171,14 +183,44 @@ const SEATING_ICON_PATHS = {
     "m15 9 6-6",
   ],
   merge: ["m8 6 4-4 4 4", "M12 2v10.3a4 4 0 0 1-1.172 2.872L4 22", "m20 22-5-5"],
+  options: [
+    "M20 7h-9",
+    "M14 17H5",
+    "M17 14a3 3 0 1 0 0 6 3 3 0 1 0 0-6z",
+    "M7 4a3 3 0 1 0 0 6 3 3 0 1 0 0-6z",
+  ],
+  minus: ["M5 12h14"],
+  plus: ["M5 12h14", "M12 5v14"],
+  edit: [
+    "M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z",
+    "m15 5 4 4",
+  ],
+  remove: [
+    "M3 6h18",
+    "M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6",
+    "M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2",
+    "M10 11v6",
+    "M14 11v6",
+  ],
 } as const;
 
-function SeatingIcon({ name }: { name: keyof typeof SEATING_ICON_PATHS }) {
+const lineIconBase =
+  "grid h-8 w-8 shrink-0 place-items-center rounded-md border focus-visible:outline-blue-500 disabled:opacity-40";
+const lineIconButton = `${lineIconBase} border-slate-300 text-slate-700 hover:bg-slate-100`;
+const lineRemoveButton = `${lineIconBase} border-red-200 text-red-600 hover:bg-red-50`;
+
+function SeatingIcon({
+  name,
+  className = "h-5 w-5",
+}: {
+  name: keyof typeof SEATING_ICON_PATHS;
+  className?: string;
+}) {
   return (
     <svg
       aria-hidden="true"
       viewBox="0 0 24 24"
-      className="h-5 w-5"
+      className={className}
       fill="none"
       stroke="currentColor"
       strokeWidth={2}
@@ -219,7 +261,9 @@ export function OrderPanel({
   onIncreaseLineQuantity,
   onDecreaseLineQuantity,
   onRemoveLine,
-  onToggleFoc,
+  onEditLine,
+  chargeOptions,
+  menuPrice = () => undefined,
   promotions = [],
   promotionDiscounts = {},
   promotionName = () => undefined,
@@ -264,19 +308,21 @@ export function OrderPanel({
 }: OrderPanelProps) {
   const { t } = useTranslation();
   const [confirmCancelOrder, setConfirmCancelOrder] = useState(false);
-  const [tableControlsExpanded, setTableControlsExpanded] = useState(false);
-  const [expandedLine, setExpandedLine] = useState<{
+  const [billOptions, setBillOptions] = useState<{
+    orderId: string | undefined;
+  } | null>(null);
+  const [editing, setEditing] = useState<{
     orderId: string | undefined;
     lineId: string;
+    promo?: string;
   } | null>(null);
-  const lineDetailsId = useId();
-  const tableControlsId = useId();
   const groupedOrderLines = useMemo(
     () => groupOrderLines(selectedOrderLines, isFeeLine),
     [isFeeLine, selectedOrderLines]
   );
   const variants = Object.values(variantsByProductId).flat();
   const hasActiveOrder = !!selectedOrder || selectedOrderLines.length > 0;
+  const hasMenuLines = selectedOrderLines.length > 0;
   const isSettledOrder = isSettledSalesOrder(selectedOrder);
   const checkoutReady = isSplitMode
     ? splitTenderCount > 0 && splitRemaining <= 0.009
@@ -287,10 +333,6 @@ export function OrderPanel({
   useEffect(() => {
     if (!hasActiveOrder) setConfirmCancelOrder(false);
   }, [hasActiveOrder]);
-
-  useEffect(() => {
-    setTableControlsExpanded(false);
-  }, [selectedOrder?.id, selectedSession?.id, selectedTable?.id]);
 
   const resolveLineName = (line: SalesOrderLine) => {
     const variant = variants.find((item) => item.id === line.variantId);
@@ -312,6 +354,163 @@ export function OrderPanel({
     const variant = variants.find((item) => item.id === line.variantId);
     return variantDisplayName(line) || variantDisplayName(variant ?? {});
   };
+
+  const hasTable = Boolean(selectedTable || selectedSession);
+  const canAdjustBill = Boolean(onDiscountAmountChange && onTipAmountChange);
+  const showBillOptions =
+    billOptions !== null && billOptions.orderId === selectedOrder?.id;
+  const billOptionsTitle = t(
+    hasTable ? "cashier.billOptions.titleWithTable" : "cashier.billOptions.title"
+  );
+  const billOptionsSummary = [
+    chargeOptions && !chargeOptions.includeTax ? t("cashier.billOptions.noTax") : null,
+    chargeOptions && !chargeOptions.includeServiceCharge
+      ? t("cashier.billOptions.noServiceCharge")
+      : null,
+    Number(discountAmount) > 0 ? `−${formatPosMoney(discountAmount)}` : null,
+    Number(tipAmount) > 0
+      ? t("cashier.billOptions.tipSummary", { amount: formatPosMoney(tipAmount) })
+      : null,
+    memberPointsLabel || null,
+    selectedTable
+      ? selectedTable.tableNumber ||
+        t(`cashier.orderPanel.tableStatuses.${selectedTable.status}`)
+      : null,
+    selectedSession
+      ? t(`cashier.orderPanel.sessionStates.${selectedSession.sessionState}`)
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const tableControls = hasTable ? (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-2">
+        {selectedTable ? (
+          <label
+            className={[
+              "min-w-0 space-y-1",
+              selectedSession ? "" : "col-span-2",
+            ].join(" ")}
+          >
+            <span className="text-xs text-slate-300">
+              {t("cashier.orderPanel.tableStatusLabel")}
+            </span>
+            <select
+              aria-label={t("cashier.orderPanel.tableStatus")}
+              value={selectedTable.status}
+              onChange={(event) =>
+                onTableStatusChange(event.target.value as DiningTableStatus)
+              }
+              className="min-h-11 w-full min-w-0 rounded-md border border-slate-700 bg-slate-900 px-2 text-sm text-slate-100 focus:border-blue-500 focus:outline-none"
+            >
+              {(["AVAILABLE", "OCCUPIED", "DIRTY", "RESERVED"] as const).map(
+                (status) => (
+                  <option
+                    key={status}
+                    value={status}
+                    disabled={
+                      status === "AVAILABLE" && (hasMenuLines || hasActiveTableOrder)
+                    }
+                  >
+                    {t(`cashier.orderPanel.tableStatuses.${status}`)}
+                  </option>
+                )
+              )}
+            </select>
+          </label>
+        ) : null}
+        {selectedSession ? (
+          <label
+            className={[
+              "min-w-0 space-y-1",
+              selectedTable ? "" : "col-span-2",
+            ].join(" ")}
+          >
+            <span className="text-xs text-slate-300">
+              {t("cashier.orderPanel.sessionStateLabel")}
+            </span>
+            <select
+              aria-label={t("cashier.orderPanel.sessionState")}
+              value={selectedSession.sessionState}
+              onChange={(event) =>
+                onSessionStateChange(event.target.value as TableSessionState)
+              }
+              className="min-h-11 w-full min-w-0 rounded-md border border-slate-700 bg-slate-900 px-2 text-sm text-slate-100 focus:border-blue-500 focus:outline-none"
+            >
+              {(
+                [
+                  "SEATED",
+                  "ORDERING",
+                  "SERVED",
+                  "PAYMENT_PENDING",
+                  "CLOSED",
+                ] as const
+              ).map((state) => (
+                <option key={state} value={state}>
+                  {t(`cashier.orderPanel.sessionStates.${state}`)}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+      </div>
+
+      {selectedSession && onChangeTable && onCombineTables ? (
+        <div className="space-y-2">
+          <div className="grid grid-cols-3 gap-2">
+            {(
+              [
+                ["move", onChangeTable, "cashier.seating.changeTable"],
+                ["split", onSplitItems, "cashier.seating.split"],
+                ["merge", onCombineTables, "cashier.seating.combine"],
+              ] as const
+            ).map(([icon, onClick, label]) => (
+              <button
+                key={icon}
+                type="button"
+                disabled={isLoading || !onClick}
+                onClick={onClick}
+                title={t(label)}
+                className="flex min-h-14 flex-col items-center justify-center gap-1 rounded border border-slate-700 bg-slate-900 px-1 text-[11px] font-semibold text-slate-100 transition-colors hover:border-blue-500 hover:bg-blue-600/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <SeatingIcon name={icon} />
+                {t(label)}
+              </button>
+            ))}
+          </div>
+          {joinedTables.length && onReleaseTable ? (
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-slate-400">
+                {t("cashier.seating.joinedTables")}:
+              </span>
+              {joinedTables.map((table) => (
+                <button
+                  key={table.id}
+                  type="button"
+                  disabled={isLoading}
+                  onClick={() => onReleaseTable(table.id)}
+                  title={t("cashier.seating.release", {
+                    table: table.tableNumber,
+                  })}
+                  aria-label={t("cashier.seating.release", {
+                    table: table.tableNumber,
+                  })}
+                  className="min-h-11 rounded-full border border-slate-700 bg-slate-900 px-3 font-semibold text-slate-200 transition-colors hover:border-red-400 hover:bg-red-950/40 hover:text-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {table.tableNumber} ×
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  ) : null;
+
+  const editingLine =
+    editing && editing.orderId === selectedOrder?.id && !isSettledOrder
+      ? groupedOrderLines.find((line) => line.id === editing.lineId)
+      : undefined;
 
   return (
     <aside className="flex min-h-0 min-w-0 flex-col overflow-y-auto border-r border-slate-200 bg-white p-3 text-slate-900 min-[1100px]:p-4">
@@ -438,33 +637,18 @@ export function OrderPanel({
                   (saving ? t("cashier.orderPanel.promo") : "");
                 // A previewed saving is not on the bill yet, so take it off here.
                 const lineDue = lineTotal - previewSaving;
-                const isExpanded =
-                  expandedLine?.orderId === selectedOrder?.id &&
-                  expandedLine?.lineId === line.id;
-                const detailsId = `${lineDetailsId}-${line.id}`;
                 const isPendingKds = isPendingKdsLine(line);
                 const isFee = isFeeLine?.(line) ?? false;
+                const listPrice = menuPrice(line);
+                const priceNote = isFee ? undefined : linePriceNote(line.unitPrice, listPrice);
+                const priceChanged = priceNote !== undefined;
+                const shownName = priceNote
+                  ? t(`cashier.orderPanel.priceNote.${priceNote}`, { name: lineName })
+                  : lineName;
+                const isLocked = isLoading || isSettledOrder;
                 return (
-                  <div
-                    key={line.id}
-                    className={isExpanded ? "bg-slate-50" : "bg-white"}
-                  >
-                    <button
-                      type="button"
-                      className="flex min-h-11 w-full min-w-0 items-center gap-2 px-2 text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
-                      aria-expanded={isExpanded}
-                      aria-controls={detailsId}
-                      aria-label={t(
-                        isExpanded ? "cashier.orderPanel.collapseItem" : "cashier.orderPanel.expandItem",
-                        { name: lineName }
-                      )}
-                      onClick={() => setExpandedLine(
-                        isExpanded ? null : {
-                          orderId: selectedOrder?.id,
-                          lineId: line.id,
-                        }
-                      )}
-                    >
+                  <div key={line.id} role="group" aria-label={shownName} className="bg-white px-2 py-1.5">
+                    <div className="flex min-w-0 items-center gap-1.5">
                       {!isFee && isPendingKds ? (
                         <span
                           className="h-2.5 w-2.5 shrink-0 rounded-full border-2 border-emerald-500 bg-emerald-500"
@@ -472,13 +656,8 @@ export function OrderPanel({
                           title={t("cashier.orderPanel.kdsPending")}
                         />
                       ) : null}
-                      <span
-                        className="shrink-0 text-xs font-semibold tabular-nums text-slate-500"
-                        aria-label={t("cashier.orderPanel.lineQuantity", { count: quantityLabel })}
-                      >
-                        {quantityLabel}×
-                      </span>
                       <span className="flex min-w-0 flex-1 items-center gap-1.5 text-sm font-medium">
+                        <span className="min-w-0 truncate" title={shownName}>{shownName}</span>
                         {saving ? (
                           <span
                             className="shrink-0 rounded border border-emerald-600 px-1 text-[10px] font-semibold tracking-wide text-emerald-700"
@@ -497,98 +676,93 @@ export function OrderPanel({
                             {t("cashier.orderPanel.foc")}
                           </span>
                         ) : null}
-                        <span className="min-w-0 truncate" title={lineName}>{lineName}</span>
                       </span>
-                      <span className="shrink-0 text-sm tabular-nums">
+                      <span className="shrink-0 text-sm font-semibold tabular-nums">
                         {formatPosMoney(lineDue)}
                       </span>
-                      <svg
-                        aria-hidden="true"
-                        viewBox="0 0 16 16"
-                        fill="none"
-                        className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform duration-150 motion-reduce:transition-none ${isExpanded ? "rotate-180" : ""}`}
-                      >
-                        <path d="m4 6 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                    {lineOptions ? (
-                      <p
-                        className="truncate px-2 pb-1 text-xs text-slate-500"
-                        title={lineOptions}
-                      >
-                        {lineOptions}
-                      </p>
-                    ) : null}
-                    {isExpanded ? (
-                      <div id={detailsId} className="border-t border-slate-200 px-2 pb-2 pt-1.5">
-                        <p className="break-words text-sm font-medium">{lineName}</p>
-                        {lineVariant && lineVariant !== lineName ? (
-                          <p className="mt-0.5 break-words text-xs text-slate-500">
-                            {lineVariant}
-                          </p>
-                        ) : null}
-                        <p className="mt-0.5 text-xs tabular-nums text-slate-600">
-                          <span className={saving ? "text-slate-400 line-through" : ""}>
-                            {formatPosMoney(line.unitPrice)}
-                          </span>
-                          {saving && promoLabel ? ` · ${promoLabel}` : ""}
-                        </p>
-                        {saving ? (
-                          <p className="mt-0.5 text-xs font-medium text-emerald-700">
-                            {t("cashier.orderPanel.promoSaving", {
-                              name: promoLabel,
-                              amount: formatPosMoney(saving.amount),
-                            })}
-                          </p>
-                        ) : null}
-                        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-                          <button
-                            type="button"
-                            className="min-h-11 min-w-11 rounded border border-slate-300 px-2 font-semibold leading-none hover:bg-slate-100 focus-visible:outline-blue-500 disabled:opacity-50"
-                            aria-label={t("cashier.orderPanel.decreaseQuantity")}
-                            onClick={() => onDecreaseLineQuantity(line)}
-                            disabled={isLoading || isSettledOrder}
-                          >
-                            -
-                          </button>
-                          <span
-                            className="min-w-[2ch] text-center font-medium tabular-nums"
-                            aria-label={t("cashier.orderPanel.lineQuantity", {
-                              count: quantityLabel,
-                            })}
-                          >
-                            {quantityLabel}
-                          </span>
-                          <button
-                            type="button"
-                            className="min-h-11 min-w-11 rounded border border-slate-300 px-2 font-semibold leading-none hover:bg-slate-100 focus-visible:outline-blue-500 disabled:opacity-50"
-                            aria-label={t("cashier.orderPanel.increaseQuantity")}
-                            onClick={() => onIncreaseLineQuantity(line)}
-                            disabled={isLoading || isSettledOrder}
-                          >
-                            +
-                          </button>
-                          <button
-                            type="button"
-                            className="min-h-11 rounded border border-slate-300 px-2 py-1 font-medium hover:bg-slate-100 focus-visible:outline-blue-500 disabled:opacity-50"
-                            onClick={() => onToggleFoc?.(line)}
-                            disabled={isLoading || isSettledOrder || !onToggleFoc}
-                          >
-                            {isFocLine(line)
-                              ? t("cashier.orderPanel.undoFoc")
-                              : t("cashier.orderPanel.foc")}
-                          </button>
-                          <button
-                            type="button"
-                            className="min-h-11 rounded border border-red-300 px-2 py-1 font-medium text-red-700 hover:bg-red-50 focus-visible:outline-blue-500 disabled:opacity-50"
-                            onClick={() => onRemoveLine(line)}
-                            disabled={isLoading || isSettledOrder}
-                          >
-                            {t("cashier.orderPanel.remove")}
-                          </button>
-                        </div>
+                    </div>
+                    <p
+                      className="mt-0.5 truncate text-xs tabular-nums text-slate-500"
+                      title={[lineVariant !== lineName ? lineVariant : "", lineOptions].filter(Boolean).join(" · ")}
+                    >
+                      {"@ "}
+                      {formatPosMoney(line.unitPrice)}
+                      {priceChanged ? (
+                        <span
+                          className="ml-1 text-slate-400 line-through"
+                          aria-label={t("cashier.orderPanel.menuPriceWas", {
+                            amount: formatPosMoney(listPrice),
+                          })}
+                        >
+                          {formatPosMoney(listPrice)}
+                        </span>
+                      ) : null}
+                      {lineVariant && lineVariant !== lineName ? ` · ${lineVariant}` : ""}
+                      {lineOptions ? ` · ${lineOptions}` : ""}
+                    </p>
+                    <div className="mt-1 flex items-center justify-between gap-1">
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          className={lineIconButton}
+                          aria-label={t("cashier.orderPanel.decreaseQuantity")}
+                          onClick={() => onDecreaseLineQuantity(line)}
+                          disabled={isLocked}
+                        >
+                          <SeatingIcon name="minus" className="h-4 w-4" />
+                        </button>
+                        <span
+                          className="min-w-[2.5ch] text-center text-sm font-semibold tabular-nums"
+                          aria-label={t("cashier.orderPanel.lineQuantity", {
+                            count: quantityLabel,
+                          })}
+                        >
+                          {quantityLabel}
+                        </span>
+                        <button
+                          type="button"
+                          className={lineIconButton}
+                          aria-label={t("cashier.orderPanel.increaseQuantity")}
+                          onClick={() => onIncreaseLineQuantity(line)}
+                          disabled={isLocked}
+                        >
+                          <SeatingIcon name="plus" className="h-4 w-4" />
+                        </button>
                       </div>
-                    ) : null}
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          className={lineIconButton}
+                          aria-label={t("cashier.orderPanel.editItem", { name: lineName })}
+                          title={t("cashier.lineEdit.title")}
+                          onClick={() =>
+                            setEditing({
+                              orderId: selectedOrder?.id,
+                              lineId: line.id,
+                              promo: saving
+                                ? t("cashier.orderPanel.promoSaving", {
+                                    name: promoLabel,
+                                    amount: formatPosMoney(saving.amount),
+                                  })
+                                : undefined,
+                            })
+                          }
+                          disabled={isLocked || !onEditLine}
+                        >
+                          <SeatingIcon name="edit" className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          className={lineRemoveButton}
+                          aria-label={t("cashier.orderPanel.removeItem", { name: lineName })}
+                          title={t("cashier.orderPanel.remove")}
+                          onClick={() => onRemoveLine(line)}
+                          disabled={isLocked}
+                        >
+                          <SeatingIcon name="remove" className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 );
               })}
@@ -636,26 +810,6 @@ export function OrderPanel({
             <span>{t("cashier.total")}</span>
             <span className="tabular-nums">{formatPosMoney(total)}</span>
           </div>
-          {onDiscountAmountChange && onTipAmountChange ? (
-            <OrderAdjustments
-              discountAmount={discountAmount}
-              discountReasonId={discountReasonId}
-              discountReasons={discountReasons}
-              serviceCharge={serviceCharge}
-              tipAmount={tipAmount}
-              memberCardUid={memberCardUid}
-              memberPointsLabel={memberPointsLabel}
-              memberCardError={memberCardError}
-              isMemberCardLoading={isMemberCardLoading}
-              disabled={isLoading || isSettledOrder}
-              onDiscountAmountChange={onDiscountAmountChange}
-              onDiscountReasonChange={onDiscountReasonChange || (() => undefined)}
-              onRemoveDiscount={onRemoveDiscount || (() => undefined)}
-              onTipAmountChange={onTipAmountChange}
-              onMemberCardUidChange={onMemberCardUidChange || (() => undefined)}
-              onLookupMemberCard={onLookupMemberCard || (() => undefined)}
-            />
-          ) : null}
           {isSplitMode || isPayView ? (
             <p className="text-xs text-slate-500">
               {isSplitMode
@@ -667,173 +821,12 @@ export function OrderPanel({
                 : t("cashier.payment.chooseMethod")}
             </p>
           ) : null}
-          {selectedTable || selectedSession ? (
-            <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-              <button
-                type="button"
-                className="flex min-h-11 w-full items-center gap-2 px-3 text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
-                aria-expanded={tableControlsExpanded}
-                aria-controls={tableControlsId}
-                aria-label={t(
-                  tableControlsExpanded
-                    ? "cashier.orderPanel.collapseTableControls"
-                    : "cashier.orderPanel.expandTableControls"
-                )}
-                onClick={() => setTableControlsExpanded((expanded) => !expanded)}
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                    {t("cashier.orderPanel.tableControls")}
-                  </span>
-                  <span className="block truncate text-xs font-medium text-slate-800">
-                    {[
-                      selectedTable
-                        ? selectedTable.tableNumber ||
-                          t(`cashier.orderPanel.tableStatuses.${selectedTable.status}`)
-                        : null,
-                      selectedSession
-                        ? t(`cashier.orderPanel.sessionStates.${selectedSession.sessionState}`)
-                        : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </span>
-                </span>
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  className={`h-4 w-4 shrink-0 text-slate-500 transition-transform duration-200 motion-reduce:transition-none ${tableControlsExpanded ? "rotate-180" : ""}`}
-                >
-                  <path d="m4 6 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-
-              {tableControlsExpanded ? (
-                <div id={tableControlsId} className="space-y-2 border-t border-slate-200 bg-slate-50 p-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    {selectedTable ? (
-                      <label
-                        className={[
-                          "min-w-0 space-y-1",
-                          selectedSession ? "" : "col-span-2",
-                        ].join(" ")}
-                      >
-                        <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                          {t("cashier.orderPanel.tableStatusLabel")}
-                        </span>
-                        <select
-                          aria-label={t("cashier.orderPanel.tableStatus")}
-                          value={selectedTable.status}
-                          onChange={(event) =>
-                            onTableStatusChange(event.target.value as DiningTableStatus)
-                          }
-                          className="min-h-11 w-full min-w-0 rounded border border-slate-300 bg-white px-2 text-xs focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                        >
-                          {(["AVAILABLE", "OCCUPIED", "DIRTY", "RESERVED"] as const).map(
-                            (status) => (
-                              <option
-                                key={status}
-                                value={status}
-                                disabled={status === "AVAILABLE" && hasActiveTableOrder}
-                              >
-                                {t(`cashier.orderPanel.tableStatuses.${status}`)}
-                              </option>
-                            )
-                          )}
-                        </select>
-                      </label>
-                    ) : null}
-                    {selectedSession ? (
-                      <label
-                        className={[
-                          "min-w-0 space-y-1",
-                          selectedTable ? "" : "col-span-2",
-                        ].join(" ")}
-                      >
-                        <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                          {t("cashier.orderPanel.sessionStateLabel")}
-                        </span>
-                        <select
-                          aria-label={t("cashier.orderPanel.sessionState")}
-                          value={selectedSession.sessionState}
-                          onChange={(event) =>
-                            onSessionStateChange(event.target.value as TableSessionState)
-                          }
-                          className="min-h-11 w-full min-w-0 rounded border border-slate-300 bg-white px-2 text-xs focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                        >
-                          {(
-                            [
-                              "SEATED",
-                              "ORDERING",
-                              "SERVED",
-                              "PAYMENT_PENDING",
-                              "CLOSED",
-                            ] as const
-                          ).map((state) => (
-                            <option key={state} value={state}>
-                              {t(`cashier.orderPanel.sessionStates.${state}`)}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    ) : null}
-                  </div>
-
-                  {selectedSession && onChangeTable && onCombineTables ? (
-                    <div className="space-y-2">
-                      <div className="grid grid-cols-3 gap-2">
-                        {(
-                          [
-                            ["move", onChangeTable, "cashier.seating.changeTable"],
-                            ["split", onSplitItems, "cashier.seating.split"],
-                            ["merge", onCombineTables, "cashier.seating.combine"],
-                          ] as const
-                        ).map(([icon, onClick, label]) => (
-                          <button
-                            key={icon}
-                            type="button"
-                            disabled={isLoading || !onClick}
-                            onClick={onClick}
-                            title={t(label)}
-                            className="flex min-h-14 flex-col items-center justify-center gap-1 rounded border border-slate-300 bg-white px-1 text-[11px] font-semibold text-slate-800 transition-colors hover:border-blue-500 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            <SeatingIcon name={icon} />
-                            {t(label)}
-                          </button>
-                        ))}
-                      </div>
-                      {joinedTables.length && onReleaseTable ? (
-                        <div className="flex flex-wrap items-center gap-2 text-xs">
-                          <span className="text-slate-500">
-                            {t("cashier.seating.joinedTables")}:
-                          </span>
-                          {joinedTables.map((table) => (
-                            <button
-                              key={table.id}
-                              type="button"
-                              disabled={isLoading}
-                              onClick={() => onReleaseTable(table.id)}
-                              title={t("cashier.seating.release", {
-                                table: table.tableNumber,
-                              })}
-                              aria-label={t("cashier.seating.release", {
-                                table: table.tableNumber,
-                              })}
-                              className="min-h-11 rounded-full border border-slate-300 bg-white px-3 font-semibold text-slate-700 transition-colors hover:border-red-400 hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              {table.tableNumber} ×
-                            </button>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-            </section>
-          ) : null}
-          <div className="grid grid-cols-2 gap-2">
+          <div
+            className={[
+              "grid gap-2",
+              selectedOrder?.serviceType === "PICK_UP" ? "grid-cols-3" : "grid-cols-2",
+            ].join(" ")}
+          >
             <Button
               variant="secondary"
               disabled={
@@ -851,6 +844,26 @@ export function OrderPanel({
             >
               {t("cashier.orderPanel.sendKds")}
             </Button>
+            {canAdjustBill || hasTable ? (
+              <button
+                type="button"
+                className="flex min-h-11 min-w-0 flex-col items-center justify-center rounded-md border border-slate-300 bg-white px-2 text-sm font-semibold text-slate-800 transition-colors hover:border-blue-500 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                aria-haspopup="dialog"
+                onClick={() => setBillOptions({ orderId: selectedOrder?.id })}
+              >
+                <span className="flex max-w-full items-center gap-1.5">
+                  <SeatingIcon name="options" className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{billOptionsTitle}</span>
+                </span>
+                {billOptionsSummary ? (
+                  <span className="max-w-full truncate text-[11px] font-medium text-slate-500">
+                    {billOptionsSummary}
+                  </span>
+                ) : null}
+              </button>
+            ) : (
+              <span />
+            )}
             {selectedOrder?.serviceType === "PICK_UP" ? (
               <Button
                 variant="secondary"
@@ -859,9 +872,7 @@ export function OrderPanel({
               >
                 {t("cashier.orderPanel.pickedUp")}
               </Button>
-            ) : (
-              <span />
-            )}
+            ) : null}
           </div>
           {isPayView && canTakePayment ? (
             <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs font-medium text-slate-700">
@@ -998,6 +1009,90 @@ export function OrderPanel({
             </p>
           ) : null}
         </div>
+      ) : null}
+      {showBillOptions ? (
+        <BillOptionsDialog
+          title={billOptionsTitle}
+          bill={onDiscountAmountChange && onTipAmountChange ? (
+            <>
+              {chargeOptions ? (
+                <fieldset
+                  className="space-y-1 rounded-md border border-slate-800 bg-slate-900/60 p-2"
+                  disabled={isLoading || isSettledOrder}
+                >
+                  <legend className="sr-only">{t("cashier.payment.options")}</legend>
+                  {(["includeTax", "includeServiceCharge"] as const).map((field) => (
+                    <label
+                      key={field}
+                      className="flex min-h-11 cursor-pointer items-center gap-3 px-1 text-sm"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={chargeOptions[field]}
+                        onChange={(event) => chargeOptions.onChange(field, event.target.checked)}
+                        className="h-5 w-5 accent-blue-500"
+                      />
+                      {t(`cashier.payment.${field}`)}
+                    </label>
+                  ))}
+                  <p className="px-1 pb-1 text-xs text-slate-400">
+                    {t("cashier.payment.optionsHint")}
+                  </p>
+                </fieldset>
+              ) : null}
+              <OrderAdjustments
+                discountAmount={discountAmount}
+                discountReasonId={discountReasonId}
+                discountReasons={discountReasons}
+                serviceCharge={serviceCharge}
+                tipAmount={tipAmount}
+                memberCardUid={memberCardUid}
+                memberPointsLabel={memberPointsLabel}
+                memberCardError={memberCardError}
+                isMemberCardLoading={isMemberCardLoading}
+                disabled={isLoading || isSettledOrder}
+                onDiscountAmountChange={onDiscountAmountChange}
+                onDiscountReasonChange={onDiscountReasonChange || (() => undefined)}
+                onRemoveDiscount={onRemoveDiscount || (() => undefined)}
+                onTipAmountChange={onTipAmountChange}
+                onMemberCardUidChange={onMemberCardUidChange || (() => undefined)}
+                onLookupMemberCard={onLookupMemberCard || (() => undefined)}
+              />
+            </>
+          ) : undefined}
+          table={tableControls}
+          tableTitle={[
+            t("cashier.billOptions.table"),
+            selectedTable?.tableNumber,
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          onClose={() => setBillOptions(null)}
+        />
+      ) : null}
+      {editingLine ? (
+        <LineEditDialog
+          key={editingLine.id}
+          name={resolveLineName(editingLine)}
+          variant={resolveLineVariant(editingLine)}
+          options={modifierPrintText(editingLine.selectedModifiers).names}
+          promo={editing?.promo}
+          quantity={Number(editingLine.quantity || 0)}
+          unitPrice={Number(editingLine.unitPrice || 0)}
+          menuPrice={menuPrice(editingLine)}
+          isFoc={isFocLine(editingLine)}
+          isFee={isFeeLine?.(editingLine) ?? false}
+          isBusy={isLoading}
+          onSave={(edit) => {
+            onEditLine?.(editingLine, edit);
+            setEditing(null);
+          }}
+          onRemove={() => {
+            onRemoveLine(editingLine);
+            setEditing(null);
+          }}
+          onClose={() => setEditing(null)}
+        />
       ) : null}
     </aside>
   );

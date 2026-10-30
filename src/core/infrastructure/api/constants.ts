@@ -177,6 +177,8 @@ export const API_ENDPOINTS = {
         `/api/v1/sales-orders/${salesOrderId}/lines/${lineId}`,
       FIRE: (lineId: string) =>
         `/api/v1/sales-orders/${salesOrderId}/lines/${lineId}/fire`,
+      SPLIT: (lineId: string) =>
+        `/api/v1/sales-orders/${salesOrderId}/lines/${lineId}/split`,
       READY: (lineId: string) =>
         `/api/v1/sales-orders/${salesOrderId}/lines/${lineId}/ready`,
       SERVE: (lineId: string) =>

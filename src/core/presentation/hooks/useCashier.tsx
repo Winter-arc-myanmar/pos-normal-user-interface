@@ -212,7 +212,16 @@ interface UseCashierReturn {
     product: Product,
     variantId?: string,
     quantity?: number,
-    options?: { refreshLines?: boolean; modifiers?: ChosenModifier[] }
+    options?: {
+      refreshLines?: boolean;
+      modifiers?: ChosenModifier[];
+      unitPrice?: string;
+    }
+  ) => Promise<SalesOrderLine>;
+  splitOrderLine: (
+    orderId: string,
+    lineId: string,
+    quantity: string
   ) => Promise<SalesOrderLine>;
   updateOrderLine: (
     orderId: string,
@@ -226,7 +235,8 @@ interface UseCashierReturn {
     variantId?: string,
     quantity?: number,
     keepSelectedOrderId?: string,
-    modifiers?: ChosenModifier[]
+    modifiers?: ChosenModifier[],
+    unitPrice?: string
   ) => Promise<SalesOrderLine>;
   addExtraFeeLine: (
     target: { orderId: string } | { sessionId: string },
@@ -477,7 +487,11 @@ export function useCashier(): UseCashierReturn {
       product: Product,
       variantId?: string,
       quantity: number = 1,
-      options?: { refreshLines?: boolean; modifiers?: ChosenModifier[] }
+      options?: {
+        refreshLines?: boolean;
+        modifiers?: ChosenModifier[];
+        unitPrice?: string;
+      }
     ) => {
       setIsLoading(true);
       clearError();
@@ -492,8 +506,9 @@ export function useCashier(): UseCashierReturn {
 
         const variantModifier = Number(selectedVariant?.priceModifier || 0);
         const modifiers = options?.modifiers;
-        const unitPrice =
-          Number(product.basePrice || 0) + variantModifier + modifierExtra(modifiers);
+        const unitPrice = options?.unitPrice
+          ? Number(options.unitPrice)
+          : Number(product.basePrice || 0) + variantModifier + modifierExtra(modifiers);
 
         const createdLine = await cashierService.addSalesOrderLine(orderId, {
           variantId: selectedVariant.id,
@@ -529,6 +544,23 @@ export function useCashier(): UseCashierReturn {
         setSelectedOrderLines(lines);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to update order line";
+        setError(message);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [cashierService, clearError]
+  );
+
+  const splitOrderLine = useCallback(
+    async (orderId: string, lineId: string, quantity: string) => {
+      setIsLoading(true);
+      clearError();
+      try {
+        return await cashierService.splitSalesOrderLine(orderId, lineId, quantity);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to split order line";
         setError(message);
         throw err;
       } finally {
@@ -1353,7 +1385,8 @@ export function useCashier(): UseCashierReturn {
       variantId?: string,
       quantity: number = 1,
       keepSelectedOrderId?: string,
-      modifiers?: ChosenModifier[]
+      modifiers?: ChosenModifier[],
+      priceOverride?: string
     ) => {
       setIsLoading(true);
       clearError();
@@ -1367,8 +1400,9 @@ export function useCashier(): UseCashierReturn {
         }
 
         const variantModifier = Number(selectedVariant?.priceModifier || 0);
-        const unitPrice =
-          Number(product.basePrice || 0) + variantModifier + modifierExtra(modifiers);
+        const unitPrice = priceOverride
+          ? Number(priceOverride)
+          : Number(product.basePrice || 0) + variantModifier + modifierExtra(modifiers);
 
         const line = await cashierService.addTableSessionLine(sessionId, {
           variantId: selectedVariant.id,
@@ -1632,6 +1666,7 @@ export function useCashier(): UseCashierReturn {
       selectOrderById,
       createOrder,
       addProductToOrder,
+      splitOrderLine,
       updateOrderLine,
       removeOrderLine,
       addProductToTableSession,
@@ -1714,6 +1749,7 @@ export function useCashier(): UseCashierReturn {
       selectOrderById,
       createOrder,
       addProductToOrder,
+      splitOrderLine,
       updateOrderLine,
       removeOrderLine,
       addProductToTableSession,

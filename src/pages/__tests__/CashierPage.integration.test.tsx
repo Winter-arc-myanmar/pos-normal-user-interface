@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { CashierPage } from "../CashierPage";
+import { writeTableOrderIds } from "@/lib/pos/multiOrdering";
 
 const mocks = vi.hoisted(() => ({
   addTableCharge: vi.fn(),
   stopTableCharges: vi.fn(),
   addProductToTableSession: vi.fn(),
   updateOrderLine: vi.fn(),
+  splitOrderLine: vi.fn(),
   removeOrderLine: vi.fn(),
   checkoutTableSession: vi.fn(),
   closePosSession: vi.fn(),
@@ -255,6 +257,7 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
     createOrder: vi.fn(),
     addProductToOrder: vi.fn(),
     updateOrderLine: mocks.updateOrderLine,
+    splitOrderLine: mocks.splitOrderLine,
     removeOrderLine: mocks.removeOrderLine,
     addProductToTableSession: mocks.addProductToTableSession,
     getCounterOrderById: mocks.getCounterOrderById,
@@ -438,11 +441,11 @@ describe("CashierPage integration", () => {
     }) => {
       productState = { ...product, basePrice: inclusive ? "110.0000" : "100.0000", taxRate: 10, isPriceInclusive: inclusive };
       await startDirectBill();
-      const adjustments = screen.getByRole("button", { name: "cashier.orderPanel.adjustments" });
-      if (adjustments.getAttribute("aria-expanded") !== "true") fireEvent.click(adjustments);
+      fireEvent.click(screen.getByRole("button", { name: /cashier.billOptions.title/ }));
       fireEvent.change(screen.getByRole("textbox", { name: "cashier.orderPanel.discount" }), {
         target: { value: inclusive ? "11" : "10" },
       });
+      fireEvent.click(screen.getByRole("button", { name: "cashier.billOptions.done" }));
       fireEvent.click(screen.getByRole("button", { name: "cashier.payment.options" }));
       const taxCheckbox = screen.getByRole("checkbox", { name: "cashier.payment.includeTax" });
       const serviceCheckbox = screen.getByRole("checkbox", { name: "cashier.payment.includeServiceCharge" });
@@ -523,6 +526,56 @@ describe("CashierPage integration", () => {
     });
   });
 
+  it("adds a new line for an item removed from a table bill", async () => {
+    writeTableOrderIds("table-1", ["order-1"]);
+    mocks.fetchManagedOrderLines.mockResolvedValue({
+      lines: [orderLine],
+      total: 1,
+      page: 1,
+      limit: 100,
+      totalPages: 1,
+    });
+    mocks.removeOrderLine.mockImplementation(async () => {
+      selectedOrderLinesState = [];
+    });
+    mocks.addProductToTableSession.mockResolvedValue({ ...orderLine, id: "line-new" });
+    const { rerender } = render(
+      <MemoryRouter initialEntries={["/cashier?view=orders"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^T1/ }));
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText("cashier.productMenu.search")).toBeInTheDocument()
+    );
+    expect(mocks.fetchManagedOrderLines).toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.removeItem" }));
+    await waitFor(() => expect(mocks.removeOrderLine).toHaveBeenCalledWith("order-1", "line-1"));
+    rerender(
+      <MemoryRouter initialEntries={["/cashier?view=orders"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Coffee/ }));
+
+    await waitFor(() => expect(mocks.addProductToTableSession).toHaveBeenCalled());
+    expect(mocks.updateOrderLine).not.toHaveBeenCalled();
+  });
+
+  it("shows a table line at the price saved for this bill, not the menu price", () => {
+    selectedOrderLinesState = [{ ...orderLine, unitPrice: "8.0000" }];
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=menu"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    const row = screen.getByRole("group", { name: "cashier.orderPanel.priceNote.discount" });
+    expect(row).toHaveTextContent("@ 8.00");
+    expect(row).toHaveTextContent("10.00");
+  });
+
   it("increments an existing product line instead of adding a duplicate", async () => {
     render(
       <MemoryRouter initialEntries={["/cashier?view=menu"]}>
@@ -546,6 +599,75 @@ describe("CashierPage integration", () => {
     expect(mocks.updateTableSessionState).toHaveBeenCalledWith("session-1", {
       sessionState: "ORDERING",
     });
+  });
+
+  it("saves a new price and FOC for a table line in one update", async () => {
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=menu"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.editItem" }));
+    fireEvent.change(screen.getByLabelText("cashier.lineEdit.price"), {
+      target: { value: "8" },
+    });
+    fireEvent.click(screen.getByRole("switch", { name: "cashier.lineEdit.foc" }));
+    fireEvent.click(screen.getByRole("button", { name: "cashier.lineEdit.save" }));
+
+    await waitFor(() =>
+      expect(mocks.updateOrderLine).toHaveBeenCalledExactlyOnceWith(
+        "order-1",
+        "line-1",
+        expect.objectContaining({
+          variantId: "variant-1",
+          quantity: "1.0000",
+          unitPrice: "8.0000",
+          lineDiscount: "8.0000",
+        })
+      )
+    );
+  });
+
+  it("splits one water off a sent line of 4 and prices it on its own", async () => {
+    selectedOrderLinesState = [
+      { ...orderLine, quantity: "4.0000", unitPrice: "2000.0000", status: "FIRED" },
+    ];
+    mocks.splitOrderLine.mockResolvedValue({
+      ...orderLine,
+      id: "line-part",
+      quantity: "1.0000",
+      unitPrice: "2000.0000",
+      status: "FIRED",
+    });
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=menu"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.editItem" }));
+    for (let i = 0; i < 3; i += 1) {
+      fireEvent.click(
+        within(screen.getByRole("dialog")).getByRole("button", {
+          name: "cashier.orderPanel.decreaseQuantity",
+        })
+      );
+    }
+    fireEvent.change(screen.getByLabelText("cashier.lineEdit.price"), {
+      target: { value: "1500" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "cashier.lineEdit.save" }));
+
+    await waitFor(() =>
+      expect(mocks.updateOrderLine).toHaveBeenCalledExactlyOnceWith(
+        "order-1",
+        "line-part",
+        expect.objectContaining({ quantity: "1.0000", unitPrice: "1500.0000" })
+      )
+    );
+    expect(mocks.splitOrderLine).toHaveBeenCalledExactlyOnceWith("order-1", "line-1", "1.0000");
+    expect(mocks.addProductToTableSession).not.toHaveBeenCalled();
   });
 
   it("adds a new pending line after Send KDS so the kitchen receives it", async () => {
@@ -611,9 +733,6 @@ describe("CashierPage integration", () => {
       </MemoryRouter>
     );
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "cashier.orderPanel.expandItem" })
-    );
     fireEvent.click(
       screen.getByRole("button", { name: "cashier.orderPanel.increaseQuantity" })
     );
@@ -996,10 +1115,7 @@ describe("CashierPage integration", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: "cashier.orderPanel.expandItem" })
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "cashier.orderPanel.remove" })
+      screen.getByRole("button", { name: "cashier.orderPanel.removeItem" })
     );
 
     await waitFor(() =>
@@ -1037,10 +1153,7 @@ describe("CashierPage integration", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: "cashier.orderPanel.expandItem" })
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "cashier.orderPanel.remove" })
+      screen.getByRole("button", { name: "cashier.orderPanel.removeItem" })
     );
 
     await waitFor(() =>
@@ -1100,10 +1213,7 @@ describe("CashierPage integration", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: "cashier.orderPanel.expandItem" })
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "cashier.orderPanel.remove" })
+      screen.getByRole("button", { name: "cashier.orderPanel.removeItem" })
     );
 
     await waitFor(() =>
@@ -1148,19 +1258,25 @@ describe("CashierPage integration", () => {
     ).toBeInTheDocument();
 
     fireEvent.click(
-      screen.getByRole("button", {
-        name: "cashier.orderPanel.expandTableControls",
-      })
+      screen.getByRole("button", { name: /cashier.billOptions.titleWithTable/ })
     );
-    fireEvent.change(screen.getByLabelText("cashier.orderPanel.tableStatus"), {
+    const tableStatusSelect = screen.getByLabelText("cashier.orderPanel.tableStatus");
+    expect(
+      within(tableStatusSelect).getByRole("option", {
+        name: "cashier.orderPanel.tableStatuses.AVAILABLE",
+      })
+    ).toBeDisabled();
+
+    // An open order keeps its table: neither guard lets it go available.
+    fireEvent.change(tableStatusSelect, {
       target: { value: "AVAILABLE" },
     });
     expect(
-      await screen.findByText("cashier.errors.tableHasActiveOrder")
+      await screen.findByText("cashier.errors.tableAvailableWithMenu")
     ).toBeInTheDocument();
     expect(mocks.updateDiningTableStatus).not.toHaveBeenCalled();
 
-    fireEvent.change(screen.getByLabelText("cashier.orderPanel.tableStatus"), {
+    fireEvent.change(tableStatusSelect, {
       target: { value: "DIRTY" },
     });
     fireEvent.change(screen.getByLabelText("cashier.orderPanel.sessionState"), {
@@ -1185,7 +1301,7 @@ describe("CashierPage integration", () => {
       </MemoryRouter>
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /T1/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^T1/ }));
 
     await waitFor(() => {
       expect(
@@ -1193,6 +1309,58 @@ describe("CashierPage integration", () => {
       ).toBeInTheDocument();
     });
     expect(mocks.openTableSession).not.toHaveBeenCalled();
+    expect(mocks.updateDiningTableStatus).not.toHaveBeenCalled();
+  });
+
+  it("allows marking a table available when the order has no menu lines and is settled", async () => {
+    selectedOrderLinesState = [];
+    selectedOrderState = { ...order, status: "COMPLETED" };
+
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=orders"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /cashier.billOptions.titleWithTable/ })
+    );
+    const tableStatusSelect = screen.getByLabelText("cashier.orderPanel.tableStatus");
+    expect(
+      within(tableStatusSelect).getByRole("option", {
+        name: "cashier.orderPanel.tableStatuses.AVAILABLE",
+      })
+    ).toBeEnabled();
+
+    fireEvent.change(tableStatusSelect, { target: { value: "AVAILABLE" } });
+
+    await waitFor(() =>
+      expect(mocks.updateDiningTableStatus).toHaveBeenCalledWith(
+        "table-1",
+        "AVAILABLE"
+      )
+    );
+  });
+
+  it("blocks marking a table available while its order is still open", async () => {
+    selectedOrderLinesState = [];
+
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=orders"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /cashier.billOptions.titleWithTable/ })
+    );
+    fireEvent.change(screen.getByLabelText("cashier.orderPanel.tableStatus"), {
+      target: { value: "AVAILABLE" },
+    });
+
+    expect(
+      await screen.findByText("cashier.errors.tableHasActiveOrder")
+    ).toBeInTheDocument();
     expect(mocks.updateDiningTableStatus).not.toHaveBeenCalled();
   });
 

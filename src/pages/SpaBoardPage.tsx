@@ -1225,6 +1225,10 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     }
   };
 
+  const removeLines = async (group: SalesOrderLine[]) => {
+    for (const line of [...group].reverse()) await removeLine(line);
+  };
+
   const togglePause = async () => {
     if (!session || billClosed) return;
     const updated =
@@ -1807,7 +1811,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             onTogglePause={() => void togglePause()}
             onChangeQuantity={(line) => void reduceLine(line)}
             onAddAnother={addAnother}
-            onRemoveLine={(line) => void removeLine(line)}
+            onRemoveLine={(group) => void removeLines(group)}
             pending={pending}
             onPendingChange={(variantId, delta) =>
               setPending((current) => changePending(current, variantId, delta))
