@@ -1263,6 +1263,19 @@
       "stop": "Stop",
       "minutes": "{{count}} min",
       "clocksStopped": "Table time used has been added to the bill."
+    },
+    "breakdown": {
+      "subtotal": "Subtotal",
+      "priceDiscount": "Price discount",
+      "priceChange": "Price change",
+      "promotion": "Promotion discount",
+      "foc": "FOC",
+      "itemDiscount": "Item discount",
+      "billDiscount": "Bill discount",
+      "serviceCharge": "Service charge",
+      "tax": "Tax",
+      "includedTax": "Tax included in prices",
+      "tip": "Tip"
     }
   },
   "salesOrders": {

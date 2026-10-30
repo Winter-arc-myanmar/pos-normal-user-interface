@@ -7,6 +7,8 @@ import { PaymentMethod } from "@/core/domain/entities/Cashier";
 import { isMemberCardPaymentMethod } from "@/lib/pos/paymentMethods";
 import { remainingReceivable } from "@/lib/pos/splitPayments";
 import { formatPosMoney } from "@/lib/pos/orderListDisplay";
+import type { BillBreakdown } from "@/lib/pos/billBreakdown";
+import { BillBreakdownRows } from "./BillBreakdownRows";
 
 interface MemberCardLookupProps {
   cardUid: string;
@@ -30,7 +32,7 @@ interface PaymentViewProps {
   selectedMethodId: string;
   paymentAmount: string;
   total: string;
-  subtotal?: string;
+  breakdown?: BillBreakdown;
   billOptions?: {
     includeTax: boolean;
     includeServiceCharge: boolean;
@@ -132,7 +134,7 @@ export function PaymentView({
   selectedMethodId,
   paymentAmount,
   total,
-  subtotal,
+  breakdown,
   billOptions,
   isSplitMode,
   splitTenders,
@@ -153,7 +155,6 @@ export function PaymentView({
   const displayRemaining = isSplitMode ? remaining : Number(total || 0);
   const splitCovered =
     isSplitMode && splitTenders.length > 0 && remaining <= 0.009;
-  const billSubtotal = Number(subtotal || total || 0);
   const billTotal = Number(total || 0);
   const memberCardLabel = t("cashier.payment.memberCard");
   const selectedMethod = methods.find((method) => method.id === selectedMethodId);
@@ -211,11 +212,12 @@ export function PaymentView({
       <aside className="order-3 flex min-h-0 max-h-[38%] flex-col overflow-y-auto border-t border-white/10 p-2 min-[1100px]:order-none min-[1100px]:max-h-none min-[1100px]:border-r min-[1100px]:border-t-0">
         <div className="rounded bg-white p-3 text-slate-900">
           <p className="text-sm font-semibold">{t("cashier.payment.bill")}</p>
-          <div className="mt-3 flex justify-between text-sm">
-            <span className="text-slate-500">{t("cashier.payment.subtotal")}</span>
-            <span>{formatMoney(billSubtotal)}</span>
-          </div>
-          <div className="mt-2 flex justify-between text-sm font-semibold">
+          {breakdown ? (
+            <div className="mt-3">
+              <BillBreakdownRows breakdown={breakdown} />
+            </div>
+          ) : null}
+          <div className="mt-2 flex justify-between border-t border-slate-200 pt-2 text-sm font-semibold">
             <span>{t("cashier.total")}</span>
             <span>{formatMoney(billTotal)}</span>
           </div>

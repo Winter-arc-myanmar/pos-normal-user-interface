@@ -976,10 +976,21 @@ describe("CashierPage integration", () => {
       serviceCharge: includeServiceCharge ? serviceCharge : undefined,
       total: expected,
     })));
-    expect(mocks.fetchOrderBill).toHaveBeenLastCalledWith("order-1", {
+    expect(mocks.fetchOrderBill).toHaveBeenCalledWith("order-1", {
       discount: "0.0000", includeTax, includeServiceCharge,
     });
     expect(mocks.processCheckout).not.toHaveBeenCalled();
+  });
+
+  it("shows the server's subtotal and tax for a saved bill before any option is changed", async () => {
+    render(<MemoryRouter initialEntries={["/cashier?view=pay"]}><CashierPage /></MemoryRouter>);
+    await waitFor(() => expect(mocks.fetchOrderBill).toHaveBeenCalledWith("order-1", {
+      discount: "0.0000", includeTax: true, includeServiceCharge: true,
+    }));
+    await waitFor(() => expect(screen.getAllByText("cashier.breakdown.tax")[0].nextSibling).toHaveTextContent("+0.50"));
+    for (const row of screen.getAllByText("cashier.breakdown.subtotal")) {
+      expect(row.nextSibling).toHaveTextContent("10.00");
+    }
   });
 
   it("blocks split and finance while a quote is pending but permits changing options and clears tenders", async () => {

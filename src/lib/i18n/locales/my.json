@@ -1263,6 +1263,19 @@
       "stop": "ရပ်",
       "minutes": "{{count}} မိနစ်",
       "clocksStopped": "စားပွဲ သုံးချိန်ကို ဘေလ်ထဲ ထည့်ပြီးပါပြီ။"
+    },
+    "breakdown": {
+      "subtotal": "ခွဲစုစုပေါင်း",
+      "priceDiscount": "ဈေးလျှော့",
+      "priceChange": "ဈေးပြင်",
+      "promotion": "ပရိုမိုးရှင်း လျှော့စျေး",
+      "foc": "အခမဲ့ (FOC)",
+      "itemDiscount": "ပစ္စည်း လျှော့စျေး",
+      "billDiscount": "ဘောက်ချာ လျှော့စျေး",
+      "serviceCharge": "ဝန်ဆောင်ခ",
+      "tax": "အခွန်",
+      "includedTax": "ဈေးနှုန်းတွင် ပါဝင်သော အခွန်",
+      "tip": "လက်ဆောင်ငွေ"
     }
   },
   "salesOrders": {

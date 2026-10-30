@@ -17,7 +17,12 @@ describe("useBillOptions", () => {
     }), { initialProps: { billKey: "order-1" } });
     expect(result.current.includeTax).toBe(true);
     expect(result.current.includeServiceCharge).toBe(true);
-    expect(fetchBill).not.toHaveBeenCalled();
+    await waitFor(() => expect(result.current.quote).toEqual(bill));
+    expect(result.current.bill).toBeUndefined();
+    expect(result.current.isLoading).toBe(false);
+    expect(fetchBill).toHaveBeenCalledWith("order-1", {
+      discount: "0", includeTax: true, includeServiceCharge: true,
+    });
     act(() => result.current.choose("includeTax", false));
     expect(result.current.isLoading).toBe(true);
     await waitFor(() => expect(result.current.bill).toEqual(bill));
@@ -38,6 +43,7 @@ describe("useBillOptions", () => {
     let resolveFirst!: (value: SalesOrderBillDTO) => void;
     let resolveSecond!: (value: SalesOrderBillDTO) => void;
     const fetchBill = vi.fn()
+      .mockResolvedValueOnce(bill)
       .mockImplementationOnce(() => new Promise<SalesOrderBillDTO>((resolve) => { resolveFirst = resolve; }))
       .mockImplementationOnce(() => new Promise<SalesOrderBillDTO>((resolve) => { resolveSecond = resolve; }));
     const { result } = renderHook(() => useBillOptions({
@@ -51,7 +57,7 @@ describe("useBillOptions", () => {
   });
 
   it("requires a successful fresh quote after errors or discount changes", async () => {
-    const fetchBill = vi.fn().mockRejectedValueOnce(new Error("Offline")).mockResolvedValue(bill);
+    const fetchBill = vi.fn().mockResolvedValueOnce(bill).mockRejectedValueOnce(new Error("Offline")).mockResolvedValue(bill);
     const { result, rerender } = renderHook(({ discount }) => useBillOptions({
       billKey: "1", orderId: "order-1", discount, revision: "1", fetchBill,
     }), { initialProps: { discount: "0" } });

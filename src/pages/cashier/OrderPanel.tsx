@@ -23,6 +23,8 @@ import { isSettledSalesOrder } from "@/lib/pos/orderStatus";
 import { modifierPrintText } from "@/lib/printing/modifierText";
 import { isPendingKdsLine } from "@/lib/pos/kdsLines";
 import { isFocLine } from "@/lib/pos/checkoutAdjustments";
+import type { BillBreakdown } from "@/lib/pos/billBreakdown";
+import { BillBreakdownRows } from "./BillBreakdownRows";
 import { linePriceNote } from "@/lib/pos/linePrice";
 import type {
   PromotionDiscount,
@@ -93,6 +95,8 @@ interface OrderPanelProps {
   paymentMethodId: string;
   paymentAmount: string;
   total: string;
+  /** How the total is made up, from the subtotal through each discount and charge. */
+  breakdown?: BillBreakdown;
   selectedTable: DiningTable | null;
   selectedSession: TableSession | null;
   paymentInputRef: RefObject<HTMLInputElement | null>;
@@ -243,6 +247,7 @@ export function OrderPanel({
   paymentMethodId,
   paymentAmount,
   total,
+  breakdown,
   selectedTable,
   selectedSession,
   isLoading,
@@ -800,7 +805,9 @@ export function OrderPanel({
 
       {hasActiveOrder ? (
         <div className="max-h-[48%] shrink-0 space-y-2 overflow-y-auto border-t border-slate-200 pt-3">
-          {promotionDiscount > 0 ? (
+          {breakdown ? (
+            <BillBreakdownRows breakdown={breakdown} />
+          ) : promotionDiscount > 0 ? (
             <p className="flex items-center justify-between text-sm text-emerald-700">
               <span>{t("cashier.orderPanel.promotionDiscount")}</span>
               <span className="tabular-nums">−{formatPosMoney(promotionDiscount)}</span>
