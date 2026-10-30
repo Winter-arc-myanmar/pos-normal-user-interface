@@ -437,6 +437,30 @@ describe("OrderPanel", () => {
     expect(screen.queryByText("cashier.billOptions.table")).not.toBeInTheDocument();
   });
 
+  it("chooses tax and service charge for the bill from Bill options", () => {
+    const onChange = vi.fn();
+    render(
+      <OrderPanel
+        {...defaultProps}
+        selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
+        onDiscountAmountChange={vi.fn()}
+        onTipAmountChange={vi.fn()}
+        chargeOptions={{ includeTax: false, includeServiceCharge: true, onChange }}
+      />
+    );
+
+    const options = screen.getByRole("button", { name: /cashier.billOptions.title/ });
+    expect(options).toHaveTextContent("cashier.billOptions.noTax");
+    expect(options).not.toHaveTextContent("cashier.billOptions.noServiceCharge");
+    fireEvent.click(options);
+    const tax = screen.getByRole("checkbox", { name: "cashier.payment.includeTax" });
+    expect(tax).not.toBeChecked();
+    fireEvent.click(tax);
+    expect(onChange).toHaveBeenCalledWith("includeTax", true);
+    fireEvent.click(screen.getByRole("checkbox", { name: "cashier.payment.includeServiceCharge" }));
+    expect(onChange).toHaveBeenCalledWith("includeServiceCharge", false);
+  });
+
   it("shows the promotions running and the discount the server already took", () => {
     render(
       <OrderPanel
