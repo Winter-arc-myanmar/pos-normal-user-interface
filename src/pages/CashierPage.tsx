@@ -32,6 +32,7 @@ import { useSalesOrderManagement } from "@/core/presentation/hooks/useSalesOrder
 import { CashierBoard } from "./cashier/CashierBoard";
 import { MultiOrderingView } from "./cashier/MultiOrderingView";
 import { OrderPanel, type GroupedSalesOrderLine } from "./cashier/OrderPanel";
+import { billBreakdown } from "@/lib/pos/billBreakdown";
 import { linePriceNote } from "@/lib/pos/linePrice";
 import { TableSeatingDialog } from "./cashier/TableSeatingDialog";
 import { ExtraFeeDialog } from "./cashier/ExtraFeeDialog";
@@ -926,6 +927,36 @@ export function CashierPage() {
     ? toMoney(paymentBillLines.reduce((sum, line) => sum + Number(line.lineDiscount || 0), 0)
       + (isDirectCheckoutMode ? 0 : Math.max(0, Number(discountAmount) || 0)))
     : discountAmount);
+
+  const breakdown = (() => {
+    const quote = billOptions.bill ?? billOptions.quote;
+    const taxes = paymentBillLines.reduce(
+      (sum, line) => {
+        if (!billOptions.includeTax) return sum;
+        const amount = Number(line.taxAmount || 0);
+        return line.taxInclusive
+          ? { ...sum, included: sum.included + amount }
+          : { ...sum, added: sum.added + amount };
+      },
+      { added: 0, included: 0 }
+    );
+    return billBreakdown({
+      lines: displayOrderLines,
+      menuPrice: menuPriceFor,
+      itemsTotal: quote
+        ? Number(quote.subtotal)
+        : paymentBillLines.reduce((sum, line) => sum + Number(line.quantity || 0) * Number(line.unitPrice || 0)
+          - (!billOptions.includeTax && line.taxInclusive ? Number(line.taxAmount || 0) : 0), 0),
+      billDiscount: Number(discountAmount) || 0,
+      serviceCharge: quote ? Number(quote.serviceCharge) : serviceCharge,
+      tax: quote ? Number(quote.addedTax) + Number(quote.serviceChargeTax) : taxes.added + serviceChargeTax,
+      includedTax: quote
+        ? Number(quote.totalTax) - Number(quote.addedTax) - Number(quote.serviceChargeTax)
+        : taxes.included,
+      tip: Number(tipAmount) || 0,
+      total: Number(orderTotal),
+    });
+  })();
 
   const checkoutPaymentMethods = useMemo(
     () => ensureMemberCardPaymentMethod(paymentMethods),
@@ -3138,6 +3169,7 @@ export function CashierPage() {
         paymentMethodId={paymentMethodId}
         paymentAmount={paymentAmount}
         total={orderTotal}
+        breakdown={breakdown}
         selectedTable={displayedOrderTable}
         selectedSession={selectedOrderSession}
         paymentInputRef={paymentInputRef}
@@ -3358,7 +3390,7 @@ export function CashierPage() {
             selectedMethodId={paymentMethodId}
             paymentAmount={paymentAmount}
             total={orderTotal}
-            subtotal={billOptions.bill?.subtotal || selectedOrder?.subtotal || orderTotal}
+            breakdown={breakdown}
             billOptions={{
               includeTax: billOptions.includeTax,
               includeServiceCharge: billOptions.includeServiceCharge,
