@@ -572,6 +572,19 @@ describe("CashierPage integration", () => {
     expect(mocks.updateOrderLine).not.toHaveBeenCalled();
   });
 
+  it("shows a table line at the price saved for this bill, not the menu price", () => {
+    selectedOrderLinesState = [{ ...orderLine, unitPrice: "8.0000" }];
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=menu"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    const row = screen.getByRole("group", { name: "cashier.orderPanel.priceNote.discount" });
+    expect(row).toHaveTextContent("@ 8.00");
+    expect(row).toHaveTextContent("10.00");
+  });
+
   it("increments an existing product line instead of adding a duplicate", async () => {
     render(
       <MemoryRouter initialEntries={["/cashier?view=menu"]}>
