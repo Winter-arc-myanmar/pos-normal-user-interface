@@ -1,9 +1,24 @@
 import { jsPDF } from "jspdf";
 import { isMedianAppShell, openPdfInMedianViewer } from "./medianBridge";
+import type { SlipPreview, SlipPreviewRow } from "./formatKdsTicket";
 
 const LINE_HEIGHT_MM = 4;
 const MARGIN_MM = 3;
 const FONT_SIZE = 8;
+
+const pdfRowHeight = (row: SlipPreviewRow) =>
+  row.kind === "text" && (row.size === "tall" || row.size === "huge")
+    ? LINE_HEIGHT_MM * 2
+    : LINE_HEIGHT_MM;
+
+const pdfRowText = (row: Exclude<SlipPreviewRow, { kind: "gap" | "image" }>) =>
+  row.kind === "contact" ? `${row.icon === "phone" ? "Tel" : "Email"} ${row.text}` : row.text;
+
+const styledHeight = (preview: SlipPreview) =>
+  preview.rows.reduce(
+    (height, row) => height + (row.kind === "image" ? 0 : pdfRowHeight(row)),
+    0
+  );
 
 const sanitizeFilename = (title: string) =>
   title.replace(/[^\w.-]+/g, "-").replace(/^-+|-+$/g, "") || "receipt";
@@ -25,7 +40,11 @@ const measureLines = (doc: jsPDF, lines: string[], widthMm: number) => {
   return count;
 };
 
-export function buildReceiptPdf(lines: string[], paperWidthMm = 80): jsPDF {
+export function buildReceiptPdf(
+  lines: string[],
+  paperWidthMm = 80,
+  preview?: SlipPreview
+): jsPDF {
   const scratch = new jsPDF({
     unit: "mm",
     format: [paperWidthMm, 40],
@@ -33,8 +52,10 @@ export function buildReceiptPdf(lines: string[], paperWidthMm = 80): jsPDF {
   });
   scratch.setFont("courier", "normal");
   scratch.setFontSize(FONT_SIZE);
-  const lineCount = measureLines(scratch, lines, paperWidthMm);
-  const height = Math.max(40, MARGIN_MM * 2 + lineCount * LINE_HEIGHT_MM + 6);
+  const contentHeight = preview
+    ? styledHeight(preview)
+    : measureLines(scratch, lines, paperWidthMm) * LINE_HEIGHT_MM;
+  const height = Math.max(40, MARGIN_MM * 2 + contentHeight + 6);
   const doc = new jsPDF({
     unit: "mm",
     format: [paperWidthMm, height],
@@ -44,6 +65,38 @@ export function buildReceiptPdf(lines: string[], paperWidthMm = 80): jsPDF {
   doc.setFontSize(FONT_SIZE);
   let y = MARGIN_MM + 4;
   const maxWidth = paperWidthMm - MARGIN_MM * 2;
+  if (preview) {
+    for (const row of preview.rows) {
+      if (row.kind === "image") continue;
+      const rowHeight = pdfRowHeight(row);
+      if (row.kind === "gap") {
+        y += rowHeight;
+        continue;
+      }
+
+      const text = pdfRowText(row);
+      const styled = row.kind === "text" ? row : null;
+      const tall = styled?.size === "tall" || styled?.size === "huge";
+      const wide = styled?.size === "wide" || styled?.size === "huge";
+      const fontSize = tall ? FONT_SIZE * 2 : FONT_SIZE;
+      const horizontalScale = wide ? (tall ? 1 : 2) : tall ? 0.5 : 1;
+      const align = row.kind === "contact" ? "center" : styled?.align || "left";
+      const x = align === "center" ? paperWidthMm / 2 : align === "right" ? paperWidthMm - MARGIN_MM : MARGIN_MM;
+
+      doc.setFont("courier", styled?.bold ? "bold" : "normal");
+      doc.setFontSize(fontSize);
+      if (styled?.invert) {
+        doc.setFillColor(17, 24, 39);
+        doc.rect(MARGIN_MM, y - rowHeight + 1, maxWidth, rowHeight, "F");
+        doc.setTextColor(255, 255, 255);
+      }
+      doc.text(text, x, y, { align, horizontalScale });
+      if (styled?.invert) doc.setTextColor(0, 0, 0);
+      y += rowHeight;
+    }
+    return doc;
+  }
+
   for (const line of lines) {
     const parts = doc.splitTextToSize(line, maxWidth);
     for (const part of parts) {
@@ -71,13 +124,14 @@ type FileShareNavigator = Navigator & {
 const shareReceiptPdf = async (
   lines: string[],
   title: string,
-  paperWidthMm: number
+  paperWidthMm: number,
+  preview?: SlipPreview
 ): Promise<boolean> => {
   if (!isMobileDevice() || typeof File === "undefined") return false;
   const shareNavigator = navigator as FileShareNavigator;
   if (typeof shareNavigator.share !== "function") return false;
 
-  const doc = buildReceiptPdf(lines, paperWidthMm);
+  const doc = buildReceiptPdf(lines, paperWidthMm, preview);
   const file = new File(
     [doc.output("blob")],
     `${sanitizeFilename(title)}.pdf`,
@@ -155,7 +209,8 @@ const downloadPdf = (url: string, filename: string) => {
 export async function printLinesWithBrowserDialog(
   lines: string[],
   title: string,
-  paperWidthMm = 80
+  paperWidthMm = 80,
+  preview?: SlipPreview
 ): Promise<void> {
   if (typeof window === "undefined") {
     throw new Error("Browser printing is only available in the browser");
@@ -166,8 +221,8 @@ export async function printLinesWithBrowserDialog(
   // If file sharing is unavailable, open/download the PDF so Android's viewer
   // can hand it to an installed print service.
   if (isMobileDevice()) {
-    if (await shareReceiptPdf(lines, title, paperWidthMm)) return;
-    await printLinesAsPdf(lines, title, paperWidthMm);
+    if (await shareReceiptPdf(lines, title, paperWidthMm, preview)) return;
+    await printLinesAsPdf(lines, title, paperWidthMm, preview);
     return;
   }
 
@@ -262,12 +317,13 @@ export async function printLinesWithBrowserDialog(
 export async function printLinesAsPdf(
   lines: string[],
   title: string,
-  paperWidthMm = 80
+  paperWidthMm = 80,
+  preview?: SlipPreview
 ): Promise<void> {
   if (typeof window === "undefined") {
     throw new Error("PDF printing is only available in the browser");
   }
-  const doc = buildReceiptPdf(lines, paperWidthMm);
+  const doc = buildReceiptPdf(lines, paperWidthMm, preview);
   const blob = doc.output("blob");
   const url = URL.createObjectURL(blob);
   const filename = `${sanitizeFilename(title)}.pdf`;

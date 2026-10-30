@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { DiningTable, PaymentMethod, SalesOrder, SalesOrderLine, TableSession } from "@/core/domain/entities/Cashier";
 import type { RunningPromotion } from "@/core/domain/entities/Promotion";
-import { OrderPanel } from "../OrderPanel";
+import { groupOrderLines, OrderPanel } from "../OrderPanel";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -97,6 +97,7 @@ describe("OrderPanel", () => {
             sessionState: "ORDERING",
           })
         }
+        hasActiveTableOrder
         onChangeTable={onChangeTable}
         onCombineTables={onCombineTables}
       />
@@ -118,6 +119,11 @@ describe("OrderPanel", () => {
       screen.getByRole("button", { name: "cashier.orderPanel.collapseTableControls" })
     ).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByLabelText("cashier.orderPanel.tableStatus")).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", {
+        name: "cashier.orderPanel.tableStatuses.AVAILABLE",
+      })
+    ).toBeDisabled();
     expect(screen.getByLabelText("cashier.orderPanel.sessionState")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "cashier.seating.changeTable" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "cashier.seating.combine" })).toBeInTheDocument();
@@ -199,6 +205,25 @@ describe("OrderPanel", () => {
         groupedLineIds: ["line-1", "line-2"],
       })
     );
+  });
+
+  it("combines promotion-split rows of the same item", () => {
+    const grouped = groupOrderLines([
+      new SalesOrderLine({ ...line, quantity: "1.0000", lineDiscount: "1000.0000" }),
+      new SalesOrderLine({
+        ...line,
+        id: "line-2",
+        quantity: "1.0000",
+        lineDiscount: "10000.0000",
+        appliedPromotionId: "promo-1",
+      }),
+    ]);
+
+    expect(grouped).toHaveLength(1);
+    expect(grouped[0]).toMatchObject({
+      quantity: "2.0000",
+      groupedLineIds: ["line-1", "line-2"],
+    });
   });
 
   it("blocks finance printing while a bill quote is unavailable", () => {

@@ -18,6 +18,22 @@ describe("documentPrint", () => {
     expect(doc.getNumberOfPages()).toBe(1);
   });
 
+  it("keeps the configured receipt text sizes in the PDF fallback", () => {
+    const doc = buildReceiptPdf(["fallback"], 80, {
+      columns: 48,
+      rows: [
+        { kind: "text", text: "Normal", align: "left", size: "normal", bold: false, invert: false },
+        { kind: "text", text: "Tall", align: "left", size: "tall", bold: false, invert: false },
+        { kind: "text", text: "Wide", align: "left", size: "wide", bold: false, invert: false },
+        { kind: "text", text: "Big", align: "left", size: "huge", bold: true, invert: false },
+      ],
+    });
+    const pdf = doc.output();
+
+    expect(pdf).toContain("8 Tf");
+    expect(pdf).toContain("16 Tf");
+  });
+
   it("uses the Median bridge when available", async () => {
     const downloadFile = vi.fn();
     vi.stubGlobal("navigator", { userAgent: "Median Android" });

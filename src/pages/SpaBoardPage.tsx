@@ -1161,13 +1161,19 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     );
   };
 
+  const sourceLinesOf = (line: SalesOrderLine) =>
+    (line as SalesOrderLine & { groupedLines?: SalesOrderLine[] }).groupedLines || [line];
+
   const reduceLine = async (line: SalesOrderLine) => {
     if (!session?.salesOrderId || billClosed) return;
-    const next = Number(line.quantity || 0) - 1;
+    const sources = sourceLinesOf(line);
+    const target = [...sources].reverse().find((item) => Number(item.quantity || 0) > 0);
+    if (!target) return;
+    const next = Number(target.quantity || 0) - 1;
     setActionError(null);
     try {
-      if (next <= 0) await deleteOrderLine(session.salesOrderId, line.id);
-      else await updateOrderLine(session.salesOrderId, line.id, { quantity: next.toFixed(4) });
+      if (next <= 0) await deleteOrderLine(session.salesOrderId, target.id);
+      else await updateOrderLine(session.salesOrderId, target.id, { quantity: next.toFixed(4) });
       await refreshBill(session);
     } catch (caught) {
       setActionError(caught instanceof Error ? caught.message : tr("errors.editLine"));
@@ -1176,10 +1182,11 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
 
   const removeLine = async (line: SalesOrderLine) => {
     if (!session?.salesOrderId || billClosed) return;
+    const sources = sourceLinesOf(line);
     setActionError(null);
     if (quote?.prepaid && line.compReasonId) {
       try {
-        await refundLine(session.id, line.id);
+        for (const source of sources) await refundLine(session.id, source.id);
         await refreshBill(session);
         setNotice(tr("lineRemoved"));
       } catch (caught) {
@@ -1189,13 +1196,19 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     }
     if (quote?.prepaid) {
       try {
-        const result = await refundLine(session.id, line.id);
+        let refunded = 0;
+        let balanceAfter = wallet?.balance || "0";
+        for (const source of sources) {
+          const result = await refundLine(session.id, source.id);
+          refunded += Math.abs(Number(result.charged));
+          balanceAfter = result.balanceAfter;
+        }
         await refreshBill(session);
-        if (wallet) setWallet({ ...wallet, balance: result.balanceAfter });
+        if (wallet) setWallet({ ...wallet, balance: balanceAfter });
         setNotice(
           tr("refunded", {
-            amount: money(Math.abs(Number(result.charged))),
-            balance: money(result.balanceAfter),
+            amount: money(refunded),
+            balance: money(balanceAfter),
           })
         );
       } catch (caught) {
@@ -1204,7 +1217,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       return;
     }
     try {
-      await deleteOrderLine(session.salesOrderId, line.id);
+      for (const source of sources) await deleteOrderLine(session.salesOrderId, source.id);
       await refreshBill(session);
       setNotice(tr("lineRemoved"));
     } catch (caught) {
