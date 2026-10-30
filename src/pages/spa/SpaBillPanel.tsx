@@ -58,6 +58,9 @@ export function SpaBillPanel({
   breakdown,
   extraFeeLabel,
   onAddExtraFee,
+  orderers = [],
+  onOrderedBy,
+  orderedByName = () => undefined,
 }: {
   kind?: RoomKind;
   room: SpaRoom | null;
@@ -97,6 +100,11 @@ export function SpaBillPanel({
   breakdown?: BillBreakdown;
   extraFeeLabel?: string;
   onAddExtraFee?: () => void;
+  /** Hostesses with this room, who may order a dish or drink. */
+  orderers?: { id: string; name: string }[];
+  onOrderedBy?: (key: string, hostess?: { id: string; name: string }) => void;
+  /** The hostess who ordered a menu line, when one did. */
+  orderedByName?: (line: SalesOrderLine) => string | undefined;
 }) {
   const tr = useRoomText(kind);
   const { t } = useTranslation();
@@ -272,6 +280,11 @@ export function SpaBillPanel({
                       ? ` · ${promotionName(promotedLine.appliedPromotionId)}`
                       : ""}
                   </p>
+                  {orderedByName(line) ? (
+                    <p className="text-xs text-pink-300">
+                      {tr("orderedBy", { name: orderedByName(line) })}
+                    </p>
+                  ) : null}
                 </div>
                 {editable && isFoc ? (
                   <span className="shrink-0 text-xs text-slate-400">
@@ -381,6 +394,29 @@ export function SpaBillPanel({
                     )}
                   </span>
                 </div>
+                {!item.service && orderers.length && onOrderedBy ? (
+                  <div className="flex flex-wrap items-center gap-1 text-[11px]">
+                    <span className="text-slate-500">{tr("orderedByLabel")}</span>
+                    {[undefined, ...orderers].map((hostess) => {
+                      const chosen = (item.hostessId || undefined) === hostess?.id;
+                      return (
+                        <button
+                          key={hostess?.id || "customer"}
+                          type="button"
+                          aria-pressed={chosen}
+                          className={`min-h-7 rounded border px-2 ${
+                            chosen
+                              ? "border-pink-400 bg-pink-500/20 text-pink-100"
+                              : "border-slate-700 text-slate-400"
+                          }`}
+                          onClick={() => onOrderedBy(pendingKey(item), hostess)}
+                        >
+                          {hostess?.name || tr("customer")}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
                 {deal?.discount ? (
                   <p className="text-xs text-emerald-300">
                     {tr("promoSaving", {

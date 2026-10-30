@@ -36,6 +36,7 @@ const mocks = vi.hoisted(() => ({
   printReceipt: vi.fn(),
   listStations: vi.fn(),
   fetchOrderBill: vi.fn(),
+  loadHostesses: vi.fn(),
   settleOrder: vi.fn(),
   processCheckout: vi.fn(),
 }));
@@ -206,6 +207,18 @@ vi.mock("@/core/presentation/hooks/useTableCharges", () => ({
   }),
 }));
 
+vi.mock("@/core/presentation/hooks/useWorkingHostesses", () => ({
+  useWorkingHostesses: () => ({
+    hostesses: [
+      { id: "hostess-snow", name: "Ma Hnin", nickname: "Snow", inRoom: null },
+      { id: "hostess-rose", name: "Ma Thiri", nickname: "Rose", inRoom: null },
+    ],
+    isLoading: false,
+    error: null,
+    load: mocks.loadHostesses,
+  }),
+}));
+
 vi.mock("@/core/presentation/hooks/useCashier", () => ({
   useCashier: () => ({
     products: [
@@ -213,6 +226,7 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
       soup,
       { ...product, id: "product-vip", name: "VIP room fee", kind: "RENTAL" },
       { ...product, id: "product-spa-tea", name: "Spa tea", soldAt: ["SPA"] },
+      { ...product, id: "product-hostess", name: "Hostess hour", askWhoServed: true },
     ],
     variantsByProductId: { "product-1": [variant] },
     salesOrders: [order],
@@ -601,6 +615,56 @@ describe("CashierPage integration", () => {
     });
   });
 
+  it("asks which hostess gives a hostess service and sends her with it", async () => {
+    mocks.addProductToTableSession.mockResolvedValue({ ...orderLine, id: "line-hostess" });
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=menu"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Hostess hour/ }));
+    expect(mocks.addProductToTableSession).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole("button", { name: /Snow/ }));
+
+    await waitFor(() =>
+      expect(mocks.addProductToTableSession).toHaveBeenCalledWith(
+        "session-1",
+        expect.objectContaining({ id: "product-hostess" }),
+        expect.anything(),
+        1,
+        undefined,
+        undefined,
+        undefined,
+        "hostess-snow"
+      )
+    );
+  });
+
+  it("saves who ordered an item from Edit item", async () => {
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=menu"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.editItem" }));
+    expect(screen.getByRole("button", { name: "cashier.lineEdit.customer" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Rose" }));
+    fireEvent.click(screen.getByRole("button", { name: "cashier.lineEdit.save" }));
+
+    await waitFor(() =>
+      expect(mocks.updateOrderLine).toHaveBeenCalledWith(
+        "order-1",
+        "line-1",
+        expect.objectContaining({ hostessId: "hostess-rose" })
+      )
+    );
+  });
+
   it("saves a new price and FOC for a table line in one update", async () => {
     render(
       <MemoryRouter initialEntries={["/cashier?view=menu"]}>
@@ -692,6 +756,8 @@ describe("CashierPage integration", () => {
         "variant-1",
         1,
         undefined,
+        undefined,
+        undefined,
         undefined
       )
     );
@@ -744,7 +810,9 @@ describe("CashierPage integration", () => {
         "variant-1",
         1,
         undefined,
-        []
+        [],
+        undefined,
+        undefined
       )
     );
     expect(mocks.updateOrderLine).not.toHaveBeenCalled();

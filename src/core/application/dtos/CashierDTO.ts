@@ -238,6 +238,8 @@ export interface UpsertSalesOrderLineDTO {
   seatNumber?: number;
   /** Extra fees only: the name on the bill, as typed for "Other". */
   name?: string;
+  /** The hostess who gave a service, or who ordered an item; null for the customer. */
+  hostessId?: string | null;
 }
 
 export type UpdateSalesOrderLineDTO = Partial<UpsertSalesOrderLineDTO>;
@@ -292,6 +294,7 @@ export interface CheckoutRequestDTO {
     unitPrice?: string;
     name?: string;
     selectedModifiers?: Array<{ modifierId: string }>;
+    hostessId?: string;
   }>;
   payments: CheckoutPaymentEntryDTO[];
 }

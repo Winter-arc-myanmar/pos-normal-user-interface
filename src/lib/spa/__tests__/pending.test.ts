@@ -5,6 +5,7 @@ import {
   pendingKey,
   pendingOrderItems,
   pendingTotal,
+  setOrderedBy,
   toggleOneFoc,
 } from "../pending";
 
@@ -60,5 +61,23 @@ describe("pending tray", () => {
 
   it("sends no hostess for ordinary items", () => {
     expect(pendingOrderItems(addPending([], beer, 2))).toEqual([{ variantId: "v-beer", quantity: 2 }]);
+  });
+});
+
+describe("setOrderedBy", () => {
+  const snow = { id: "h-snow", name: "Snow" };
+
+  it("puts the hostess who ordered on a row, and merges it with her other row", () => {
+    const tray = addPending(addPending([], beer, 2), { ...beer, hostessId: "h-snow", hostessName: "Snow" });
+    const next = setOrderedBy(tray, pendingKey(tray[0]), snow);
+    expect(next).toEqual([{ ...beer, hostessId: "h-snow", hostessName: "Snow", quantity: 3 }]);
+    expect(pendingOrderItems(next)).toEqual([{ variantId: "v-beer", quantity: 3, hostessId: "h-snow" }]);
+  });
+
+  it("back to the customer, and never on a hostess service", () => {
+    const ordered = setOrderedBy(addPending([], beer), pendingKey({ ...beer }), snow);
+    expect(setOrderedBy(ordered, pendingKey(ordered[0]))[0].hostessId).toBeUndefined();
+    const service = [{ ...beer, quantity: 1, hostessId: "h-rose", service: true }];
+    expect(setOrderedBy(service, pendingKey(service[0]), snow)).toBe(service);
   });
 });
