@@ -24,6 +24,12 @@ export interface IAuthService {
   logout(): Promise<void>;
 
   /**
+   * Checks this device is still the one signed in; the account may be signed in
+   * on one POS device at a time.
+   */
+  checkSession(): Promise<void>;
+
+  /**
    * Get the current authenticated user
    */
   getCurrentUser(): Promise<User | null>;

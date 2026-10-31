@@ -20,6 +20,10 @@ export class AuthService implements IAuthService {
   /**
    * Login a user with User ID and password
    */
+  async checkSession(): Promise<void> {
+    await this.authRepository.checkSession();
+  }
+
   async login(input: LoginInputDTO): Promise<User> {
     const userId = input.userId?.trim();
     const password = input.password;
@@ -33,6 +37,7 @@ export class AuthService implements IAuthService {
         userId,
         password,
         type: "user",
+        app: "pos",
       });
       return result.user;
     } catch (error: unknown) {

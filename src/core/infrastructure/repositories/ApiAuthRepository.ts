@@ -90,6 +90,10 @@ export class ApiAuthRepository implements IAuthRepository {
     tokenCookies.clearAll();
   }
 
+  async checkSession(): Promise<void> {
+    await this.httpClient.get<unknown>(API_ENDPOINTS.AUTH.PING);
+  }
+
   /**
    * Logout user
    */
