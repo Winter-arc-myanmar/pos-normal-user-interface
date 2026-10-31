@@ -110,7 +110,7 @@ describe("PrintTemplateSettingsPanel", () => {
     const preview = screen.getByTestId("slip-preview");
 
     expect(await screen.findByText("GRAND SPA")).toBeInTheDocument();
-    expect(preview).toHaveTextContent("53,675 MMK");
+    expect(preview).toHaveTextContent("53,675");
     expect(preview).toHaveTextContent("+ Extra egg (+500)");
     expect(preview).toHaveTextContent("Cashier Aung Aung");
 
@@ -153,8 +153,8 @@ describe("PrintTemplateSettingsPanel", () => {
     );
     const preview = screen.getByTestId("slip-preview");
     expect(preview).toHaveTextContent("SHIFT REPORT");
-    expect(preview).toHaveTextContent("NET 65,000 MMK");
-    expect(preview).toHaveTextContent("KBZPay (1) 30,000 MMK");
+    expect(preview).toHaveTextContent("NET 65,000");
+    expect(preview).toHaveTextContent("KBZPay (1) 30,000");
     expect(screen.queryByLabelText("settings.printTemplate.itemTextSize")).not.toBeInTheDocument();
 
     fireEvent.click(

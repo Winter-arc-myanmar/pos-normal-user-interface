@@ -27,15 +27,15 @@ describe("receipt design", () => {
   });
 
   it("writes amounts the way the business charges", () => {
-    expect(printAmount("100000.0000", "MMK")).toBe("100,000 MMK");
+    expect(printAmount("100000.0000", "MMK")).toBe("100,000");
     expect(printAmount("100000", "USD")).toBe("$ 100,000");
     expect(printAmount("12.5", "USD")).toBe("$ 12.50");
-    expect(printAmount(-2825, "MMK")).toBe("-2,825 MMK");
+    expect(printAmount(-2825, "MMK")).toBe("-2,825");
     expect(printAmount(-2825, "USD")).toBe("-$ 2,825");
     expect(printAmount("100000")).toBe("100,000");
   });
 
-  it("prints the totals, payments and change in the currency", () => {
+  it("prints the totals, payments and change, tagging only dollars", () => {
     const receipt = {
       title: "Receipt",
       lines: [{ name: "Beer", quantity: "2", unitPrice: "3000" }],
@@ -47,11 +47,13 @@ describe("receipt design", () => {
     };
     const kyat = buildSaleReceiptLines({ ...receipt, currency: "MMK" }).join("\n");
     expect(kyat).toMatch(/2 x Beer\s+6,000\n/);
-    expect(kyat).toMatch(/Subtotal\s+6,000 MMK/);
-    expect(kyat).toMatch(/Discount\s+-500 MMK/);
-    expect(kyat).toMatch(/TOTAL\s+5,500 MMK/);
-    expect(kyat).toMatch(/Cash\s+10,000 MMK/);
-    expect(kyat).toMatch(/Change\s+4,500 MMK/);
+    // Kyat needs no currency tag on the slip.
+    expect(kyat).not.toContain("MMK");
+    expect(kyat).toMatch(/Subtotal\s+6,000/);
+    expect(kyat).toMatch(/Discount\s+-500/);
+    expect(kyat).toMatch(/TOTAL\s+5,500/);
+    expect(kyat).toMatch(/Cash\s+10,000/);
+    expect(kyat).toMatch(/Change\s+4,500/);
     const dollars = buildSaleReceiptLines({ ...receipt, currency: "USD" }).join("\n");
     expect(dollars).toMatch(/TOTAL\s+\$ 5,500/);
     expect(dollars).toMatch(/Discount\s+-\$ 500/);
@@ -76,8 +78,8 @@ describe("receipt design", () => {
     }).join("\n");
     // The 1+1 prints under the item it belongs to, not in the totals.
     expect(text).toMatch(/2 @ 10,000[\s\S]*?1\+1\s+-10,000/);
-    expect(text).toMatch(/Subtotal\s+10,000 MMK/);
-    expect(text).toMatch(/Discount\s+-1,500\.50 MMK/);
+    expect(text).toMatch(/Subtotal\s+10,000/);
+    expect(text).toMatch(/Discount\s+-1,500\.50/);
     // Money never prints the API's four decimals.
     expect(text).not.toMatch(/\.0000/);
     expect(text).not.toMatch(/\d\.\d{3,}/);

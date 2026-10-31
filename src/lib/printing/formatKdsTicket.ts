@@ -115,7 +115,7 @@ export interface SaleReceipt extends PrintParty {
   showPrices?: boolean;
   template?: PrintTemplateSettings;
   paperWidth?: PrintPaperWidth;
-  /** Totals print as 100,000 MMK or $ 100,000; plain numbers without it. */
+  /** Totals print as 100,000, or $ 100,000 for dollars; plain numbers without it. */
   currency?: PriceCurrency;
   /** The closing line; "Thank you!" on a customer's receipt when left out. */
   footer?: string;
@@ -425,16 +425,18 @@ export function printMoney(value?: string | number | null): string {
   });
 }
 
-/** An amount in the business's money: "100,000 MMK", "$ 100,000", "-$ 2,825". */
+/** An amount in the business's money: "100,000", "$ 100,000", "-$ 2,825". */
 export function printAmount(
   value?: string | number | null,
   currency?: PriceCurrency
 ): string {
   const text = printMoney(value);
   if (!text || !currency || !Number.isFinite(Number(value))) return text;
+  // Kyat is the shop's own money, so a slip prints the number on its own.
+  if (currency !== "USD") return text;
   const sign = text.startsWith("-") ? "-" : "";
   const digits = sign ? text.slice(1) : text;
-  return currency === "USD" ? `${sign}$ ${digits}` : `${sign}${digits} MMK`;
+  return `${sign}$ ${digits}`;
 }
 
 const quantityText = (value: string) => {
