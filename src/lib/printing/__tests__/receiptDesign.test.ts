@@ -57,6 +57,43 @@ describe("receipt design", () => {
     expect(dollars).toMatch(/Discount\s+-\$ 500/);
   });
 
+  it("shows a promotion under its item, in two decimals", () => {
+    const text = buildSaleReceiptLines({
+      title: "Receipt",
+      lines: [
+        {
+          name: "Beer",
+          quantity: "2",
+          unitPrice: "10000",
+          promotion: "1+1",
+          promotionAmount: "10000.0000",
+        },
+      ],
+      subtotal: "10000.0000",
+      discount: "1500.5000",
+      total: "8499.5000",
+      currency: "MMK",
+    }).join("\n");
+    // The 1+1 prints under the item it belongs to, not in the totals.
+    expect(text).toMatch(/2 @ 10,000[\s\S]*?1\+1\s+-10,000/);
+    expect(text).toMatch(/Subtotal\s+10,000 MMK/);
+    expect(text).toMatch(/Discount\s+-1,500\.50 MMK/);
+    // Money never prints the API's four decimals.
+    expect(text).not.toMatch(/\.0000/);
+    expect(text).not.toMatch(/\d\.\d{3,}/);
+  });
+
+  it("leaves the promotion line out when nothing was promoted", () => {
+    const text = buildSaleReceiptLines({
+      title: "Receipt",
+      lines: [{ name: "Beer", quantity: "1", unitPrice: "10000" }],
+      subtotal: "10000",
+      total: "10000",
+    }).join("\n");
+    expect(text).not.toContain("Promotion");
+    expect(text).not.toContain("1+1");
+  });
+
   it("wraps long words and lines to the paper", () => {
     expect(wrapText("Fried rice with chicken", 10)).toEqual(["Fried rice", "with", "chicken"]);
     expect(wrapText("ABCDEFGHIJKL", 5)).toEqual(["ABCDE", "FGHIJ", "KL"]);

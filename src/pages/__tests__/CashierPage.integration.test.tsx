@@ -1,8 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render as mount, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { CashierPage } from "../CashierPage";
 import { writeTableOrderIds } from "@/lib/pos/multiOrdering";
+
+
+/** Opens every bill row: the panel keeps each row's details collapsed. */
+const openRows = () => {
+  for (const toggle of screen.queryAllByRole("button", {
+    name: /cashier\.orderPanel\.lineDetails/,
+  })) {
+    if (toggle.getAttribute("aria-expanded") !== "true") fireEvent.click(toggle);
+  }
+};
+
+/** Renders the till with its bill rows open: the panel keeps them collapsed. */
+const render = (ui: Parameters<typeof mount>[0]) => {
+  const result = mount(ui);
+  openRows();
+  return result;
+};
 
 const mocks = vi.hoisted(() => ({
   addTableCharge: vi.fn(),

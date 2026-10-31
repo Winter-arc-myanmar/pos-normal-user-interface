@@ -19,6 +19,24 @@ const ticket = (fields: Partial<KdsTicket>): KdsTicket =>
   }) as KdsTicket;
 
 describe("the kitchen slip", () => {
+  it("spaces a room ticket's items like the bill, not the kitchen", () => {
+    const items = [{ name: "Beer", quantity: "2" }];
+    const itemMode = (slip: string) => {
+      const index = slip.indexOf("2 x BEER");
+      const escape = slip.lastIndexOf("\u001b!", index);
+      return slip.charCodeAt(escape + 2);
+    };
+
+    // 0x10 is the printer's double-height bit: the gap between items grows with
+    // it, so a room ticket prints at the checkout bill's normal line height.
+    expect(itemMode(formatKitchenSlip({ title: "0012", lines: items })) & 0x10).toBe(
+      0x10
+    );
+    expect(
+      itemMode(formatKitchenSlip({ title: "0012", room: true, lines: items })) & 0x10
+    ).toBe(0);
+  });
+
   it("says which room or table the food goes to", () => {
     expect(
       kdsTicketPlace(
@@ -46,13 +64,13 @@ describe("the kitchen slip", () => {
   });
 
   it("names a KTV room after the tenant when the company is loaded", () => {
-    const lounge = ticket({
+    const ktvRoom = ticket({
       place: { kind: "KTV_ROOM", number: "101", name: null, guestCount: null },
     });
-    expect(kdsTicketPlace(lounge, "Golden Lounge")).toBe("Golden Lounge 101");
+    expect(kdsTicketPlace(ktvRoom, "Golden Club")).toBe("Golden Club 101");
     // Until the company loads, the slip still says where the food goes.
-    expect(kdsTicketPlace(lounge)).toBe("KTV 101");
-    expect(kdsTicketPlace(lounge, "   ")).toBe("KTV 101");
+    expect(kdsTicketPlace(ktvRoom)).toBe("KTV 101");
+    expect(kdsTicketPlace(ktvRoom, "   ")).toBe("KTV 101");
   });
 
   it("says who sent it", () => {

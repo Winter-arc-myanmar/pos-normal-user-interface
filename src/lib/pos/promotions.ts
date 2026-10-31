@@ -38,12 +38,21 @@ export function promotionPreviewItems(
     }));
 }
 
+/** The line fields a promotion needs: what was sold, and what the bill credited. */
+export interface PromotionLine {
+  variantId: string;
+  quantity?: string | number;
+  unitPrice?: string | number;
+  lineDiscount?: string;
+  appliedPromotionId?: string;
+}
+
 /**
  * What a promotion takes off one line: what the server already credited it, or
  * what the running promotions would take off it. Null when nothing applies.
  */
 export function linePromotionSaving(
-  line: SalesOrderLine,
+  line: PromotionLine,
   discounts: Record<string, PromotionDiscount> = {}
 ): LinePromotionSaving | null {
   if (isFocLine(line)) return null;

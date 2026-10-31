@@ -1,5 +1,5 @@
 import { createRef, type ComponentProps } from "react";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render as mount, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { DiningTable, PaymentMethod, SalesOrder, SalesOrderLine, TableSession } from "@/core/domain/entities/Cashier";
@@ -35,7 +35,30 @@ const line = new SalesOrderLine({
 });
 
 /** The bill row of the default line, named after its variant id. */
-const row = (name = "variant-") => screen.getByRole("group", { name });
+const row = (name = "variant-") => {
+  const group = screen.getByRole("group", { name });
+  const toggle = within(group).getByRole("button", {
+    name: /cashier\.orderPanel\.lineDetails/,
+  });
+  if (toggle.getAttribute("aria-expanded") !== "true") fireEvent.click(toggle);
+  return group;
+};
+
+/** Opens every bill row: the panel keeps each row's details collapsed. */
+const openRows = () => {
+  for (const toggle of screen.queryAllByRole("button", {
+    name: /cashier\.orderPanel\.lineDetails/,
+  })) {
+    if (toggle.getAttribute("aria-expanded") !== "true") fireEvent.click(toggle);
+  }
+};
+
+/** Renders the panel with the bill rows open, as the cashier would tap them. */
+const render = (ui: Parameters<typeof mount>[0]) => {
+  const result = mount(ui);
+  openRows();
+  return result;
+};
 
 const defaultProps: ComponentProps<typeof OrderPanel> = {
   selectedOrder: paidOrder,
@@ -78,6 +101,49 @@ const promotion: RunningPromotion = {
 };
 
 describe("OrderPanel", () => {
+  it("keeps a bill row compact until the cashier opens it", () => {
+    mount(
+      <OrderPanel
+        {...defaultProps}
+        selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
+        selectedOrderLines={[
+          new SalesOrderLine({ ...line, productName: "Coffee", quantity: "2.0000" }),
+        ]}
+        onEditLine={vi.fn()}
+      />
+    );
+
+    const coffee = screen.getByRole("group", { name: "Coffee" });
+    const toggle = within(coffee).getByRole("button", {
+      name: /cashier\.orderPanel\.lineDetails/,
+    });
+    // Like a bill: the row says what and how much, and the rest opens on a tap.
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(coffee).toHaveTextContent("2×");
+    expect(coffee).toHaveTextContent("20.00");
+    expect(
+      within(coffee).queryByLabelText("cashier.orderPanel.lineQuantity")
+    ).toBeNull();
+    expect(
+      within(coffee).queryByRole("button", {
+        name: "cashier.orderPanel.removeItem",
+      })
+    ).toBeNull();
+
+    fireEvent.click(toggle);
+
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(coffee).toHaveTextContent("@ 10.00");
+    expect(
+      within(coffee).getByLabelText("cashier.orderPanel.lineQuantity")
+    ).toHaveTextContent("2");
+    expect(
+      within(coffee).getByRole("button", {
+        name: "cashier.orderPanel.removeItem",
+      })
+    ).toBeEnabled();
+  });
+
   it("keeps table controls compact until the cashier expands them", () => {
     const onChangeTable = vi.fn();
     const onCombineTables = vi.fn();

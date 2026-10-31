@@ -179,7 +179,7 @@ function TemplatePreview({
           title: "0012",
           stationName: "Kitchen",
           place: "KTV K3",
-          placeDetail: "VIP - 4 guests",
+          placeDetail: "KTV - 4 guests",
           orderRef: "SO-R01-0012",
           firedAt: sampleTime(14, 5),
           sentBy: "Aung Aung",
