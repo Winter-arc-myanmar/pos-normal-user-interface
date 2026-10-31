@@ -17,6 +17,9 @@ const ALLOW_SAME = new Set([
   "MEMBER CARD",
   "Tenant ID",
   "{{bps}} bps",
+  // A lounge is named KTV in both languages, like the other product names above.
+  "KTV",
+  "KTV {{number}}",
 ]);
 
 type Tree = Record<string, unknown>;

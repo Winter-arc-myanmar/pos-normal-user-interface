@@ -137,8 +137,8 @@ describe("receipt design", () => {
   });
 });
 
-describe("a Private VIP Lounge bill", () => {
-  it("names the service and the lounge, not KTV and room", () => {
+describe("a KTV bill", () => {
+  it("names the service and the room, not the old lounge brand", () => {
     const text = buildSaleReceiptLines({
       title: "Receipt",
       serviceType: "KTV",
@@ -146,9 +146,9 @@ describe("a Private VIP Lounge bill", () => {
       lines: [],
       total: "1000",
     }).join("\n");
-    expect(text).toMatch(/Service\s+Private VIP Lounge/);
-    expect(text).toMatch(/Lounge\s+K3/);
-    expect(text).not.toContain("KTV");
+    expect(text).toMatch(/Service\s+KTV/);
+    expect(text).toMatch(/KTV\s+K3/);
+    expect(text).not.toContain("Private VIP Lounge");
   });
 
   it("still calls a spa room a room", () => {
@@ -168,11 +168,11 @@ describe("kitchen slip design", () => {
     const printed = formatKitchenSlip({
       title: "KDS-0012",
       stationName: "Bar",
-      place: "VIP Lounge K3",
+      place: "KTV K3",
       lines: [{ name: "Beer", quantity: "2" }],
     });
     expect(printed).toContain("\x1dB\x01");
-    expect(printed).toContain("\x1b!\x38VIP Lounge K3");
+    expect(printed).toContain("\x1b!\x38KTV K3");
     expect(printed).toContain("\x1b!\x182 x BEER");
   });
 

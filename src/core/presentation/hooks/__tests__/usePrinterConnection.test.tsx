@@ -355,7 +355,7 @@ describe("usePrinterConnection lounge slips", () => {
     mocks.getSalesOrderLines.mockReset();
     mocks.getSalesOrderLines.mockResolvedValue({ lines: [] });
     mocks.company.mockReset();
-    mocks.company.mockResolvedValue({ name: "Private VIP Lounge" });
+    mocks.company.mockResolvedValue({ name: "Golden Lounge" });
     savePrinterBinding(
       loungeTenant,
       registerId,
@@ -391,6 +391,6 @@ describe("usePrinterConnection lounge slips", () => {
     });
 
     const [, slip] = mocks.printKitchen.mock.calls[0];
-    expect(slip.place).toBe("Private VIP Lounge 101");
+    expect(slip.place).toBe("Golden Lounge 101");
   });
 });
