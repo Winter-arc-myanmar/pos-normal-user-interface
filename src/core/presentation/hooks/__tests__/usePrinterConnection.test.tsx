@@ -341,9 +341,9 @@ describe("usePrinterConnection KDS ticket modifiers", () => {
   });
 });
 
-describe("usePrinterConnection lounge slips", () => {
+describe("usePrinterConnection KTV slips", () => {
   // A tenant of its own, so the cached company of the other suites does not leak in.
-  const loungeTenant = "tenant-lounge";
+  const ktvTenant = "tenant-ktv";
 
   beforeEach(() => {
     localStorage.clear();
@@ -355,9 +355,9 @@ describe("usePrinterConnection lounge slips", () => {
     mocks.getSalesOrderLines.mockReset();
     mocks.getSalesOrderLines.mockResolvedValue({ lines: [] });
     mocks.company.mockReset();
-    mocks.company.mockResolvedValue({ name: "Golden Lounge" });
+    mocks.company.mockResolvedValue({ name: "Golden Club" });
     savePrinterBinding(
-      loungeTenant,
+      ktvTenant,
       registerId,
       {
         id: "backend:printer-kds",
@@ -373,7 +373,7 @@ describe("usePrinterConnection lounge slips", () => {
 
   it("prints the room under the tenant's name instead of a fixed brand", async () => {
     const { result } = renderHook(() =>
-      usePrinterConnection(loungeTenant, registerId)
+      usePrinterConnection(ktvTenant, registerId)
     );
     await waitFor(() => expect(result.current.isConnected).toBe(true));
 
@@ -391,6 +391,6 @@ describe("usePrinterConnection lounge slips", () => {
     });
 
     const [, slip] = mocks.printKitchen.mock.calls[0];
-    expect(slip.place).toBe("Golden Lounge 101");
+    expect(slip.place).toBe("Golden Club 101");
   });
 });

@@ -31,6 +31,10 @@ export interface PrintLine {
   unitPrice?: string;
   modifiers?: string;
   modifierPrices?: string;
+  /** A running promotion on this item, such as "1+1". */
+  promotion?: string;
+  /** What that promotion took off this item. */
+  promotionAmount?: string;
   remarks?: string;
   seat?: string;
 }
@@ -60,11 +64,16 @@ export interface KitchenSlip extends PrintParty {
   stationId?: string;
   stationName?: string;
   orderRef?: string;
-  /** Where the food goes, printed huge: "Table T12", "My Lounge K3". */
+  /** Where the food goes, printed huge: "Table T12", "KTV K3". */
   place?: string;
   /** Under the place: room name, service, guests. */
   placeDetail?: string;
   sentBy?: string;
+  /**
+   * A room's ticket (KTV or SPA). It reads like the room's bill, with its items
+   * at receipt height instead of the kitchen's double-height line.
+   */
+  room?: boolean;
   lines?: PrintLine[];
   template?: PrintTemplateSettings;
   paperWidth?: PrintPaperWidth;
@@ -552,7 +561,9 @@ function kitchenLayout(slip: KitchenSlip): Layout {
   layout.rule("=");
 
   const lines = slip.lines || [];
-  const size = itemSizeFor(settings, true);
+  // A room's ticket spaces its items like the room's bill: the checkout receipt
+  // is the reference, so items print at its height rather than the kitchen's.
+  const size = slip.room ? itemSizeFor(settings, false) : itemSizeFor(settings, true);
   lines.forEach((item, index) => {
     if (index) layout.gap();
     // The quantity leads the name with an "x" after it, as the receipt prints it.
@@ -676,6 +687,14 @@ function receiptLayout(receipt: SaleReceipt): Layout {
       if (hasPrice && Number(item.quantity) !== 1) {
         layout.indented(4, `${quantity} @ ${printMoney(unit)}`);
       }
+      // A running promotion prints under its item: what the 1+1 took off here.
+      const promotionAmount = Number(item.promotionAmount || 0);
+      if (showPrices && promotionAmount > 0) {
+        layout.pair(
+          `    ${item.promotion?.trim() || "Promotion"}`,
+          `-${printMoney(promotionAmount)}`
+        );
+      }
       if (showModifiers) {
         for (const modifier of modifierRows(item, showPrices)) layout.indented(4, modifier);
       }
@@ -795,7 +814,7 @@ export function kdsTicketPlace(
   const place = ticket.place;
   if (place?.kind === "TABLE" && place.number) return `Table ${place.number}`;
   if (place?.kind === "SPA_ROOM" && place.number) return `SPA ${place.number}`;
-  // A lounge goes by the tenant's own name; only fall back to a generic one
+  // A KTV room goes by the tenant's own name; only fall back to a generic one
   // when the company has not loaded.
   if (place?.kind === "KTV_ROOM" && place.number) {
     return `${tenantName?.trim() || "KTV"} ${place.number}`;
@@ -847,6 +866,7 @@ export function kdsTicketSlip(ticket: KdsTicket, tenantName?: string | null): Ki
     orderRef: ticket.orderNumber || undefined,
     place: kdsTicketPlace(ticket, tenantName),
     placeDetail: kdsTicketPlaceDetail(ticket),
+    room: ticket.place?.kind === "KTV_ROOM" || ticket.place?.kind === "SPA_ROOM",
     sentBy: kdsTicketSender(ticket),
     lines: kdsTicketPrintLines(ticket),
   };

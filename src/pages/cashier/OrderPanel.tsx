@@ -186,6 +186,7 @@ interface OrderPanelProps {
 
 const SEATING_ICON_PATHS = {
   move: ["m16 3 4 4-4 4", "M20 7H4", "m8 21-4-4 4-4", "M4 17h16"],
+  chevron: ["m6 9 6 6 6-6"],
   split: [
     "M16 3h5v5",
     "M8 3H3v5",
@@ -321,6 +322,8 @@ export function OrderPanel({
 }: OrderPanelProps) {
   const { t } = useTranslation();
   const [confirmCancelOrder, setConfirmCancelOrder] = useState(false);
+  // Rows stay compact like a bill; the price, options and actions open per row.
+  const [openLines, setOpenLines] = useState<Record<string, boolean>>({});
   const [billOptions, setBillOptions] = useState<{
     orderId: string | undefined;
   } | null>(null);
@@ -660,9 +663,18 @@ export function OrderPanel({
                   ? t(`cashier.orderPanel.priceNote.${priceNote}`, { name: lineName })
                   : lineName;
                 const isLocked = isLoading || isSettledOrder;
+                const lineOpen = openLines[line.id] === true;
                 return (
                   <div key={line.id} role="group" aria-label={shownName} className="bg-white px-2 py-1.5">
-                    <div className="flex min-w-0 items-center gap-1.5">
+                    <button
+                      type="button"
+                      className="flex w-full min-w-0 items-center gap-1.5 text-left"
+                      aria-expanded={lineOpen}
+                      aria-label={t("cashier.orderPanel.lineDetails", { name: shownName })}
+                      onClick={() =>
+                        setOpenLines((current) => ({ ...current, [line.id]: !lineOpen }))
+                      }
+                    >
                       {!isFee && isPendingKds ? (
                         <span
                           className="h-2.5 w-2.5 shrink-0 rounded-full border-2 border-emerald-500 bg-emerald-500"
@@ -671,7 +683,9 @@ export function OrderPanel({
                         />
                       ) : null}
                       <span className="flex min-w-0 flex-1 items-center gap-1.5 text-sm font-medium">
-                        <span className="min-w-0 truncate" title={shownName}>{shownName}</span>
+                        <span className="shrink-0 text-xs font-semibold tabular-nums text-slate-500">
+                          {quantityLabel}×
+                        </span>
                         {saving ? (
                           <span
                             className="shrink-0 rounded border border-emerald-600 px-1 text-[10px] font-semibold tracking-wide text-emerald-700"
@@ -690,11 +704,20 @@ export function OrderPanel({
                             {t("cashier.orderPanel.foc")}
                           </span>
                         ) : null}
+                        <span className="min-w-0 truncate" title={shownName}>{shownName}</span>
                       </span>
                       <span className="shrink-0 text-sm font-semibold tabular-nums">
                         {formatPosMoney(lineDue)}
                       </span>
-                    </div>
+                      <SeatingIcon
+                        name="chevron"
+                        className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${
+                          lineOpen ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+                    {lineOpen ? (
+                      <>
                     <p
                       className="mt-0.5 truncate text-xs tabular-nums text-slate-500"
                       title={[lineVariant !== lineName ? lineVariant : "", lineOptions].filter(Boolean).join(" · ")}
@@ -783,6 +806,8 @@ export function OrderPanel({
                         </button>
                       </div>
                     </div>
+                      </>
+                    ) : null}
                   </div>
                 );
               })}

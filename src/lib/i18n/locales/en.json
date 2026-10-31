@@ -1187,6 +1187,7 @@
       "promoFreeTime": "buy {{buy}}, get {{free}} free",
       "promoSaving": "{{name}} −{{amount}}",
       "promotionDiscount": "Promotion discount",
+      "lineDetails": "Show or hide the details of {{name}}",
       "editItem": "Edit {{name}}",
       "removeItem": "Remove {{name}}",
       "priceNote": {
@@ -1921,7 +1922,7 @@
       "active": "In use"
     },
     "billClosed": "Room closed. The bill is waiting for payment.",
-    "billPaid": "Paid. The lounge is free for the next guest.",
+    "billPaid": "Paid. The KTV room is free for the next guest.",
     "payTitle": "Close room and pay",
     "steps": {
       "sessions": "Choose hours",

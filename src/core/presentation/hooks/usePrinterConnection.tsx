@@ -450,7 +450,7 @@ export function usePrinterConnection(
               categoryIds: [],
             }
           : undefined;
-      // A lounge room is printed under the tenant's own name, loaded once per company.
+      // A KTV room is printed under the tenant's own name, loaded once per company.
       const company = await printCompanyFor(tenantId);
       return printKitchen(
         {

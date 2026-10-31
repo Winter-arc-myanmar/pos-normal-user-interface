@@ -69,7 +69,8 @@ import {
 import { isUnspendableWalletStatus } from "@/lib/pos/guestWalletAmounts";
 import { isSettledSalesOrder } from "@/lib/pos/orderStatus";
 import { isPendingKdsLine, pendingKdsLines } from "@/lib/pos/kdsLines";
-import { promotionPreviewItems } from "@/lib/pos/promotions";
+import { linePromotionSaving, promotionPreviewItems } from "@/lib/pos/promotions";
+import type { PromotionLine } from "@/lib/pos/promotions";
 import {
   findOpenTableSession,
   isOpenTableSession,
@@ -709,7 +710,9 @@ export function CashierPage() {
     }>,
     withoutTax = false,
     // On a bill the guest gets, a repriced item says so: "Water (Discount)".
-    notePrices = false
+    notePrices = false,
+    // A promotion prints under its own item, as the till showed it.
+    promotionOf?: (line: PromotionLine) => { label: string; amount: string } | undefined
   ) => {
     const printable = lines
       .filter((line) => !line.voidedAt)
@@ -728,6 +731,7 @@ export function CashierPage() {
         const note = notePrices
           ? linePriceNote(line.unitPrice, menuPriceFor(line))
           : undefined;
+        const promotion = promotionOf?.(line);
         return {
           variantId: line.variantId,
           name: note ? t(`cashier.orderPanel.priceNote.${note}`, { name }) : name,
@@ -739,6 +743,9 @@ export function CashierPage() {
           categoryName: line.categoryName || product?.categoryName,
           modifiers: modifiers.names,
           modifierPrices: modifiers.prices,
+          ...(promotion
+            ? { promotion: promotion.label, promotionAmount: promotion.amount }
+            : {}),
         };
       });
     // A bill may already hold the same item on more than one line. The receipt
@@ -752,6 +759,7 @@ export function CashierPage() {
         line.categoryId,
         line.modifiers,
         line.modifierPrices,
+        line.promotion,
       ]);
       const existing = merged.get(key);
       if (!existing) {
@@ -761,6 +769,14 @@ export function CashierPage() {
       merged.set(key, {
         ...existing,
         quantity: String(Number(existing.quantity) + Number(line.quantity)),
+        // Two rows of the same item under the same promotion add up too.
+        ...(line.promotionAmount
+          ? {
+              promotionAmount: String(
+                Number(existing.promotionAmount || 0) + Number(line.promotionAmount)
+              ),
+            }
+          : {}),
       });
     }
     return [...merged.values()];
@@ -836,6 +852,18 @@ export function CashierPage() {
     });
   }, [activeOrderLines, billOptions.changed, buildDirectLine, discountAmount, displayOrderLines, isDirectCheckoutMode, isFeeLine, productById, variantById]);
 
+  /**
+   * What running promotions take off the bill: credited on a saved line, or
+   * previewed for a direct cart, which the server prices at checkout.
+   */
+  const promotionSaving = useMemo(() => {
+    const discounts = isDirectCheckoutMode ? promotions.discounts : {};
+    return paymentBillLines.reduce((sum, line) => {
+      if (line.voidedAt || isFeeLine(line)) return sum;
+      return sum + (linePromotionSaving(line, discounts)?.amount || 0);
+    }, 0);
+  }, [isDirectCheckoutMode, paymentBillLines, promotions.discounts]);
+
   const lineSubtotal = useMemo(() => {
     const backendTotal = Number(selectedOrder?.grandTotal || 0);
     const totalLines = paymentBillLines;
@@ -851,11 +879,15 @@ export function CashierPage() {
     if (!isDirectCheckoutMode && backendTotal > 0) {
       return Math.max(backendTotal, lineTotal);
     }
-    return lineTotal > 0 ? lineTotal : backendTotal;
+    // A direct cart is not priced yet: take the previewed promotions off here, so
+    // the till charges what the server will bill and the receipt adds up.
+    const directTotal = lineTotal - (isDirectCheckoutMode ? promotionSaving : 0);
+    return directTotal > 0 ? directTotal : backendTotal;
   }, [
     paymentBillLines,
     billOptions.includeTax,
     isDirectCheckoutMode,
+    promotionSaving,
     selectedOrder?.grandTotal,
   ]);
 
@@ -958,6 +990,21 @@ export function CashierPage() {
     ? toMoney(paymentBillLines.reduce((sum, line) => sum + Number(line.lineDiscount || 0), 0)
       + (isDirectCheckoutMode ? 0 : Math.max(0, Number(discountAmount) || 0)))
     : discountAmount);
+  /** How a promotion on one line reads under that item, e.g. "1+1  -10,000". */
+  const promotionForLine = (line: PromotionLine) => {
+    const saving = linePromotionSaving(
+      line,
+      isDirectCheckoutMode ? promotions.discounts : {}
+    );
+    if (!saving || saving.amount <= 0) return undefined;
+    const label =
+      (line.appliedPromotionId
+        ? promotions.promotionName(line.appliedPromotionId)
+        : undefined) ||
+      saving.names.join(", ") ||
+      t("cashier.orderPanel.promo");
+    return { label, amount: saving.amount.toFixed(4) };
+  };
 
   const breakdown = (() => {
     const quote = billOptions.bill ?? billOptions.quote;
@@ -979,6 +1026,8 @@ export function CashierPage() {
         : paymentBillLines.reduce((sum, line) => sum + Number(line.quantity || 0) * Number(line.unitPrice || 0)
           - (!billOptions.includeTax && line.taxInclusive ? Number(line.taxAmount || 0) : 0), 0),
       billDiscount: Number(discountAmount) || 0,
+      // A direct cart's promotions are a preview until the server prices it.
+      promotion: isDirectCheckoutMode ? promotionSaving : undefined,
       serviceCharge: quote ? Number(quote.serviceCharge) : serviceCharge,
       tax: quote ? Number(quote.addedTax) + Number(quote.serviceChargeTax) : taxes.added + serviceChargeTax,
       includedTax: quote
@@ -1073,7 +1122,7 @@ export function CashierPage() {
 
   useEffect(() => {
     if (isSplitMode) return;
-    setPaymentAmount(orderTotal);
+    setPaymentAmount(Number(orderTotal).toFixed(2));
   }, [isDirectCheckoutMode, isSplitMode, orderTotal, selectedOrder?.id]);
 
   const previousOrderIdRef = useRef(selectedOrder?.id);
@@ -2148,7 +2197,7 @@ export function CashierPage() {
         if (Math.abs(refreshedTotal - Number(orderTotal)) > 0.009) {
           setIsSplitMode(false);
           setSplitTenders([]);
-          setPaymentAmount(refreshedTotal.toFixed(4));
+          setPaymentAmount(refreshedTotal.toFixed(2));
           setSyncedPaymentTotal({
             orderId: selectedOrder.id,
             discountAmount,
@@ -2229,7 +2278,7 @@ export function CashierPage() {
         showPrices: true,
         receiptId: selectedOrder?.orderNumber,
         ...receiptParty(true),
-        lines: printableLines(paymentBillLines, !billOptions.includeTax, true),
+        lines: printableLines(paymentBillLines, !billOptions.includeTax, true, promotionForLine),
         subtotal: receiptSubtotal,
         discount: Number(receiptDiscount) > 0 ? receiptDiscount : undefined,
         tax: Number(receiptTax) > 0 ? receiptTax : undefined,
@@ -2371,7 +2420,7 @@ export function CashierPage() {
       if (Number.isFinite(requiredTotal) && requiredTotal > 0) {
         setIsSplitMode(false);
         setSplitTenders([]);
-        setPaymentAmount(requiredTotal.toFixed(4));
+        setPaymentAmount(requiredTotal.toFixed(2));
         if (selectedOrder) {
           setSyncedPaymentTotal({
             orderId: selectedOrder.id,
@@ -2689,7 +2738,7 @@ export function CashierPage() {
         : "menu";
     setIsSplitMode(false);
     setSplitTenders([]);
-    setPaymentAmount(orderTotal);
+    setPaymentAmount(Number(orderTotal).toFixed(2));
     resetMemberCardLookup();
     setSearchParams({ view: nextView });
   };
@@ -2730,7 +2779,7 @@ export function CashierPage() {
     if (isSplitMode) return;
     setIsSplitMode(true);
     setSplitTenders([]);
-    setPaymentAmount(orderTotal);
+    setPaymentAmount(Number(orderTotal).toFixed(2));
     setLocalError(null);
     setNotice(t("cashier.payment.splitOpened"));
   };
@@ -2780,14 +2829,14 @@ export function CashierPage() {
       },
     ];
     setSplitTenders(nextTenders);
-    setPaymentAmount(remainingReceivable(orderTotal, nextTenders).toFixed(4));
+    setPaymentAmount(remainingReceivable(orderTotal, nextTenders).toFixed(2));
     setLocalError(null);
   };
 
   const handleRemoveSplitTender = (tenderId: string) => {
     const nextTenders = splitTenders.filter((tender) => tender.id !== tenderId);
     setSplitTenders(nextTenders);
-    setPaymentAmount(remainingReceivable(orderTotal, nextTenders).toFixed(4));
+    setPaymentAmount(remainingReceivable(orderTotal, nextTenders).toFixed(2));
   };
 
   const handleIncreaseLineQuantity = async (line: (typeof activeOrderLines)[number]) => {
@@ -3327,7 +3376,7 @@ export function CashierPage() {
             showPrices: true,
             receiptId: selectedOrder?.orderNumber,
             ...receiptParty(),
-            lines: printableLines(paymentBillLines, !billOptions.includeTax, true),
+            lines: printableLines(paymentBillLines, !billOptions.includeTax, true, promotionForLine),
             subtotal: receiptSubtotal,
             discount: Number(receiptDiscount) > 0 ? receiptDiscount : undefined,
             tax: Number(receiptTax) > 0 ? receiptTax : undefined,

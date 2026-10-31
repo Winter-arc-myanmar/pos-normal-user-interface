@@ -6,6 +6,8 @@ export const toTabletSlip = (order: RoomOrderView): KitchenSlip => ({
   place: `Room ${order.roomNumber}`,
   placeDetail: order.roomName && order.roomName !== order.roomNumber ? order.roomName : undefined,
   firedAt: order.createdAt,
+  // A room order prints its items at bill height, not the kitchen's.
+  room: true,
   sentBy: order.source === "TABLET" ? order.deviceName || "Room tablet" : undefined,
   lines: order.items.map((item) => ({
     name: item.name,

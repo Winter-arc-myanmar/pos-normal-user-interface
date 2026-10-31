@@ -1187,6 +1187,7 @@
       "promoFreeTime": "{{buy}} ခု ဝယ်လျှင် {{free}} ခု အခမဲ့",
       "promoSaving": "{{name}} ဖြင့် {{amount}} လျှော့",
       "promotionDiscount": "ပရိုမိုးရှင်း လျှော့စျေး",
+      "lineDetails": "{{name}} ၏ အသေးစိတ် ပြ/ဖျောက်",
       "editItem": "{{name}} ပြင်မည်",
       "removeItem": "{{name}} ဖယ်မည်",
       "priceNote": {

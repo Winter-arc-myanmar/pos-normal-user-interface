@@ -34,6 +34,7 @@ export function billBreakdown<Line extends BreakdownLine>({
   menuPrice,
   itemsTotal,
   billDiscount,
+  promotion,
   serviceCharge,
   tax,
   includedTax,
@@ -45,6 +46,11 @@ export function billBreakdown<Line extends BreakdownLine>({
   /** The items at the prices on the bill, as the server counts them. */
   itemsTotal: number;
   billDiscount: number;
+  /**
+   * Savings from running promotions the lines do not carry yet. A saved bill has
+   * them in each line's discount; a direct cart only knows the preview.
+   */
+  promotion?: number;
   serviceCharge: number;
   tax: number;
   includedTax: number;
@@ -52,7 +58,7 @@ export function billBreakdown<Line extends BreakdownLine>({
   total: number;
 }): BillBreakdown {
   let priceChange = 0;
-  let promotion = 0;
+  let promotionSaving = 0;
   let foc = 0;
   let itemDiscount = 0;
   for (const line of lines) {
@@ -61,14 +67,14 @@ export function billBreakdown<Line extends BreakdownLine>({
     if (menu !== undefined) priceChange += quantity * (Number(line.unitPrice || 0) - menu);
     const discount = Math.max(0, Number(line.lineDiscount || 0));
     if (isFocLine(line)) foc += discount;
-    else if (line.appliedPromotionId) promotion += discount;
+    else if (line.appliedPromotionId) promotionSaving += discount;
     else itemDiscount += discount;
   }
   if (Math.abs(priceChange) < 0.005) priceChange = 0;
   return {
     subtotal: itemsTotal - priceChange,
     priceChange,
-    promotion,
+    promotion: Math.max(0, promotion ?? promotionSaving),
     foc,
     itemDiscount,
     billDiscount: Math.max(0, billDiscount),

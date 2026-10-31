@@ -120,6 +120,12 @@ const emptyRoomForm = {
 };
 
 /** The products behind room time and SPA packages, which are not on the menu. */
+/**
+ * Product categories whose items are room time and packages rather than menu
+ * items. These are the backend's category names, matched so they never show on
+ * the menu: the KTV wording and the older "Private VIP Lounges" name both stay
+ * listed so a renamed catalogue cannot leak room charges onto the menu.
+ */
 const ROOM_CATEGORIES = ["Spa Packages", "Spa Rooms", "KTV Rooms", "Private VIP Lounges"];
 
 const money = (value: string | number | undefined) =>
@@ -1572,7 +1578,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     if (isSplitMode) return;
     setIsSplitMode(true);
     setSplitTenders([]);
-    setPayAmount(endBillTotal.toFixed(4));
+    setPayAmount(endBillTotal.toFixed(2));
   };
 
   const addEndTender = () => {
@@ -1610,13 +1616,13 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       },
     ];
     setSplitTenders(next);
-    setPayAmount(remainingReceivable(endBillTotal, next).toFixed(4));
+    setPayAmount(remainingReceivable(endBillTotal, next).toFixed(2));
   };
 
   const removeEndTender = (tenderId: string) => {
     const next = splitTenders.filter((tender) => tender.id !== tenderId);
     setSplitTenders(next);
-    setPayAmount(remainingReceivable(endBillTotal, next).toFixed(4));
+    setPayAmount(remainingReceivable(endBillTotal, next).toFixed(2));
   };
 
   /**
@@ -2248,7 +2254,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                 <PaymentView
                   methods={endPayMethods}
                   selectedMethodId={endPayMethodId}
-                  paymentAmount={isSplitMode ? payAmount : endBillTotal.toFixed(4)}
+                  paymentAmount={isSplitMode ? payAmount : endBillTotal.toFixed(2)}
                   total={endBillTotal.toFixed(4)}
                   breakdown={endBreakdown}
                   billOptions={{
