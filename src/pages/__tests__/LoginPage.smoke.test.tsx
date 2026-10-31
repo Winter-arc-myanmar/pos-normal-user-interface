@@ -50,4 +50,14 @@ describe("LoginPage", () => {
     expect(container.querySelector('img[src="/logo.png"]')).toHaveAttribute("width", "176");
     expect(container.querySelector('img[src="/logo.png"]')).toHaveAttribute("height", "176");
   });
+
+  it("says why when another device signed the account in", () => {
+    render(
+      <MemoryRouter initialEntries={["/login?reason=signed_in_elsewhere"]}>
+        <LoginPage />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText("login.signedInElsewhere")).toBeInTheDocument();
+  });
 });

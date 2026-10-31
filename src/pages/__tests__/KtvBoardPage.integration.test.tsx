@@ -189,6 +189,9 @@ vi.mock("@/core/presentation/hooks/useWorkingHostesses", () => ({
     load: mocks.loadHostesses,
   }),
 }));
+vi.mock("@/core/presentation/hooks/useRoomFloor", () => ({
+  useRoomFloor: () => ({ moveRoom: vi.fn(), mergeRoom: vi.fn(), splitRoom: vi.fn() }),
+}));
 vi.mock("@/core/presentation/hooks/useHostessBoard", () => ({
   useHostessBoard: () => ({
     hostesses: [
