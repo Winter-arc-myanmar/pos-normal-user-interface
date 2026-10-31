@@ -250,15 +250,15 @@ export function SpaBillPanel({
             // A promotion can split one item into several copies of its own line,
             // so the promo badge belongs to whichever copy carries it.
             const promotedLine = group.lines.find((item) => item.appliedPromotionId);
-            // What one of the row is charged: a copy the promotion made free reads
-            // 0 here instead of the menu price.
-            const chargedUnit =
-              promotedLine && quantity > 0
-                ? Math.max(0, total / quantity)
-                : unitPrice;
             const isPackage = Boolean(packageVariantIds?.has(line.variantId));
             const isTreatment = line.variantId === room?.rateVariantId || isPackage;
             const isFoc = Boolean(line.compReasonId);
+            // What one of the row is charged: a copy a promotion gave away, or one
+            // given free, reads 0 here instead of the menu or session price.
+            const chargedUnit =
+              (promotedLine || isFoc) && quantity > 0
+                ? Math.max(0, total / quantity)
+                : unitPrice;
             const editable = !billClosed && !isTreatment;
             return (
               <div key={group.key} className="flex items-center gap-2 py-2 text-sm">

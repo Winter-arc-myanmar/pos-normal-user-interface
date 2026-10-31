@@ -145,4 +145,41 @@ describe("SpaBillPanel actions", () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/^0 · Buy 1 Get 1$/)).toBeInTheDocument();
   });
+
+  it("shows the room session a free-time promotion gave away at 0", () => {
+    const hour = (id: string, lineDiscount: string) =>
+      new SalesOrderLine({
+        id,
+        salesOrderId: "order-1",
+        variantId: "variant-hour",
+        quantity: "1.0000",
+        unitPrice: "40000.0000",
+        lineDiscount,
+        appliedPromotionId: "bogo-hours",
+      });
+    const money = (value: number) =>
+      value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+
+    renderPanel({
+      room: new SpaRoom({
+        id: "room-102",
+        roomNumber: "102",
+        name: "VIP 102",
+        minimumMinutes: 60,
+        status: "OCCUPIED",
+        rateVariantId: "variant-hour",
+        sessionPrice: "40000.0000",
+      }),
+      lines: [hour("line-1", "0.0000"), hour("line-2", "40000.0000")],
+      promotionName: (id?: string) =>
+        id === "bogo-hours" ? "1 hour + 1 free" : undefined,
+    });
+
+    // The hour bought at the rate, then the hour the promotion gave away.
+    expect(screen.getAllByText("spa.treatmentCharge")).toHaveLength(2);
+    expect(
+      screen.getByText(new RegExp(`^${money(40000)} · 1 hour \\+ 1 free$`))
+    ).toBeInTheDocument();
+    expect(screen.getByText(/^0 · 1 hour \+ 1 free$/)).toBeInTheDocument();
+  });
 });
