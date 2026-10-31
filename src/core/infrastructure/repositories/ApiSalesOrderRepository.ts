@@ -12,6 +12,11 @@ import {
   SettleSalesOrderDTO,
   SettleSalesOrderResultDTO,
   VoidSalesOrderLineDTO,
+  EditSalesOrderDTO,
+  EditSalesOrderPreviewDTO,
+  EditSalesOrderPreviewResultDTO,
+  EditSalesOrderResultDTO,
+  SalesOrderEditDTO,
 } from "../../application/dtos/SalesOrderDTO";
 import { fromApiServiceType } from "../../application/dtos/CashierDTO";
 import { ISalesOrderRepository } from "../../domain/repositories/ISalesOrderRepository";
@@ -432,6 +437,63 @@ export class ApiSalesOrderRepository implements ISalesOrderRepository {
       change: String(item.change || "0.0000"),
       status: String(item.status || "COMPLETED"),
     };
+  }
+
+  async previewSalesOrderEdit(
+    id: string,
+    payload: EditSalesOrderPreviewDTO
+  ): Promise<EditSalesOrderPreviewResultDTO> {
+    const response = await this.httpClient.post<ApiEnvelope<Record<string, unknown>>>(
+      API_ENDPOINTS.SALES_ORDERS.EDIT_PREVIEW(id),
+      payload
+    );
+    const item = asRecord(unwrap(response)) || {};
+    return {
+      previousTotal: toDecimalString(item.previousTotal),
+      subtotal: toDecimalString(item.subtotal),
+      totalDiscount: toDecimalString(item.totalDiscount),
+      totalTax: toDecimalString(item.totalTax),
+      serviceCharge: toDecimalString(item.serviceCharge),
+      tipAmount: toDecimalString(item.tipAmount),
+      newTotal: toDecimalString(item.newTotal),
+      difference: toDecimalString(item.difference),
+    };
+  }
+
+  async editSalesOrder(
+    id: string,
+    payload: EditSalesOrderDTO,
+    approverToken: string
+  ): Promise<EditSalesOrderResultDTO> {
+    const response = await this.httpClient.post<ApiEnvelope<Record<string, unknown>>>(
+      API_ENDPOINTS.SALES_ORDERS.EDIT(id),
+      payload,
+      { headers: { "x-approver-authorization": approverToken } }
+    );
+    const item = asRecord(unwrap(response)) || {};
+    return {
+      editId: String(item.editId || ""),
+      orderId: String(item.orderId || id),
+      orderNumber: String(item.orderNumber || ""),
+      previousTotal: toDecimalString(item.previousTotal),
+      newTotal: toDecimalString(item.newTotal),
+      difference: toDecimalString(item.difference),
+    };
+  }
+
+  async getSalesOrderEdits(id: string): Promise<SalesOrderEditDTO[]> {
+    const response = await this.httpClient.get<ApiEnvelope<Record<string, unknown>[]>>(
+      API_ENDPOINTS.SALES_ORDERS.EDITS(id)
+    );
+    return asList<Record<string, unknown>>(response).map((item) => ({
+      id: String(item.id || ""),
+      reason: String(item.reason || ""),
+      editedByName: nestedName(item.editedBy, ["fullName"]) || "",
+      approvedByName: nestedName(item.approvedBy, ["fullName"]) || "",
+      previousTotal: toDecimalString(item.previousTotal),
+      newTotal: toDecimalString(item.newTotal),
+      createdAt: String(item.createdAt || ""),
+    }));
   }
 
   async deleteSalesOrder(id: string): Promise<SalesOrder> {
