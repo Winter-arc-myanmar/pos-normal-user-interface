@@ -3,6 +3,8 @@ import { SalesOrderLine } from "@/core/domain/entities/Cashier";
 import type { RunningPromotion } from "@/core/domain/entities/Promotion";
 import {
   appliedPromotionDiscount,
+  givenAwayAmount,
+  givenAwayDiscount,
   linePromotionSaving,
   promotionPreviewItems,
   promotionSummary,
@@ -101,5 +103,40 @@ describe("running promotion summary", () => {
         text
       )
     ).toBe("Special Menu (buy 1, get 1 free)");
+  });
+});
+
+describe("what a promotion gave away", () => {
+  it("counts a line its discount covers in full", () => {
+    expect(
+      givenAwayAmount(
+        line({
+          quantity: "2.0000",
+          unitPrice: "10.0000",
+          lineDiscount: "20.0000",
+          appliedPromotionId: "bogo",
+        })
+      )
+    ).toBe(20);
+  });
+
+  it("leaves a discounted line, a comp and a plain line alone", () => {
+    // Only part of the line is off: it prints at its price with a saving row.
+    expect(
+      givenAwayAmount(line({ lineDiscount: "1.0000", appliedPromotionId: "bogo" }))
+    ).toBe(0);
+    // A comp carries no promotion: it keeps the price plus a discount row.
+    expect(givenAwayAmount(line({ lineDiscount: "10.0000" }))).toBe(0);
+    expect(givenAwayAmount(line())).toBe(0);
+  });
+
+  it("adds up the copies a bill gave away", () => {
+    expect(
+      givenAwayDiscount([
+        line({ appliedPromotionId: "bogo", lineDiscount: "10.0000" }),
+        line({ id: "line-2", appliedPromotionId: "bogo", lineDiscount: "1.0000" }),
+        line({ id: "line-3" }),
+      ])
+    ).toBe(10);
   });
 });

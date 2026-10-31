@@ -781,6 +781,36 @@ describe("CashierPage integration", () => {
     expect(mocks.updateOrderLine).not.toHaveBeenCalled();
   });
 
+  it("prints a copy a promotion gave away at 0 on the receipt", async () => {
+    selectedOrderLinesState = [
+      orderLine,
+      {
+        ...orderLine,
+        id: "line-2",
+        lineDiscount: "10.0000",
+        appliedPromotionId: "promo-1",
+      },
+    ];
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=pay"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "cashier.printFinance" }));
+
+    await waitFor(() =>
+      expect(mocks.printReceipt).toHaveBeenCalledWith(
+        expect.objectContaining({
+          lines: [
+            expect.objectContaining({ name: "Coffee", unitPrice: "10.0000" }),
+            expect.objectContaining({ name: "Coffee", unitPrice: "0.0000" }),
+          ],
+        })
+      )
+    );
+  });
+
   it("prints duplicate item lines as one combined quantity on the receipt", async () => {
     selectedOrderLinesState = [
       orderLine,
