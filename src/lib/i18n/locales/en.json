@@ -105,7 +105,8 @@
     "submit": "Sign in",
     "sessionExpired": "Your session expired. Please sign in again.",
     "submitting": "Signing in...",
-    "errorFallback": "Unable to sign in"
+    "errorFallback": "Unable to sign in",
+    "signedInElsewhere": "This account was signed in on another device, so it was signed out here."
   },
   "dashboard": {
     "title": "Sales analytics",
