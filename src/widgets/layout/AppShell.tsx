@@ -87,6 +87,15 @@ function KtvIcon() {
   );
 }
 
+function HostessIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass} aria-hidden="true">
+      <circle cx="9" cy="7" r="3" />
+      <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 4.5a3 3 0 0 1 0 5M18 14c2 .8 3 2.7 3 6" />
+    </svg>
+  );
+}
+
 function SpaIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass} aria-hidden="true">
@@ -230,6 +239,7 @@ export function AppShell() {
   const isPosWorkspace = [
     "/cashier",
     "/ktv",
+    "/hostesses",
     "/spa",
     "/sales-orders",
     "/waitlist",
@@ -275,6 +285,12 @@ export function AppShell() {
       label: t("shell.ktvTitle"),
       icon: <KtvIcon />,
       visible: canAccess(PAGE_PERMISSIONS.ktv) && sells("KTV"),
+    },
+    {
+      to: "/hostesses",
+      label: t("shell.hostessesTitle"),
+      icon: <HostessIcon />,
+      visible: canAccess(PAGE_PERMISSIONS.hostesses) && sells("KTV"),
     },
     {
       to: "/spa",

@@ -52,6 +52,10 @@ import { estimateRoomCharges } from "@/lib/spa/roomCharges";
 import type { Hostess } from "@/core/domain/entities/Hostess";
 import { usePlaceCharges } from "@/core/presentation/hooks/usePlaceCharges";
 import { HostessPicker } from "./spa/HostessPicker";
+import { HostessStrip } from "./ktv/HostessStrip";
+import { useHostessBoard } from "@/core/presentation/hooks/useHostessBoard";
+import { hostessStatusRows } from "@/lib/ktv/hostessStatus";
+import { useWorkingHostesses } from "@/core/presentation/hooks/useWorkingHostesses";
 import {
   addPending,
   changePending,
@@ -59,6 +63,7 @@ import {
   paidPending,
   PendingItem,
   pendingOrderItems,
+  setOrderedBy,
   pendingSaving,
   pendingTotal,
   toggleOneFoc,
@@ -357,6 +362,54 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     () => new Set(spaPackages.map((item) => item.variantId)),
     [spaPackages]
   );
+  // KTV: the hostesses with this room may order dishes and drinks for it.
+  const { hostesses: workingHostesses, load: loadHostesses } = useWorkingHostesses();
+  useEffect(() => {
+    if (!isSpa && session?.id) void loadHostesses();
+  }, [isSpa, session?.id, loadHostesses]);
+  const serviceVariantIds = useMemo(
+    () =>
+      new Set(
+        products
+          .filter((product) => product.askWhoServed)
+          .flatMap((product) => (variantsByProductId[product.id] || []).map((variant) => variant.id))
+      ),
+    [products, variantsByProductId]
+  );
+  const hostessName = (id: string) => {
+    const hostess = workingHostesses.find((item) => item.id === id);
+    return hostess ? hostess.nickname || hostess.name : undefined;
+  };
+  const roomHostessIds = new Set([
+    ...orderLines
+      .filter((line) => line.hostessId && serviceVariantIds.has(line.variantId))
+      .map((line) => line.hostessId!),
+    ...pending.filter((item) => item.service && item.hostessId).map((item) => item.hostessId!),
+    ...workingHostesses
+      .filter((hostess) => room && hostess.inRoom?.roomNumber === room.roomNumber)
+      .map((hostess) => hostess.id),
+  ]);
+  const orderers = isSpa
+    ? []
+    : [...roomHostessIds].flatMap((id) => {
+        const name = hostessName(id);
+        return name ? [{ id, name }] : [];
+      });
+  const orderedByName = (line: SalesOrderLine) =>
+    line.hostessId && !serviceVariantIds.has(line.variantId)
+      ? hostessName(line.hostessId) || tr("aHostess")
+      : undefined;
+  /** A printed line's options, then who ordered it when a hostess did. */
+  const printedExtras = (line: SalesOrderLine) => {
+    const modifiers = modifierPrintText(line.selectedModifiers);
+    const who = orderedByName(line);
+    if (!who) return modifiers;
+    const note = tr("orderedBy", { name: who });
+    return {
+      names: [modifiers.names, note].filter(Boolean).join(", "),
+      prices: [modifiers.prices, "-"].filter(Boolean).join(", "),
+    };
+  };
   // Before the room starts, the packages it starts with; once it runs, the ones added.
   const booking = session ? extendChoice : packageChoice;
   // KTV: the rentals this room can be sold under; the room's own rate unless another is picked.
@@ -666,6 +719,14 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     await loadBill(next);
     setStep("menu");
   };
+
+  // KTV: who is working, which room each is in and how long she has left.
+  const hostessBoard = useHostessBoard(!isSpa && step === "rooms");
+  const hostessRows = hostessStatusRows(hostessBoard.hostesses, nowMs);
+  const hostessesIn = (target: SpaRoom) =>
+    hostessRows
+      .filter((row) => row.roomId === target.id || (!row.roomId && row.roomNumber === target.roomNumber))
+      .map((row) => row.name);
 
   const selectRoom = (next: SpaRoom) => {
     setSelectedRoomId(next.id);
@@ -1134,7 +1195,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           lines: orderLines
             .filter((line) => !line.voidedAt)
             .map((line) => {
-              const modifiers = modifierPrintText(line.selectedModifiers);
+              const modifiers = printedExtras(line);
               return {
                 name: lineDisplayName(line) || line.productName || itemNames[line.variantId] || tr("item"),
                 quantity: String(line.quantity || "1"),
@@ -1215,6 +1276,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           unitPrice,
           hostessId: hostess.id,
           hostessName: who,
+          service: true,
         },
         quantity
       )
@@ -1348,7 +1410,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         lines: orderLines
           .filter((line) => !line.voidedAt)
           .map((line) => {
-            const modifiers = modifierPrintText(line.selectedModifiers);
+            const modifiers = printedExtras(line);
             return {
               name: lineDisplayName(line) || line.productName || itemNames[line.variantId] || tr("item"),
               quantity: String(line.quantity || "1"),
@@ -1760,6 +1822,17 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
 
       {step === "rooms" ? (
         <>
+          {!isSpa ? (
+            <HostessStrip
+              rows={hostessRows}
+              onOpenRoom={(row) => {
+                const target = rooms.find(
+                  (item) => item.id === row.roomId || item.roomNumber === row.roomNumber
+                );
+                if (target) selectRoom(target);
+              }}
+            />
+          ) : null}
           <div className="my-3 flex gap-2">
             {(["ALL", "AVAILABLE", "ACTIVE"] as const).map((value) => (
               <button
@@ -1787,6 +1860,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                     key={item.id}
                     room={item}
                     nowMs={nowMs}
+                    hostessNames={isSpa ? undefined : hostessesIn(item)}
                     onSelect={() => selectRoom(item)}
                     onReady={() => void markRoomReady(item.id)}
                     onManage={() => openRoomManager(item)}
@@ -2095,6 +2169,9 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             breakdown={endBreakdown}
             extraFeeLabel={t("cashier.extraFee.button")}
             onAddExtraFee={endBillOrderId && !paid ? () => setExtraFeeOpen(true) : undefined}
+            orderers={orderers}
+            onOrderedBy={(key, hostess) => setPending((current) => setOrderedBy(current, key, hostess))}
+            orderedByName={orderedByName}
           />
 
           {step === "menu" && !menuAllowed && isSpa ? (
