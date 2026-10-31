@@ -1734,7 +1734,29 @@
     "orderedByLabel": "Ordered by",
     "customer": "Customer",
     "orderedBy": "Ordered by {{name}}",
-    "aHostess": "a hostess"
+    "aHostess": "a hostess",
+    "floor": {
+      "move": "Move",
+      "split": "Split",
+      "merge": "Merge",
+      "moveTitle": "Move room {{room}}",
+      "moveHint": "The guests, their bill, time and staff move to the free room you pick. This room goes for cleaning.",
+      "moveTo": "Move them to",
+      "mergeTitle": "Merge into room {{room}}",
+      "mergeHint": "Another room's bill joins this one. That room closes and goes for cleaning.",
+      "mergeTo": "Bring in the bill of",
+      "splitTitle": "Split items from room {{room}}",
+      "splitHint": "Pick the items and how many, then the room they go to. A free room is started for them.",
+      "splitTo": "Move them to",
+      "inUse": "In use",
+      "free": "Free room",
+      "noRooms": "No other room fits.",
+      "moved": "Moved to room {{room}}.",
+      "merged": "Bills merged.",
+      "splitDone": "Items moved to room {{room}}.",
+      "failed": "Could not change the room.",
+      "paidAsItGoes": "Split and Merge are for rooms paid at the end."
+    }
   },
   "statusBadge": {
     "verified": "Verified",

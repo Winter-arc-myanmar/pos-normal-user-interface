@@ -28,6 +28,7 @@ import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
 import { useSalesOrderManagement } from "@/core/presentation/hooks/useSalesOrderManagement";
 import { RoomKind, useRoomPos } from "@/core/presentation/hooks/useRoomPos";
 import { useRoomText } from "@/core/presentation/hooks/useRoomText";
+import { useRoomFloor } from "@/core/presentation/hooks/useRoomFloor";
 import { useRoomPromotions } from "@/core/presentation/hooks/useRoomPromotions";
 import type { RunningPromotion } from "@/core/domain/entities/Promotion";
 import { useSpaPackages } from "@/core/presentation/hooks/useSpaPackages";
@@ -81,6 +82,7 @@ import { BillOptionsDialog } from "./cashier/BillOptionsDialog";
 import { OrderAdjustments } from "./cashier/OrderAdjustments";
 import { CardTapDialog } from "./spa/CardTapDialog";
 import { SpaBillPanel } from "./spa/SpaBillPanel";
+import { RoomFloorDialog, RoomFloorMode } from "./spa/RoomFloorDialog";
 import { PackagePicker } from "./spa/PackagePicker";
 import { SpaRoomTile } from "./spa/SpaRoomTile";
 import { modifierPrintText } from "@/lib/printing/modifierText";
@@ -214,6 +216,9 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const [cashAmount, setCashAmount] = useState("");
   const { fees: extraFees } = useExtraFees();
   const [extraFeeOpen, setExtraFeeOpen] = useState(false);
+  const { moveRoom, mergeRoom, splitRoom } = useRoomFloor(kind);
+  const [floorMode, setFloorMode] = useState<RoomFloorMode | null>(null);
+  const [isMovingRoom, setIsMovingRoom] = useState(false);
   const [isAddingFee, setIsAddingFee] = useState(false);
   const [payMethodId, setPayMethodId] = useState("");
   const [payAmount, setPayAmount] = useState("");
@@ -1381,6 +1386,31 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     for (const line of [...group].reverse()) await removeLine(line);
   };
 
+  const changeRooms = async (
+    change: () => Promise<{ roomId: string }>,
+    done: (roomNumber: string) => string
+  ) => {
+    if (!session) return;
+    setIsMovingRoom(true);
+    try {
+      const result = await change();
+      const board = await fetchBoard();
+      const nextRoom = board.find((item) => item.id === result.roomId);
+      setSelectedRoomId(result.roomId);
+      setSession({ ...session, roomId: result.roomId });
+      await refreshBill(session);
+      setFloorMode(null);
+      setNotice(done(nextRoom?.roomNumber || ""));
+    } catch (caught) {
+      setActionError(caught instanceof Error ? caught.message : tr("floor.failed"));
+    } finally {
+      setIsMovingRoom(false);
+    }
+  };
+
+  const roomNumberOf = (roomId: string) =>
+    rooms.find((item) => item.id === roomId)?.roomNumber || "";
+
   const togglePause = async () => {
     if (!session || billClosed) return;
     const updated =
@@ -2157,6 +2187,9 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             }}
             onTogglePause={() => void togglePause()}
             onOpenBill={endBillOrderId ? () => setBillOptionsOpen(true) : undefined}
+            onMoveRoom={!paid ? () => setFloorMode("move") : undefined}
+            onSplitRoom={endBillOrderId && !paid ? () => setFloorMode("split") : undefined}
+            onMergeRoom={endBillOrderId && !paid ? () => setFloorMode("merge") : undefined}
             onChangeQuantity={(line) => void reduceLine(line)}
             onAddAnother={addAnother}
             onRemoveLine={(group) => void removeLines(group)}
@@ -2472,6 +2505,49 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             </>
           }
           onClose={() => setBillOptionsOpen(false)}
+        />
+      ) : null}
+
+      {floorMode && room && session ? (
+        <RoomFloorDialog
+          kind={kind}
+          mode={floorMode}
+          room={room}
+          session={liveSession || session}
+          rooms={rooms}
+          lines={orderLines}
+          itemNames={itemNames}
+          isBusy={isMovingRoom}
+          onMove={(roomId) =>
+            void changeRooms(
+              () => moveRoom(session.id, roomId),
+              (room) => tr("floor.moved", { room })
+            )
+          }
+          onMerge={(sourceSessionId) =>
+            void changeRooms(
+              () => mergeRoom(session.id, sourceSessionId),
+              () => tr("floor.merged")
+            )
+          }
+          onSplit={(target, lines) => {
+            const toRoom =
+              "roomId" in target
+                ? target.roomId
+                : rooms.find((item) => item.sessions.some((each) => each.id === target.sessionId))
+                    ?.id;
+            void changeRooms(
+              async () => {
+                const context = await requireCashierContext();
+                return splitRoom(session.id, target, lines, {
+                  posRegisterId: context.posRegisterId,
+                  openedByPosSessionId: context.posSessionId,
+                });
+              },
+              () => tr("floor.splitDone", { room: roomNumberOf(toRoom || "") })
+            );
+          }}
+          onClose={() => setFloorMode(null)}
         />
       ) : null}
 
