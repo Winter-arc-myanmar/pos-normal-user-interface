@@ -504,7 +504,7 @@ describe("SpaBoardPage", () => {
     expect(mocks.lookupCard).not.toHaveBeenCalled();
   });
 
-  it("shows promotion-split copies of one menu item as one combined quantity", async () => {
+  it("gives the copy a promotion made free a row of its own", async () => {
     lines = [
       {
         id: "line-1",
@@ -531,9 +531,12 @@ describe("SpaBoardPage", () => {
     ];
     await openRunningRoom();
 
-    // One product-card label plus one combined bill row, not two bill rows.
-    expect(screen.getAllByText("Foot Scrub")).toHaveLength(2);
-    fireEvent.click(screen.getByRole("button", { name: "spa.decrease" }));
+    // One product-card label plus two bill rows: the charged copy and the free
+    // one, which reads 0 rather than the menu price.
+    expect(screen.getAllByText("Foot Scrub")).toHaveLength(3);
+    const decreases = screen.getAllByRole("button", { name: "spa.decrease" });
+    expect(decreases).toHaveLength(2);
+    fireEvent.click(decreases[1]);
     await waitFor(() =>
       expect(mocks.deleteOrderLine).toHaveBeenCalledWith("order-1", "line-2")
     );

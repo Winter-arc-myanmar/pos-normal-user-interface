@@ -48,4 +48,21 @@ describe("groupBillLines", () => {
     ]);
     expect(groups[2].total).toBe(10000);
   });
+
+  it("keeps the copy a promotion made free in a row of its own that totals nothing", () => {
+    const groups = groupBillLines([
+      line("paid", { appliedPromotionId: "bogo", lineDiscount: "5000.0000" }),
+      line("free", { appliedPromotionId: "bogo", lineDiscount: "15000.0000" }),
+      line("free-2", { appliedPromotionId: "bogo", lineDiscount: "15000.0000" }),
+    ]);
+
+    // The charged copy and the free ones do not add up into one row.
+    expect(groups.map((group) => group.lines.map((row) => row.id))).toEqual([
+      ["paid"],
+      ["free", "free-2"],
+    ]);
+    expect(groups[0].total).toBe(10000);
+    expect(groups[1].quantity).toBe(2);
+    expect(groups[1].total).toBe(0);
+  });
 });
