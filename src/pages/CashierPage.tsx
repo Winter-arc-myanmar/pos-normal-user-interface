@@ -32,9 +32,13 @@ import { useSalesOrderManagement } from "@/core/presentation/hooks/useSalesOrder
 import { CashierBoard } from "./cashier/CashierBoard";
 import { MultiOrderingView } from "./cashier/MultiOrderingView";
 import { OrderPanel, type GroupedSalesOrderLine } from "./cashier/OrderPanel";
+import { billBreakdown } from "@/lib/pos/billBreakdown";
 import { linePriceNote } from "@/lib/pos/linePrice";
 import { TableSeatingDialog } from "./cashier/TableSeatingDialog";
 import { ExtraFeeDialog } from "./cashier/ExtraFeeDialog";
+import { HostessPicker } from "./spa/HostessPicker";
+import { useWorkingHostesses } from "@/core/presentation/hooks/useWorkingHostesses";
+import type { Hostess } from "@/core/domain/entities/Hostess";
 import { SplitItemsDialog, SplitTarget } from "./cashier/SplitItemsDialog";
 import { PaymentView } from "./cashier/PaymentView";
 import { ProductMenu } from "./cashier/ProductMenu";
@@ -246,6 +250,17 @@ export function CashierPage() {
   const productAddQueueRef = useRef<Promise<void>>(Promise.resolve());
   const { fees: extraFees, isFeeLine } = useExtraFees();
   const [extraFeeOpen, setExtraFeeOpen] = useState(false);
+  // A hostess service waits here until the cashier says which hostess gave it.
+  const [hostessFor, setHostessFor] = useState<{
+    product: Product;
+    variantId: string;
+    quantity: number;
+    modifiers?: ChosenModifier[];
+  } | null>(null);
+  const { hostesses: workingHostesses, load: loadHostesses } = useWorkingHostesses();
+  useEffect(() => {
+    void loadHostesses();
+  }, [loadHostesses]);
   const [isAddingFee, setIsAddingFee] = useState(false);
   const payTableSyncRef = useRef<string | null>(null);
 
@@ -524,14 +539,13 @@ export function CashierPage() {
     return [...categories.entries()].map(([id, name]) => ({ id, name }));
   }, [products]);
 
-  // The restaurant's menu: room and table charges are added from the table, a
-  // hostess is chosen at the KTV till, and products sold only elsewhere stay there.
+  // The restaurant's menu: room and table charges are added from the table, and
+  // products sold only elsewhere stay there. A hostess service asks who gave it.
   const menuProducts = useMemo(
     () =>
       products.filter(
         (product) =>
           product.kind !== "RENTAL" &&
-          !product.askWhoServed &&
           (!product.soldAt?.length || product.soldAt.includes("BAR")) &&
           (menuCategoryId === "ALL" || product.categoryId === menuCategoryId)
       ),
@@ -663,6 +677,21 @@ export function CashierPage() {
       : listPrice + modifierExtra(line.selectedModifiers);
   };
 
+  /** A printed line's options, then the hostess who gave or ordered it. */
+  const withHostessNote = (
+    modifiers: { names?: string; prices?: string },
+    hostess?: { name: string; gave: boolean }
+  ) => {
+    if (!hostess) return modifiers;
+    const note = hostess.gave
+      ? hostess.name
+      : t("cashier.orderPanel.orderedBy", { name: hostess.name });
+    return {
+      names: [modifiers.names, note].filter(Boolean).join(", "),
+      prices: [modifiers.prices, "-"].filter(Boolean).join(", "),
+    };
+  };
+
   const printableLines = (
     lines: Array<{
       voidedAt?: string | null;
@@ -687,7 +716,10 @@ export function CashierPage() {
       .map((line) => {
         const variant = variantById[line.variantId];
         const product = variant ? productById[variant.productId] : undefined;
-        const modifiers = modifierPrintText(line.selectedModifiers);
+        const modifiers = withHostessNote(
+          modifierPrintText(line.selectedModifiers),
+          lineHostess(line)
+        );
         const quantity = Number(line.quantity || 1);
         const unitPrice = withoutTax && line.taxInclusive && quantity > 0
           ? toMoney(Number(line.unitPrice || 0) - Number(line.taxAmount || 0) / quantity)
@@ -926,6 +958,36 @@ export function CashierPage() {
     ? toMoney(paymentBillLines.reduce((sum, line) => sum + Number(line.lineDiscount || 0), 0)
       + (isDirectCheckoutMode ? 0 : Math.max(0, Number(discountAmount) || 0)))
     : discountAmount);
+
+  const breakdown = (() => {
+    const quote = billOptions.bill ?? billOptions.quote;
+    const taxes = paymentBillLines.reduce(
+      (sum, line) => {
+        if (!billOptions.includeTax) return sum;
+        const amount = Number(line.taxAmount || 0);
+        return line.taxInclusive
+          ? { ...sum, included: sum.included + amount }
+          : { ...sum, added: sum.added + amount };
+      },
+      { added: 0, included: 0 }
+    );
+    return billBreakdown({
+      lines: displayOrderLines,
+      menuPrice: menuPriceFor,
+      itemsTotal: quote
+        ? Number(quote.subtotal)
+        : paymentBillLines.reduce((sum, line) => sum + Number(line.quantity || 0) * Number(line.unitPrice || 0)
+          - (!billOptions.includeTax && line.taxInclusive ? Number(line.taxAmount || 0) : 0), 0),
+      billDiscount: Number(discountAmount) || 0,
+      serviceCharge: quote ? Number(quote.serviceCharge) : serviceCharge,
+      tax: quote ? Number(quote.addedTax) + Number(quote.serviceChargeTax) : taxes.added + serviceChargeTax,
+      includedTax: quote
+        ? Number(quote.totalTax) - Number(quote.addedTax) - Number(quote.serviceChargeTax)
+        : taxes.included,
+      tip: Number(tipAmount) || 0,
+      total: Number(orderTotal),
+    });
+  })();
 
   const checkoutPaymentMethods = useMemo(
     () => ensureMemberCardPaymentMethod(paymentMethods),
@@ -1667,7 +1729,8 @@ export function CashierPage() {
     product: (typeof products)[number],
     variantId: string,
     quantity: number,
-    modifiers?: ChosenModifier[]
+    modifiers?: ChosenModifier[],
+    hostessId?: string
   ) => {
     const startFreshCart = isSettledSalesOrder(selectedOrder);
     if (startFreshCart) {
@@ -1712,6 +1775,7 @@ export function CashierPage() {
             line.variantId === variantId &&
             Number(line.unitPrice || 0).toFixed(4) === clickedUnitPrice &&
             !hasModifiers(line) &&
+            (line.hostessId || undefined) === hostessId &&
             !line.voidedAt &&
             isPendingKdsLine(line)
         );
@@ -1811,7 +1875,9 @@ export function CashierPage() {
         variantId,
         quantity,
         tableOrderIds.length > 1 ? selectedOrder?.id : undefined,
-        modifiers
+        modifiers,
+        undefined,
+        hostessId
       );
       rememberAddedLine(line);
       if (selectedOrderSession.sessionState === "SEATED") {
@@ -1842,7 +1908,7 @@ export function CashierPage() {
         product,
         variantId,
         quantity,
-        { modifiers }
+        { modifiers, hostessId }
       );
       rememberAddedLine(line);
     } else if (!requiresTableSelection || isDirectCheckoutMode || startFreshCart) {
@@ -1850,7 +1916,7 @@ export function CashierPage() {
       setDirectCartLines((current) => {
         const variants = variantsByProductId[product.id] || [];
         const variant = variants.find((item) => item.id === variantId);
-        const key = modifierKey(modifiers);
+        const key = [modifierKey(modifiers), hostessId].filter(Boolean).join("-");
         const lineId = key ? `direct-${variantId}-${key}` : `direct-${variantId}`;
         const existing = current.find((line) => line.id === lineId);
         if (existing) {
@@ -1877,6 +1943,7 @@ export function CashierPage() {
             taxAmount: "0.0000",
             status: "PENDING",
             ...(modifiers?.length ? { selectedModifiers: modifiers } : {}),
+            ...(hostessId ? { hostessId } : {}),
           },
           product,
           variant
@@ -1895,10 +1962,15 @@ export function CashierPage() {
     product: (typeof products)[number],
     variantId: string,
     quantity: number,
-    modifiers?: ChosenModifier[]
+    modifiers?: ChosenModifier[],
+    hostessId?: string
   ) => {
+    if (product.askWhoServed && !hostessId) {
+      setHostessFor({ product, variantId, quantity: Math.max(1, quantity), modifiers });
+      return Promise.resolve();
+    }
     const pendingAdd = productAddQueueRef.current.then(() =>
-      addProductToCart(product, variantId, quantity, modifiers)
+      addProductToCart(product, variantId, quantity, modifiers, hostessId)
     );
     productAddQueueRef.current = pendingAdd.catch(() => undefined);
     return pendingAdd;
@@ -2201,15 +2273,19 @@ export function CashierPage() {
             includeServiceCharge: billOptions.includeServiceCharge,
           } : {}),
         });
-      } else if (billOptions.changed && selectedOrder && !isDirectCheckoutMode) {
+      } else if (selectedOrder && !isDirectCheckoutMode && !isMultiOrderSecondary) {
+        // A saved order is paid as it stands, at the prices on its lines. The
+        // quick-sale checkout would open a second order and price it from the menu.
         await settleOrder(selectedOrder.id, {
           payments: checkoutPayments,
           posSessionId: context.posSessionId,
           ...(tip > 0 ? { tipAmount: toMoney(tip) } : {}),
           ...(orderDiscount > 0 ? { totalDiscount: toMoney(orderDiscount) } : {}),
           ...(discountReasonId ? { discountReasonId } : {}),
-          includeTax: billOptions.includeTax,
-          includeServiceCharge: billOptions.includeServiceCharge,
+          ...(billOptions.changed ? {
+            includeTax: billOptions.includeTax,
+            includeServiceCharge: billOptions.includeServiceCharge,
+          } : {}),
         });
       } else if (isMultiOrderSecondary && selectedOrder) {
         for (const payment of checkoutPayments) {
@@ -2475,9 +2551,34 @@ export function CashierPage() {
 
   const menuPriceOf = (line: SalesOrderLine) => menuPriceFor(line);
 
+  const hostessOrderers = workingHostesses.map((hostess) => ({
+    id: hostess.id,
+    name: hostess.nickname || hostess.name,
+  }));
+  /** The hostess a line names: who gave a hostess service, or who ordered anything else. */
+  const lineHostess = (line: { variantId: string; hostessId?: string }) => {
+    if (!line.hostessId) return undefined;
+    const variant = variantById[line.variantId];
+    const product = variant ? productById[variant.productId] : undefined;
+    const hostess = workingHostesses.find((item) => item.id === line.hostessId);
+    return {
+      name: hostess ? hostess.nickname || hostess.name : t("cashier.orderPanel.aHostess"),
+      gave: Boolean(product?.askWhoServed),
+    };
+  };
+
+  const pickHostess = (hostess: Hostess) => {
+    if (!hostessFor) return;
+    const { product, variantId, quantity, modifiers } = hostessFor;
+    setHostessFor(null);
+    void handleAddProduct(product, variantId, quantity, modifiers, hostess.id).catch((caught) =>
+      setLocalError(caught instanceof Error ? caught.message : t("cashier.errors.addProduct"))
+    );
+  };
+
   const handleEditLine = async (
     line: GroupedSalesOrderLine,
-    edit: { quantity: number; unitPrice: number; foc: boolean }
+    edit: { quantity: number; unitPrice: number; foc: boolean; orderedBy?: string | null }
   ) => {
     setLocalError(null);
     setNotice(null);
@@ -2489,9 +2590,12 @@ export function CashierPage() {
       if (edit.foc) return lineFocDiscount({ quantity: entry.quantity, unitPrice });
       return isFocLine(entry) ? "0.0000" : entry.lineDiscount || "0.0000";
     };
+    const hostessOf = (entry: SalesOrderLine) =>
+      edit.orderedBy === undefined ? entry.hostessId : edit.orderedBy || undefined;
     const unchanged = (entry: SalesOrderLine) =>
       Number(priceFor(entry)) === Number(entry.unitPrice || 0) &&
-      edit.foc === isFocLine(entry);
+      edit.foc === isFocLine(entry) &&
+      (hostessOf(entry) || null) === (entry.hostessId || null);
     // The newest lines take the change first; a line only partly covered is
     // split, so the rest of it keeps its price (3 waters at 2,000, 1 at 1,500).
     let left = edit.quantity;
@@ -2521,6 +2625,7 @@ export function CashierPage() {
               ...entry,
               priceOverride: repriced ? unitPrice : undefined,
               lineDiscount: discountFor(entry, unitPrice),
+              hostessId: hostessOf(entry),
             },
             product,
             variant
@@ -2567,6 +2672,7 @@ export function CashierPage() {
           ),
           taxAmount: target.taxAmount || "0.0000",
           seatNumber: entry.seatNumber,
+          ...(edit.orderedBy !== undefined ? { hostessId: edit.orderedBy } : {}),
         });
       }
     } catch (caught) {
@@ -3138,6 +3244,7 @@ export function CashierPage() {
         paymentMethodId={paymentMethodId}
         paymentAmount={paymentAmount}
         total={orderTotal}
+        breakdown={breakdown}
         selectedTable={displayedOrderTable}
         selectedSession={selectedOrderSession}
         paymentInputRef={paymentInputRef}
@@ -3168,6 +3275,8 @@ export function CashierPage() {
           onChange: chooseBillOption,
         }}
         menuPrice={menuPriceOf}
+        orderers={hostessOrderers}
+        lineHostess={lineHostess}
         promotions={promotions.running}
         promotionDiscounts={isDirectCheckoutMode ? promotions.discounts : undefined}
         promotionName={promotions.promotionName}
@@ -3257,6 +3366,14 @@ export function CashierPage() {
         isFeeLine={isFeeLine}
       />
 
+      {hostessFor ? (
+        <HostessPicker
+          serviceName={hostessFor.product.name}
+          onPick={pickHostess}
+          onCancel={() => setHostessFor(null)}
+        />
+      ) : null}
+
       {extraFeeOpen ? (
         <ExtraFeeDialog
           fees={extraFees}
@@ -3273,6 +3390,10 @@ export function CashierPage() {
           tables={diningTables}
           sessions={tableSessions}
           isBusy={isLoading}
+          menuName={(line) => {
+            const variant = variantById[line.variantId];
+            return (variant ? productById[variant.productId]?.name : undefined) || variant?.variantSku;
+          }}
           onConfirm={(target, lines) => void handleSplitToTable(target, lines)}
           onClose={() => setSeatingMode(null)}
         />
@@ -3358,7 +3479,7 @@ export function CashierPage() {
             selectedMethodId={paymentMethodId}
             paymentAmount={paymentAmount}
             total={orderTotal}
-            subtotal={billOptions.bill?.subtotal || selectedOrder?.subtotal || orderTotal}
+            breakdown={breakdown}
             billOptions={{
               includeTax: billOptions.includeTax,
               includeServiceCharge: billOptions.includeServiceCharge,

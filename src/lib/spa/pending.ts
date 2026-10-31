@@ -5,9 +5,14 @@ export interface PendingItem {
   unitPrice: number;
   quantity: number;
   foc?: boolean;
-  /** The hostess who gives it, for a KTV service that asks who served. */
+  /**
+   * The hostess who gives it, for a KTV service that asks who served; on a menu
+   * item, the hostess who ordered it.
+   */
   hostessId?: string;
   hostessName?: string;
+  /** A service a hostess gives: its hostess is fixed, not who ordered it. */
+  service?: boolean;
 }
 
 /** One row per item, hostess and paid-or-free, so two hostesses never merge. */
@@ -40,6 +45,22 @@ export const changePending = (
       pendingKey(entry) === key ? { ...entry, quantity: entry.quantity + delta } : entry
     )
     .filter((entry) => entry.quantity > 0);
+
+/** Says who ordered a row: a hostess, or the customer when none. Rows that end up alike merge. */
+export const setOrderedBy = (
+  items: PendingItem[],
+  key: string,
+  hostess?: { id: string; name: string }
+): PendingItem[] => {
+  const source = items.find((entry) => pendingKey(entry) === key);
+  if (!source || source.service) return items;
+  const moved = { ...source, hostessId: hostess?.id, hostessName: hostess?.name };
+  const twin = items.find((entry) => entry !== source && pendingKey(entry) === pendingKey(moved));
+  if (!twin) return items.map((entry) => (entry === source ? moved : entry));
+  return items
+    .filter((entry) => entry !== source)
+    .map((entry) => (entry === twin ? { ...entry, quantity: entry.quantity + source.quantity } : entry));
+};
 
 /** Moves one of a row between paid and free, so a round of three can have one on the house. */
 export const toggleOneFoc = (items: PendingItem[], key: string): PendingItem[] => {

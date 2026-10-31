@@ -450,16 +450,18 @@ export function usePrinterConnection(
               categoryIds: [],
             }
           : undefined;
+      // A lounge room is printed under the tenant's own name, loaded once per company.
+      const company = await printCompanyFor(tenantId);
       return printKitchen(
         {
-          ...kdsTicketSlip(enriched),
+          ...kdsTicketSlip(enriched, company?.name),
           stationId,
           stationName: station?.name,
         },
         station ? [station] : []
       );
     },
-    [printKitchen, ticketWithModifiers]
+    [printKitchen, tenantId, ticketWithModifiers]
   );
 
   return {

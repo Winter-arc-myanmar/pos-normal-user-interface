@@ -60,7 +60,7 @@ export interface KitchenSlip extends PrintParty {
   stationId?: string;
   stationName?: string;
   orderRef?: string;
-  /** Where the food goes, printed huge: "Table T12", "VIP Lounge K3". */
+  /** Where the food goes, printed huge: "Table T12", "My Lounge K3". */
   place?: string;
   /** Under the place: room name, service, guests. */
   placeDetail?: string;
@@ -788,11 +788,18 @@ export function kdsTicketPrintLines(ticket: KdsTicket): PrintLine[] {
 }
 
 /** The table, room or pickup a ticket is for, as the kitchen slip shows it. */
-export function kdsTicketPlace(ticket: KdsTicket): string | undefined {
+export function kdsTicketPlace(
+  ticket: KdsTicket,
+  tenantName?: string | null
+): string | undefined {
   const place = ticket.place;
   if (place?.kind === "TABLE" && place.number) return `Table ${place.number}`;
   if (place?.kind === "SPA_ROOM" && place.number) return `SPA ${place.number}`;
-  if (place?.kind === "KTV_ROOM" && place.number) return `VIP Lounge ${place.number}`;
+  // A lounge goes by the tenant's own name; only fall back to a generic one
+  // when the company has not loaded.
+  if (place?.kind === "KTV_ROOM" && place.number) {
+    return `${tenantName?.trim() || "VIP Lounge"} ${place.number}`;
+  }
   if (ticket.pickupNumber) return `Pickup ${ticket.pickupNumber}`;
   if (place?.kind === "COUNTER") return "Counter";
   return undefined;
@@ -829,7 +836,7 @@ export function kdsTicketSender(ticket: KdsTicket): string | undefined {
 }
 
 /** A ticket as the kitchen slip prints it. */
-export function kdsTicketSlip(ticket: KdsTicket): KitchenSlip {
+export function kdsTicketSlip(ticket: KdsTicket, tenantName?: string | null): KitchenSlip {
   return {
     title: ticket.ticketNumber || ticket.id,
     status: ticket.status,
@@ -838,7 +845,7 @@ export function kdsTicketSlip(ticket: KdsTicket): KitchenSlip {
     stationId: ticket.stationId || ticket.station?.id,
     stationName: ticket.station?.name,
     orderRef: ticket.orderNumber || undefined,
-    place: kdsTicketPlace(ticket),
+    place: kdsTicketPlace(ticket, tenantName),
     placeDetail: kdsTicketPlaceDetail(ticket),
     sentBy: kdsTicketSender(ticket),
     lines: kdsTicketPrintLines(ticket),

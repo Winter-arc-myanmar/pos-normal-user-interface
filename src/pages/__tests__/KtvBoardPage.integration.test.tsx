@@ -38,6 +38,7 @@ let venueState: {
 
 const mocks = vi.hoisted(() => ({
   fetchBoard: vi.fn(),
+  fetchOrderBill: vi.fn(),
   getQuote: vi.fn(),
   openSession: vi.fn(),
   extendSession: vi.fn(),
@@ -188,6 +189,21 @@ vi.mock("@/core/presentation/hooks/useWorkingHostesses", () => ({
     load: mocks.loadHostesses,
   }),
 }));
+vi.mock("@/core/presentation/hooks/useHostessBoard", () => ({
+  useHostessBoard: () => ({
+    hostesses: [
+      { id: "hostess-lily", name: "Lily", nickname: null, inRoom: null },
+      {
+        id: "hostess-snow",
+        name: "Ma Hnin",
+        nickname: "Snow",
+        inRoom: { roomNumber: "K1", roomId: "ktv-1", until: new Date(Date.now() + 5 * 60000).toISOString() },
+      },
+    ],
+    error: null,
+    loaded: true,
+  }),
+}));
 vi.mock("@/core/presentation/hooks/useCashier", () => ({
   useCashier: () => ({
     products: [
@@ -226,7 +242,11 @@ vi.mock("@/core/presentation/hooks/useSalesOrderManagement", () => ({
     updateOrderLine: mocks.noop,
     deleteOrderLine: mocks.noop,
     settleOrder: mocks.noop,
+    fetchOrderBill: mocks.fetchOrderBill,
   }),
+}));
+vi.mock("@/core/presentation/hooks/useExtraFees", () => ({
+  useExtraFees: () => ({ fees: [], isFeeLine: () => false }),
 }));
 vi.mock("@/core/presentation/hooks/useGuestWalletManagement", () => ({
   useGuestWalletManagement: () => ({ lookupCard: mocks.lookupCard, getWallet: mocks.getWallet }),
@@ -491,6 +511,53 @@ describe("KtvBoardPage", () => {
           })
         )
       );
+    });
+
+    it("sends the hostess who ordered a drink with it", async () => {
+      rooms = [busyRoom];
+      mocks.chargeItems.mockResolvedValue({
+        charged: "25000.0000",
+        balanceAfter: "175000.0000",
+        quote: paidQuote,
+      });
+      renderPage();
+      fireEvent.click(screen.getByRole("button", { name: /K1/ }));
+      fireEvent.click(await screen.findByRole("button", { name: /Hostess per hour/ }));
+      fireEvent.click(await screen.findByRole("button", { name: /Snow/ }));
+      fireEvent.click(await screen.findByRole("button", { name: /Myanmar Beer/ }));
+
+      const customer = await screen.findByRole("button", { name: /customer$/ });
+      expect(customer).toHaveAttribute("aria-pressed", "true");
+      fireEvent.click(screen.getByRole("button", { name: "Snow" }));
+      fireEvent.click(screen.getByRole("button", { name: /ktvPos.addToBill/ }));
+      await tapCard();
+
+      await waitFor(() =>
+        expect(mocks.chargeItems).toHaveBeenCalledWith(
+          "ktv-session-1",
+          expect.objectContaining({
+            items: expect.arrayContaining([
+              expect.objectContaining({ variantId: "variant-hostess", hostessId: "hostess-snow" }),
+              expect.objectContaining({ variantId: "variant-beer", hostessId: "hostess-snow" }),
+            ]),
+          })
+        )
+      );
+    });
+
+    it("shows each hostess with her room and time left, and opens her room", async () => {
+      rooms = [busyRoom];
+      renderPage();
+
+      expect(await screen.findByText(/ktvPos.hostessesSummary/)).toBeInTheDocument();
+      expect(screen.getByText("ktvPos.hostessesInRoom")).toBeInTheDocument();
+      const snow = screen.getByRole("button", { name: "ktvPos.openHostessRoom" });
+      expect(snow).toHaveTextContent("● K1");
+      expect(snow).toHaveTextContent("⚠ ktvPos.hostessLeft");
+      expect(screen.getByRole("button", { name: "Lily" })).toBeDisabled();
+
+      fireEvent.click(snow);
+      expect(await screen.findByRole("button", { name: /Myanmar Beer/ })).toBeInTheDocument();
     });
 
     it("keeps products sold only at the SPA off the KTV menu", async () => {

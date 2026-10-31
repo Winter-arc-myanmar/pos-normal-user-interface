@@ -77,7 +77,8 @@
     "expandSidebar": "ဘေးဘား ဖြန့်မည်",
     "openMenu": "မီနူး ဖွင့်မည်",
     "closeMenu": "မီနူး ပိတ်မည်",
-    "drawerNotConfigured": "ငွေသားအံ API မပြင်ဆင်ရသေးပါ"
+    "drawerNotConfigured": "ငွေသားအံ API မပြင်ဆင်ရသေးပါ",
+    "hostessesTitle": "Hostess များ"
   },
   "login": {
     "title": "အကောင့်ဝင်ရန်",
@@ -1191,7 +1192,9 @@
       "priceNote": {
         "discount": "{{name}} (လျှော့ဈေး)",
         "changed": "{{name}} (ဈေးပြင်ထား)"
-      }
+      },
+      "orderedBy": "{{name}} မှာထားသည်",
+      "aHostess": "Hostess"
     },
     "lineEdit": {
       "title": "ပစ္စည်း ပြင်ရန်",
@@ -1204,7 +1207,9 @@
       "priceRequired": "ဈေးနှုန်း 0 သို့မဟုတ် အထက် ထည့်ပါ။",
       "howMany": "အရေအတွက်",
       "ofTotal": "{{count}} ခုအနက်",
-      "restStay": "{{count}} × {{price}} မူလအတိုင်း ကျန်မည်"
+      "restStay": "{{count}} × {{price}} မူလအတိုင်း ကျန်မည်",
+      "orderedBy": "မှာသူ",
+      "customer": "ဧည့်သည်"
     },
     "billOptions": {
       "title": "ဘောက်ချာ ရွေးချယ်စရာ",
@@ -1263,6 +1268,19 @@
       "stop": "ရပ်",
       "minutes": "{{count}} မိနစ်",
       "clocksStopped": "စားပွဲ သုံးချိန်ကို ဘေလ်ထဲ ထည့်ပြီးပါပြီ။"
+    },
+    "breakdown": {
+      "subtotal": "ခွဲစုစုပေါင်း",
+      "priceDiscount": "ဈေးလျှော့",
+      "priceChange": "ဈေးပြင်",
+      "promotion": "ပရိုမိုးရှင်း လျှော့စျေး",
+      "foc": "အခမဲ့ (FOC)",
+      "itemDiscount": "ပစ္စည်း လျှော့စျေး",
+      "billDiscount": "ဘောက်ချာ လျှော့စျေး",
+      "serviceCharge": "ဝန်ဆောင်ခ",
+      "tax": "အခွန်",
+      "includedTax": "ဈေးနှုန်းတွင် ပါဝင်သော အခွန်",
+      "tip": "လက်ဆောင်ငွေ"
     }
   },
   "salesOrders": {
@@ -1562,7 +1580,8 @@
       "extend": "ဤကုသမှုကို သက်တမ်းတိုး၍ မရပါ။",
       "foc": "အခမဲ့ ပေး၍ မရပါ",
       "packages": "ဝန်ဆောင်မှု ပက်ကေ့ချ်များကို ဖွင့်မရပါ: {{message}}",
-      "tipMethod": "ဆုငွေ ပေးချေမည့်နည်း ရွေးပါ"
+      "tipMethod": "ဆုငွေ ပေးချေမည့်နည်း ရွေးပါ",
+      "oneCardPerBill": "ဘောက်ချာတစ်ခုကို အသင်းဝင်ကတ် တစ်ကတ်သာ ပေးချေနိုင်သည်။ ကျန်ငွေကို အခြားနည်းလမ်းများဖြင့် ခွဲပေးပါ။"
     },
     "item": "ပစ္စည်း",
     "treatmentSoFar": "ယခုအထိ ကုသမှု",
@@ -1662,7 +1681,11 @@
     "freePackageAdded": "+{{count}} {{package}} အခမဲ့ · {{name}}",
     "roomChargeFree": "{{count}} အခမဲ့",
     "tipPaidWith": "ဆုငွေ ပေးချေမည့်နည်း",
-    "totalWithTip": "ဆုငွေအပါ စုစုပေါင်း {{amount}}"
+    "totalWithTip": "ဆုငွေအပါ စုစုပေါင်း {{amount}}",
+    "orderedByLabel": "မှာသူ",
+    "customer": "ဧည့်သည်",
+    "orderedBy": "{{name}} မှာထားသည်",
+    "aHostess": "Hostess"
   },
   "statusBadge": {
     "verified": "အတည်ပြုပြီး",
@@ -1866,7 +1889,21 @@
     "noHostesses": "ယခု အလုပ်လုပ်နေသော Hostess မရှိပါ။ Admin ရှိ Hostesses တွင် ထည့်ပါ။",
     "hostessFree": "အားသည်",
     "hostessInRoom": "အခန်း {{room}} တွင်",
-    "hostessInRoomUntil": "အခန်း {{room}} တွင် {{time}} အထိ"
+    "hostessInRoomUntil": "အခန်း {{room}} တွင် {{time}} အထိ",
+    "hostessesTitle": "Hostess များ",
+    "hostessesSummary": "Hostess: {{working}} ဦး အလုပ်ဆင်း · အခန်းထဲ {{inRooms}} · အားနေ {{free}}",
+    "hostessUntilClose": "အခန်းပိတ်သည်အထိ",
+    "hostessTimeUp": "အချိန်ပြည့်ပြီ",
+    "hostessLeft": "{{time}} ကျန်",
+    "hostessesInRoom": "အခန်းထဲရှိ Hostess: {{names}}",
+    "hostessStatusTitle": "Hostess အခြေအနေ",
+    "hostessColumn": "Hostess အမည်",
+    "statusColumn": "အခြေအနေ",
+    "roomColumn": "အခန်း",
+    "sinceColumn": "စဝင်ချိန်",
+    "timeLeftColumn": "ကျန်ချိန်",
+    "hostessInRoomStatus": "အခန်းထဲ",
+    "openHostessRoom": "{{name}}: သူ့အခန်းကို ဖွင့်မည်"
   },
   "diningTables": {
     "title": "စားပွဲ စီမံမှု",

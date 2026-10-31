@@ -106,4 +106,23 @@ describe("SplitItemsDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: /T2/ }));
     expect(move).toBeDisabled();
   });
+
+  it("names a line saved without a name from the menu", () => {
+    render(
+      <SplitItemsDialog
+        session={own}
+        lines={[
+          ...lines,
+          new SalesOrderLine({ id: "noodles", salesOrderId: "o1", variantId: "v4", quantity: "1.0000", unitPrice: "13000" }),
+        ]}
+        tables={tables}
+        sessions={[own, other]}
+        menuName={(line) => (line.variantId === "v4" ? "Fried noodles" : undefined)}
+        onConfirm={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+    expect(screen.getByText("Fried noodles")).toBeInTheDocument();
+    expect(screen.queryByText("?")).not.toBeInTheDocument();
+  });
 });

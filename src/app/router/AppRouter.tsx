@@ -41,6 +41,11 @@ const KtvBoardPage = lazy(() =>
     default: module.KtvBoardPage,
   }))
 );
+const HostessStatusPage = lazy(() =>
+  import("../../pages/HostessStatusPage").then((module) => ({
+    default: module.HostessStatusPage,
+  }))
+);
 const KtvRoomPage = lazy(() =>
   import("../../pages/KtvRoomPage").then((module) => ({
     default: module.KtvRoomPage,
@@ -285,6 +290,14 @@ export function AppRouter() {
                 element={
                   <RequirePermission requiredPermissions={PAGE_PERMISSIONS.ktv}>
                     <KtvBoardPage />
+                  </RequirePermission>
+                }
+              />
+              <Route
+                path="/hostesses"
+                element={
+                  <RequirePermission requiredPermissions={PAGE_PERMISSIONS.hostesses}>
+                    <HostessStatusPage />
                   </RequirePermission>
                 }
               />

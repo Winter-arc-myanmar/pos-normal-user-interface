@@ -126,6 +126,24 @@ describe("ProductMenu", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
+  it("keeps the product grid a touch-scrolling pane for embedded WebViews", () => {
+    render(
+      <ProductMenu
+        products={[coffee]}
+        variantsByProductId={{ "product-1": [coffeeVariant] }}
+        onLoadVariants={vi.fn()}
+        onAdd={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+
+    // Android WebView only sends a drag to the list itself when it is a
+    // zero-basis pane with pan-y touch-action (see .pos-pane-scroll in index.css).
+    const pane = screen.getByRole("button", { name: /Coffee/ }).parentElement
+      ?.parentElement;
+    expect(pane).toHaveClass("pos-pane-scroll", "overflow-y-auto");
+  });
+
   it("marks ordered products as selected in the menu grid", () => {
     render(
       <ProductMenu

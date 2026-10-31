@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   printReceipt: vi.fn(),
   resolveTemplate: vi.fn(),
   getSalesOrderLines: vi.fn(),
+  company: vi.fn(),
 }));
 
 vi.mock("@/core/infrastructure/printing/getPrinterClient", () => ({
@@ -40,7 +41,7 @@ vi.mock("@/core/infrastructure/di/container", () => ({
       return {
         list: vi.fn().mockResolvedValue({ printers: [] }),
         resolve: mocks.resolveTemplate,
-        company: vi.fn().mockResolvedValue({ name: "" }),
+        company: mocks.company,
         get: vi.fn().mockResolvedValue({ currency: "MMK" }),
       };
     },
@@ -62,6 +63,12 @@ const drinkStation = {
 
 const renderConnection = () =>
   renderHook(() => usePrinterConnection(tenantId, registerId));
+
+// The company is cached per tenant for the life of the module; keep the default empty.
+beforeEach(() => {
+  mocks.company.mockReset();
+  mocks.company.mockResolvedValue({ name: "" });
+});
 
 describe("usePrinterConnection station routing", () => {
   beforeEach(() => {
@@ -331,5 +338,59 @@ describe("usePrinterConnection KDS ticket modifiers", () => {
         modifierPrices: "1.5000",
       }),
     ]);
+  });
+});
+
+describe("usePrinterConnection lounge slips", () => {
+  // A tenant of its own, so the cached company of the other suites does not leak in.
+  const loungeTenant = "tenant-lounge";
+
+  beforeEach(() => {
+    localStorage.clear();
+    mocks.connect.mockReset();
+    mocks.connect.mockResolvedValue(undefined);
+    mocks.resolveTemplate.mockResolvedValue({ settings: undefined });
+    mocks.printKitchen.mockReset();
+    mocks.printKitchen.mockResolvedValue(undefined);
+    mocks.getSalesOrderLines.mockReset();
+    mocks.getSalesOrderLines.mockResolvedValue({ lines: [] });
+    mocks.company.mockReset();
+    mocks.company.mockResolvedValue({ name: "Private VIP Lounge" });
+    savePrinterBinding(
+      loungeTenant,
+      registerId,
+      {
+        id: "backend:printer-kds",
+        backendPrinterId: "printer-kds",
+        transport: "NETWORK",
+        displayName: "KDS printer",
+        sectors: ["KDS"],
+        lastVerifiedAt: "",
+      },
+      true
+    );
+  });
+
+  it("prints the room under the tenant's name instead of a fixed brand", async () => {
+    const { result } = renderHook(() =>
+      usePrinterConnection(loungeTenant, registerId)
+    );
+    await waitFor(() => expect(result.current.isConnected).toBe(true));
+
+    const ticket = new KdsTicket({
+      id: "ticket-ktv",
+      ticketNumber: "KDS-0021",
+      salesOrderId: "order-2",
+      status: "PENDING",
+      place: { kind: "KTV_ROOM", number: "101", name: null, guestCount: 2 },
+      lines: [{ name: "Beer", quantity: "2" }],
+    });
+
+    await act(async () => {
+      await result.current.printTicket(ticket);
+    });
+
+    const [, slip] = mocks.printKitchen.mock.calls[0];
+    expect(slip.place).toBe("Private VIP Lounge 101");
   });
 });

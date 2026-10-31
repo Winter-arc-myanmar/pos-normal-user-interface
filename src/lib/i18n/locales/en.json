@@ -77,7 +77,8 @@
     "expandSidebar": "Expand sidebar",
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
-    "drawerNotConfigured": "Cash drawer API is not configured"
+    "drawerNotConfigured": "Cash drawer API is not configured",
+    "hostessesTitle": "Hostesses"
   },
   "login": {
     "title": "Sign in",
@@ -1191,7 +1192,9 @@
       "priceNote": {
         "discount": "{{name}} (Discount)",
         "changed": "{{name}} (Price changed)"
-      }
+      },
+      "orderedBy": "Ordered by {{name}}",
+      "aHostess": "a hostess"
     },
     "lineEdit": {
       "title": "Edit item",
@@ -1204,7 +1207,9 @@
       "priceRequired": "Enter a price of 0 or more.",
       "howMany": "How many",
       "ofTotal": "of {{count}}",
-      "restStay": "{{count}} × {{price}} stay as they are"
+      "restStay": "{{count}} × {{price}} stay as they are",
+      "orderedBy": "Ordered by",
+      "customer": "Customer"
     },
     "billOptions": {
       "title": "Bill options",
@@ -1263,6 +1268,19 @@
       "stop": "Stop",
       "minutes": "{{count}} min",
       "clocksStopped": "Table time used has been added to the bill."
+    },
+    "breakdown": {
+      "subtotal": "Subtotal",
+      "priceDiscount": "Price discount",
+      "priceChange": "Price change",
+      "promotion": "Promotion discount",
+      "foc": "FOC",
+      "itemDiscount": "Item discount",
+      "billDiscount": "Bill discount",
+      "serviceCharge": "Service charge",
+      "tax": "Tax",
+      "includedTax": "Tax included in prices",
+      "tip": "Tip"
     }
   },
   "salesOrders": {
@@ -1610,7 +1628,8 @@
       "extend": "Unable to extend this treatment.",
       "foc": "Could not give the items free",
       "packages": "Couldn't load the service packages: {{message}}",
-      "tipMethod": "Choose how the tip is paid"
+      "tipMethod": "Choose how the tip is paid",
+      "oneCardPerBill": "Only one member card can pay a bill. Split the rest with other methods."
     },
     "item": "Item",
     "treatmentSoFar": "Treatment so far",
@@ -1710,7 +1729,11 @@
     "freePackageAdded": "+{{count}} free {{package}} · {{name}}",
     "roomChargeFree": "{{count}} free",
     "tipPaidWith": "Tip paid with",
-    "totalWithTip": "Total with tip {{amount}}"
+    "totalWithTip": "Total with tip {{amount}}",
+    "orderedByLabel": "Ordered by",
+    "customer": "Customer",
+    "orderedBy": "Ordered by {{name}}",
+    "aHostess": "a hostess"
   },
   "statusBadge": {
     "verified": "Verified",
@@ -1914,7 +1937,21 @@
     "noHostesses": "No hostesses are working now. Add them in admin under Hostesses.",
     "hostessFree": "Free",
     "hostessInRoom": "In room {{room}}",
-    "hostessInRoomUntil": "In room {{room}} until {{time}}"
+    "hostessInRoomUntil": "In room {{room}} until {{time}}",
+    "hostessesTitle": "Hostesses",
+    "hostessesSummary": "Hostesses: {{working}} working · {{inRooms}} in rooms · {{free}} free",
+    "hostessUntilClose": "until close",
+    "hostessTimeUp": "Time up",
+    "hostessLeft": "{{time}} left",
+    "hostessesInRoom": "Hostess: {{names}}",
+    "hostessStatusTitle": "Hostess status",
+    "hostessColumn": "Hostess",
+    "statusColumn": "Status",
+    "roomColumn": "Room",
+    "sinceColumn": "Since",
+    "timeLeftColumn": "Time left",
+    "hostessInRoomStatus": "In room",
+    "openHostessRoom": "{{name}}: open her room"
   },
   "diningTables": {
     "title": "Dining tables",

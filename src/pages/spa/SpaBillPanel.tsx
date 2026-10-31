@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { SalesOrderLine } from "@/core/domain/entities/Cashier";
 import { GuestCard, GuestWallet } from "@/core/domain/entities/GuestWallet";
@@ -16,6 +17,8 @@ import {
   pendingTotal,
 } from "@/lib/spa/pending";
 import type { PromotionDiscount, RunningPromotion } from "@/core/domain/entities/Promotion";
+import type { BillBreakdown } from "@/lib/pos/billBreakdown";
+import { BillBreakdownRows } from "../cashier/BillBreakdownRows";
 
 const money = (value: string | number | undefined) =>
   Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -37,6 +40,7 @@ export function SpaBillPanel({
   onPrimary,
   primaryLabel,
   onTogglePause,
+  onOpenBill,
   onChangeQuantity,
   onAddAnother,
   onRemoveLine,
@@ -51,6 +55,12 @@ export function SpaBillPanel({
   pendingDiscounts = {},
   promotionName = () => undefined,
   packageVariantIds,
+  breakdown,
+  extraFeeLabel,
+  onAddExtraFee,
+  orderers = [],
+  onOrderedBy,
+  orderedByName = () => undefined,
 }: {
   kind?: RoomKind;
   room: SpaRoom | null;
@@ -68,6 +78,8 @@ export function SpaBillPanel({
   onPrimary: () => void;
   primaryLabel: string;
   onTogglePause: () => void;
+  /** Adjusts the bill as a whole (tax, service charge, discount, tip), as on the cashier. */
+  onOpenBill?: () => void;
   onChangeQuantity: (line: SalesOrderLine, delta: number) => void;
   onAddAnother: (line: SalesOrderLine) => void;
   /** Removes a row: every line it shows. */
@@ -84,8 +96,18 @@ export function SpaBillPanel({
   promotionName?: (id: string | undefined) => string | undefined;
   /** SPA package lines: booked treatments, shown by name and never edited. */
   packageVariantIds?: Set<string>;
+  /** A bill paid at the end: how its total is made up, as on the cashier. */
+  breakdown?: BillBreakdown;
+  extraFeeLabel?: string;
+  onAddExtraFee?: () => void;
+  /** Hostesses with this room, who may order a dish or drink. */
+  orderers?: { id: string; name: string }[];
+  onOrderedBy?: (key: string, hostess?: { id: string; name: string }) => void;
+  /** The hostess who ordered a menu line, when one did. */
+  orderedByName?: (line: SalesOrderLine) => string | undefined;
 }) {
   const tr = useRoomText(kind);
+  const { t } = useTranslation();
   const warning = getKtvWarning(session.endsAt, nowMs);
   const discountBps = wallet?.discountBpsSnapshot || 0;
   const pendingDue = pendingTotal(pending) - pendingSaving(pending, pendingDiscounts);
@@ -98,6 +120,11 @@ export function SpaBillPanel({
   const prepaid = Boolean(quote?.prepaid);
   // Time is bought (paid now, or on the bill to pay at the end), never run up on a clock.
   const canExtend = prepaid || quote?.paymentTiming === "PAY_AT_END";
+  // Bill & table joins the row whenever the bill can still be adjusted; Extend
+  // only when the room's time is bought rather than metered.
+  const actionCount = 1 + (onOpenBill ? 1 : 0) + (canExtend ? 1 : 0) + 1;
+  const actionGrid =
+    actionCount >= 4 ? "grid-cols-4" : actionCount === 3 ? "grid-cols-3" : "grid-cols-2";
   const visibleLines = groupBillLines(
     lines.filter(
       (line) => !["VOIDED", "COMPED"].includes(String(line.status || "").toUpperCase())
@@ -253,6 +280,11 @@ export function SpaBillPanel({
                       ? ` · ${promotionName(promotedLine.appliedPromotionId)}`
                       : ""}
                   </p>
+                  {orderedByName(line) ? (
+                    <p className="text-xs text-pink-300">
+                      {tr("orderedBy", { name: orderedByName(line) })}
+                    </p>
+                  ) : null}
                 </div>
                 {editable && isFoc ? (
                   <span className="shrink-0 text-xs text-slate-400">
@@ -323,6 +355,17 @@ export function SpaBillPanel({
         )}
       </section>
 
+      {onAddExtraFee ? (
+        <button
+          type="button"
+          className="inline-flex min-h-10 shrink-0 items-center gap-1 self-start rounded border border-dashed border-slate-600 px-3 text-sm font-medium text-slate-300 hover:border-blue-400 hover:text-blue-300 disabled:opacity-50"
+          disabled={isBusy}
+          onClick={onAddExtraFee}
+        >
+          + {extraFeeLabel}
+        </button>
+      ) : null}
+
       {pending.length ? (
         <section className="flex shrink-0 flex-col gap-1 rounded border border-slate-700 bg-slate-900/70 p-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
@@ -351,6 +394,29 @@ export function SpaBillPanel({
                     )}
                   </span>
                 </div>
+                {!item.service && orderers.length && onOrderedBy ? (
+                  <div className="flex flex-wrap items-center gap-1 text-[11px]">
+                    <span className="text-slate-500">{tr("orderedByLabel")}</span>
+                    {[undefined, ...orderers].map((hostess) => {
+                      const chosen = (item.hostessId || undefined) === hostess?.id;
+                      return (
+                        <button
+                          key={hostess?.id || "customer"}
+                          type="button"
+                          aria-pressed={chosen}
+                          className={`min-h-7 rounded border px-2 ${
+                            chosen
+                              ? "border-pink-400 bg-pink-500/20 text-pink-100"
+                              : "border-slate-700 text-slate-400"
+                          }`}
+                          onClick={() => onOrderedBy(pendingKey(item), hostess)}
+                        >
+                          {hostess?.name || tr("customer")}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
                 {deal?.discount ? (
                   <p className="text-xs text-emerald-300">
                     {tr("promoSaving", {
@@ -428,6 +494,15 @@ export function SpaBillPanel({
         </section>
       ) : null}
 
+      {breakdown ? (
+        <section className="shrink-0 space-y-1 text-sm">
+          <BillBreakdownRows breakdown={breakdown} dark />
+          <p className="flex justify-between border-t border-slate-800 pt-1.5 text-base font-bold">
+            <span>{tr("estimatedTotal")}</span>
+            <span>{money(breakdown.total)}</span>
+          </p>
+        </section>
+      ) : (
       <section className="shrink-0 space-y-0.5 text-sm">
         <p className="flex justify-between text-slate-300">
           <span>{billClosed ? tr("treatmentCharge") : tr("treatmentSoFar")}</span>
@@ -465,18 +540,43 @@ export function SpaBillPanel({
           </>
         ) : null}
       </section>
+      )}
 
       {!billClosed ? (
-        <div className={`grid shrink-0 gap-2 ${canExtend ? "grid-cols-3" : "grid-cols-2"}`}>
-          <Button variant="secondary" disabled={isBusy} onClick={onTogglePause}>
+        <div className={`grid shrink-0 gap-2 ${actionGrid}`}>
+          {onOpenBill ? (
+            <Button
+              variant="secondary"
+              className="min-w-0 px-2 leading-tight"
+              disabled={isBusy}
+              onClick={onOpenBill}
+            >
+              {t("cashier.billOptions.titleWithTable")}
+            </Button>
+          ) : null}
+          <Button
+            variant="secondary"
+            className="min-w-0 px-2 leading-tight"
+            disabled={isBusy}
+            onClick={onTogglePause}
+          >
             {isPaused ? tr("resume") : tr("pause")}
           </Button>
           {canExtend ? (
-            <Button variant="secondary" disabled={isBusy} onClick={onExtend}>
+            <Button
+              variant="secondary"
+              className="min-w-0 px-2 leading-tight"
+              disabled={isBusy}
+              onClick={onExtend}
+            >
               {tr("extend")}
             </Button>
           ) : null}
-          <Button disabled={isBusy} onClick={onPrimary}>
+          <Button
+            className="min-w-0 px-2 leading-tight"
+            disabled={isBusy}
+            onClick={onPrimary}
+          >
             {primaryLabel}
           </Button>
         </div>

@@ -75,12 +75,23 @@ describe("PaymentView", () => {
     expect(screen.getByRole("checkbox", { name: "cashier.payment.includeTax" })).toBeDisabled();
   });
 
-  it("keeps payment methods scrollable when the member lookup takes vertical space", () => {
+  it("keeps the payment methods reachable when the member lookup takes vertical space", () => {
     renderPaymentView();
 
     const methodsGrid = screen.getByRole("button", { name: /memberCard/i }).parentElement;
-    expect(methodsGrid).toHaveClass("min-h-40", "overflow-y-auto");
-    expect(methodsGrid?.parentElement).toHaveClass("min-w-0", "overflow-y-auto");
+    // At desktop widths the methods rail keeps its own scrolling…
+    expect(methodsGrid).toHaveClass("min-[1100px]:min-h-40", "min-[1100px]:overflow-y-auto");
+    expect(methodsGrid?.parentElement).toHaveClass(
+      "min-w-0",
+      "min-[1100px]:overflow-y-auto"
+    );
+    // …while a phone stacks the panes in one column that scrolls as a whole, so
+    // the methods are never squeezed into slivers (shrink-0) or cut off.
+    expect(methodsGrid?.parentElement).toHaveClass("shrink-0");
+    expect(methodsGrid?.parentElement?.parentElement).toHaveClass(
+      "flex",
+      "overflow-y-auto"
+    );
   });
 
   it("selects member card and can add a split tender", () => {
@@ -254,5 +265,21 @@ describe("PaymentView", () => {
     });
 
     expect(screen.getByText(/card-1/)).toBeInTheDocument();
+  });
+
+  it("shows how the bill adds up, leaving out rows that come to nothing", () => {
+    renderPaymentView({
+      total: "44100.0000",
+      breakdown: {
+        subtotal: 56000, priceChange: -2000, promotion: 12000, foc: 0, itemDiscount: 0,
+        billDiscount: 0, serviceCharge: 0, tax: 2100, includedTax: 0, tip: 0, total: 44100,
+      },
+    });
+    expect(screen.getByText("cashier.breakdown.subtotal").nextSibling).toHaveTextContent("56,000");
+    expect(screen.getByText("cashier.breakdown.priceDiscount").nextSibling).toHaveTextContent("−2,000");
+    expect(screen.getByText("cashier.breakdown.promotion").nextSibling).toHaveTextContent("−12,000");
+    expect(screen.getByText("cashier.breakdown.tax").nextSibling).toHaveTextContent("+2,100");
+    expect(screen.queryByText("FOC")).not.toBeInTheDocument();
+    expect(screen.queryByText("Service charge")).not.toBeInTheDocument();
   });
 });

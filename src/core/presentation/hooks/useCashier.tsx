@@ -216,6 +216,7 @@ interface UseCashierReturn {
       refreshLines?: boolean;
       modifiers?: ChosenModifier[];
       unitPrice?: string;
+      hostessId?: string;
     }
   ) => Promise<SalesOrderLine>;
   splitOrderLine: (
@@ -236,7 +237,8 @@ interface UseCashierReturn {
     quantity?: number,
     keepSelectedOrderId?: string,
     modifiers?: ChosenModifier[],
-    unitPrice?: string
+    unitPrice?: string,
+    hostessId?: string
   ) => Promise<SalesOrderLine>;
   addExtraFeeLine: (
     target: { orderId: string } | { sessionId: string },
@@ -491,6 +493,7 @@ export function useCashier(): UseCashierReturn {
         refreshLines?: boolean;
         modifiers?: ChosenModifier[];
         unitPrice?: string;
+        hostessId?: string;
       }
     ) => {
       setIsLoading(true);
@@ -516,6 +519,7 @@ export function useCashier(): UseCashierReturn {
           unitPrice: unitPrice.toFixed(4),
           lineDiscount: "0.0000",
           ...(modifiers?.length ? { selectedModifiers: modifiers } : {}),
+          ...(options?.hostessId ? { hostessId: options.hostessId } : {}),
         });
         if (options?.refreshLines !== false) {
           const lines = await cashierService.getSalesOrderLines(orderId);
@@ -1386,7 +1390,8 @@ export function useCashier(): UseCashierReturn {
       quantity: number = 1,
       keepSelectedOrderId?: string,
       modifiers?: ChosenModifier[],
-      priceOverride?: string
+      priceOverride?: string,
+      hostessId?: string
     ) => {
       setIsLoading(true);
       clearError();
@@ -1410,6 +1415,7 @@ export function useCashier(): UseCashierReturn {
           unitPrice: unitPrice.toFixed(4),
           lineDiscount: "0.0000",
           ...(modifiers?.length ? { selectedModifiers: modifiers } : {}),
+          ...(hostessId ? { hostessId } : {}),
         });
 
         if (keepSelectedOrderId && keepSelectedOrderId !== line.salesOrderId) {

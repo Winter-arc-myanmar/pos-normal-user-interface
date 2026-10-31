@@ -40,7 +40,7 @@ export function useBillOptions({
   const needsQuote = changed && Boolean(orderId);
 
   useEffect(() => {
-    if (!needsQuote || !orderId) return;
+    if (!orderId) return;
     let cancelled = false;
     void fetchBill(orderId, { discount, includeTax, includeServiceCharge })
       .then((bill) => {
@@ -55,7 +55,7 @@ export function useBillOptions({
         }
       });
     return () => { cancelled = true; };
-  }, [fetchBill, needsQuote, orderId, discount, includeTax, includeServiceCharge, requestKey]);
+  }, [fetchBill, orderId, discount, includeTax, includeServiceCharge, requestKey]);
 
   const choose = (field: "includeTax" | "includeServiceCharge", value: boolean) => {
     setSelection({ ...current, [field]: value, changed: true, version: current.version + 1 });
@@ -72,6 +72,8 @@ export function useBillOptions({
     changed,
     query,
     bill: needsQuote ? matchingResult?.bill : undefined,
+    /** The server's bill for a saved order, with or without changed options, to show how it adds up. */
+    quote: orderId ? matchingResult?.bill : undefined,
     error: needsQuote ? matchingResult?.error : undefined,
     isLoading: needsQuote && !matchingResult,
     choose,
