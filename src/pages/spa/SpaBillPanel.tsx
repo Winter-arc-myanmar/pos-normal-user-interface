@@ -18,6 +18,7 @@ import {
 } from "@/lib/spa/pending";
 import type { PromotionDiscount, RunningPromotion } from "@/core/domain/entities/Promotion";
 import type { BillBreakdown } from "@/lib/pos/billBreakdown";
+import { SeatingIcon } from "../cashier/SeatingIcon";
 import { BillBreakdownRows } from "../cashier/BillBreakdownRows";
 
 const money = (value: string | number | undefined) =>
@@ -41,6 +42,9 @@ export function SpaBillPanel({
   primaryLabel,
   onTogglePause,
   onOpenBill,
+  onMoveRoom,
+  onSplitRoom,
+  onMergeRoom,
   onChangeQuantity,
   onAddAnother,
   onRemoveLine,
@@ -80,6 +84,11 @@ export function SpaBillPanel({
   onTogglePause: () => void;
   /** Adjusts the bill as a whole (tax, service charge, discount, tip), as on the cashier. */
   onOpenBill?: () => void;
+  /** Move the visit to a free room. */
+  onMoveRoom?: () => void;
+  /** Split items off or merge another room in; only on a bill paid at the end. */
+  onSplitRoom?: () => void;
+  onMergeRoom?: () => void;
   onChangeQuantity: (line: SalesOrderLine, delta: number) => void;
   onAddAnother: (line: SalesOrderLine) => void;
   /** Removes a row: every line it shows. */
@@ -547,6 +556,30 @@ export function SpaBillPanel({
         ) : null}
       </section>
       )}
+
+      {!billClosed && onMoveRoom ? (
+        <div className="grid shrink-0 grid-cols-3 gap-2">
+          {(
+            [
+              ["move", onMoveRoom, "floor.move"],
+              ["split", onSplitRoom, "floor.split"],
+              ["merge", onMergeRoom, "floor.merge"],
+            ] as const
+          ).map(([icon, onClick, label]) => (
+            <button
+              key={icon}
+              type="button"
+              disabled={isBusy || !onClick}
+              onClick={onClick}
+              title={onClick ? tr(label) : tr("floor.paidAsItGoes")}
+              className="flex min-h-12 flex-col items-center justify-center gap-1 rounded border border-slate-700 bg-slate-900 px-1 text-[11px] font-semibold text-slate-100 transition-colors hover:border-blue-500 hover:bg-blue-600/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <SeatingIcon name={icon} />
+              {tr(label)}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {!billClosed ? (
         <div className={`grid shrink-0 gap-2 ${actionGrid}`}>
