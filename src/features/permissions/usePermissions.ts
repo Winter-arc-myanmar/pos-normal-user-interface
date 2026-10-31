@@ -53,6 +53,7 @@ export const PAGE_PERMISSIONS = {
   ],
 
   // Hospitality
+  hostesses: ["hospitality:hostess:read"],
   ktv: [
     "hospitality:ktv-session:read",
     "hospitality:ktv-session:write",

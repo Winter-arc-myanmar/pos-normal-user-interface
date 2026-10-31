@@ -52,6 +52,9 @@ import { estimateRoomCharges } from "@/lib/spa/roomCharges";
 import type { Hostess } from "@/core/domain/entities/Hostess";
 import { usePlaceCharges } from "@/core/presentation/hooks/usePlaceCharges";
 import { HostessPicker } from "./spa/HostessPicker";
+import { HostessStrip } from "./ktv/HostessStrip";
+import { useHostessBoard } from "@/core/presentation/hooks/useHostessBoard";
+import { hostessStatusRows } from "@/lib/ktv/hostessStatus";
 import { useWorkingHostesses } from "@/core/presentation/hooks/useWorkingHostesses";
 import {
   addPending,
@@ -716,6 +719,14 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     await loadBill(next);
     setStep("menu");
   };
+
+  // KTV: who is working, which room each is in and how long she has left.
+  const hostessBoard = useHostessBoard(!isSpa && step === "rooms");
+  const hostessRows = hostessStatusRows(hostessBoard.hostesses, nowMs);
+  const hostessesIn = (target: SpaRoom) =>
+    hostessRows
+      .filter((row) => row.roomId === target.id || (!row.roomId && row.roomNumber === target.roomNumber))
+      .map((row) => row.name);
 
   const selectRoom = (next: SpaRoom) => {
     setSelectedRoomId(next.id);
@@ -1811,6 +1822,17 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
 
       {step === "rooms" ? (
         <>
+          {!isSpa ? (
+            <HostessStrip
+              rows={hostessRows}
+              onOpenRoom={(row) => {
+                const target = rooms.find(
+                  (item) => item.id === row.roomId || item.roomNumber === row.roomNumber
+                );
+                if (target) selectRoom(target);
+              }}
+            />
+          ) : null}
           <div className="my-3 flex gap-2">
             {(["ALL", "AVAILABLE", "ACTIVE"] as const).map((value) => (
               <button
@@ -1838,6 +1860,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                     key={item.id}
                     room={item}
                     nowMs={nowMs}
+                    hostessNames={isSpa ? undefined : hostessesIn(item)}
                     onSelect={() => selectRoom(item)}
                     onReady={() => void markRoomReady(item.id)}
                     onManage={() => openRoomManager(item)}

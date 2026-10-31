@@ -8,6 +8,7 @@ export function SpaRoomTile({
   kind = "spa",
   room,
   nowMs,
+  hostessNames,
   onSelect,
   onReady,
   onManage,
@@ -15,6 +16,8 @@ export function SpaRoomTile({
   kind?: RoomKind;
   room: SpaRoom;
   nowMs: number;
+  /** KTV: the hostesses in this room now. */
+  hostessNames?: string[];
   onSelect: () => void;
   onReady: () => void;
   onManage: () => void;
@@ -96,6 +99,11 @@ export function SpaRoomTile({
             {warning.level === "EXPIRED"
               ? tr("timeUp")
               : tr("minutesRemaining", { count: warning.remainingMinutes })}
+          </p>
+        ) : null}
+        {hostessNames?.length ? (
+          <p className="mt-1 truncate text-sm text-pink-200">
+            {tr("hostessesInRoom", { names: hostessNames.join(", ") })}
           </p>
         ) : null}
       </button>

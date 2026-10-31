@@ -248,6 +248,9 @@ vi.mock("@/core/presentation/hooks/useSalesOrderManagement", () => ({
     fetchOrderBill: mocks.fetchOrderBill,
   }),
 }));
+vi.mock("@/core/presentation/hooks/useHostessBoard", () => ({
+  useHostessBoard: () => ({ hostesses: [], error: null, loaded: true }),
+}));
 vi.mock("@/core/presentation/hooks/useExtraFees", () => ({
   useExtraFees: () => ({
     fees: [{ id: "fee-box", name: "Plastic container", amount: 500, variantId: "variant-fee", isActive: true, isOther: false }],
