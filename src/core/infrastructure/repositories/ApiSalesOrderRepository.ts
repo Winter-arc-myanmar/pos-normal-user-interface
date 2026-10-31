@@ -15,7 +15,7 @@ import {
 } from "../../application/dtos/SalesOrderDTO";
 import { fromApiServiceType } from "../../application/dtos/CashierDTO";
 import { ISalesOrderRepository } from "../../domain/repositories/ISalesOrderRepository";
-import { SalesOrder, SalesOrderLine } from "../../domain/entities/Cashier";
+import { SalesOrder, SalesOrderLine, SalesOrderPlace } from "../../domain/entities/Cashier";
 import { HttpClient } from "../api/HttpClient";
 import { API_ENDPOINTS } from "../api/constants";
 import { parseCashier } from "@/lib/printing/cashier";
@@ -200,6 +200,27 @@ const resolveItemSummary = (item: Record<string, unknown>) => {
   return { itemCount, itemSummary };
 };
 
+const PLACE_KINDS = ["TABLE", "KTV", "SPA"] as const;
+
+const toPlace = (value: unknown): SalesOrderPlace | null => {
+  const place = asRecord(value);
+  const kind = PLACE_KINDS.find((item) => item === place?.kind);
+  if (!place || !kind || !place.number || !place.openedAt) return null;
+  return {
+    kind,
+    number: String(place.number),
+    openedAt: String(place.openedAt),
+    closedAt: place.closedAt ? String(place.closedAt) : null,
+  };
+};
+
+const readLineMenuPrice = (item: Record<string, unknown>) => {
+  const variant = asRecord(item.variant);
+  const basePrice = asRecord(variant?.product)?.basePrice;
+  if (basePrice === undefined || basePrice === null) return undefined;
+  return String(Number(basePrice) + Number(variant?.priceModifier ?? 0));
+};
+
 const toSalesOrder = (item: Record<string, unknown>): SalesOrder => {
   const catalog = resolveItemSummary(item);
   return new SalesOrder({
@@ -231,6 +252,22 @@ const toSalesOrder = (item: Record<string, unknown>): SalesOrder => {
       : undefined,
     customerName: resolveCustomerName(item),
     cashier: parseCashier(item.cashier),
+    locationName: nestedName(item.location, ["name"]),
+    place: toPlace(item.place),
+    payments: Array.isArray(item.orderPayments)
+      ? item.orderPayments.flatMap((value) => {
+          const payment = asRecord(value);
+          if (!payment) return [];
+          return [
+            {
+              methodName: nestedName(payment.paymentMethod, ["name"]) || "Payment",
+              methodKind: asText(asRecord(payment.paymentMethod)?.kind),
+              amount: toDecimalString(payment.amount),
+              paidAt: asText(payment.paymentDate),
+            },
+          ];
+        })
+      : undefined,
     itemCount: catalog.itemCount,
     itemSummary: catalog.itemSummary,
     createdAt: String(item.createdAt || ""),
@@ -281,6 +318,14 @@ const toSalesOrderLine = (
         : undefined,
     seatNumber: typeof item.seatNumber === "number" ? item.seatNumber : undefined,
     hostessId: item.hostessId ? String(item.hostessId) : undefined,
+    askWhoServed: asRecord(asRecord(item.variant)?.product)?.askWhoServed === true,
+    promotionNames: Array.isArray(item.promotions)
+      ? item.promotions.flatMap((value) => {
+          const name = asText(asRecord(value)?.name);
+          return name ? [name] : [];
+        })
+      : undefined,
+    menuPrice: readLineMenuPrice(item),
     productName: catalog.productName,
     variantName: catalog.variantName,
     sku: catalog.sku,
