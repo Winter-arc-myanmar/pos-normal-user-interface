@@ -42,7 +42,8 @@ export function LoginPage() {
 
   const from = (location.state as { from?: { pathname?: string } })?.from
     ?.pathname;
-  const sessionExpired = searchParams.get("reason") === "session_expired";
+  const reason = searchParams.get("reason");
+  const sessionExpired = reason === "session_expired" || reason === "signed_in_elsewhere";
 
   if (isAuthenticated && user) {
     return <Navigate to={from || "/cashier"} replace />;
@@ -142,7 +143,11 @@ export function LoginPage() {
             <p className="rounded-lg border border-red-500/40 bg-red-950/50 px-3 py-2 text-sm text-red-200">
               {localError ||
                 error ||
-                (sessionExpired ? t("login.sessionExpired") : null)}
+                (reason === "signed_in_elsewhere"
+                  ? t("login.signedInElsewhere")
+                  : sessionExpired
+                    ? t("login.sessionExpired")
+                    : null)}
             </p>
           )}
 

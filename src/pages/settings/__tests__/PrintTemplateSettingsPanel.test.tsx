@@ -110,7 +110,7 @@ describe("PrintTemplateSettingsPanel", () => {
     const preview = screen.getByTestId("slip-preview");
 
     expect(await screen.findByText("GRAND SPA")).toBeInTheDocument();
-    expect(preview).toHaveTextContent("53,675 MMK");
+    expect(preview).toHaveTextContent("53,675");
     expect(preview).toHaveTextContent("+ Extra egg (+500)");
     expect(preview).toHaveTextContent("Cashier Aung Aung");
 
@@ -141,7 +141,7 @@ describe("PrintTemplateSettingsPanel", () => {
       screen.getByRole("button", { name: /settings.printTemplate.placeKdsHint/ })
     );
     const preview = screen.getByTestId("slip-preview");
-    expect(preview).toHaveTextContent("KTV K3");
+    expect(preview).toHaveTextContent("VIP Lounge K3");
     expect(preview).toHaveTextContent("FRIED RICE");
     expect(preview).not.toHaveTextContent("53,675");
   });
@@ -153,8 +153,8 @@ describe("PrintTemplateSettingsPanel", () => {
     );
     const preview = screen.getByTestId("slip-preview");
     expect(preview).toHaveTextContent("SHIFT REPORT");
-    expect(preview).toHaveTextContent("NET 65,000 MMK");
-    expect(preview).toHaveTextContent("KBZPay (1) 30,000 MMK");
+    expect(preview).toHaveTextContent("NET 65,000");
+    expect(preview).toHaveTextContent("KBZPay (1) 30,000");
     expect(screen.queryByLabelText("settings.printTemplate.itemTextSize")).not.toBeInTheDocument();
 
     fireEvent.click(

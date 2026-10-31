@@ -20,12 +20,12 @@ export const PAGE_PERMISSIONS = {
   users: ["iam:user:read", "iam:user:write", "iam:user:delete"],
 
   // Sales
+  // The till needs a checkout permission: a POS session on its own would open
+  // the page and then refuse to take payment, so the menu stays hidden.
   cashier: [
     "sales:checkout:read",
     "sales:checkout:write",
     "sales:checkout:delete",
-    "pos:session:read",
-    "pos:session:write",
   ],
   salesOrders: [
     "sales:sales-order:read",

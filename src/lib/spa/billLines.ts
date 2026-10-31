@@ -11,10 +11,15 @@ export interface BillLineGroup {
 const lineTotal = (line: SalesOrderLine) =>
   Number(line.quantity || 0) * Number(line.unitPrice || 0) - Number(line.lineDiscount || 0);
 
+/** The copy a promotion gives away: nothing is charged for it. */
+const isPromotionFree = (line: SalesOrderLine) =>
+  Boolean(line.appliedPromotionId) && lineTotal(line) <= 0.005;
+
 /**
  * Every order sent from a room is saved as lines of its own, so a second round of
  * the same drink is a second line. On the bill they read as one row; only lines
- * sold alike (price, hostess, free, promotion, options) are put together.
+ * sold alike (price, hostess, free, promotion, options) are put together. A copy
+ * a promotion left unpaid keeps a row of its own, so it reads 0 on the bill.
  */
 export function groupBillLines(lines: SalesOrderLine[]): BillLineGroup[] {
   const groups = new Map<string, BillLineGroup>();
@@ -25,6 +30,7 @@ export function groupBillLines(lines: SalesOrderLine[]): BillLineGroup[] {
       line.hostessId ?? "",
       line.compReasonId ? "foc" : "",
       line.appliedPromotionId ?? "",
+      isPromotionFree(line) ? "promo-free" : "",
       line.productName ?? "",
       JSON.stringify(line.selectedModifiers ?? []),
     ].join("|");

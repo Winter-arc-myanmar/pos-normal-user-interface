@@ -59,6 +59,7 @@ import { ISpaRepository } from "../../domain/repositories/ISpaRepository";
 import { ApiPromotionRepository } from "../repositories/ApiPromotionRepository";
 import { ApiExtraFeeRepository } from "../repositories/ApiExtraFeeRepository";
 import { ApiHostessRepository } from "../repositories/ApiHostessRepository";
+import { ApiRoomFloorRepository } from "../repositories/ApiRoomFloorRepository";
 import { ApiShiftRepository } from "../repositories/ApiShiftRepository";
 import { ApiTableChargeRepository } from "../repositories/ApiTableChargeRepository";
 import { ApiSpaPackageRepository } from "../repositories/ApiSpaPackageRepository";
@@ -174,6 +175,10 @@ class Container {
     this.register<ApiHostessRepository>(
       "hostessRepository",
       new ApiHostessRepository(this.resolve("httpClient"))
+    );
+    this.register<ApiRoomFloorRepository>(
+      "roomFloorRepository",
+      new ApiRoomFloorRepository(this.resolve("httpClient"))
     );
     this.register<ApiTableChargeRepository>(
       "tableChargeRepository",

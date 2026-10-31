@@ -23,6 +23,8 @@ interface AuthContextType {
   error: string | null;
 }
 
+const SESSION_CHECK_MS = 30_000;
+
 // Create context with default value
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -58,6 +60,18 @@ export function AuthProvider({ children, service }: AuthProviderProps) {
 
     checkAuth();
   }, [authService]);
+
+  // One POS device per account: a sign-in elsewhere signs this one out, which the
+  // next request finds; this check finds it on a till left idle too.
+  useEffect(() => {
+    if (!user) return;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        authService.checkSession().catch(() => undefined);
+      }
+    }, SESSION_CHECK_MS);
+    return () => window.clearInterval(timer);
+  }, [authService, user]);
 
   // Login function
   const login = async (input: LoginInputDTO) => {

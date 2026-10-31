@@ -41,7 +41,7 @@
     "salesSummaryTitle": "POS summary",
     "cashierTitle": "Cashier",
     "cashierMeta": "POS mode",
-    "ktvTitle": "KTV",
+    "ktvTitle": "VIP Lounge",
     "spaTitle": "SPA Rooms",
     "counterOrdersTitle": "Counter orders",
     "salesOrdersTitle": "Sales orders",
@@ -105,7 +105,8 @@
     "submit": "Sign in",
     "sessionExpired": "Your session expired. Please sign in again.",
     "submitting": "Signing in...",
-    "errorFallback": "Unable to sign in"
+    "errorFallback": "Unable to sign in",
+    "signedInElsewhere": "This account was signed in on another device, so it was signed out here."
   },
   "dashboard": {
     "title": "Sales analytics",
@@ -186,7 +187,7 @@
   },
   "salesSummary": {
     "title": "POS sales summary",
-    "description": "POS totals, bills, bar categories, SPA menu, and KTV sessions.",
+    "description": "POS totals, bills, bar categories, SPA menu, and VIP Lounge sessions.",
     "posType": "POS type",
     "searchBills": "Search bill, room, or guest",
     "empty": "No sales in this range.",
@@ -227,11 +228,11 @@
       "posBills": "POS bills",
       "bar": "Bar by category",
       "spaMenu": "SPA by menu",
-      "ktv": "KTV sessions"
+      "ktv": "VIP Lounge sessions"
     },
     "posTypes": {
       "SPA": "SPA",
-      "KTV": "KTV",
+      "KTV": "VIP Lounge",
       "BAR": "Bar"
     }
   },
@@ -1460,9 +1461,9 @@
     "goToDashboard": "Go to dashboard"
   },
   "ktv": {
-    "boardTitle": "KTV Board",
+    "boardTitle": "VIP Lounge Board",
     "boardDescription": "Open rooms, monitor sessions, and manage room readiness.",
-    "loading": "Loading KTV rooms...",
+    "loading": "Loading VIP Lounge rooms...",
     "addRoom": "Add room",
     "editRoom": "Edit room",
     "manageRoom": "Manage room",
@@ -1532,11 +1533,11 @@
       "walletUnavailable": "This guest wallet cannot be used.",
       "wrongSessionCard": "This card does not belong to the selected room session.",
       "openSession": "Unable to open the room session.",
-      "createRoom": "Unable to create the KTV room.",
+      "createRoom": "Unable to create the VIP Lounge room.",
       "sessionRequired": "Select an active room session and card first.",
       "paymentUnavailable": "Guest card payment is not configured for this branch.",
       "checkout": "Unable to close and pay this room session.",
-      "roomNotFound": "KTV room not found.",
+      "roomNotFound": "VIP Lounge room not found.",
       "noActiveSession": "This room has no active session."
     }
   },
@@ -1734,7 +1735,29 @@
     "orderedByLabel": "Ordered by",
     "customer": "Customer",
     "orderedBy": "Ordered by {{name}}",
-    "aHostess": "a hostess"
+    "aHostess": "a hostess",
+    "floor": {
+      "move": "Move",
+      "split": "Split",
+      "merge": "Merge",
+      "moveTitle": "Move room {{room}}",
+      "moveHint": "The guests, their bill, time and staff move to the free room you pick. This room goes for cleaning.",
+      "moveTo": "Move them to",
+      "mergeTitle": "Merge into room {{room}}",
+      "mergeHint": "Another room's bill joins this one. That room closes and goes for cleaning.",
+      "mergeTo": "Bring in the bill of",
+      "splitTitle": "Split items from room {{room}}",
+      "splitHint": "Pick the items and how many, then the room they go to. A free room is started for them.",
+      "splitTo": "Move them to",
+      "inUse": "In use",
+      "free": "Free room",
+      "noRooms": "No other room fits.",
+      "moved": "Moved to room {{room}}.",
+      "merged": "Bills merged.",
+      "splitDone": "Items moved to room {{room}}.",
+      "failed": "Could not change the room.",
+      "paidAsItGoes": "Split and Merge are for rooms paid at the end."
+    }
   },
   "statusBadge": {
     "verified": "Verified",
@@ -1848,7 +1871,7 @@
     "ready": "Ready",
     "table": "Table {{number}}",
     "spaRoom": "SPA room {{number}}",
-    "ktvRoom": "KTV {{number}}",
+    "ktvRoom": "VIP Lounge {{number}}",
     "counter": "Counter",
     "pickup": "Pickup {{number}}",
     "guests": "{{count}} guests",
@@ -1878,7 +1901,7 @@
     "started": "Started from tablet"
   },
   "ktvPos": {
-    "boardTitle": "KTV Board",
+    "boardTitle": "VIP Lounge Board",
     "sessions": "Hours",
     "newSession": "New party in {{room}}",
     "sessionsSummary": "{{minutes}} min in total",
@@ -1905,7 +1928,7 @@
     "minutesOfBooked": "{{count}}/{{booked}} min ({{sessions}} h)",
     "treatmentMinutes": "{{count}} min",
     "sessionOption": "Since {{time}} · {{count}} guests",
-    "noRooms": "No KTV rooms yet. Add a room to start.",
+    "noRooms": "No VIP Lounge rooms yet. Add a room to start.",
     "errors": {
       "openSession": "Could not start the room",
       "sessionRequired": "Start the room first",
@@ -1922,7 +1945,7 @@
       "active": "In use"
     },
     "billClosed": "Room closed. The bill is waiting for payment.",
-    "billPaid": "Paid. The KTV room is free for the next guest.",
+    "billPaid": "Paid. The VIP Lounge room is free for the next guest.",
     "payTitle": "Close room and pay",
     "steps": {
       "sessions": "Choose hours",

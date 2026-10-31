@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { Toaster } from "@/components/ui/Toaster";
 import { SpaBoardPage } from "../SpaBoardPage";
@@ -53,6 +53,9 @@ const mocks = vi.hoisted(() => ({
   printTicket: vi.fn(),
   listKdsTickets: vi.fn(),
   noop: vi.fn(),
+  moveRoom: vi.fn(),
+  mergeRoom: vi.fn(),
+  splitRoom: vi.fn(),
 }));
 
 const wallet = {
@@ -248,6 +251,13 @@ vi.mock("@/core/presentation/hooks/useSalesOrderManagement", () => ({
     fetchOrderBill: mocks.fetchOrderBill,
   }),
 }));
+vi.mock("@/core/presentation/hooks/useRoomFloor", () => ({
+  useRoomFloor: () => ({
+    moveRoom: mocks.moveRoom,
+    mergeRoom: mocks.mergeRoom,
+    splitRoom: mocks.splitRoom,
+  }),
+}));
 vi.mock("@/core/presentation/hooks/useHostessBoard", () => ({
   useHostessBoard: () => ({ hostesses: [], error: null, loaded: true }),
 }));
@@ -304,7 +314,7 @@ const renderPage = () =>
 const openRunningRoom = async () => {
   renderPage();
   fireEvent.click(screen.getByRole("button", { name: /SUITE1/ }));
-  await screen.findByRole("button", { name: "spa.pause" });
+  await screen.findByRole("button", { name: "spa.floor.move" });
 };
 
 const tapCard = async (uid = "04A3B2C1") => {
@@ -504,7 +514,7 @@ describe("SpaBoardPage", () => {
     expect(mocks.lookupCard).not.toHaveBeenCalled();
   });
 
-  it("shows promotion-split copies of one menu item as one combined quantity", async () => {
+  it("gives the copy a promotion made free a row of its own", async () => {
     lines = [
       {
         id: "line-1",
@@ -531,9 +541,12 @@ describe("SpaBoardPage", () => {
     ];
     await openRunningRoom();
 
-    // One product-card label plus one combined bill row, not two bill rows.
-    expect(screen.getAllByText("Foot Scrub")).toHaveLength(2);
-    fireEvent.click(screen.getByRole("button", { name: "spa.decrease" }));
+    // One product-card label plus two bill rows: the charged copy and the free
+    // one, which reads 0 rather than the menu price.
+    expect(screen.getAllByText("Foot Scrub")).toHaveLength(3);
+    const decreases = screen.getAllByRole("button", { name: "spa.decrease" });
+    expect(decreases).toHaveLength(2);
+    fireEvent.click(decreases[1]);
     await waitFor(() =>
       expect(mocks.deleteOrderLine).toHaveBeenCalledWith("order-1", "line-2")
     );
@@ -654,6 +667,13 @@ describe("SpaBoardPage", () => {
     await waitFor(() =>
       expect(mocks.deleteOrderLine).toHaveBeenCalledWith("order-1", "line-foc")
     );
+  });
+
+  it("moves a room paid as it goes, but does not split or merge it", async () => {
+    await openRunningRoom();
+    expect(screen.getByRole("button", { name: "spa.floor.move" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "spa.floor.split" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "spa.floor.merge" })).toBeDisabled();
   });
 
   it("shows no price or session length on a SPA room tile", () => {
@@ -916,6 +936,84 @@ describe("SpaBoardPage", () => {
       );
     });
 
+    it("moves the guests to a free room", async () => {
+      rooms = [
+        room("wallet-1"),
+        { ...room("wallet-1"), id: "room-2", roomNumber: "SUITE2", status: "AVAILABLE", sessions: [] },
+      ];
+      mocks.fetchBoard.mockResolvedValue(rooms);
+      mocks.moveRoom.mockResolvedValue({ sessionId: "session-1", roomId: "room-2" });
+      await openRunningRoom();
+      fireEvent.click(screen.getByRole("button", { name: "spa.floor.move" }));
+      const dialog = await screen.findByRole("dialog");
+      fireEvent.click(within(dialog).getByRole("button", { name: /SUITE2/ }));
+      fireEvent.click(within(dialog).getByRole("button", { name: "spa.floor.move" }));
+
+      await waitFor(() => expect(mocks.moveRoom).toHaveBeenCalledWith("session-1", "room-2"));
+    });
+
+    it("merges another room's bill into this one", async () => {
+      const other = room("wallet-2");
+      rooms = [
+        room("wallet-1"),
+        {
+          ...other,
+          id: "room-2",
+          roomNumber: "SUITE2",
+          sessions: [{ ...other.sessions[0], id: "session-2", roomId: "room-2" }],
+        },
+      ];
+      mocks.fetchBoard.mockResolvedValue(rooms);
+      mocks.mergeRoom.mockResolvedValue({ sessionId: "session-1", roomId: "room-1" });
+      await openRunningRoom();
+      fireEvent.click(screen.getByRole("button", { name: "spa.floor.merge" }));
+      const dialog = await screen.findByRole("dialog");
+      fireEvent.click(within(dialog).getByRole("button", { name: /SUITE2/ }));
+      fireEvent.click(within(dialog).getByRole("button", { name: "spa.floor.merge" }));
+
+      await waitFor(() => expect(mocks.mergeRoom).toHaveBeenCalledWith("session-1", "session-2"));
+    });
+
+    it("splits items onto a free room", async () => {
+      rooms = [
+        room("wallet-1"),
+        { ...room("wallet-1"), id: "room-2", roomNumber: "SUITE2", status: "AVAILABLE", sessions: [] },
+      ];
+      mocks.fetchBoard.mockResolvedValue(rooms);
+      lines = [
+        {
+          id: "line-beer",
+          salesOrderId: "order-1",
+          variantId: "variant-beer",
+          productName: "Myanmar Beer",
+          quantity: 2,
+          unitPrice: "3500.0000",
+          status: "SERVED",
+        },
+      ];
+      mocks.fetchOrderLines.mockResolvedValue({ lines });
+      mocks.splitRoom.mockResolvedValue({
+        sessionId: "session-1",
+        roomId: "room-1",
+        targetSessionId: "session-9",
+      });
+      await openRunningRoom();
+      fireEvent.click(screen.getByRole("button", { name: "spa.floor.split" }));
+      const dialog = await screen.findByRole("dialog");
+      fireEvent.click(within(dialog).getByRole("button", { name: "cashier.orderPanel.increaseQuantity" }));
+      fireEvent.click(within(dialog).getByRole("button", { name: /SUITE2/ }));
+      fireEvent.click(within(dialog).getByRole("button", { name: "cashier.seating.moveItems" }));
+
+      await waitFor(() =>
+        expect(mocks.splitRoom).toHaveBeenCalledWith(
+          "session-1",
+          { roomId: "room-2" },
+          [{ lineId: "line-beer", quantity: 1 }],
+          { posRegisterId: "register-1", openedByPosSessionId: "pos-session-1" }
+        )
+      );
+    });
+
     it("adds an extra fee to the room's bill", async () => {
       await openRunningRoom();
       fireEvent.click(screen.getByRole("button", { name: "+ cashier.extraFee.button" }));
@@ -938,8 +1036,8 @@ describe("SpaBoardPage", () => {
       expect(
         screen.getByRole("button", { name: "cashier.billOptions.done" })
       ).toBeInTheDocument();
-      // Pause keeps its place beside it.
-      expect(screen.getByRole("button", { name: "spa.pause" })).toBeInTheDocument();
+      // Rooms are no longer paused.
+      expect(screen.queryByRole("button", { name: "spa.pause" })).not.toBeInTheDocument();
 
       fireEvent.click(
         screen.getByRole("checkbox", { name: "cashier.payment.includeTax" })

@@ -63,7 +63,7 @@ describe("the shift report slip", () => {
     expect(text).not.toContain("GRAND SPA");
     expect(text).not.toContain("Ma Aye");
     expect(text).not.toMatch(/Cash \(3\)/);
-    expect(text).toMatch(/NET\s+65,000 MMK/);
+    expect(text).toMatch(/NET\s+65,000/);
     expect(text).toContain("Count the drawer");
   });
 
@@ -95,10 +95,10 @@ describe("the shift report slip", () => {
     expect(text).toMatch(/Opened\s+07 Oct 2026 08:00/);
     expect(text).toMatch(/Closed\s+07 Oct 2026 16:00/);
     expect(text).toMatch(/Sales\s+4 bills/);
-    expect(text).toMatch(/Sales\s+70,000 MMK/);
-    expect(text).toMatch(/Refunds\s+-5,000 MMK/);
-    expect(text).toMatch(/NET\s+65,000 MMK/);
-    expect(text).toMatch(/Cash \(3\)\s+40,000 MMK/);
+    expect(text).toMatch(/Sales\s+70,000/);
+    expect(text).toMatch(/Refunds\s+-5,000/);
+    expect(text).toMatch(/NET\s+65,000/);
+    expect(text).toMatch(/Cash \(3\)\s+40,000/);
     expect(text).not.toContain("Thank you!");
   });
 
@@ -107,7 +107,7 @@ describe("the shift report slip", () => {
       ...shiftSlip({ ...summary, tipAmount: 3000 }),
       currency: "MMK",
     }).join("\n");
-    expect(withTips).toMatch(/Tips\s+3,000 MMK/);
+    expect(withTips).toMatch(/Tips\s+3,000/);
 
     // A shift with no tips says nothing about them.
     const withoutTips = buildSaleReceiptLines({

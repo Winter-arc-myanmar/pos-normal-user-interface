@@ -76,6 +76,28 @@ export function appliedPromotionDiscount(lines: SalesOrderLine[]): number {
   );
 }
 
+/** What a promotion needs to tell a copy it gave away from one it only discounted. */
+export interface PromotableLine {
+  quantity?: string | number;
+  unitPrice?: string;
+  lineDiscount?: string;
+  appliedPromotionId?: string;
+}
+
+/**
+ * What a promotion gave away on one line: the whole line, when its discount
+ * covers it. The till prints and bills that copy at 0, not at the menu price.
+ */
+export function givenAwayAmount(line: PromotableLine): number {
+  if (!line.appliedPromotionId || !isFocLine(line)) return 0;
+  return Number(line.quantity || 0) * Number(line.unitPrice || 0);
+}
+
+/** What the promotions gave away as whole free copies on a bill. */
+export function givenAwayDiscount(lines: PromotableLine[]): number {
+  return lines.reduce((sum, line) => sum + givenAwayAmount(line), 0);
+}
+
 /** How the till writes a running promotion: its name, then what it gives. */
 export function promotionSummary(
   promotion: RunningPromotion,

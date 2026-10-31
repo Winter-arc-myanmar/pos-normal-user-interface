@@ -17,6 +17,8 @@ export interface SignInRequestDTO {
   userId: string;
   password: string;
   type: AuthSignInTypeDTO;
+  /** "pos": the account is signed in on this device only; the one before is signed out. */
+  app?: "pos";
 }
 
 export interface SetActiveBranchRequestDTO {

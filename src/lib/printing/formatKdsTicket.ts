@@ -115,7 +115,7 @@ export interface SaleReceipt extends PrintParty {
   showPrices?: boolean;
   template?: PrintTemplateSettings;
   paperWidth?: PrintPaperWidth;
-  /** Totals print as 100,000 MMK or $ 100,000; plain numbers without it. */
+  /** Totals print as 100,000, or $ 100,000 for dollars; plain numbers without it. */
   currency?: PriceCurrency;
   /** The closing line; "Thank you!" on a customer's receipt when left out. */
   footer?: string;
@@ -425,16 +425,18 @@ export function printMoney(value?: string | number | null): string {
   });
 }
 
-/** An amount in the business's money: "100,000 MMK", "$ 100,000", "-$ 2,825". */
+/** An amount in the business's money: "100,000", "$ 100,000", "-$ 2,825". */
 export function printAmount(
   value?: string | number | null,
   currency?: PriceCurrency
 ): string {
   const text = printMoney(value);
   if (!text || !currency || !Number.isFinite(Number(value))) return text;
+  // Kyat is the shop's own money, so a slip prints the number on its own.
+  if (currency !== "USD") return text;
   const sign = text.startsWith("-") ? "-" : "";
   const digits = sign ? text.slice(1) : text;
-  return currency === "USD" ? `${sign}$ ${digits}` : `${sign}${digits} MMK`;
+  return `${sign}$ ${digits}`;
 }
 
 const quantityText = (value: string) => {
@@ -598,7 +600,7 @@ function kitchenLayout(slip: KitchenSlip): Layout {
 /** How a room service reads on paper, and what its place is called. */
 const ROOM_SERVICES: Record<string, { name: string; place: string }> = {
   SPA: { name: "SPA", place: "Room" },
-  KTV: { name: "KTV", place: "KTV" },
+  KTV: { name: "VIP Lounge", place: "Room" },
 };
 
 function receiptLayout(receipt: SaleReceipt): Layout {
@@ -817,7 +819,7 @@ export function kdsTicketPlace(
   // A KTV room goes by the tenant's own name; only fall back to a generic one
   // when the company has not loaded.
   if (place?.kind === "KTV_ROOM" && place.number) {
-    return `${tenantName?.trim() || "KTV"} ${place.number}`;
+    return `${tenantName?.trim() || "VIP Lounge"} ${place.number}`;
   }
   if (ticket.pickupNumber) return `Pickup ${ticket.pickupNumber}`;
   if (place?.kind === "COUNTER") return "Counter";

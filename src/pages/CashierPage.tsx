@@ -69,7 +69,12 @@ import {
 import { isUnspendableWalletStatus } from "@/lib/pos/guestWalletAmounts";
 import { isSettledSalesOrder } from "@/lib/pos/orderStatus";
 import { isPendingKdsLine, pendingKdsLines } from "@/lib/pos/kdsLines";
-import { linePromotionSaving, promotionPreviewItems } from "@/lib/pos/promotions";
+import {
+  givenAwayAmount,
+  givenAwayDiscount,
+  linePromotionSaving,
+  promotionPreviewItems,
+} from "@/lib/pos/promotions";
 import type { PromotionLine } from "@/lib/pos/promotions";
 import {
   findOpenTableSession,
@@ -701,6 +706,8 @@ export function CashierPage() {
       variantName?: string;
       quantity?: string | number;
       unitPrice?: string;
+      lineDiscount?: string;
+      appliedPromotionId?: string;
       taxAmount?: string;
       taxInclusive?: boolean;
       categoryId?: string;
@@ -724,14 +731,19 @@ export function CashierPage() {
           lineHostess(line)
         );
         const quantity = Number(line.quantity || 1);
-        const unitPrice = withoutTax && line.taxInclusive && quantity > 0
-          ? toMoney(Number(line.unitPrice || 0) - Number(line.taxAmount || 0) / quantity)
-          : line.unitPrice?.trim();
+        // A copy its promotion gave away prints at 0, not at the menu price with
+        // the saving left to the discount row.
+        const givenAway = givenAwayAmount(line) > 0;
+        const unitPrice = givenAway
+          ? toMoney(0)
+          : withoutTax && line.taxInclusive && quantity > 0
+            ? toMoney(Number(line.unitPrice || 0) - Number(line.taxAmount || 0) / quantity)
+            : line.unitPrice?.trim();
         const name = line.productName || product?.name || line.variantName || "Item";
-        const note = notePrices
+        const note = notePrices && !givenAway
           ? linePriceNote(line.unitPrice, menuPriceFor(line))
           : undefined;
-        const promotion = promotionOf?.(line);
+        const promotion = givenAway ? undefined : promotionOf?.(line);
         return {
           variantId: line.variantId,
           name: note ? t(`cashier.orderPanel.priceNote.${note}`, { name }) : name,
@@ -990,6 +1002,12 @@ export function CashierPage() {
     ? toMoney(paymentBillLines.reduce((sum, line) => sum + Number(line.lineDiscount || 0), 0)
       + (isDirectCheckoutMode ? 0 : Math.max(0, Number(discountAmount) || 0)))
     : discountAmount);
+  // A copy a promotion gave away prints at 0, so the items and the discount row
+  // leave its value out: the rows still add up to the subtotal, and the total
+  // does not take the giveaway off twice.
+  const receiptGivenAway = givenAwayDiscount(paymentBillLines);
+  const receiptItemsSubtotal = toMoney(Number(receiptSubtotal) - receiptGivenAway);
+  const receiptItemsDiscount = toMoney(Number(receiptDiscount) - receiptGivenAway);
   /** How a promotion on one line reads under that item, e.g. "1+1  -10,000". */
   const promotionForLine = (line: PromotionLine) => {
     const saving = linePromotionSaving(
@@ -2279,8 +2297,8 @@ export function CashierPage() {
         receiptId: selectedOrder?.orderNumber,
         ...receiptParty(true),
         lines: printableLines(paymentBillLines, !billOptions.includeTax, true, promotionForLine),
-        subtotal: receiptSubtotal,
-        discount: Number(receiptDiscount) > 0 ? receiptDiscount : undefined,
+        subtotal: receiptItemsSubtotal,
+        discount: Number(receiptItemsDiscount) > 0 ? receiptItemsDiscount : undefined,
         tax: Number(receiptTax) > 0 ? receiptTax : undefined,
         serviceCharge: Number(receiptServiceCharge) > 0 ? receiptServiceCharge : undefined,
         // The tip is inside the total below, so the slip says so.
@@ -3377,8 +3395,8 @@ export function CashierPage() {
             receiptId: selectedOrder?.orderNumber,
             ...receiptParty(),
             lines: printableLines(paymentBillLines, !billOptions.includeTax, true, promotionForLine),
-            subtotal: receiptSubtotal,
-            discount: Number(receiptDiscount) > 0 ? receiptDiscount : undefined,
+            subtotal: receiptItemsSubtotal,
+            discount: Number(receiptItemsDiscount) > 0 ? receiptItemsDiscount : undefined,
             tax: Number(receiptTax) > 0 ? receiptTax : undefined,
             serviceCharge: Number(receiptServiceCharge) > 0 ? receiptServiceCharge : undefined,
             ...(Number(tipAmount) > 0

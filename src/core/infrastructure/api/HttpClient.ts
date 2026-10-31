@@ -164,7 +164,10 @@ export class HttpClient {
           const isOnLoginPage = window.location.pathname === "/login";
 
           if (!isLoginRequest && !isOnLoginPage && !isSessionRequest) {
-            this.handleTokenExpiration();
+            const message = String(error.response?.data?.message || "");
+            this.handleTokenExpiration(
+              /another device/i.test(message) ? "signed_in_elsewhere" : "session_expired"
+            );
             return Promise.reject(new Error("Authentication required"));
           }
 
@@ -203,7 +206,7 @@ export class HttpClient {
   /**
    * Handle token expiration by clearing tokens and redirecting to login
    */
-  private handleTokenExpiration(): void {
+  private handleTokenExpiration(reason = "session_expired"): void {
     if (this.isRedirecting) return; // Prevent multiple redirects
 
     this.isRedirecting = true;
@@ -215,7 +218,7 @@ export class HttpClient {
     // Show user-friendly message
     console.log("Your session has expired. Please log in again.");
 
-    clearAuthAndRedirectToLogin("session_expired");
+    clearAuthAndRedirectToLogin(reason);
   }
 
   /**
