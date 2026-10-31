@@ -81,6 +81,7 @@ export function SpaBillPanel({
   paid?: boolean;
   onPrimary: () => void;
   primaryLabel: string;
+  /** Restarts the clock of a room paused before pausing was taken away. */
   onTogglePause: () => void;
   /** Adjusts the bill as a whole (tax, service charge, discount, tip), as on the cashier. */
   onOpenBill?: () => void;
@@ -130,8 +131,9 @@ export function SpaBillPanel({
   // Time is bought (paid now, or on the bill to pay at the end), never run up on a clock.
   const canExtend = prepaid || quote?.paymentTiming === "PAY_AT_END";
   // Bill & table joins the row whenever the bill can still be adjusted; Extend
-  // only when the room's time is bought rather than metered.
-  const actionCount = 1 + (onOpenBill ? 1 : 0) + (canExtend ? 1 : 0) + 1;
+  // only when the room's time is bought rather than metered. Rooms are no longer
+  // paused; one paused before that can still be resumed.
+  const actionCount = (isPaused ? 1 : 0) + (onOpenBill ? 1 : 0) + (canExtend ? 1 : 0) + 1;
   const actionGrid =
     actionCount >= 4 ? "grid-cols-4" : actionCount === 3 ? "grid-cols-3" : "grid-cols-2";
   const visibleLines = groupBillLines(
@@ -593,14 +595,16 @@ export function SpaBillPanel({
               {t("cashier.billOptions.titleWithTable")}
             </Button>
           ) : null}
-          <Button
-            variant="secondary"
-            className="min-w-0 px-2 leading-tight"
-            disabled={isBusy}
-            onClick={onTogglePause}
-          >
-            {isPaused ? tr("resume") : tr("pause")}
-          </Button>
+          {isPaused ? (
+            <Button
+              variant="secondary"
+              className="min-w-0 px-2 leading-tight"
+              disabled={isBusy}
+              onClick={onTogglePause}
+            >
+              {tr("resume")}
+            </Button>
+          ) : null}
           {canExtend ? (
             <Button
               variant="secondary"

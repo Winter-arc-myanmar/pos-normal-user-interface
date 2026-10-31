@@ -83,16 +83,15 @@ const renderPanel = (overrides: Record<string, unknown> = {}) => {
 };
 
 describe("SpaBillPanel actions", () => {
-  it("puts Bill & table beside Pause, Extend and the close button", () => {
-    const { onOpenBill, onTogglePause, onExtend, onPrimary } = renderPanel();
+  it("puts Bill & table beside Extend and the close button, without Pause", () => {
+    const { onOpenBill, onExtend, onPrimary } = renderPanel();
 
     fireEvent.click(
       screen.getByRole("button", { name: "cashier.billOptions.titleWithTable" })
     );
     expect(onOpenBill).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByRole("button", { name: "spa.pause" }));
-    expect(onTogglePause).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: "spa.pause" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "spa.extend" }));
     expect(onExtend).toHaveBeenCalledTimes(1);
@@ -107,7 +106,15 @@ describe("SpaBillPanel actions", () => {
     expect(
       screen.queryByRole("button", { name: "cashier.billOptions.titleWithTable" })
     ).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "spa.pause" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "spa.extend" })).toBeInTheDocument();
+  });
+
+  it("still restarts a room paused before Pause was taken away", () => {
+    const { onTogglePause } = renderPanel({
+      session: new SpaSession({ ...session, sessionState: "PAUSED" }),
+    });
+    fireEvent.click(screen.getByRole("button", { name: "spa.resume" }));
+    expect(onTogglePause).toHaveBeenCalledTimes(1);
   });
 
   it("hides the action row once the bill is closed", () => {

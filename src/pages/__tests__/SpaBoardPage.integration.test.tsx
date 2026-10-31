@@ -314,7 +314,7 @@ const renderPage = () =>
 const openRunningRoom = async () => {
   renderPage();
   fireEvent.click(screen.getByRole("button", { name: /SUITE1/ }));
-  await screen.findByRole("button", { name: "spa.pause" });
+  await screen.findByRole("button", { name: "spa.floor.move" });
 };
 
 const tapCard = async (uid = "04A3B2C1") => {
@@ -1036,8 +1036,8 @@ describe("SpaBoardPage", () => {
       expect(
         screen.getByRole("button", { name: "cashier.billOptions.done" })
       ).toBeInTheDocument();
-      // Pause keeps its place beside it.
-      expect(screen.getByRole("button", { name: "spa.pause" })).toBeInTheDocument();
+      // Rooms are no longer paused.
+      expect(screen.queryByRole("button", { name: "spa.pause" })).not.toBeInTheDocument();
 
       fireEvent.click(
         screen.getByRole("checkbox", { name: "cashier.payment.includeTax" })
