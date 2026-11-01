@@ -85,6 +85,7 @@ import { SpaBillPanel } from "./spa/SpaBillPanel";
 import { RoomFloorDialog, RoomFloorMode } from "./spa/RoomFloorDialog";
 import { PackagePicker } from "./spa/PackagePicker";
 import { SpaRoomTile } from "./spa/SpaRoomTile";
+import { ManagerApprovalDialog } from "@/components/shift/ManagerApprovalDialog";
 import { ManualTimesFields } from "./spa/ManualTimesFields";
 import {
   defaultManualTimes,
@@ -242,6 +243,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const [packageChoice, setPackageChoice] = useState<PackageChoice>({});
   const [extendChoice, setExtendChoice] = useState<PackageChoice>({});
   const [confirmEnd, setConfirmEnd] = useState(false);
+  // Charged items waiting for a manager before their money goes back to the card.
+  const [refundApproval, setRefundApproval] = useState<SalesOrderLine[] | null>(null);
   const tapKeys = useRef<Partial<Record<CardAction, string>>>({});
   const [showRoomForm, setShowRoomForm] = useState(false);
   const [editingRoom, setEditingRoom] = useState<SpaRoom | null>(null);
@@ -1433,7 +1436,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     }
   };
 
-  const removeLine = async (line: SalesOrderLine) => {
+  const removeLine = async (line: SalesOrderLine, approverToken?: string) => {
     if (!session?.salesOrderId || billClosed) return;
     const sources = sourceLinesOf(line);
     setActionError(null);
@@ -1452,7 +1455,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         let refunded = 0;
         let balanceAfter = wallet?.balance || "0";
         for (const source of sources) {
-          const result = await refundLine(session.id, source.id);
+          const result = await refundLine(session.id, source.id, undefined, approverToken);
           refunded += Math.abs(Number(result.charged));
           balanceAfter = result.balanceAfter;
         }
@@ -1478,8 +1481,13 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     }
   };
 
-  const removeLines = async (group: SalesOrderLine[]) => {
-    for (const line of [...group].reverse()) await removeLine(line);
+  const removeLines = async (group: SalesOrderLine[], approverToken?: string) => {
+    // Money going back to the card waits for a manager, once for the whole row.
+    if (!approverToken && quote?.prepaid && group.some((line) => !line.compReasonId)) {
+      setRefundApproval(group);
+      return;
+    }
+    for (const line of [...group].reverse()) await removeLine(line, approverToken);
   };
 
   const changeRooms = async (
@@ -2920,6 +2928,35 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             </div>
           </div>
         </div>
+      ) : null}
+
+      {refundApproval ? (
+        <ManagerApprovalDialog
+          title={tr("refundApprovalTitle", {
+            item: lineDisplayName(refundApproval[0]) || refundApproval[0].productName || tr("item"),
+          })}
+          permission="sales:refund:approve"
+          confirmLabel={tr("refundApprovalConfirm")}
+          onCancel={() => setRefundApproval(null)}
+          onApproved={async (token) => {
+            await removeLines(refundApproval, token);
+            setRefundApproval(null);
+          }}
+        >
+          {tr("refundApprovalBody", {
+            amount: money(
+              refundApproval
+                .filter((line) => !line.compReasonId)
+                .reduce(
+                  (sum, line) =>
+                    sum +
+                    Number(line.quantity || 0) * Number(line.unitPrice || 0) -
+                    Number(line.lineDiscount || 0),
+                  0
+                )
+            ),
+          })}
+        </ManagerApprovalDialog>
       ) : null}
 
       {confirmEnd && session ? (

@@ -24,5 +24,10 @@ export interface ISpaRepository {
   extendSession(id: string, payload: ExtendSpaSessionDTO): Promise<SpaChargeResultDTO>;
   chargeItems(id: string, payload: ChargeSpaItemsDTO): Promise<SpaChargeResultDTO>;
   giveFree(id: string, payload: GiveFreeItemsDTO): Promise<SpaChargeResultDTO>;
-  refundLine(id: string, lineId: string, reason?: string): Promise<SpaChargeResultDTO>;
+  refundLine(
+    id: string,
+    lineId: string,
+    reason?: string,
+    approverToken?: string
+  ): Promise<SpaChargeResultDTO>;
 }

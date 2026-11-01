@@ -30,6 +30,7 @@ let venueState: {
 };
 
 const mocks = vi.hoisted(() => ({
+  approve: vi.fn(),
   fetchBoard: vi.fn(),
   fetchOrderBill: vi.fn(),
   addExtraFeeLine: vi.fn(),
@@ -151,6 +152,10 @@ const scrubVariant = { id: "variant-scrub", productId: "product-scrub", priceMod
 
 let rooms = [room("wallet-1")];
 let lines: Record<string, unknown>[] = [];
+
+vi.mock("@/components/shift/shiftApi", () => ({
+  shiftApi: () => ({ approve: mocks.approve }),
+}));
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -327,6 +332,7 @@ const tapCard = async (uid = "04A3B2C1") => {
 describe("SpaBoardPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.approve.mockResolvedValue({ token: "approval-token" });
     placeChargesState = [];
     venueState = { paymentTiming: "PAY_WHEN_ORDERING" };
     rooms = [room("wallet-1")];
@@ -1264,7 +1270,7 @@ describe("SpaBoardPage", () => {
       );
     });
 
-    it("refunds a wrong item to the card without asking for it", async () => {
+    it("refunds a wrong item to the card once a manager signs it off", async () => {
       lines = [
         {
           id: "line-1",
@@ -1280,9 +1286,21 @@ describe("SpaBoardPage", () => {
       await openRunningRoom();
       fireEvent.click(screen.getByRole("button", { name: "spa.refundLine" }));
 
+      expect(await screen.findByText("spa.refundApprovalTitle")).toBeInTheDocument();
+      expect(mocks.refundLine).not.toHaveBeenCalled();
+      fireEvent.change(screen.getByLabelText("shift.managerId"), { target: { value: "MGR0001" } });
+      fireEvent.change(screen.getByLabelText("shift.managerPassword"), { target: { value: "secret" } });
+      fireEvent.click(screen.getByRole("button", { name: "spa.refundApprovalConfirm" }));
+
       await waitFor(() =>
-        expect(mocks.refundLine).toHaveBeenCalledWith("session-1", "line-1")
+        expect(mocks.refundLine).toHaveBeenCalledWith(
+          "session-1",
+          "line-1",
+          undefined,
+          "approval-token"
+        )
       );
+      expect(mocks.approve).toHaveBeenCalledWith("MGR0001", "secret", "sales:refund:approve");
       expect(mocks.lookupCard).not.toHaveBeenCalled();
     });
 

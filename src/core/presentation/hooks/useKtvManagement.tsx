@@ -193,9 +193,9 @@ export function useKtvManagement() {
   );
 
   const refundLine = useCallback(
-    (id: string, lineId: string, reason?: string) =>
+    (id: string, lineId: string, reason?: string, approverToken?: string) =>
       run(async () => {
-        const result = await service.refundLine(id, lineId, reason);
+        const result = await service.refundLine(id, lineId, reason, approverToken);
         setQuote(result.quote);
         return result;
       }),

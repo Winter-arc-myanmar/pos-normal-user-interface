@@ -18,7 +18,7 @@ const quantityText = (value: string) => {
 export class RefundService implements IRefundService {
   constructor(private refundRepository: IRefundRepository) {}
 
-  async createRefund(payload: CreateRefundDTO): Promise<SalesRefund> {
+  async createRefund(payload: CreateRefundDTO, approverToken?: string): Promise<SalesRefund> {
     if (!payload.tenantId?.trim()) throw new Error("Tenant is required");
     if (!payload.salesOrderId?.trim()) throw new Error("Sales order is required");
     if (!payload.reason?.trim()) throw new Error("Reason is required");
@@ -36,7 +36,7 @@ export class RefundService implements IRefundService {
         salesOrderLineId: item.salesOrderLineId,
         returnedQuantity: quantityText(item.returnedQuantity),
       })),
-    });
+    }, approverToken);
   }
 
   async getRefundById(id: string): Promise<SalesRefund> {

@@ -1283,6 +1283,11 @@
       "tax": "Tax",
       "includedTax": "Tax included in prices",
       "tip": "Tip"
+    },
+    "voidApproval": {
+      "title": "Void {{number}}?",
+      "body": "All {{amount}} is given back and the stock returns.",
+      "confirm": "Void sale"
     }
   },
   "salesOrders": {
@@ -1430,7 +1435,8 @@
       "missingSession": "Enter a POS session.",
       "missingReason": "Enter a reason for the refund.",
       "missingItems": "Add a sales order line and a quantity.",
-      "itemsFailed": "Could not load the order's items."
+      "itemsFailed": "Could not load the order's items.",
+      "failed": "Could not process the refund."
     }
   },
   "router": {
@@ -1803,6 +1809,9 @@
       "failed": "Could not change the room.",
       "paidAsItGoes": "Split and Merge are for rooms paid at the end."
     },
+    "refundApprovalTitle": "Refund {{item}} to the card?",
+    "refundApprovalBody": "{{amount}} goes back to the guest card.",
+    "refundApprovalConfirm": "Refund",
     "sessionTime": "Room clock: {{time}}",
     "manualIn": "In",
     "manualOut": "Out"
@@ -2186,6 +2195,8 @@
     "logoutRoom": "The day stays open for the next person until it is closed.",
     "byPayment": "By payment type",
     "dailyShift": "Shift: once a day",
-    "perLoginShift": "Shift: per login"
+    "perLoginShift": "Shift: per login",
+    "managerApproval": "Manager approval",
+    "managerRequired": "A manager must type their User ID and password."
   }
 }

@@ -188,5 +188,5 @@ export interface ICashierRepository {
   startKdsTicket(id: string): Promise<KdsTicket>;
   readyKdsTicket(id: string): Promise<KdsTicket>;
   checkout(payload: CheckoutRequestDTO): Promise<Record<string, unknown>>;
-  voidCheckout(id: string): Promise<VoidCheckoutResultDTO>;
+  voidCheckout(id: string, approverToken?: string): Promise<VoidCheckoutResultDTO>;
 }

@@ -38,6 +38,7 @@ let venueState: {
 };
 
 const mocks = vi.hoisted(() => ({
+  approve: vi.fn(),
   fetchBoard: vi.fn(),
   fetchOrderBill: vi.fn(),
   getQuote: vi.fn(),
@@ -119,6 +120,10 @@ const paidQuote = {
 };
 
 let rooms: Record<string, unknown>[] = [freeRoom];
+
+vi.mock("@/components/shift/shiftApi", () => ({
+  shiftApi: () => ({ approve: mocks.approve }),
+}));
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -298,6 +303,7 @@ const tapCard = async () => {
 describe("KtvBoardPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.approve.mockResolvedValue({ token: "approval-token" });
     venueState = { paymentTiming: "PAY_WHEN_ORDERING" };
     rooms = [freeRoom];
     rentalsState = [];
