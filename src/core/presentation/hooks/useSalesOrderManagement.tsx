@@ -13,6 +13,11 @@ import {
   SettleSalesOrderDTO,
   SettleSalesOrderResultDTO,
   VoidSalesOrderLineDTO,
+  EditSalesOrderDTO,
+  EditSalesOrderPreviewDTO,
+  EditSalesOrderPreviewResultDTO,
+  EditSalesOrderResultDTO,
+  SalesOrderEditDTO,
 } from "../../application/dtos/SalesOrderDTO";
 import { SalesOrder, SalesOrderLine } from "../../domain/entities/Cashier";
 import { ISalesOrderService } from "../../domain/services/ISalesOrderService";
@@ -41,6 +46,16 @@ interface UseSalesOrderManagementReturn {
     id: string,
     payload: SettleSalesOrderDTO
   ) => Promise<SettleSalesOrderResultDTO>;
+  previewOrderEdit: (
+    id: string,
+    payload: EditSalesOrderPreviewDTO
+  ) => Promise<EditSalesOrderPreviewResultDTO>;
+  editOrder: (
+    id: string,
+    payload: EditSalesOrderDTO,
+    approverToken: string
+  ) => Promise<EditSalesOrderResultDTO>;
+  fetchOrderEdits: (id: string) => Promise<SalesOrderEditDTO[]>;
   fetchOrderLines: (
     salesOrderId: string,
     params?: SalesOrderFilterDTO
@@ -209,6 +224,34 @@ export function useSalesOrderManagement(): UseSalesOrderManagementReturn {
       }
     },
     [clearError, salesOrderService]
+  );
+
+  const previewOrderEdit = useCallback(
+    (id: string, payload: EditSalesOrderPreviewDTO) =>
+      salesOrderService.previewSalesOrderEdit(id, payload),
+    [salesOrderService]
+  );
+
+  const editOrder = useCallback(
+    async (id: string, payload: EditSalesOrderDTO, approverToken: string) => {
+      try {
+        setIsLoading(true);
+        clearError();
+        return await salesOrderService.editSalesOrder(id, payload, approverToken);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to edit sales order";
+        setError(message);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [clearError, salesOrderService]
+  );
+
+  const fetchOrderEdits = useCallback(
+    (id: string) => salesOrderService.getSalesOrderEdits(id),
+    [salesOrderService]
   );
 
   const deleteOrder = useCallback(
@@ -380,6 +423,9 @@ export function useSalesOrderManagement(): UseSalesOrderManagementReturn {
     updateOrder,
     deleteOrder,
     settleOrder,
+    previewOrderEdit,
+    editOrder,
+    fetchOrderEdits,
     fetchOrderLines,
     addOrderLine,
     updateOrderLine,
