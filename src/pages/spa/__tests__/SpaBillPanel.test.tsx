@@ -153,6 +153,48 @@ describe("SpaBillPanel actions", () => {
     expect(screen.getByText(/^0 · Buy 1 Get 1$/)).toBeInTheDocument();
   });
 
+  it("shows every rate the room sells as room time, with no stepper", () => {
+    const roomRate = (id: string, over: Record<string, string>) =>
+      new SalesOrderLine({
+        id,
+        salesOrderId: "order-1",
+        quantity: "1.0000",
+        unitPrice: "20000.0000",
+        ...over,
+      });
+
+    renderPanel({
+      room: new SpaRoom({
+        id: "room-102",
+        roomNumber: "102",
+        name: "VIP 102",
+        minimumMinutes: 60,
+        status: "OCCUPIED",
+        rateVariantId: "variant-hour",
+        sessionPrice: "40000.0000",
+      }),
+      rentalVariantIds: new Set(["variant-hour", "variant-half"]),
+      lines: [
+        roomRate("line-hour", { variantId: "variant-hour", quantity: "2.0000", unitPrice: "40000.0000" }),
+        roomRate("line-half", { variantId: "variant-half" }),
+        roomRate("line-beer", {
+          variantId: "variant-beer",
+          productName: "Myanmar Beer",
+          unitPrice: "4000.0000",
+        }),
+      ],
+    });
+
+    // Both rates read as room time, and neither can be changed from the bill.
+    expect(screen.getAllByText("spa.treatmentCharge")).toHaveLength(2);
+    expect(screen.getByText("× 1")).toBeInTheDocument();
+    expect(screen.getByText("× 2")).toBeInTheDocument();
+    // Only the menu line keeps its − / + and its remove button.
+    expect(screen.getAllByRole("button", { name: "spa.decrease" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "spa.increase" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "spa.removeLine" })).toHaveLength(1);
+  });
+
   it("shows the room session a free-time promotion gave away at 0", () => {
     const hour = (id: string, lineDiscount: string) =>
       new SalesOrderLine({

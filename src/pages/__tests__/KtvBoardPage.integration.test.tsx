@@ -513,6 +513,23 @@ describe("KtvBoardPage", () => {
       );
     });
 
+    it("shows every rate on the bill as room time, without a stepper", async () => {
+      rooms = [busyRoom];
+      rentalsState = [ownRate, halfHour];
+      orderLinesState = [
+        { id: "line-1", variantId: "variant-ktv", quantity: "2", unitPrice: "40000" },
+        { id: "line-2", variantId: "variant-half", quantity: "1", unitPrice: "20000" },
+        { id: "line-3", variantId: "variant-beer", quantity: "2", unitPrice: "4000" },
+      ];
+      renderPage();
+      fireEvent.click(screen.getByRole("button", { name: /K1/ }));
+
+      // Both rates read as room time; only the drinks keep their bill controls.
+      expect(await screen.findAllByText("ktvPos.treatmentCharge")).toHaveLength(2);
+      expect(screen.getAllByRole("button", { name: "ktvPos.increase" })).toHaveLength(1);
+      expect(screen.getAllByRole("button", { name: "ktvPos.refundLine" })).toHaveLength(1);
+    });
+
     it("adds 2 hours and a 30 min block to a running room", async () => {
       rooms = [busyRoom];
       rentalsState = [ownRate, halfHour];

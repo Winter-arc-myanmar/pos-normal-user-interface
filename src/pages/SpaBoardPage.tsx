@@ -750,6 +750,11 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     () => new Set(rooms.map((item) => item.rateProductId).filter(Boolean)),
     [rooms]
   );
+  /** KTV: every rate this room sells, so the bill reads them all as room time. */
+  const rentalVariantIds = useMemo(
+    () => new Set(rentals.map((item) => item.variantId)),
+    [rentals]
+  );
   // Room time and packages are booked with the room, never ordered from the menu. A
   // product sold only at other areas stays off, and only KTV can pick a hostess.
   const area = isSpa ? "SPA" : "KTV";
@@ -2480,6 +2485,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             pendingDiscounts={promotions.discounts}
             promotionName={promotions.promotionName}
             packageVariantIds={packageVariantIds}
+            rentalVariantIds={rentalVariantIds}
             breakdown={endBreakdown}
             extraFeeLabel={t("cashier.extraFee.button")}
             onAddExtraFee={endBillOrderId && !paid ? () => setExtraFeeOpen(true) : undefined}

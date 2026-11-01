@@ -59,6 +59,7 @@ export function SpaBillPanel({
   pendingDiscounts = {},
   promotionName = () => undefined,
   packageVariantIds,
+  rentalVariantIds,
   breakdown,
   extraFeeLabel,
   onAddExtraFee,
@@ -106,6 +107,11 @@ export function SpaBillPanel({
   promotionName?: (id: string | undefined) => string | undefined;
   /** SPA package lines: booked treatments, shown by name and never edited. */
   packageVariantIds?: Set<string>;
+  /**
+   * KTV: every rate the room sells (its own rate, an hour, a half hour). They are
+   * all room time, so a row of any of them is shown and never edited from the bill.
+   */
+  rentalVariantIds?: Set<string>;
   /** A bill paid at the end: how its total is made up, as on the cashier. */
   breakdown?: BillBreakdown;
   extraFeeLabel?: string;
@@ -262,7 +268,12 @@ export function SpaBillPanel({
             // so the promo badge belongs to whichever copy carries it.
             const promotedLine = group.lines.find((item) => item.appliedPromotionId);
             const isPackage = Boolean(packageVariantIds?.has(line.variantId));
-            const isTreatment = line.variantId === room?.rateVariantId || isPackage;
+            // Room time: the room's own rate, and any other rate the party bought
+            // (an hour, a half hour) - the same time sold in another block.
+            const isRoomTime =
+              line.variantId === room?.rateVariantId ||
+              Boolean(rentalVariantIds?.has(line.variantId));
+            const isTreatment = isRoomTime || isPackage;
             const isFoc = Boolean(line.compReasonId);
             // What one of the row is charged: a copy a promotion gave away, or one
             // given free, reads 0 here instead of the menu or session price.
