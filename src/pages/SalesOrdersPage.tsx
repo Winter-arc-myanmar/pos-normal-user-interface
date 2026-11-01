@@ -7,9 +7,12 @@ import { OrderStatus } from "@/core/application/dtos/CashierDTO";
 import type { SalesOrderEditDTO } from "@/core/application/dtos/SalesOrderDTO";
 import { SalesOrder } from "@/core/domain/entities/Cashier";
 import { useAuth } from "@/core/presentation/hooks/useAuth";
+import { useExtraFees } from "@/core/presentation/hooks/useExtraFees";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
 import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
 import { useSalesOrderManagement } from "@/core/presentation/hooks/useSalesOrderManagement";
+import { useRoomText } from "@/core/presentation/hooks/useRoomText";
+import { useWorkingHostesses } from "@/core/presentation/hooks/useWorkingHostesses";
 import { useDateFormatter, useNumberFormatter } from "@/lib/i18n/formatters";
 import {
   formatPosQuantity,
@@ -17,8 +20,8 @@ import {
   salesOrderServiceTypeKey,
   salesOrderStatusKey,
 } from "@/lib/pos/orderListDisplay";
-import { modifierPrintText } from "@/lib/printing/modifierText";
 import { cashierLabel } from "@/lib/printing/cashier";
+import { reprintSlip } from "@/lib/printing/reprintSlip";
 import { EditOrderDialog } from "./salesOrders/EditOrderDialog";
 
 type StatusTab = "open" | "completed" | "voided";
@@ -122,6 +125,22 @@ export function SalesOrdersPage() {
   const tenantId = String(user?.tenantId || "");
   const locationId = activeLocationId;
   const printer = usePrinterConnection(tenantId, activePosRegisterId, locationId);
+  const { isFeeLine } = useExtraFees();
+  const ktvText = useRoomText("ktv");
+  const spaText = useRoomText("spa");
+  const { hostesses, load: loadHostesses } = useWorkingHostesses();
+
+  useEffect(() => {
+    void loadHostesses();
+  }, [loadHostesses]);
+
+  const hostessName = useCallback(
+    (id: string) => {
+      const hostess = hostesses.find((item) => item.id === id);
+      return hostess ? hostess.nickname || hostess.name : undefined;
+    },
+    [hostesses]
+  );
 
   const statusFilter = statusTabFilters[statusTab];
 
@@ -235,37 +254,35 @@ export function SalesOrdersPage() {
     if (!selectedOrder) return;
     setLocalError(null);
     try {
-      await printer.printReceipt({
-        title: selectedOrder.orderNumber || "RECEIPT",
-        place: "CHECKOUT",
-        showLogo: true,
-        showPrices: true,
-        receiptId: selectedOrder.orderNumber,
-        cashier: cashierLabel(selectedOrder.cashier, user),
-        serviceType: t(salesOrderServiceTypeKey(selectedOrder.serviceType)),
-        pickupCode: selectedOrder.pickupNumber,
-        lines: orderLines.map((line) => {
-          const modifiers = modifierPrintText(line.selectedModifiers);
-          const unitPrice = line.unitPrice?.trim();
-          return {
-            name: lineDisplayName(line) || t("salesOrders.item"),
-            quantity: String(line.quantity || "1"),
-            unitPrice: unitPrice || undefined,
-            modifiers: modifiers.names,
-            modifierPrices: modifiers.prices,
-          };
-        }),
-        subtotal: selectedOrder.subtotal,
-        discount: selectedOrder.totalDiscount,
-        tax: Number(selectedOrder.totalTax) > 0 ? selectedOrder.totalTax : undefined,
-        // Print template does not support extra fee or tip.
-        // extraFee:
-        //   Number(selectedOrder.serviceCharge) > 0
-        //     ? selectedOrder.serviceCharge
-        //     : undefined,
-        // tip: Number(selectedOrder.tipAmount) > 0 ? selectedOrder.tipAmount : undefined,
-        total: selectedOrder.grandTotal,
-      });
+      const isRoom = Boolean(selectedOrder.place && selectedOrder.place.kind !== "TABLE");
+      const tr = selectedOrder.place?.kind === "KTV" ? ktvText : spaText;
+      await printer.printReceipt(
+        reprintSlip({
+          order: selectedOrder,
+          lines: orderLines,
+          outletName: selectedOrder.locationName,
+          cashier: cashierLabel(selectedOrder.cashier, user),
+          hostessName,
+          isFeeLine,
+          formatDateTime,
+          text: {
+            item: isRoom ? tr("item") : t("salesOrders.item"),
+            aHostess: isRoom ? tr("aHostess") : t("cashier.orderPanel.aHostess"),
+            promo: t("cashier.orderPanel.promo"),
+            tip: isRoom ? tr("tip") : t("receipt.tip"),
+            startTime: t("receipt.startTime"),
+            endTime: t("receipt.endTime"),
+            serviceType: (service) => {
+              const key = `settings.cashier.serviceTypes.${service}`;
+              const label = t(key);
+              return label === key ? service.replaceAll("_", " ") : label;
+            },
+            orderedBy: (name) =>
+              isRoom ? tr("orderedBy", { name }) : t("cashier.orderPanel.orderedBy", { name }),
+            priceNote: (note, name) => t(`cashier.orderPanel.priceNote.${note}`, { name }),
+          },
+        })
+      );
     } catch (caught) {
       setLocalError(caught instanceof Error ? caught.message : t("salesOrders.printFailed"));
     }

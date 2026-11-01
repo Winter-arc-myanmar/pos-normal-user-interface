@@ -127,6 +127,20 @@ export class TaxRate {
   }
 }
 
+export interface SalesOrderPlace {
+  kind: "TABLE" | "KTV" | "SPA";
+  number: string;
+  openedAt: string;
+  closedAt?: string | null;
+}
+
+export interface SalesOrderPaymentSummary {
+  methodName: string;
+  methodKind?: string;
+  amount: string;
+  paidAt?: string;
+}
+
 export class SalesOrder {
   id!: string;
   tenantId!: string;
@@ -152,6 +166,12 @@ export class SalesOrder {
   customerName?: string;
   itemCount?: number;
   itemSummary?: string;
+  /** The outlet the order was sold at; only on one order. */
+  locationName?: string;
+  /** The table or room the bill was run up at, with when it opened and closed; only on one order. */
+  place?: SalesOrderPlace | null;
+  /** The payments on the bill with their method's name; only on one order. */
+  payments?: SalesOrderPaymentSummary[];
   createdAt!: string;
   updatedAt!: string;
 
@@ -182,6 +202,10 @@ export class SalesOrderLine {
   seatNumber?: number;
   /** The hostess who gave this service, on a KTV bill. */
   hostessId?: string;
+  /** Whether the product names the hostess who gave it, rather than who ordered it. */
+  askWhoServed?: boolean;
+  /** The promotions the line was sold under, as the server recorded them. */
+  promotionNames?: string[];
   productName?: string;
   variantName?: string;
   sku?: string;

@@ -80,6 +80,18 @@ vi.mock("@/core/presentation/hooks/usePosWorkspace", () => ({
   }),
 }));
 
+vi.mock("@/core/presentation/hooks/useExtraFees", () => ({
+  useExtraFees: () => ({ fees: [], isFeeLine: () => false }),
+}));
+
+vi.mock("@/core/presentation/hooks/useWorkingHostesses", () => ({
+  useWorkingHostesses: () => ({ hostesses: [], load: () => Promise.resolve() }),
+}));
+
+vi.mock("@/core/presentation/hooks/useRoomText", () => ({
+  useRoomText: () => (key: string) => key,
+}));
+
 vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
   usePrinterConnection: () => ({
     printReceipt: vi.fn().mockResolvedValue(undefined),
