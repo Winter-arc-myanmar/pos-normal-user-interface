@@ -1631,7 +1631,8 @@
       "foc": "Could not give the items free",
       "packages": "Couldn't load the service packages: {{message}}",
       "tipMethod": "Choose how the tip is paid",
-      "oneCardPerBill": "Only one member card can pay a bill. Split the rest with other methods."
+      "oneCardPerBill": "Only one member card can pay a bill. Split the rest with other methods.",
+      "manualTimes": "The Out time can't be before the In time."
     },
     "item": "Item",
     "treatmentSoFar": "Treatment so far",
@@ -1757,7 +1758,10 @@
       "splitDone": "Items moved to room {{room}}.",
       "failed": "Could not change the room.",
       "paidAsItGoes": "Split and Merge are for rooms paid at the end."
-    }
+    },
+    "sessionTime": "Room clock: {{time}}",
+    "manualIn": "In",
+    "manualOut": "Out"
   },
   "statusBadge": {
     "verified": "Verified",
