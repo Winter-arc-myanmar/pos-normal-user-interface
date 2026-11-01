@@ -82,6 +82,11 @@ export class ApiRefundRepository implements IRefundRepository {
   constructor(private httpClient: HttpClient) {}
 
   async createRefund(payload: CreateRefundDTO, approverToken?: string): Promise<SalesRefund> {
+    /**
+     * The backend derives the tenant from the auth token and rejects unknown
+     * properties ("property tenantId should not exist"), so the body carries
+     * only the fields the refund contract declares.
+     */
     const response = await this.httpClient.post<ApiEnvelope<Record<string, unknown>>>(
       API_ENDPOINTS.REFUNDS.CREATE,
       {
@@ -93,7 +98,6 @@ export class ApiRefundRepository implements IRefundRepository {
           salesOrderLineId: item.salesOrderLineId,
           returnedQuantity: item.returnedQuantity,
         })),
-        tenantId: payload.tenantId,
       },
       approverToken ? { headers: { "x-approver-authorization": approverToken } } : undefined
     );

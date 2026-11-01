@@ -446,15 +446,100 @@ describe("KtvBoardPage", () => {
     it("starts a room on another rental the cashier picks, at its minimum", async () => {
       rentalsState = [ownRate, vip];
       mocks.openSession.mockResolvedValue(started);
+      mocks.extendSession.mockResolvedValue({
+        charged: "100000.0000",
+        balanceAfter: "100000.0000",
+        quote: paidQuote,
+      });
       renderPage();
       fireEvent.click(screen.getByRole("button", { name: /K1/ }));
       fireEvent.click(screen.getByRole("button", { name: /VIP hourly/ }));
       fireEvent.click(screen.getByRole("button", { name: "ktvPos.startAndPay" }));
       await tapCard();
 
+      // The room opens on its own rate, then the picked rate is added at its minimum.
       await waitFor(() =>
         expect(mocks.openSession).toHaveBeenCalledWith(
+          expect.objectContaining({ rentalVariantId: "variant-ktv", hours: 1 })
+        )
+      );
+      await waitFor(() =>
+        expect(mocks.extendSession).toHaveBeenCalledWith(
+          "ktv-session-1",
           expect.objectContaining({ rentalVariantId: "variant-vip", hours: 2 })
+        )
+      );
+    });
+
+    const halfHour = {
+      variantId: "variant-half",
+      productId: "product-half",
+      name: "KTV 30 min",
+      unitPrice: 20000,
+      blockMinutes: 30,
+      minimumUnits: 1,
+    };
+
+    it("books 2 hours and a 30 min block as one 2 h 30 min party", async () => {
+      rentalsState = [ownRate, halfHour];
+      mocks.openSession.mockResolvedValue(started);
+      mocks.extendSession.mockResolvedValue({
+        charged: "20000.0000",
+        balanceAfter: "80000.0000",
+        quote: paidQuote,
+      });
+      renderPage();
+      fireEvent.click(screen.getByRole("button", { name: /K1/ }));
+
+      // The room's own rate starts at one hour: one more hour, then one 30 min block.
+      fireEvent.click(screen.getAllByRole("button", { name: "ktvPos.moreRental" })[0]);
+      fireEvent.click(screen.getByRole("button", { name: /KTV 30 min/ }));
+      // 2 h at the room's price now (35,000) plus one 30 min block at 20,000.
+      expect(screen.getByText(/ktvPos\.sessionsSummary/)).toHaveTextContent("90,000");
+
+      fireEvent.click(screen.getByRole("button", { name: "ktvPos.startAndPay" }));
+      await tapCard();
+
+      await waitFor(() =>
+        expect(mocks.openSession).toHaveBeenCalledWith(
+          expect.objectContaining({ rentalVariantId: "variant-ktv", hours: 2 })
+        )
+      );
+      await waitFor(() =>
+        expect(mocks.extendSession).toHaveBeenCalledWith(
+          "ktv-session-1",
+          expect.objectContaining({ rentalVariantId: "variant-half", hours: 1 })
+        )
+      );
+    });
+
+    it("adds 2 hours and a 30 min block to a running room", async () => {
+      rooms = [busyRoom];
+      rentalsState = [ownRate, halfHour];
+      mocks.extendSession.mockResolvedValue({
+        charged: "40000.0000",
+        balanceAfter: "60000.0000",
+        quote: paidQuote,
+      });
+      renderPage();
+      fireEvent.click(screen.getByRole("button", { name: /K1/ }));
+      fireEvent.click(await screen.findByRole("button", { name: "ktvPos.extend" }));
+
+      fireEvent.click(screen.getAllByRole("button", { name: "ktvPos.moreRental" })[0]);
+      fireEvent.click(screen.getByRole("button", { name: /KTV 30 min/ }));
+      fireEvent.click(screen.getByRole("button", { name: "ktvPos.extendAndPay" }));
+      await tapCard();
+
+      await waitFor(() =>
+        expect(mocks.extendSession).toHaveBeenCalledWith(
+          "ktv-session-1",
+          expect.objectContaining({ rentalVariantId: "variant-ktv", hours: 2 })
+        )
+      );
+      await waitFor(() =>
+        expect(mocks.extendSession).toHaveBeenCalledWith(
+          "ktv-session-1",
+          expect.objectContaining({ rentalVariantId: "variant-half", hours: 1 })
         )
       );
     });
