@@ -253,7 +253,7 @@ interface UseCashierReturn {
   getKdsTicketById: (ticketId: string) => Promise<KdsTicket>;
   addPayment: (orderId: string, payload: CreateOrderPaymentDTO) => Promise<void>;
   processCheckout: (payload: CheckoutRequestDTO) => Promise<Record<string, unknown>>;
-  voidCheckout: (id: string) => Promise<VoidCheckoutResultDTO>;
+  voidCheckout: (id: string, approverToken?: string) => Promise<VoidCheckoutResultDTO>;
   resolveTableWarning: (
     openedAt?: string | null,
     nowMs?: number
@@ -1578,11 +1578,11 @@ export function useCashier(): UseCashierReturn {
   );
 
   const voidCheckout = useCallback(
-    async (id: string) => {
+    async (id: string, approverToken?: string) => {
       setIsLoading(true);
       clearError();
       try {
-        const result = await cashierService.voidCheckout(id);
+        const result = await cashierService.voidCheckout(id, approverToken);
         await fetchSalesOrders({ page: 1, limit: 100 });
         return result;
       } catch (err) {

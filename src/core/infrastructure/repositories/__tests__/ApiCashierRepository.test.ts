@@ -743,7 +743,7 @@ describe("ApiCashierRepository", () => {
 
     const result = await repository.voidCheckout("sale-1");
 
-    expect(post).toHaveBeenCalledWith("/api/v1/checkout/sale-1/void");
+    expect(post).toHaveBeenCalledWith("/api/v1/checkout/sale-1/void", undefined, undefined);
     expect(result).toEqual({
       orderId: "sale-1",
       orderNumber: "SO-20260402-0001",
@@ -753,6 +753,17 @@ describe("ApiCashierRepository", () => {
       status: "COMPLETED",
     });
   });
+  it("sends the manager's approval with a void", async () => {
+    const post = vi.fn().mockResolvedValue({ success: true, data: { orderId: "sale-1" } });
+    const repository = new ApiCashierRepository({ post } as unknown as HttpClient);
+
+    await repository.voidCheckout("sale-1", "approval-token");
+
+    expect(post).toHaveBeenCalledWith("/api/v1/checkout/sale-1/void", undefined, {
+      headers: { "x-approver-authorization": "approval-token" },
+    });
+  });
+
 
   it("lists discount reasons without activeOnly query params", async () => {
     const get = vi.fn().mockResolvedValue({

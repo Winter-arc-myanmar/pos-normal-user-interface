@@ -2,6 +2,9 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiLoadingState } from "@/components/ApiLoadingState";
 import { Button } from "@/components/ui/Button";
+import { ManagerApprovalFields } from "@/components/shift/ManagerApprovalFields";
+import { shiftApi } from "@/components/shift/shiftApi";
+import { EMPTY_MANAGER_LOGIN, ManagerLogin, managerLoginFilled } from "@/lib/pos/managerLogin";
 import { SalesOrderLine } from "@/core/domain/entities/Cashier";
 import { SalesRefund } from "@/core/domain/entities/SalesRefund";
 import { useAuth } from "@/core/presentation/hooks/useAuth";
@@ -167,6 +170,7 @@ export function RefundsPage() {
   const [refundMethod, setRefundMethod] = useState("CASH");
   const [posSessionId, setPosSessionId] = useState(activePosSessionId || "");
   const [items, setItems] = useState<DraftItem[]>([newItem()]);
+  const [manager, setManager] = useState<ManagerLogin>(EMPTY_MANAGER_LOGIN);
   const [notice, setNotice] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [itemsError, setItemsError] = useState<string | null>(null);
@@ -267,17 +271,30 @@ export function RefundsPage() {
       setLocalError(t("refunds.errors.missingItems"));
       return;
     }
+    if (!managerLoginFilled(manager)) {
+      setLocalError(t("shift.managerRequired"));
+      return;
+    }
     setLocalError(null);
     setNotice(null);
     try {
-      const created = await createRefund({
-        tenantId,
-        salesOrderId: orderId,
-        reason: reason.trim(),
-        refundMethod: refundMethod.trim(),
-        posSessionId: posSessionId.trim(),
-        items: payloadItems,
-      });
+      const { token } = await shiftApi().approve(
+        manager.userId.trim(),
+        manager.password,
+        "sales:refund:approve"
+      );
+      const created = await createRefund(
+        {
+          tenantId,
+          salesOrderId: orderId,
+          reason: reason.trim(),
+          refundMethod: refundMethod.trim(),
+          posSessionId: posSessionId.trim(),
+          items: payloadItems,
+        },
+        token
+      );
+      setManager(EMPTY_MANAGER_LOGIN);
       setShowForm(false);
       setNotice(
         t("refunds.processed", {
@@ -288,8 +305,8 @@ export function RefundsPage() {
       setReason("");
       setItems([newItem()]);
       if (loadedOrderId) await loadRefunds(page, loadedOrderId);
-    } catch {
-      // surfaced via hook error
+    } catch (caught) {
+      setLocalError(caught instanceof Error ? caught.message : t("refunds.errors.failed"));
     }
   };
 
@@ -550,6 +567,10 @@ export function RefundsPage() {
                     );
                   })}
                 </ul>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{t("shift.managerApproval")}</p>
+                <ManagerApprovalFields value={manager} onChange={setManager} />
               </div>
               <Button
                 type="button"

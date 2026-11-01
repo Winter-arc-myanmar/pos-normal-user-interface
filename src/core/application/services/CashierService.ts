@@ -715,10 +715,10 @@ export class CashierService implements ICashierService {
     });
   }
 
-  async voidCheckout(id: string): Promise<VoidCheckoutResultDTO> {
+  async voidCheckout(id: string, approverToken?: string): Promise<VoidCheckoutResultDTO> {
     if (!id?.trim()) {
       throw new Error("Checkout ID is required");
     }
-    return this.cashierRepository.voidCheckout(id.trim());
+    return this.cashierRepository.voidCheckout(id.trim(), approverToken);
   }
 }

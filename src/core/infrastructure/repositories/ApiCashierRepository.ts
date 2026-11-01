@@ -2047,10 +2047,14 @@ export class ApiCashierRepository implements ICashierRepository {
     return unwrap(response);
   }
 
-  async voidCheckout(id: string): Promise<VoidCheckoutResultDTO> {
+  async voidCheckout(id: string, approverToken?: string): Promise<VoidCheckoutResultDTO> {
     const response = await this.httpClient.post<
       ApiEnvelope<Record<string, unknown>> | Record<string, unknown>
-    >(API_ENDPOINTS.CHECKOUT.VOID(id));
+    >(
+      API_ENDPOINTS.CHECKOUT.VOID(id),
+      undefined,
+      approverToken ? { headers: { "x-approver-authorization": approverToken } } : undefined
+    );
     const item = unwrap(response) as Record<string, unknown>;
     return {
       orderId: String(item.orderId || id),

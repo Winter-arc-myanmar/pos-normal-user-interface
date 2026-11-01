@@ -6,7 +6,8 @@ import {
 } from "../../application/dtos/RefundDTO";
 
 export interface IRefundRepository {
-  createRefund(payload: CreateRefundDTO): Promise<SalesRefund>;
+  /** A manager's approval token rides along; see ApiShiftRepository.approve. */
+  createRefund(payload: CreateRefundDTO, approverToken?: string): Promise<SalesRefund>;
   getRefundById(id: string): Promise<SalesRefund>;
   listRefundsForOrder(
     salesOrderId: string,

@@ -197,8 +197,8 @@ export function useRoomPos(kind: RoomKind) {
         fromKtvCharge(await ktvChargeItems(id, payload)),
       giveFree: async (id: string, payload: GiveFreeItemsDTO) =>
         fromKtvCharge(await ktvGiveFree(id, payload)),
-      refundLine: async (id: string, lineId: string, reason?: string) =>
-        fromKtvCharge(await ktvRefundLine(id, lineId, reason)),
+      refundLine: async (id: string, lineId: string, reason?: string, approverToken?: string) =>
+        fromKtvCharge(await ktvRefundLine(id, lineId, reason, approverToken)),
       clearQuote: ktvClearQuote,
     }),
     [
