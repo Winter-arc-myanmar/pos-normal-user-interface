@@ -53,7 +53,7 @@ describe("ApiRefundRepository", () => {
       posSessionId: "session-1",
       items: [{ salesOrderLineId: "line-1", returnedQuantity: "1.0000" }],
       tenantId: "tenant-1",
-    });
+    }, undefined);
   });
 
   it("lists refunds for a sales order", async () => {

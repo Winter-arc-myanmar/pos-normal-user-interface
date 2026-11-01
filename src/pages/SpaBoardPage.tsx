@@ -85,6 +85,16 @@ import { SpaBillPanel } from "./spa/SpaBillPanel";
 import { RoomFloorDialog, RoomFloorMode } from "./spa/RoomFloorDialog";
 import { PackagePicker } from "./spa/PackagePicker";
 import { SpaRoomTile } from "./spa/SpaRoomTile";
+import { ManagerApprovalDialog } from "@/components/shift/ManagerApprovalDialog";
+import { ManualTimesFields } from "./spa/ManualTimesFields";
+import {
+  defaultManualTimes,
+  fromLocalInput,
+  ManualTimes,
+  manualTimesBackwards,
+  roomTimeNamer,
+  slipTimeRange,
+} from "@/lib/spa/manualTimes";
 import { modifierPrintText } from "@/lib/printing/modifierText";
 import { cashierLabel } from "@/lib/printing/cashier";
 
@@ -208,6 +218,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [tip, setTip] = useState("");
+  const [manualTimes, setManualTimes] = useState<ManualTimes>({ inAt: "", outAt: "" });
   // Bill & table for a room: the same bill-level choices the cashier takes.
   const [billDiscount, setBillDiscount] = useState("0.0000");
   const [billDiscountReasonId, setBillDiscountReasonId] = useState("");
@@ -232,6 +243,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const [packageChoice, setPackageChoice] = useState<PackageChoice>({});
   const [extendChoice, setExtendChoice] = useState<PackageChoice>({});
   const [confirmEnd, setConfirmEnd] = useState(false);
+  // Charged items waiting for a manager before their money goes back to the card.
+  const [refundApproval, setRefundApproval] = useState<SalesOrderLine[] | null>(null);
   const tapKeys = useRef<Partial<Record<CardAction, string>>>({});
   const [showRoomForm, setShowRoomForm] = useState(false);
   const [editingRoom, setEditingRoom] = useState<SpaRoom | null>(null);
@@ -262,6 +275,38 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     [room?.sessions]
   );
   const billClosed = session?.sessionState === "CLOSED";
+  const payingStarts = confirmEnd || step === "pay";
+  const sessionId = session?.id;
+  const sessionOpenedAt = session?.openedAt;
+  const sessionPlanned = session?.plannedMinutes;
+  // The guest's In and Out start from the room's own times each time paying begins.
+  useEffect(() => {
+    if (!payingStarts || billClosed || !sessionId || !sessionOpenedAt) return;
+    setManualTimes(
+      defaultManualTimes({ openedAt: sessionOpenedAt, plannedMinutes: sessionPlanned })
+    );
+  }, [billClosed, payingStarts, sessionId, sessionOpenedAt, sessionPlanned]);
+  const manualClose = () => ({
+    manualInAt: fromLocalInput(manualTimes.inAt),
+    manualOutAt: fromLocalInput(manualTimes.outAt),
+  });
+  const slipNamer = (lines: SalesOrderLine[]) =>
+    roomTimeNamer(
+      lines,
+      slipTimeRange(fromLocalInput(manualTimes.inAt), fromLocalInput(manualTimes.outAt))
+    );
+  const timesBackwards = !billClosed && manualTimesBackwards(manualTimes);
+  const manualTimesFields =
+    session && !billClosed ? (
+      <ManualTimesFields
+        value={manualTimes}
+        onChange={setManualTimes}
+        sessionTime={`${formatDateTime(session.openedAt)} → ${formatDateTime(
+          new Date(nowMs).toISOString()
+        )}`}
+        tr={tr}
+      />
+    ) : null;
   const liveSession = room?.sessions.find((item) => item.id === session?.id);
   const cardMethod = findMemberCardPaymentMethod(paymentMethods);
   const cashMethod = paymentMethods.find(
@@ -436,6 +481,50 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     rental && rental.variantId !== room?.rateVariantId ? rental.unitPrice : room?.sessionPrice;
   const unitMinutes = !isSpa && rental ? rental.blockMinutes : sessionMinutes(room);
   const minimumUnits = !isSpa && rental ? rental.minimumUnits : 1;
+  // A running room is extended on the rental last sold on its bill, as the server does.
+  const billRental =
+    [...orderLines]
+      .reverse()
+      .map((line) => rentals.find((item) => item.variantId === line.variantId))
+      .find(Boolean) ||
+    rentals.find((item) => item.variantId === room?.rateVariantId) ||
+    rentals[0];
+  const rentalPicker = (onPick: (item: (typeof rentals)[number]) => void) =>
+    rentals.length > 1 ? (
+      <div className="space-y-1">
+        <span className="text-sm text-slate-300">{tr("chooseRental")}</span>
+        <div className="grid grid-cols-2 gap-2">
+          {rentals.map((item) => (
+            <button
+              key={item.variantId}
+              type="button"
+              aria-pressed={rental?.variantId === item.variantId}
+              onClick={() => {
+                setRentalVariantId(item.variantId);
+                onPick(item);
+              }}
+              className={`rounded border p-2 text-left text-sm ${
+                rental?.variantId === item.variantId
+                  ? "border-emerald-500 bg-emerald-950/40"
+                  : "border-slate-700 bg-slate-950"
+              }`}
+            >
+              <span className="block font-semibold">{item.name}</span>
+              <span className="block text-xs text-slate-400">
+                {tr("rentalPrice", {
+                  price: money(
+                    item.variantId === room?.rateVariantId
+                      ? room.sessionPrice ?? item.unitPrice
+                      : item.unitPrice
+                  ),
+                  minutes: item.blockMinutes,
+                })}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    ) : null;
   const hoursBought = session ? extendCount : sessionCount;
   // Packages a running "buy X, get Y free" adds on top, with their time.
   const freePackagesFor = (running: RunningPromotion[]) =>
@@ -915,7 +1004,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         session.id,
         isSpa
           ? { packages: packageOrders(extendChoice, spaPackages), idempotencyKey: keyFor("extend") }
-          : { sessions: extendCount, idempotencyKey: keyFor("extend") }
+          : { sessions: extendCount, rentalVariantId: rental?.variantId, idempotencyKey: keyFor("extend") }
       );
       tapKeys.current.extend = undefined;
       void printNewTickets(session.salesOrderId, before);
@@ -984,7 +1073,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         session.id,
         isSpa
           ? { ...charge, packages: packageOrders(extendChoice, spaPackages) }
-          : { ...charge, sessions: extendCount }
+          : { ...charge, sessions: extendCount, rentalVariantId: rental?.variantId }
       );
       tapKeys.current.extend = undefined;
       void printNewTickets(session.salesOrderId, before);
@@ -1163,6 +1252,10 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
 
   const endTreatment = async () => {
     if (!session) return;
+    if (timesBackwards) {
+      setActionError(tr("errors.manualTimes"));
+      return;
+    }
     if (pending.length) {
       setActionError(tr("errors.pendingItems"));
       return;
@@ -1184,10 +1277,15 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               idempotencyKey: `${kind}-tip-${session.id}`,
             }
           : undefined;
-      const final = await closeSession(session.id, tipPayment ? { tip: tipPayment } : {});
+      const final = await closeSession(session.id, {
+        ...(tipPayment ? { tip: tipPayment } : {}),
+        ...manualClose(),
+      });
       writeResume(kind, null);
       await fetchBoard();
       try {
+        const printedLines = orderLines.filter((line) => !line.voidedAt);
+        const slipName = slipNamer(printedLines);
         await printer.printReceipt({
           title: "RECEIPT",
           sale: true,
@@ -1203,12 +1301,13 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           endTime: formatDateTime(final.asOf || new Date().toISOString()),
           startTimeLabel: t("receipt.startTime"),
           endTimeLabel: t("receipt.endTime"),
-          lines: orderLines
-            .filter((line) => !line.voidedAt)
-            .map((line) => {
+          lines: printedLines.map((line) => {
               const modifiers = printedExtras(line);
               return {
-                name: lineDisplayName(line) || line.productName || itemNames[line.variantId] || tr("item"),
+                name: slipName(
+                  line,
+                  lineDisplayName(line) || line.productName || itemNames[line.variantId] || tr("item")
+                ),
                 quantity: String(line.quantity || "1"),
                 unitPrice: line.unitPrice?.trim() || undefined,
                 modifiers: modifiers.names,
@@ -1337,7 +1436,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     }
   };
 
-  const removeLine = async (line: SalesOrderLine) => {
+  const removeLine = async (line: SalesOrderLine, approverToken?: string) => {
     if (!session?.salesOrderId || billClosed) return;
     const sources = sourceLinesOf(line);
     setActionError(null);
@@ -1356,7 +1455,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         let refunded = 0;
         let balanceAfter = wallet?.balance || "0";
         for (const source of sources) {
-          const result = await refundLine(session.id, source.id);
+          const result = await refundLine(session.id, source.id, undefined, approverToken);
           refunded += Math.abs(Number(result.charged));
           balanceAfter = result.balanceAfter;
         }
@@ -1382,8 +1481,13 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     }
   };
 
-  const removeLines = async (group: SalesOrderLine[]) => {
-    for (const line of [...group].reverse()) await removeLine(line);
+  const removeLines = async (group: SalesOrderLine[], approverToken?: string) => {
+    // Money going back to the card waits for a manager, once for the whole row.
+    if (!approverToken && quote?.prepaid && group.some((line) => !line.compReasonId)) {
+      setRefundApproval(group);
+      return;
+    }
+    for (const line of [...group].reverse()) await removeLine(line, approverToken);
   };
 
   const changeRooms = async (
@@ -1428,6 +1532,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   ) => {
     if (!session) return;
     try {
+      const printedLines = orderLines.filter((line) => !line.voidedAt);
+      const slipName = slipNamer(printedLines);
       await printer.printReceipt({
         title: "RECEIPT",
         sale: true,
@@ -1443,12 +1549,13 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         endTime: formatDateTime(endAt),
         startTimeLabel: t("receipt.startTime"),
         endTimeLabel: t("receipt.endTime"),
-        lines: orderLines
-          .filter((line) => !line.voidedAt)
-          .map((line) => {
+        lines: printedLines.map((line) => {
             const modifiers = printedExtras(line);
             return {
-              name: lineDisplayName(line) || line.productName || itemNames[line.variantId] || tr("item"),
+              name: slipName(
+                line,
+                lineDisplayName(line) || line.productName || itemNames[line.variantId] || tr("item")
+              ),
               quantity: String(line.quantity || "1"),
               unitPrice: line.unitPrice?.trim() || undefined,
               modifiers: modifiers.names,
@@ -1470,6 +1577,10 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const handlePayOther = async () => {
     const method = otherMethods.find((item) => item.id === otherMethodId);
     if (!session?.salesOrderId || !method) return;
+    if (timesBackwards) {
+      setActionError(tr("errors.manualTimes"));
+      return;
+    }
     setActionError(null);
     setIsPaying(true);
     try {
@@ -1477,7 +1588,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       let endAt = session.closedAt || session.endsAt || "";
       let due = Number(quote?.amountDue || 0);
       if (!billClosed) {
-        const closed = await closeSession(session.id, {});
+        const closed = await closeSession(session.id, manualClose());
         endAt = closed.asOf || new Date().toISOString();
         due = Number(closed.amountDue ?? closed.runningTotal ?? 0);
         setSession({ ...session, sessionState: "CLOSED" });
@@ -1513,6 +1624,10 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   };
 
   const handlePay = async () => {
+    if (timesBackwards) {
+      setActionError(tr("errors.manualTimes"));
+      return;
+    }
     if (!session?.salesOrderId || !card || !wallet) {
       requestCard("pay");
       return;
@@ -1542,7 +1657,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           setActionError(tr("errors.balanceShort"));
           return;
         }
-        const closed = await closeSession(session.id, {});
+        const closed = await closeSession(session.id, manualClose());
         endAt = closed.asOf || new Date().toISOString();
         setSession({ ...session, sessionState: "CLOSED" });
       }
@@ -1662,6 +1777,10 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
    */
   const handleEndBillPay = async () => {
     if (!session?.salesOrderId) return;
+    if (timesBackwards) {
+      setActionError(tr("errors.manualTimes"));
+      return;
+    }
     const orderDiscount = Math.max(0, Number(billDiscount) || 0);
     if (orderDiscount > 0 && discountReasons.length && !billDiscountReasonId) {
       setActionError(t("cashier.errors.discountReasonRequired"));
@@ -1691,7 +1810,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       const context = await requireCashierContext();
       let endAt = session.closedAt || session.endsAt || "";
       if (!billClosed) {
-        const closed = await closeSession(session.id, {});
+        const closed = await closeSession(session.id, manualClose());
         endAt = closed.asOf || new Date().toISOString();
         setSession({ ...session, sessionState: "CLOSED" });
       }
@@ -2031,41 +2150,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                 </>
               ) : (
               <>
-              {rentals.length > 1 ? (
-                <div className="space-y-1">
-                  <span className="text-sm text-slate-300">{tr("chooseRental")}</span>
-                  <div className="grid grid-cols-2 gap-2">
-                    {rentals.map((item) => (
-                      <button
-                        key={item.variantId}
-                        type="button"
-                        aria-pressed={rental?.variantId === item.variantId}
-                        onClick={() => {
-                          setRentalVariantId(item.variantId);
-                          setSessionCount((count) => Math.max(item.minimumUnits, count));
-                        }}
-                        className={`rounded border p-2 text-left text-sm ${
-                          rental?.variantId === item.variantId
-                            ? "border-emerald-500 bg-emerald-950/40"
-                            : "border-slate-700 bg-slate-950"
-                        }`}
-                      >
-                        <span className="block font-semibold">{item.name}</span>
-                        <span className="block text-xs text-slate-400">
-                          {tr("rentalPrice", {
-                            price: money(
-                              item.variantId === room.rateVariantId
-                                ? room.sessionPrice ?? item.unitPrice
-                                : item.unitPrice
-                            ),
-                            minutes: item.blockMinutes,
-                          })}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
+              {rentalPicker((item) => setSessionCount((count) => Math.max(item.minimumUnits, count)))}
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm text-slate-300">{tr("sessions")}</span>
                 <div className="flex items-center rounded bg-slate-800">
@@ -2181,7 +2266,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                   : setStep("menu")
             }
             onExtend={() => {
-              setExtendCount(1);
+              setRentalVariantId(billRental?.variantId || "");
+              setExtendCount(isSpa ? 1 : billRental?.minimumUnits || 1);
               setExtendChoice({});
               setShowExtend(true);
             }}
@@ -2312,6 +2398,11 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                   onRemoveTender={removeEndTender}
                 />
               </div>
+              {manualTimesFields ? (
+                <div className="shrink-0 border-t border-white/10 bg-[#202020] p-3">
+                  {manualTimesFields}
+                </div>
+              ) : null}
               <div className="grid shrink-0 gap-2 border-t border-white/10 bg-[#202020] p-3 sm:grid-cols-[minmax(0,12rem)_1fr_auto] sm:items-end">
                 <label className="block text-sm">
                   {tr("tip")}
@@ -2351,6 +2442,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           ) : (
             <div className="space-y-4 rounded-lg border border-slate-700 p-5">
               <h2 className="text-lg font-bold">{tr("payTitle")}</h2>
+              {manualTimesFields}
               {wallet?.discountBpsSnapshot ? (
                 <p className="text-sm text-slate-300">
                   {tr("memberDiscount", {
@@ -2645,8 +2737,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             <p className="flex justify-between font-semibold">
               <span>
                 {tr("sessionsSummary", {
-                  minutes: extendCount * sessionMinutes(room),
-                  perSession: sessionMinutes(room),
+                  minutes: (extendCount + (extendFreeTime?.units || 0)) * unitMinutes,
+                  perSession: unitMinutes,
                 })}
               </span>
               {roomSessionPrice ? <span>{money(extendCharge)}</span> : null}
@@ -2658,7 +2750,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                   {tr("startSummary", {
                     room: room?.roomNumber || "",
                     sessions: sessionCount,
-                    minutes: sessionCount * sessionMinutes(room),
+                    minutes: (sessionCount + (freeTime?.units || 0)) * unitMinutes,
                     count: Math.max(1, Number(guestCount) || 1),
                   })}
                 </span>
@@ -2779,6 +2871,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               </>
             ) : (
               <>
+            {rentalPicker((item) => setExtendCount((count) => Math.max(item.minimumUnits, count)))}
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-300">{tr("moreSessionsLabel")}</span>
               <div className="flex items-center rounded bg-slate-800">
@@ -2786,8 +2879,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                   type="button"
                   aria-label={tr("fewerSessions")}
                   className="h-9 w-9 text-lg disabled:opacity-40"
-                  disabled={extendCount <= 1}
-                  onClick={() => setExtendCount((count) => Math.max(1, count - 1))}
+                  disabled={extendCount <= minimumUnits}
+                  onClick={() => setExtendCount((count) => Math.max(minimumUnits, count - 1))}
                 >
                   −
                 </button>
@@ -2804,11 +2897,21 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             </div>
             <p className="text-sm text-slate-300">
               {tr("sessionsSummary", {
-                minutes: extendCount * sessionMinutes(room),
-                perSession: sessionMinutes(room),
+                minutes: (extendCount + (extendFreeTime?.units || 0)) * unitMinutes,
+                perSession: unitMinutes,
               })}
               {roomSessionPrice ? ` · ${money(extendCharge)}` : ""}
             </p>
+            {hoursSaving > 0 ? (
+              <p className="text-sm text-emerald-300">
+                {tr("promotionDiscount")} −{money(hoursSaving)}
+              </p>
+            ) : null}
+            {extendFreeTime ? (
+              <p className="rounded border border-emerald-700/60 bg-emerald-950/40 px-2 py-1 text-sm text-emerald-200">
+                {tr("freeTimeAdded", { count: extendFreeTime.units, name: extendFreeTime.name })}
+              </p>
+            ) : null}
               </>
             )}
             <div className="grid grid-cols-2 gap-2">
@@ -2827,6 +2930,35 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         </div>
       ) : null}
 
+      {refundApproval ? (
+        <ManagerApprovalDialog
+          title={tr("refundApprovalTitle", {
+            item: lineDisplayName(refundApproval[0]) || refundApproval[0].productName || tr("item"),
+          })}
+          permission="sales:refund:approve"
+          confirmLabel={tr("refundApprovalConfirm")}
+          onCancel={() => setRefundApproval(null)}
+          onApproved={async (token) => {
+            await removeLines(refundApproval, token);
+            setRefundApproval(null);
+          }}
+        >
+          {tr("refundApprovalBody", {
+            amount: money(
+              refundApproval
+                .filter((line) => !line.compReasonId)
+                .reduce(
+                  (sum, line) =>
+                    sum +
+                    Number(line.quantity || 0) * Number(line.unitPrice || 0) -
+                    Number(line.lineDiscount || 0),
+                  0
+                )
+            ),
+          })}
+        </ManagerApprovalDialog>
+      ) : null}
+
       {confirmEnd && session ? (
         <div className="fixed inset-0 z-40 grid place-items-center bg-black/75 p-4">
           <div className="w-full max-w-sm space-y-4 rounded-lg border border-slate-600 bg-slate-950 p-5">
@@ -2834,6 +2966,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             <p className="text-sm text-slate-300">
               {tr("endDescription", { amount: money(quote?.paidTotal) })}
             </p>
+            {manualTimesFields}
             <label className="block text-sm">
               {tr("tip")}
               <input

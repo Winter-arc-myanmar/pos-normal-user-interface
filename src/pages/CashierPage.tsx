@@ -36,6 +36,8 @@ import { billBreakdown } from "@/lib/pos/billBreakdown";
 import { linePriceNote } from "@/lib/pos/linePrice";
 import { TableSeatingDialog } from "./cashier/TableSeatingDialog";
 import { ExtraFeeDialog } from "./cashier/ExtraFeeDialog";
+import { ManagerApprovalDialog } from "@/components/shift/ManagerApprovalDialog";
+import { useNumberFormatter } from "@/lib/i18n/formatters";
 import { HostessPicker } from "./spa/HostessPicker";
 import { useWorkingHostesses } from "@/core/presentation/hooks/useWorkingHostesses";
 import type { Hostess } from "@/core/domain/entities/Hostess";
@@ -256,6 +258,8 @@ export function CashierPage() {
   const productAddQueueRef = useRef<Promise<void>>(Promise.resolve());
   const { fees: extraFees, isFeeLine } = useExtraFees();
   const [extraFeeOpen, setExtraFeeOpen] = useState(false);
+  const [voidApproval, setVoidApproval] = useState(false);
+  const { formatCurrency } = useNumberFormatter();
   // A hostess service waits here until the cashier says which hostess gave it.
   const [hostessFor, setHostessFor] = useState<{
     product: Product;
@@ -2469,6 +2473,15 @@ export function CashierPage() {
   };
 
   const handleCancelOrder = async () => {
+    // Voiding a paid sale gives its money back, so a manager signs it off first.
+    if (String(selectedOrder?.status || "").toUpperCase() === "COMPLETED") {
+      setVoidApproval(true);
+      return;
+    }
+    await cancelOrder();
+  };
+
+  const cancelOrder = async (approverToken?: string) => {
     const orderId = selectedOrder?.id || activeTableSession?.salesOrderId;
     // A paid sale being voided was made already; only an open order stops the kitchen.
     const cancelledLines =
@@ -2486,7 +2499,7 @@ export function CashierPage() {
         const isCompletedSale =
           String(selectedOrder?.status || "").toUpperCase() === "COMPLETED";
         if (isCompletedSale) {
-          await voidCheckout(orderId);
+          await voidCheckout(orderId, approverToken);
         } else {
           await updateManagedOrder(orderId, { status: "VOIDED" });
         }
@@ -3432,6 +3445,21 @@ export function CashierPage() {
         onAddExtraFee={() => setExtraFeeOpen(true)}
         isFeeLine={isFeeLine}
       />
+
+      {voidApproval && selectedOrder ? (
+        <ManagerApprovalDialog
+          title={t("cashier.voidApproval.title", { number: selectedOrder.orderNumber || "" })}
+          permission="sales:refund:approve"
+          confirmLabel={t("cashier.voidApproval.confirm")}
+          onCancel={() => setVoidApproval(false)}
+          onApproved={async (token) => {
+            await cancelOrder(token);
+            setVoidApproval(false);
+          }}
+        >
+          {t("cashier.voidApproval.body", { amount: formatCurrency(Number(selectedOrder.grandTotal) || 0) })}
+        </ManagerApprovalDialog>
+      ) : null}
 
       {hostessFor ? (
         <HostessPicker

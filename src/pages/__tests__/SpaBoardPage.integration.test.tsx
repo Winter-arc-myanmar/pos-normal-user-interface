@@ -30,6 +30,7 @@ let venueState: {
 };
 
 const mocks = vi.hoisted(() => ({
+  approve: vi.fn(),
   fetchBoard: vi.fn(),
   fetchOrderBill: vi.fn(),
   addExtraFeeLine: vi.fn(),
@@ -151,6 +152,10 @@ const scrubVariant = { id: "variant-scrub", productId: "product-scrub", priceMod
 
 let rooms = [room("wallet-1")];
 let lines: Record<string, unknown>[] = [];
+
+vi.mock("@/components/shift/shiftApi", () => ({
+  shiftApi: () => ({ approve: mocks.approve }),
+}));
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -327,6 +332,7 @@ const tapCard = async (uid = "04A3B2C1") => {
 describe("SpaBoardPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.approve.mockResolvedValue({ token: "approval-token" });
     placeChargesState = [];
     venueState = { paymentTiming: "PAY_WHEN_ORDERING" };
     rooms = [room("wallet-1")];
@@ -1264,7 +1270,7 @@ describe("SpaBoardPage", () => {
       );
     });
 
-    it("refunds a wrong item to the card without asking for it", async () => {
+    it("refunds a wrong item to the card once a manager signs it off", async () => {
       lines = [
         {
           id: "line-1",
@@ -1280,9 +1286,21 @@ describe("SpaBoardPage", () => {
       await openRunningRoom();
       fireEvent.click(screen.getByRole("button", { name: "spa.refundLine" }));
 
+      expect(await screen.findByText("spa.refundApprovalTitle")).toBeInTheDocument();
+      expect(mocks.refundLine).not.toHaveBeenCalled();
+      fireEvent.change(screen.getByLabelText("shift.managerId"), { target: { value: "MGR0001" } });
+      fireEvent.change(screen.getByLabelText("shift.managerPassword"), { target: { value: "secret" } });
+      fireEvent.click(screen.getByRole("button", { name: "spa.refundApprovalConfirm" }));
+
       await waitFor(() =>
-        expect(mocks.refundLine).toHaveBeenCalledWith("session-1", "line-1")
+        expect(mocks.refundLine).toHaveBeenCalledWith(
+          "session-1",
+          "line-1",
+          undefined,
+          "approval-token"
+        )
       );
+      expect(mocks.approve).toHaveBeenCalledWith("MGR0001", "secret", "sales:refund:approve");
       expect(mocks.lookupCard).not.toHaveBeenCalled();
     });
 
@@ -1293,9 +1311,63 @@ describe("SpaBoardPage", () => {
       expect(dialog).toBeInTheDocument();
       fireEvent.click(screen.getAllByRole("button", { name: "spa.endTreatment" }).at(-1)!);
 
-      await waitFor(() => expect(mocks.closeSession).toHaveBeenCalledWith("session-1", {}));
+      await waitFor(() =>
+        expect(mocks.closeSession).toHaveBeenCalledWith("session-1", {
+          manualInAt: "2026-09-26T07:00:00.000Z",
+          manualOutAt: expect.any(String),
+        })
+      );
       expect(mocks.settleOrder).not.toHaveBeenCalled();
       expect(mocks.lookupCard).not.toHaveBeenCalled();
+    });
+
+    it("prints the In and Out the cashier set beside the room charge", async () => {
+      lines = [
+        {
+          id: "line-room",
+          salesOrderId: "order-1",
+          variantId: "variant-package",
+          productName: "Thai Massage",
+          quantity: "1.0000",
+          unitPrice: "30000.0000",
+          status: "SERVED",
+          courseType: "Package",
+        },
+      ];
+      await openRunningRoom();
+      fireEvent.click(screen.getByRole("button", { name: "spa.endTreatment" }));
+      await screen.findByText("spa.endTitle");
+      const inBox = screen.getByLabelText("spa.manualIn");
+      const outBox = screen.getByLabelText("spa.manualOut");
+      fireEvent.change(inBox, { target: { value: "2026-09-26T16:15" } });
+      fireEvent.change(outBox, { target: { value: "2026-09-26T18:15" } });
+      fireEvent.click(screen.getAllByRole("button", { name: "spa.endTreatment" }).at(-1)!);
+
+      await waitFor(() =>
+        expect(mocks.closeSession).toHaveBeenCalledWith("session-1", {
+          manualInAt: new Date("2026-09-26T16:15").toISOString(),
+          manualOutAt: new Date("2026-09-26T18:15").toISOString(),
+        })
+      );
+      await waitFor(() =>
+        expect(mocks.printReceipt).toHaveBeenCalledWith(
+          expect.objectContaining({
+            lines: [expect.objectContaining({ name: "Thai Massage (4:15 - 6:15)" })],
+          })
+        )
+      );
+    });
+
+    it("will not end the room with an Out before the In", async () => {
+      await openRunningRoom();
+      fireEvent.click(screen.getByRole("button", { name: "spa.endTreatment" }));
+      await screen.findByText("spa.endTitle");
+      fireEvent.change(screen.getByLabelText("spa.manualIn"), { target: { value: "2026-09-26T18:15" } });
+      fireEvent.change(screen.getByLabelText("spa.manualOut"), { target: { value: "2026-09-26T16:15" } });
+      fireEvent.click(screen.getAllByRole("button", { name: "spa.endTreatment" }).at(-1)!);
+
+      expect(await screen.findAllByText("spa.errors.manualTimes")).not.toHaveLength(0);
+      expect(mocks.closeSession).not.toHaveBeenCalled();
     });
   });
 });

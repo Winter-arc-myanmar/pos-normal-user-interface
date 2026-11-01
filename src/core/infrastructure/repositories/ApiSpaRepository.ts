@@ -239,10 +239,16 @@ export class ApiSpaRepository implements ISpaRepository {
     return toChargeResult(unwrap(response));
   }
 
-  async refundLine(id: string, lineId: string, reason?: string): Promise<SpaChargeResultDTO> {
+  async refundLine(
+    id: string,
+    lineId: string,
+    reason?: string,
+    approverToken?: string
+  ): Promise<SpaChargeResultDTO> {
     const response = await this.httpClient.post<ApiEnvelope<unknown>>(
       API_ENDPOINTS.SPA_SESSIONS.REFUND_LINE(id, lineId),
-      reason ? { reason } : {}
+      reason ? { reason } : {},
+      approverToken ? { headers: { "x-approver-authorization": approverToken } } : undefined
     );
     return toChargeResult(unwrap(response));
   }

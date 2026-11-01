@@ -81,7 +81,7 @@ const toRefund = (item: Record<string, unknown>): SalesRefund =>
 export class ApiRefundRepository implements IRefundRepository {
   constructor(private httpClient: HttpClient) {}
 
-  async createRefund(payload: CreateRefundDTO): Promise<SalesRefund> {
+  async createRefund(payload: CreateRefundDTO, approverToken?: string): Promise<SalesRefund> {
     const response = await this.httpClient.post<ApiEnvelope<Record<string, unknown>>>(
       API_ENDPOINTS.REFUNDS.CREATE,
       {
@@ -94,7 +94,8 @@ export class ApiRefundRepository implements IRefundRepository {
           returnedQuantity: item.returnedQuantity,
         })),
         tenantId: payload.tenantId,
-      }
+      },
+      approverToken ? { headers: { "x-approver-authorization": approverToken } } : undefined
     );
     return toRefund(asRecord(unwrap(response)) || {});
   }

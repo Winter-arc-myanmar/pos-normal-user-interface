@@ -171,6 +171,8 @@ export function useRoomPos(kind: RoomKind) {
           await ktvCloseSession(id, {
             closedAt: payload.closedAt || new Date().toISOString(),
             ...(payload.tip ? { tip: payload.tip } : {}),
+            ...(payload.manualInAt ? { manualInAt: payload.manualInAt } : {}),
+            ...(payload.manualOutAt ? { manualOutAt: payload.manualOutAt } : {}),
           })
         ),
       extendSession: async (id: string, payload: ExtendSpaSessionDTO) => {
@@ -197,8 +199,8 @@ export function useRoomPos(kind: RoomKind) {
         fromKtvCharge(await ktvChargeItems(id, payload)),
       giveFree: async (id: string, payload: GiveFreeItemsDTO) =>
         fromKtvCharge(await ktvGiveFree(id, payload)),
-      refundLine: async (id: string, lineId: string, reason?: string) =>
-        fromKtvCharge(await ktvRefundLine(id, lineId, reason)),
+      refundLine: async (id: string, lineId: string, reason?: string, approverToken?: string) =>
+        fromKtvCharge(await ktvRefundLine(id, lineId, reason, approverToken)),
       clearQuote: ktvClearQuote,
     }),
     [

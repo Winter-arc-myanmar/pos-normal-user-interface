@@ -93,4 +93,7 @@ export interface RoomTipDTO extends RoomOrderCardDTO {
 export interface CloseSpaSessionDTO {
   closedAt?: string;
   tip?: RoomTipDTO;
+  /** The guest's In and Out as the cashier set them, printed beside the room charge. */
+  manualInAt?: string;
+  manualOutAt?: string;
 }

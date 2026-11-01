@@ -18,6 +18,7 @@ let rentalsState: {
   blockMinutes: number;
   minimumUnits: number;
 }[] = [];
+let orderLinesState: { id: string; variantId: string; quantity: string; unitPrice: string }[] = [];
 
 const spaPackages: {
   id: string;
@@ -37,6 +38,7 @@ let venueState: {
 };
 
 const mocks = vi.hoisted(() => ({
+  approve: vi.fn(),
   fetchBoard: vi.fn(),
   fetchOrderBill: vi.fn(),
   getQuote: vi.fn(),
@@ -118,6 +120,10 @@ const paidQuote = {
 };
 
 let rooms: Record<string, unknown>[] = [freeRoom];
+
+vi.mock("@/components/shift/shiftApi", () => ({
+  shiftApi: () => ({ approve: mocks.approve }),
+}));
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -239,7 +245,7 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
 }));
 vi.mock("@/core/presentation/hooks/useSalesOrderManagement", () => ({
   useSalesOrderManagement: () => ({
-    orderLines: [],
+    orderLines: orderLinesState,
     fetchOrderLines: mocks.fetchOrderLines,
     addOrderLine: mocks.noop,
     updateOrderLine: mocks.noop,
@@ -297,9 +303,11 @@ const tapCard = async () => {
 describe("KtvBoardPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.approve.mockResolvedValue({ token: "approval-token" });
     venueState = { paymentTiming: "PAY_WHEN_ORDERING" };
     rooms = [freeRoom];
     rentalsState = [];
+    orderLinesState = [];
     promotionState.running = [];
     promotionState.discounts = {};
     mocks.fetchBoard.mockResolvedValue(rooms);
@@ -447,6 +455,55 @@ describe("KtvBoardPage", () => {
       await waitFor(() =>
         expect(mocks.openSession).toHaveBeenCalledWith(
           expect.objectContaining({ rentalVariantId: "variant-vip", hours: 2 })
+        )
+      );
+    });
+
+    const quarter = {
+      variantId: "variant-15",
+      productId: "product-15",
+      name: "KTV 15 min",
+      unitPrice: 8000,
+      blockMinutes: 15,
+      minimumUnits: 1,
+    };
+
+    it("extends a room on the rental already on its bill", async () => {
+      rooms = [busyRoom];
+      rentalsState = [ownRate, quarter];
+      orderLinesState = [{ id: "line-1", variantId: "variant-15", quantity: "2", unitPrice: "8000" }];
+      mocks.extendSession.mockResolvedValue({ charged: "8000.0000", balanceAfter: "0", quote: paidQuote });
+      renderPage();
+      fireEvent.click(screen.getByRole("button", { name: /K1/ }));
+      fireEvent.click(await screen.findByRole("button", { name: "ktvPos.extend" }));
+
+      expect(screen.getByRole("button", { name: /KTV 15 min/ })).toHaveAttribute("aria-pressed", "true");
+      fireEvent.click(screen.getByRole("button", { name: "ktvPos.extendAndPay" }));
+      await tapCard();
+
+      await waitFor(() =>
+        expect(mocks.extendSession).toHaveBeenCalledWith(
+          "ktv-session-1",
+          expect.objectContaining({ hours: 1, rentalVariantId: "variant-15" })
+        )
+      );
+    });
+
+    it("extends a room on another rental the cashier picks, at its minimum", async () => {
+      rooms = [busyRoom];
+      rentalsState = [ownRate, vip];
+      mocks.extendSession.mockResolvedValue({ charged: "100000.0000", balanceAfter: "0", quote: paidQuote });
+      renderPage();
+      fireEvent.click(screen.getByRole("button", { name: /K1/ }));
+      fireEvent.click(await screen.findByRole("button", { name: "ktvPos.extend" }));
+      fireEvent.click(screen.getByRole("button", { name: /VIP hourly/ }));
+      fireEvent.click(screen.getByRole("button", { name: "ktvPos.extendAndPay" }));
+      await tapCard();
+
+      await waitFor(() =>
+        expect(mocks.extendSession).toHaveBeenCalledWith(
+          "ktv-session-1",
+          expect.objectContaining({ hours: 2, rentalVariantId: "variant-vip" })
         )
       );
     });

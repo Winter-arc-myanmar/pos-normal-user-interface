@@ -55,11 +55,11 @@ export function useRefundManagement() {
   );
 
   const createRefund = useCallback(
-    async (payload: CreateRefundDTO) => {
+    async (payload: CreateRefundDTO, approverToken?: string) => {
       setIsLoading(true);
       setError(null);
       try {
-        const created = await refundService.createRefund(payload);
+        const created = await refundService.createRefund(payload, approverToken);
         setSelectedRefund(created);
         setRefunds((current) => [created, ...current.filter((item) => item.returnId !== created.returnId)]);
         return created;

@@ -37,7 +37,12 @@ export interface IKtvRepository {
   extendSession(id: string, payload: ExtendKtvSessionDTO): Promise<KtvChargeResultDTO>;
   chargeItems(id: string, payload: ChargeKtvItemsDTO): Promise<KtvChargeResultDTO>;
   giveFree(id: string, payload: GiveFreeItemsDTO): Promise<KtvChargeResultDTO>;
-  refundLine(id: string, lineId: string, reason?: string): Promise<KtvChargeResultDTO>;
+  refundLine(
+    id: string,
+    lineId: string,
+    reason?: string,
+    approverToken?: string
+  ): Promise<KtvChargeResultDTO>;
   getRoomTabletMenu(): Promise<RoomTabletMenu>;
   getRoomTabletSession(): Promise<RoomTabletSession>;
 }

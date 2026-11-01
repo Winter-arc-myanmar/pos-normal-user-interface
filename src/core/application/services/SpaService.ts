@@ -97,10 +97,15 @@ export class SpaService implements ISpaService {
     return this.repository.giveFree(id, payload);
   }
 
-  refundLine(id: string, lineId: string, reason?: string): Promise<SpaChargeResultDTO> {
+  refundLine(
+    id: string,
+    lineId: string,
+    reason?: string,
+    approverToken?: string
+  ): Promise<SpaChargeResultDTO> {
     requireId(id, "Session ID");
     requireId(lineId, "Line ID");
-    return this.repository.refundLine(id, lineId, reason);
+    return this.repository.refundLine(id, lineId, reason, approverToken);
   }
 
   closeSession(id: string, payload: CloseSpaSessionDTO): Promise<SpaSessionQuote> {

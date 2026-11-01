@@ -22,6 +22,7 @@ const render = (ui: Parameters<typeof mount>[0]) => {
 };
 
 const mocks = vi.hoisted(() => ({
+  approve: vi.fn(),
   addTableCharge: vi.fn(),
   stopTableCharges: vi.fn(),
   addProductToTableSession: vi.fn(),
@@ -149,6 +150,15 @@ let venueSettingsState = {
   serviceChargeTaxRate: 0,
   kdsDeleteSlips: true,
 };
+
+vi.mock("@/lib/i18n/formatters", () => ({
+  useNumberFormatter: () => ({ formatCurrency: (value: number) => String(value) }),
+  useDateFormatter: () => ({ formatDateTime: (value: string) => value }),
+}));
+
+vi.mock("@/components/shift/shiftApi", () => ({
+  shiftApi: () => ({ approve: mocks.approve }),
+}));
 
 vi.mock("@/core/presentation/hooks/useVenueSetting", () => ({
   useVenueSetting: () => venueSettingsState,
@@ -325,6 +335,7 @@ vi.mock("@/core/presentation/hooks/useGuestWalletManagement", () => ({
 describe("CashierPage integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.approve.mockResolvedValue({ token: "approval-token" });
     window.localStorage.clear();
     selectedOrderLinesState = [orderLine];
     selectedOrderState = order;
@@ -1504,6 +1515,29 @@ describe("CashierPage integration", () => {
       await screen.findByText("cashier.errors.tableHasActiveOrder")
     ).toBeInTheDocument();
     expect(mocks.updateDiningTableStatus).not.toHaveBeenCalled();
+  });
+
+  it("voids a paid sale only after a manager signs it off", async () => {
+    selectedOrderState = { ...order, status: "COMPLETED" };
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=orders"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.cancelOrder" }));
+    fireEvent.click(screen.getByRole("button", { name: "cashier.orderPanel.confirmCancelOrder" }));
+
+    expect(await screen.findByText("cashier.voidApproval.title")).toBeInTheDocument();
+    expect(mocks.voidCheckout).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText("shift.managerId"), { target: { value: "MGR0001" } });
+    fireEvent.change(screen.getByLabelText("shift.managerPassword"), { target: { value: "secret" } });
+    fireEvent.click(screen.getByRole("button", { name: "cashier.voidApproval.confirm" }));
+
+    await waitFor(() =>
+      expect(mocks.voidCheckout).toHaveBeenCalledWith("order-1", "approval-token")
+    );
+    expect(mocks.approve).toHaveBeenCalledWith("MGR0001", "secret", "sales:refund:approve");
   });
 
   it("cancels an unpaid order without calling checkout void", async () => {

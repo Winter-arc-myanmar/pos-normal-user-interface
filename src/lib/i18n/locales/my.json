@@ -41,7 +41,7 @@
     "salesSummaryTitle": "POS အရောင်းအနှစ်ချုပ်",
     "cashierTitle": "ငွေကောက်",
     "cashierMeta": "POS မုဒ်",
-    "ktvTitle": "VIP Lounge",
+    "ktvTitle": "KTV",
     "spaTitle": "SPA အခန်းများ",
     "counterOrdersTitle": "ကောင်တာ အော်ဒါများ",
     "salesOrdersTitle": "အရောင်းအော်ဒါများ",
@@ -187,7 +187,7 @@
   },
   "salesSummary": {
     "title": "POS အရောင်းအနှစ်ချုပ်",
-    "description": "POS စုစုပေါင်း၊ ဘေလ်များ၊ ဘားအမျိုးအစား၊ SPA မီနူးနှင့် VIP Lounge ဆက်ရှင်များ။",
+    "description": "POS စုစုပေါင်း၊ ဘေလ်များ၊ ဘားအမျိုးအစား၊ SPA မီနူးနှင့် KTV ဆက်ရှင်များ။",
     "posType": "POS အမျိုးအစား",
     "searchBills": "ဘေလ်၊ အခန်း သို့မဟုတ် ဧည့်သည် ရှာရန်",
     "empty": "ဤကာလတွင် အရောင်းမရှိပါ။",
@@ -228,11 +228,11 @@
       "posBills": "POS ဘေလ်များ",
       "bar": "ဘား အမျိုးအစားအလိုက်",
       "spaMenu": "SPA မီနူးအလိုက်",
-      "ktv": "VIP Lounge ဆက်ရှင်များ"
+      "ktv": "KTV ဆက်ရှင်များ"
     },
     "posTypes": {
       "SPA": "SPA ဝန်ဆောင်မှု",
-      "KTV": "VIP Lounge",
+      "KTV": "KTV",
       "BAR": "ဘားကောင်တာ"
     }
   },
@@ -1283,6 +1283,11 @@
       "tax": "အခွန်",
       "includedTax": "ဈေးနှုန်းတွင် ပါဝင်သော အခွန်",
       "tip": "လက်ဆောင်ငွေ"
+    },
+    "voidApproval": {
+      "title": "{{number}} ကို ပယ်ဖျက်မလား?",
+      "body": "{{amount}} အားလုံး ပြန်အမ်းပြီး ကုန်ပစ္စည်း စတော့ထဲ ပြန်ဝင်ပါမည်။",
+      "confirm": "အရောင်း ပယ်ဖျက်ရန်"
     }
   },
   "salesOrders": {
@@ -1339,6 +1344,50 @@
     "serve": "တင်မည်",
     "errors": {
       "missingContext": "ဆိုင် သို့မဟုတ် တည်နေရာ အချက်အလက် ပျောက်နေသည်။"
+    },
+    "edit": {
+      "button": "ပြင်ရန်",
+      "badge": "ပြင်ထားသည်",
+      "title": "{{number}} ကို ပြင်ရန်",
+      "paid": "ပေးပြီး {{amount}}",
+      "items": "ပစ္စည်းများ",
+      "addItem": "ပစ္စည်း ထည့်ရန်…",
+      "fewer": "{{name}} တစ်ခု လျှော့ရန်",
+      "more": "{{name}} တစ်ခု တိုးရန်",
+      "price": "{{name}} ဈေးနှုန်း",
+      "remove": "{{name}} ကို ဖယ်ရန်",
+      "removed": "ဖယ်ထားသည်",
+      "undo": "ပြန်ထည့်ရန်",
+      "changeHostess": "Hostess ပြောင်းရန်",
+      "bill": "ဘေလ်",
+      "discountReason": "လျှော့ဈေး အကြောင်းရင်း",
+      "customer": "ဖောက်သည်",
+      "makeWalkIn": "Walk-in အဖြစ် ပြောင်းရန်",
+      "findCustomer": "ဖောက်သည် ရှာရန်",
+      "find": "ရှာရန်",
+      "payments": "ယူပြီးသော ငွေပေးချေမှုများ",
+      "methodFor": "{{amount}} အတွက် ငွေပေးနည်း",
+      "wasNow": "ယခင် {{was}} → ယခု {{now}}",
+      "collect": "{{amount}} ထပ်ယူရန်",
+      "refund": "{{amount}} ပြန်အမ်းရန်",
+      "noDifference": "ကွာခြားငွေ မရှိပါ",
+      "collectBy": "ယူမည့်နည်း",
+      "refundTo": "ပြန်အမ်းမည့်နည်း",
+      "reason": "အကြောင်းရင်း",
+      "reasonPlaceholder": "ဒီအော်ဒါကို ဘာကြောင့် ပြင်တာလဲ?",
+      "managerApproval": "မန်နေဂျာ ခွင့်ပြုချက်",
+      "save": "ပြင်ဆင်မှု သိမ်းရန်",
+      "saved": "{{number}} ကို ပြင်ပြီးပါပြီ။",
+      "history": "ပြင်ဆင်မှု မှတ်တမ်း",
+      "historyBy": "{{when}} · {{by}} ပြင် · {{manager}} ခွင့်ပြု",
+      "errors": {
+        "load": "ပြင်ရန် အော်ဒါကို ဖွင့်မရပါ။",
+        "noChanges": "ဘာမှ မပြောင်းရသေးပါ။",
+        "reason": "ဘာကြောင့် ပြင်တာလဲ ရေးပါ။",
+        "manager": "မန်နေဂျာ၏ User ID နှင့် စကားဝှက် ထည့်ပါ။",
+        "preview": "စုစုပေါင်းအသစ် တွက်ပြီးသည်အထိ စောင့်ပါ။",
+        "settlement": "ကွာခြားငွေကို ယူမည့် / ပြန်အမ်းမည့်နည်း ရွေးပါ။"
+      }
     }
   },
   "router": {
@@ -1413,9 +1462,9 @@
     "goToDashboard": "ပင်မစာမျက်နှာသို့"
   },
   "ktv": {
-    "boardTitle": "VIP Lounge ဘုတ်",
+    "boardTitle": "KTV ဘုတ်",
     "boardDescription": "အခန်းဖွင့်ခြင်း၊ ဆက်ရှင်စောင့်ကြည့်ခြင်းနှင့် အခန်းအဆင်သင့်ဖြစ်မှုကို စီမံပါ။",
-    "loading": "VIP Lounge များ ဖွင့်နေသည်...",
+    "loading": "KTV များ ဖွင့်နေသည်...",
     "addRoom": "အခန်းထည့်မည်",
     "editRoom": "အခန်းပြင်မည်",
     "manageRoom": "အခန်းစီမံမည်",
@@ -1485,11 +1534,11 @@
       "walletUnavailable": "ဤဧည့်သည်ပိုက်ဆံအိတ်ကို အသုံးမပြုနိုင်ပါ။",
       "wrongSessionCard": "ဤကတ်သည် ရွေးထားသောအခန်းဆက်ရှင်နှင့် မသက်ဆိုင်ပါ။",
       "openSession": "အခန်းဆက်ရှင် ဖွင့်၍မရပါ။",
-      "createRoom": "VIP Lounge ဖန်တီး၍မရပါ။",
+      "createRoom": "KTV ဖန်တီး၍မရပါ။",
       "sessionRequired": "အရင် လုပ်ဆောင်နေသောအခန်းဆက်ရှင်နှင့် ကတ်ကို ရွေးပါ။",
       "paymentUnavailable": "ဤဆိုင်ခွဲတွင် ဧည့်သည်ကတ်ပေးချေမှု မပြင်ဆင်ထားပါ။",
       "checkout": "အခန်းဆက်ရှင်ပိတ်၍ ငွေပေးချေမရပါ။",
-      "roomNotFound": "VIP Lounge မတွေ့ပါ။",
+      "roomNotFound": "KTV မတွေ့ပါ။",
       "noActiveSession": "ဤအခန်းတွင် လုပ်ဆောင်နေသောဆက်ရှင် မရှိပါ။"
     }
   },
@@ -1583,7 +1632,8 @@
       "foc": "အခမဲ့ ပေး၍ မရပါ",
       "packages": "ဝန်ဆောင်မှု ပက်ကေ့ချ်များကို ဖွင့်မရပါ: {{message}}",
       "tipMethod": "ဆုငွေ ပေးချေမည့်နည်း ရွေးပါ",
-      "oneCardPerBill": "ဘောက်ချာတစ်ခုကို အသင်းဝင်ကတ် တစ်ကတ်သာ ပေးချေနိုင်သည်။ ကျန်ငွေကို အခြားနည်းလမ်းများဖြင့် ခွဲပေးပါ။"
+      "oneCardPerBill": "ဘောက်ချာတစ်ခုကို အသင်းဝင်ကတ် တစ်ကတ်သာ ပေးချေနိုင်သည်။ ကျန်ငွေကို အခြားနည်းလမ်းများဖြင့် ခွဲပေးပါ။",
+      "manualTimes": "ထွက်ချိန်သည် ဝင်ချိန်မတိုင်မီ ဖြစ်၍မရပါ။"
     },
     "item": "ပစ္စည်း",
     "treatmentSoFar": "ယခုအထိ ကုသမှု",
@@ -1709,7 +1759,13 @@
       "splitDone": "ပစ္စည်းများကို အခန်း {{room}} သို့ ရွှေ့ပြီးပါပြီ။",
       "failed": "အခန်း ပြောင်း၍ မရပါ။",
       "paidAsItGoes": "ခွဲရန်နှင့် ပေါင်းရန်သည် နောက်ဆုံးမှ ငွေရှင်းသော အခန်းများအတွက်သာ ဖြစ်သည်။"
-    }
+    },
+    "refundApprovalTitle": "{{item}} ကို ကတ်ထဲ ပြန်အမ်းမလား?",
+    "refundApprovalBody": "{{amount}} ကို ဧည့်သည်ကတ်ထဲ ပြန်ထည့်ပါမည်။",
+    "refundApprovalConfirm": "ပြန်အမ်းရန်",
+    "sessionTime": "အခန်းနာရီ: {{time}}",
+    "manualIn": "ဝင်ချိန်",
+    "manualOut": "ထွက်ချိန်"
   },
   "statusBadge": {
     "verified": "အတည်ပြုပြီး",
@@ -1823,7 +1879,7 @@
     "ready": "အဆင်သင့်",
     "table": "စားပွဲ {{number}}",
     "spaRoom": "SPA အခန်း {{number}}",
-    "ktvRoom": "VIP Lounge {{number}}",
+    "ktvRoom": "KTV {{number}}",
     "counter": "ကောင်တာ",
     "pickup": "ယူမည့်နံပါတ် {{number}}",
     "guests": "ဧည့်သည် {{count}} ဦး",
@@ -1853,7 +1909,7 @@
     "started": "တက်ဘလက်မှ စတင်ပြီး"
   },
   "ktvPos": {
-    "boardTitle": "VIP Lounge ဘုတ်",
+    "boardTitle": "KTV ဘုတ်",
     "sessions": "နာရီ",
     "newSession": "{{room}} တွင် ဧည့်သည်အသစ်",
     "sessionsSummary": "စုစုပေါင်း {{minutes}} မိနစ်",
@@ -1880,7 +1936,7 @@
     "minutesOfBooked": "{{count}}/{{booked}} မိနစ် ({{sessions}} နာရီ)",
     "treatmentMinutes": "{{count}} မိနစ်",
     "sessionOption": "{{time}} မှစ၍ · ဧည့်သည် {{count}} ဦး",
-    "noRooms": "VIP Lounge မရှိသေးပါ။ စတင်ရန် VIP Lounge ထည့်ပါ။",
+    "noRooms": "KTV မရှိသေးပါ။ စတင်ရန် KTV ထည့်ပါ။",
     "errors": {
       "openSession": "အခန်း စတင်၍ မရပါ",
       "sessionRequired": "အခန်းကို အရင်စတင်ပါ",
@@ -1897,7 +1953,7 @@
       "active": "အသုံးပြုနေသည်"
     },
     "billClosed": "အခန်း ပိတ်ပြီး။ ဘေလ်သည် ငွေပေးချေရန် စောင့်နေသည်။",
-    "billPaid": "ငွေပေးချေပြီး။ နောက်ဧည့်သည်အတွက် VIP Lounge အားပါပြီ။",
+    "billPaid": "ငွေပေးချေပြီး။ နောက်ဧည့်သည်အတွက် KTV အားပါပြီ။",
     "payTitle": "အခန်းပိတ်ပြီး ငွေပေးချေမည်",
     "steps": {
       "sessions": "နာရီ ရွေးမည်",
@@ -2090,7 +2146,9 @@
     "logoutRoom": "နေ့ကို ပိတ်သည်အထိ နောက်လူအတွက် ဖွင့်ထားမည်။",
     "byPayment": "ငွေပေးချေမှု အမျိုးအစားအလိုက်",
     "dailyShift": "အလှည့်: တစ်နေ့ တစ်ခါ",
-    "perLoginShift": "အလှည့်: Login တစ်ခါ တစ်ခါ"
+    "perLoginShift": "အလှည့်: Login တစ်ခါ တစ်ခါ",
+    "managerApproval": "မန်နေဂျာ ခွင့်ပြုချက်",
+    "managerRequired": "မန်နေဂျာ၏ User ID နှင့် စကားဝှက် ထည့်ပါ။"
   },
   "refunds": {
     "salesOrderId": "အရောင်းအော်ဒါ",
@@ -2137,7 +2195,8 @@
       "missingSession": "POS ဆက်ရှင် ထည့်ပါ။",
       "missingReason": "ပြန်အမ်းရသည့် အကြောင်းရင်း ထည့်ပါ။",
       "missingItems": "အရောင်းအော်ဒါ လိုင်းနှင့် အရေအတွက် ထည့်ပါ။",
-      "itemsFailed": "အော်ဒါ၏ ပစ္စည်းများကို ဖွင့်၍ မရပါ။"
+      "itemsFailed": "အော်ဒါ၏ ပစ္စည်းများကို ဖွင့်၍ မရပါ။",
+      "failed": "ငွေပြန်အမ်းမှု မလုပ်နိုင်ပါ။"
     }
   }
 }

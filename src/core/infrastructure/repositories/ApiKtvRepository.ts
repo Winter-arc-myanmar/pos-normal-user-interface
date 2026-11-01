@@ -363,10 +363,16 @@ export class ApiKtvRepository implements IKtvRepository {
     return toChargeResult(unwrap(response));
   }
 
-  async refundLine(id: string, lineId: string, reason?: string): Promise<KtvChargeResultDTO> {
+  async refundLine(
+    id: string,
+    lineId: string,
+    reason?: string,
+    approverToken?: string
+  ): Promise<KtvChargeResultDTO> {
     const response = await this.httpClient.post<ApiEnvelope<unknown>>(
       API_ENDPOINTS.KTV_SESSIONS.REFUND_LINE(id, lineId),
-      reason ? { reason } : {}
+      reason ? { reason } : {},
+      approverToken ? { headers: { "x-approver-authorization": approverToken } } : undefined
     );
     return toChargeResult(unwrap(response));
   }

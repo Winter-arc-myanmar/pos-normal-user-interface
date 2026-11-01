@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RefundsPage } from "../RefundsPage";
 
 const mocks = vi.hoisted(() => ({
+  approve: vi.fn(),
   listRefundsForOrder: vi.fn(),
   getRefundById: vi.fn(),
   createRefund: vi.fn(),
@@ -40,6 +41,10 @@ const refund = {
   ],
   createdAt: "2026-04-03T10:30:00.000Z",
 };
+
+vi.mock("@/components/shift/shiftApi", () => ({
+  shiftApi: () => ({ approve: mocks.approve }),
+}));
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -113,6 +118,7 @@ vi.mock("@/core/presentation/hooks/useRefundManagement", () => ({
 describe("RefundsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.approve.mockResolvedValue({ token: "approval-token" });
     mocks.listRefundsForOrder.mockResolvedValue({
       refunds: [refund],
       total: 1,
@@ -166,17 +172,26 @@ describe("RefundsPage", () => {
     });
     fireEvent.change(item, { target: { value: "line-1" } });
     fireEvent.click(screen.getByRole("button", { name: "Process refund" }));
+    expect(mocks.createRefund).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText("shift.managerId"), { target: { value: "MGR0001" } });
+    fireEvent.change(screen.getByLabelText("shift.managerPassword"), { target: { value: "secret" } });
+    fireEvent.click(screen.getByRole("button", { name: "Process refund" }));
 
     await waitFor(() => {
-      expect(mocks.createRefund).toHaveBeenCalledWith({
-        tenantId: "tenant-1",
-        salesOrderId: "order-1",
-        reason: "Defective product",
-        refundMethod: "CASH",
-        posSessionId: "session-1",
-        items: [{ salesOrderLineId: "line-1", returnedQuantity: "1" }],
-      });
+      expect(mocks.createRefund).toHaveBeenCalledWith(
+        {
+          tenantId: "tenant-1",
+          salesOrderId: "order-1",
+          reason: "Defective product",
+          refundMethod: "CASH",
+          posSessionId: "session-1",
+          items: [{ salesOrderLineId: "line-1", returnedQuantity: "1" }],
+        },
+        "approval-token"
+      );
     });
+    expect(mocks.approve).toHaveBeenCalledWith("MGR0001", "secret", "sales:refund:approve");
   });
 
   it("shows a refunded item by its name", async () => {
