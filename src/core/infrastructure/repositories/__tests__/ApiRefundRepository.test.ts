@@ -46,14 +46,19 @@ describe("ApiRefundRepository", () => {
 
     expect(created.returnNumber).toBe("RET-20260403-0001");
     expect(created.lines[0].lineRefund).toBe("32.0900");
-    expect(post).toHaveBeenCalledWith("/api/v1/refunds", {
-      salesOrderId: "order-1",
-      reason: "Defective product",
-      refundMethod: "CASH",
-      posSessionId: "session-1",
-      items: [{ salesOrderLineId: "line-1", returnedQuantity: "1.0000" }],
-      tenantId: "tenant-1",
-    }, undefined);
+    /** The endpoint takes the tenant from the auth token and rejects extras. */
+    expect(post).toHaveBeenCalledWith(
+      "/api/v1/refunds",
+      {
+        salesOrderId: "order-1",
+        reason: "Defective product",
+        refundMethod: "CASH",
+        posSessionId: "session-1",
+        items: [{ salesOrderLineId: "line-1", returnedQuantity: "1.0000" }],
+      },
+      undefined
+    );
+    expect(post.mock.calls[0][1]).not.toHaveProperty("tenantId");
   });
 
   it("lists refunds for a sales order", async () => {

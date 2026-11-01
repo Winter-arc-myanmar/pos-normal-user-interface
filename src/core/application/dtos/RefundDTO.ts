@@ -11,6 +11,10 @@ export interface CreateRefundDTO {
   refundMethod: string;
   posSessionId: string;
   items: CreateRefundItemDTO[];
+  /**
+   * The signed-in user's tenant, used to guard the form. The refund endpoint
+   * takes the tenant from the auth token, so it is never sent in the body.
+   */
   tenantId: string;
 }
 
