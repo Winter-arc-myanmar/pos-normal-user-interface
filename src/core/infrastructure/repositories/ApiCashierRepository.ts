@@ -1552,6 +1552,8 @@ export class ApiCashierRepository implements ICashierRepository {
           ? String(item.transactionReference)
           : undefined,
         paymentDate: item.paymentDate ? String(item.paymentDate) : undefined,
+        posSessionId: item.posSessionId ? String(item.posSessionId) : undefined,
+        walletLedgerEntryId: item.walletLedgerEntryId ? String(item.walletLedgerEntryId) : null,
       })
     );
   }

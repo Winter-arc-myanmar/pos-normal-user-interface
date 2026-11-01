@@ -1344,6 +1344,50 @@
     "serve": "Serve",
     "errors": {
       "missingContext": "Missing tenant or location context."
+    },
+    "edit": {
+      "button": "Edit",
+      "badge": "Edited",
+      "title": "Edit {{number}}",
+      "paid": "Paid {{amount}}",
+      "items": "Items",
+      "addItem": "Add item…",
+      "fewer": "One fewer {{name}}",
+      "more": "One more {{name}}",
+      "price": "Price of {{name}}",
+      "remove": "Remove {{name}}",
+      "removed": "Removed",
+      "undo": "Undo",
+      "changeHostess": "Change hostess",
+      "bill": "Bill",
+      "discountReason": "Discount reason",
+      "customer": "Customer",
+      "makeWalkIn": "Make walk-in",
+      "findCustomer": "Find customer",
+      "find": "Find",
+      "payments": "Payments taken",
+      "methodFor": "Method for {{amount}}",
+      "wasNow": "Was {{was}} → Now {{now}}",
+      "collect": "Collect {{amount}}",
+      "refund": "Refund {{amount}}",
+      "noDifference": "No difference to settle",
+      "collectBy": "Collect by",
+      "refundTo": "Refund to",
+      "reason": "Reason",
+      "reasonPlaceholder": "Why is this order being changed?",
+      "managerApproval": "Manager approval",
+      "save": "Save edit",
+      "saved": "{{number}} was edited.",
+      "history": "Edit history",
+      "historyBy": "{{when}} · by {{by}} · approved by {{manager}}",
+      "errors": {
+        "load": "Could not load the order to edit.",
+        "noChanges": "Nothing has been changed yet.",
+        "reason": "Say why the order is being changed.",
+        "manager": "A manager must type their User ID and password.",
+        "preview": "Wait for the new total to be worked out.",
+        "settlement": "Choose how the difference is collected or refunded."
+      }
     }
   },
   "refunds": {
@@ -1637,7 +1681,8 @@
       "foc": "Could not give the items free",
       "packages": "Couldn't load the service packages: {{message}}",
       "tipMethod": "Choose how the tip is paid",
-      "oneCardPerBill": "Only one member card can pay a bill. Split the rest with other methods."
+      "oneCardPerBill": "Only one member card can pay a bill. Split the rest with other methods.",
+      "manualTimes": "The Out time can't be before the In time."
     },
     "item": "Item",
     "treatmentSoFar": "Treatment so far",
@@ -1766,7 +1811,10 @@
     },
     "refundApprovalTitle": "Refund {{item}} to the card?",
     "refundApprovalBody": "{{amount}} goes back to the guest card.",
-    "refundApprovalConfirm": "Refund"
+    "refundApprovalConfirm": "Refund",
+    "sessionTime": "Room clock: {{time}}",
+    "manualIn": "In",
+    "manualOut": "Out"
   },
   "statusBadge": {
     "verified": "Verified",

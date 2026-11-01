@@ -1311,9 +1311,63 @@ describe("SpaBoardPage", () => {
       expect(dialog).toBeInTheDocument();
       fireEvent.click(screen.getAllByRole("button", { name: "spa.endTreatment" }).at(-1)!);
 
-      await waitFor(() => expect(mocks.closeSession).toHaveBeenCalledWith("session-1", {}));
+      await waitFor(() =>
+        expect(mocks.closeSession).toHaveBeenCalledWith("session-1", {
+          manualInAt: "2026-09-26T07:00:00.000Z",
+          manualOutAt: expect.any(String),
+        })
+      );
       expect(mocks.settleOrder).not.toHaveBeenCalled();
       expect(mocks.lookupCard).not.toHaveBeenCalled();
+    });
+
+    it("prints the In and Out the cashier set beside the room charge", async () => {
+      lines = [
+        {
+          id: "line-room",
+          salesOrderId: "order-1",
+          variantId: "variant-package",
+          productName: "Thai Massage",
+          quantity: "1.0000",
+          unitPrice: "30000.0000",
+          status: "SERVED",
+          courseType: "Package",
+        },
+      ];
+      await openRunningRoom();
+      fireEvent.click(screen.getByRole("button", { name: "spa.endTreatment" }));
+      await screen.findByText("spa.endTitle");
+      const inBox = screen.getByLabelText("spa.manualIn");
+      const outBox = screen.getByLabelText("spa.manualOut");
+      fireEvent.change(inBox, { target: { value: "2026-09-26T16:15" } });
+      fireEvent.change(outBox, { target: { value: "2026-09-26T18:15" } });
+      fireEvent.click(screen.getAllByRole("button", { name: "spa.endTreatment" }).at(-1)!);
+
+      await waitFor(() =>
+        expect(mocks.closeSession).toHaveBeenCalledWith("session-1", {
+          manualInAt: new Date("2026-09-26T16:15").toISOString(),
+          manualOutAt: new Date("2026-09-26T18:15").toISOString(),
+        })
+      );
+      await waitFor(() =>
+        expect(mocks.printReceipt).toHaveBeenCalledWith(
+          expect.objectContaining({
+            lines: [expect.objectContaining({ name: "Thai Massage (4:15 - 6:15)" })],
+          })
+        )
+      );
+    });
+
+    it("will not end the room with an Out before the In", async () => {
+      await openRunningRoom();
+      fireEvent.click(screen.getByRole("button", { name: "spa.endTreatment" }));
+      await screen.findByText("spa.endTitle");
+      fireEvent.change(screen.getByLabelText("spa.manualIn"), { target: { value: "2026-09-26T18:15" } });
+      fireEvent.change(screen.getByLabelText("spa.manualOut"), { target: { value: "2026-09-26T16:15" } });
+      fireEvent.click(screen.getAllByRole("button", { name: "spa.endTreatment" }).at(-1)!);
+
+      expect(await screen.findAllByText("spa.errors.manualTimes")).not.toHaveLength(0);
+      expect(mocks.closeSession).not.toHaveBeenCalled();
     });
   });
 });

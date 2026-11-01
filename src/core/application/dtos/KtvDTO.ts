@@ -56,6 +56,9 @@ export interface OpenKtvSessionDTO {
 export interface CloseKtvSessionDTO {
   closedAt: string;
   tip?: RoomTipDTO;
+  /** The guest's In and Out as the cashier set them, printed beside the room charge. */
+  manualInAt?: string;
+  manualOutAt?: string;
 }
 
 export interface ExtendKtvSessionDTO extends RoomOrderCardDTO {

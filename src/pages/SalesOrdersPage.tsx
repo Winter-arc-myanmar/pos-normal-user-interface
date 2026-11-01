@@ -1,14 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiLoadingState } from "@/components/ApiLoadingState";
 import { Button } from "@/components/ui/Button";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { OrderStatus } from "@/core/application/dtos/CashierDTO";
+import type { SalesOrderEditDTO } from "@/core/application/dtos/SalesOrderDTO";
 import { SalesOrder } from "@/core/domain/entities/Cashier";
 import { useAuth } from "@/core/presentation/hooks/useAuth";
+import { useExtraFees } from "@/core/presentation/hooks/useExtraFees";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
 import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
 import { useSalesOrderManagement } from "@/core/presentation/hooks/useSalesOrderManagement";
+import { useRoomText } from "@/core/presentation/hooks/useRoomText";
+import { useWorkingHostesses } from "@/core/presentation/hooks/useWorkingHostesses";
 import { useDateFormatter, useNumberFormatter } from "@/lib/i18n/formatters";
 import {
   formatPosQuantity,
@@ -16,8 +20,9 @@ import {
   salesOrderServiceTypeKey,
   salesOrderStatusKey,
 } from "@/lib/pos/orderListDisplay";
-import { modifierPrintText } from "@/lib/printing/modifierText";
 import { cashierLabel } from "@/lib/printing/cashier";
+import { reprintSlip } from "@/lib/printing/reprintSlip";
+import { EditOrderDialog } from "./salesOrders/EditOrderDialog";
 
 type StatusTab = "open" | "completed" | "voided";
 type ServiceFilter = "ALL" | "DINE_IN" | "TAKE_AWAY" | "DELIVERY" | "PICK_UP";
@@ -57,6 +62,9 @@ const statusTabFilters: Record<StatusTab, OrderStatus | undefined> = {
 
 const isVoidedSalesOrder = (order: Pick<SalesOrder, "status">) =>
   String(order.status || "").toUpperCase() === "VOIDED";
+
+const isCompletedSalesOrder = (order: Pick<SalesOrder, "status">) =>
+  String(order.status || "").toUpperCase() === "COMPLETED";
 
 function EmptyIllustration() {
   return (
@@ -100,6 +108,9 @@ export function SalesOrdersPage() {
     fireOrderLine,
     readyOrderLine,
     serveOrderLine,
+    previewOrderEdit,
+    editOrder,
+    fetchOrderEdits,
     clearSelectedOrder,
   } = useSalesOrderManagement();
 
@@ -108,10 +119,28 @@ export function SalesOrdersPage() {
   const [search, setSearch] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [edits, setEdits] = useState<SalesOrderEditDTO[]>([]);
 
   const tenantId = String(user?.tenantId || "");
   const locationId = activeLocationId;
   const printer = usePrinterConnection(tenantId, activePosRegisterId, locationId);
+  const { isFeeLine } = useExtraFees();
+  const ktvText = useRoomText("ktv");
+  const spaText = useRoomText("spa");
+  const { hostesses, load: loadHostesses } = useWorkingHostesses();
+
+  useEffect(() => {
+    void loadHostesses();
+  }, [loadHostesses]);
+
+  const hostessName = useCallback(
+    (id: string) => {
+      const hostess = hostesses.find((item) => item.id === id);
+      return hostess ? hostess.nickname || hostess.name : undefined;
+    },
+    [hostesses]
+  );
 
   const statusFilter = statusTabFilters[statusTab];
 
@@ -131,12 +160,45 @@ export function SalesOrdersPage() {
     [orders, serviceFilter]
   );
 
+  const loadEdits = useCallback(
+    (order: SalesOrder) => {
+      setEdits([]);
+      if (String(order.status || "").toUpperCase() === "DRAFT") return;
+      fetchOrderEdits(order.id)
+        .then(setEdits)
+        .catch(() => setEdits([]));
+    },
+    [fetchOrderEdits]
+  );
+
   const handleSelectOrder = async (order: SalesOrder) => {
     setLocalError(null);
     setNotice(null);
+    loadEdits(order);
     try {
       await fetchOrderById(order.id);
       await fetchOrderLines(order.id, { page: 1, limit: 50 });
+    } catch {
+      // surfaced via hook error
+    }
+  };
+
+  const handleEdited = async (orderNumber: string) => {
+    setEditing(false);
+    setNotice(t("salesOrders.edit.saved", { number: orderNumber }));
+    if (!selectedOrder) return;
+    try {
+      const fresh = await fetchOrderById(selectedOrder.id);
+      await fetchOrderLines(selectedOrder.id, { page: 1, limit: 50 });
+      loadEdits(fresh);
+      await fetchOrders({
+        page,
+        limit: 20,
+        search: search.trim() || undefined,
+        status: statusFilter,
+        sortBy: "createdAt",
+        sortOrder: "desc",
+      });
     } catch {
       // surfaced via hook error
     }
@@ -192,37 +254,35 @@ export function SalesOrdersPage() {
     if (!selectedOrder) return;
     setLocalError(null);
     try {
-      await printer.printReceipt({
-        title: selectedOrder.orderNumber || "RECEIPT",
-        place: "CHECKOUT",
-        showLogo: true,
-        showPrices: true,
-        receiptId: selectedOrder.orderNumber,
-        cashier: cashierLabel(selectedOrder.cashier, user),
-        serviceType: t(salesOrderServiceTypeKey(selectedOrder.serviceType)),
-        pickupCode: selectedOrder.pickupNumber,
-        lines: orderLines.map((line) => {
-          const modifiers = modifierPrintText(line.selectedModifiers);
-          const unitPrice = line.unitPrice?.trim();
-          return {
-            name: lineDisplayName(line) || t("salesOrders.item"),
-            quantity: String(line.quantity || "1"),
-            unitPrice: unitPrice || undefined,
-            modifiers: modifiers.names,
-            modifierPrices: modifiers.prices,
-          };
-        }),
-        subtotal: selectedOrder.subtotal,
-        discount: selectedOrder.totalDiscount,
-        tax: Number(selectedOrder.totalTax) > 0 ? selectedOrder.totalTax : undefined,
-        // Print template does not support extra fee or tip.
-        // extraFee:
-        //   Number(selectedOrder.serviceCharge) > 0
-        //     ? selectedOrder.serviceCharge
-        //     : undefined,
-        // tip: Number(selectedOrder.tipAmount) > 0 ? selectedOrder.tipAmount : undefined,
-        total: selectedOrder.grandTotal,
-      });
+      const isRoom = Boolean(selectedOrder.place && selectedOrder.place.kind !== "TABLE");
+      const tr = selectedOrder.place?.kind === "KTV" ? ktvText : spaText;
+      await printer.printReceipt(
+        reprintSlip({
+          order: selectedOrder,
+          lines: orderLines,
+          outletName: selectedOrder.locationName,
+          cashier: cashierLabel(selectedOrder.cashier, user),
+          hostessName,
+          isFeeLine,
+          formatDateTime,
+          text: {
+            item: isRoom ? tr("item") : t("salesOrders.item"),
+            aHostess: isRoom ? tr("aHostess") : t("cashier.orderPanel.aHostess"),
+            promo: t("cashier.orderPanel.promo"),
+            tip: isRoom ? tr("tip") : t("receipt.tip"),
+            startTime: t("receipt.startTime"),
+            endTime: t("receipt.endTime"),
+            serviceType: (service) => {
+              const key = `settings.cashier.serviceTypes.${service}`;
+              const label = t(key);
+              return label === key ? service.replaceAll("_", " ") : label;
+            },
+            orderedBy: (name) =>
+              isRoom ? tr("orderedBy", { name }) : t("cashier.orderPanel.orderedBy", { name }),
+            priceNote: (note, name) => t(`cashier.orderPanel.priceNote.${note}`, { name }),
+          },
+        })
+      );
     } catch (caught) {
       setLocalError(caught instanceof Error ? caught.message : t("salesOrders.printFailed"));
     }
@@ -451,14 +511,21 @@ export function SalesOrdersPage() {
                       {formatDateTime(selectedOrder.createdAt)}
                     </p>
                   </div>
-                  <span
-                    className={[
-                      "rounded px-2 py-1 text-[10px] font-semibold uppercase",
-                      statusBadgeClass(selectedOrder.status),
-                    ].join(" ")}
-                  >
-                    {t(salesOrderStatusKey(selectedOrder.status))}
-                  </span>
+                  <div className="flex flex-col items-end gap-1">
+                    <span
+                      className={[
+                        "rounded px-2 py-1 text-[10px] font-semibold uppercase",
+                        statusBadgeClass(selectedOrder.status),
+                      ].join(" ")}
+                    >
+                      {t(salesOrderStatusKey(selectedOrder.status))}
+                    </span>
+                    {edits.length ? (
+                      <span className="rounded bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-amber-800">
+                        {t("salesOrders.edit.badge")}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
                 <p className="mt-2 text-xs text-slate-500">
                   {t(salesOrderServiceTypeKey(selectedOrder.serviceType))}
@@ -486,6 +553,15 @@ export function SalesOrdersPage() {
                   >
                     {t("salesOrders.printCheckout")}
                   </button>
+                  {isCompletedSalesOrder(selectedOrder) ? (
+                    <button
+                      type="button"
+                      onClick={() => setEditing(true)}
+                      className="text-xs font-semibold text-amber-600 hover:text-amber-700"
+                    >
+                      {t("salesOrders.edit.button")}
+                    </button>
+                  ) : null}
                 </div>
               </div>
 
@@ -552,6 +628,31 @@ export function SalesOrdersPage() {
                   </div>
                 ) : null}
 
+                {edits.length ? (
+                  <div className="mt-4 border-t border-slate-200 pt-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      {t("salesOrders.edit.history")}
+                    </p>
+                    <ul className="mt-2 space-y-2">
+                      {edits.map((edit) => (
+                        <li key={edit.id} className="text-xs text-slate-600">
+                          <p className="font-semibold text-slate-800">
+                            {money(edit.previousTotal)} → {money(edit.newTotal)}
+                          </p>
+                          <p>{edit.reason}</p>
+                          <p className="text-slate-400">
+                            {t("salesOrders.edit.historyBy", {
+                              when: formatDateTime(edit.createdAt),
+                              by: edit.editedByName || "—",
+                              manager: edit.approvedByName || "—",
+                            })}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
                 <div className="mt-4 border-t border-slate-200 pt-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                     {t("salesOrders.paymentDetail")}
@@ -593,6 +694,16 @@ export function SalesOrdersPage() {
           ))}
         </aside>
       </div>
+
+      {editing && selectedOrder ? (
+        <EditOrderDialog
+          order={selectedOrder}
+          onClose={() => setEditing(false)}
+          onSaved={(result) => void handleEdited(result.orderNumber || selectedOrder.orderNumber)}
+          previewEdit={previewOrderEdit}
+          saveEdit={editOrder}
+        />
+      ) : null}
     </section>
   );
 }

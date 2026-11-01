@@ -14,6 +14,11 @@ import {
   SettleSalesOrderDTO,
   SettleSalesOrderResultDTO,
   VoidSalesOrderLineDTO,
+  EditSalesOrderDTO,
+  EditSalesOrderPreviewDTO,
+  EditSalesOrderPreviewResultDTO,
+  EditSalesOrderResultDTO,
+  SalesOrderEditDTO,
 } from "../dtos/SalesOrderDTO";
 import { SalesOrder, SalesOrderLine } from "../../domain/entities/Cashier";
 
@@ -65,6 +70,30 @@ export class SalesOrderService implements ISalesOrderService {
     if (!id?.trim()) throw new Error("Sales order ID is required");
     if (!payload.payments.length) throw new Error("At least one payment is required");
     return this.salesOrderRepository.settleSalesOrder(id, payload);
+  }
+
+  async previewSalesOrderEdit(
+    id: string,
+    payload: EditSalesOrderPreviewDTO
+  ): Promise<EditSalesOrderPreviewResultDTO> {
+    if (!id?.trim()) throw new Error("Sales order ID is required");
+    return this.salesOrderRepository.previewSalesOrderEdit(id, payload);
+  }
+
+  async editSalesOrder(
+    id: string,
+    payload: EditSalesOrderDTO,
+    approverToken: string
+  ): Promise<EditSalesOrderResultDTO> {
+    if (!id?.trim()) throw new Error("Sales order ID is required");
+    if (!payload.reason.trim()) throw new Error("Say why the order is being edited");
+    if (!approverToken) throw new Error("A manager must approve the edit");
+    return this.salesOrderRepository.editSalesOrder(id, payload, approverToken);
+  }
+
+  async getSalesOrderEdits(id: string): Promise<SalesOrderEditDTO[]> {
+    if (!id?.trim()) throw new Error("Sales order ID is required");
+    return this.salesOrderRepository.getSalesOrderEdits(id);
   }
 
   async getSalesOrderLines(

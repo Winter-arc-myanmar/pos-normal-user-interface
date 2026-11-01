@@ -54,6 +54,10 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
+vi.mock("../salesOrders/EditOrderDialog", () => ({
+  EditOrderDialog: () => null,
+}));
+
 vi.mock("@/lib/i18n/formatters", () => ({
   useDateFormatter: () => ({
     formatDateTime: (value: string) => value,
@@ -74,6 +78,18 @@ vi.mock("@/core/presentation/hooks/usePosWorkspace", () => ({
     activeLocationId: "location-1",
     activePosRegisterId: "register-1",
   }),
+}));
+
+vi.mock("@/core/presentation/hooks/useExtraFees", () => ({
+  useExtraFees: () => ({ fees: [], isFeeLine: () => false }),
+}));
+
+vi.mock("@/core/presentation/hooks/useWorkingHostesses", () => ({
+  useWorkingHostesses: () => ({ hostesses: [], load: () => Promise.resolve() }),
+}));
+
+vi.mock("@/core/presentation/hooks/useRoomText", () => ({
+  useRoomText: () => (key: string) => key,
 }));
 
 vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
@@ -106,6 +122,9 @@ vi.mock("@/core/presentation/hooks/useSalesOrderManagement", () => ({
     serveOrderLine: vi.fn(),
     voidOrderLine: vi.fn(),
     compOrderLine: vi.fn(),
+    previewOrderEdit: vi.fn(),
+    editOrder: vi.fn(),
+    fetchOrderEdits: vi.fn().mockResolvedValue([]),
     clearSelectedOrder: vi.fn(),
     clearError: vi.fn(),
   }),
