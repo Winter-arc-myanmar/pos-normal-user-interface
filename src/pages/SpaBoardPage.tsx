@@ -49,6 +49,15 @@ import {
 } from "@/lib/spa/payment";
 import { withOrderTipOnFirstPayment } from "@/lib/pos/checkoutAdjustments";
 import { freeTimeFor } from "@/lib/spa/freeTime";
+import type { RentalChoice } from "@/lib/spa/freeTime";
+import {
+  blockPrice,
+  changeRentalPick,
+  defaultRentalPicks,
+  pickedRentals,
+  RentalPicks,
+  toggleRentalPick,
+} from "@/lib/ktv/rentalPicks";
 import { estimateRoomCharges } from "@/lib/spa/roomCharges";
 import type { Hostess } from "@/core/domain/entities/Hostess";
 import { usePlaceCharges } from "@/core/presentation/hooks/usePlaceCharges";
@@ -253,6 +262,12 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const [focReason, setFocReason] = useState("");
   const [isGivingFoc, setIsGivingFoc] = useState(false);
   const [rentalVariantId, setRentalVariantId] = useState("");
+  // KTV: a party can buy more than one rate (2 h hourly + one 30 min block), so each
+  // rate keeps its own count instead of one count shared by the picked rate.
+  const [startPicks, setStartPicks] = useState<RentalPicks>({});
+  const [extendPicks, setExtendPicks] = useState<RentalPicks>({});
+  /** The room whose default rate was put on the new-party form, so a refresh keeps it. */
+  const startPicksRoom = useRef("");
   const [pickedCharges, setPickedCharges] = useState<string[]>([]);
   const [hostessFor, setHostessFor] = useState<{
     product: Product;
@@ -470,7 +485,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const booking = session ? extendChoice : packageChoice;
   // KTV: the rentals this room can be sold under; the room's own rate unless another is picked.
   const placeCharges = usePlaceCharges(room ? room.id : null);
-  const rentals = isSpa ? [] : placeCharges;
+  const rentals = useMemo(() => (isSpa ? [] : placeCharges), [isSpa, placeCharges]);
   const rental =
     rentals.find((item) => item.variantId === rentalVariantId) ||
     rentals.find((item) => item.variantId === room?.rateVariantId) ||
@@ -489,43 +504,110 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       .find(Boolean) ||
     rentals.find((item) => item.variantId === room?.rateVariantId) ||
     rentals[0];
-  const rentalPicker = (onPick: (item: (typeof rentals)[number]) => void) =>
-    rentals.length > 1 ? (
+  /**
+   * KTV rooms that sell more than one rate (an hour and a half hour, say) let the
+   * party buy several at once, so 2 h 30 min is two hourly blocks plus one 30 min
+   * block. Rooms with a single rate keep the one count they always had.
+   */
+  const multiRate = !isSpa && rentals.length > 1;
+  const rentalPrice = (item: RentalChoice) =>
+    blockPrice(item, room?.rateVariantId, room?.sessionPrice);
+  const rentalPicksPicker = (
+    picks: RentalPicks,
+    onChange: (variantId: string, delta: number) => void,
+    onToggle: (variantId: string) => void
+  ) =>
+    multiRate ? (
       <div className="space-y-1">
         <span className="text-sm text-slate-300">{tr("chooseRental")}</span>
-        <div className="grid grid-cols-2 gap-2">
-          {rentals.map((item) => (
-            <button
+        {rentals.map((item) => {
+          const units = Math.max(0, Math.floor(picks[item.variantId] || 0));
+          return (
+            <div
               key={item.variantId}
-              type="button"
-              aria-pressed={rental?.variantId === item.variantId}
-              onClick={() => {
-                setRentalVariantId(item.variantId);
-                onPick(item);
-              }}
-              className={`rounded border p-2 text-left text-sm ${
-                rental?.variantId === item.variantId
-                  ? "border-emerald-500 bg-emerald-950/40"
-                  : "border-slate-700 bg-slate-950"
+              className={`flex items-center gap-2 rounded border p-2 text-sm ${
+                units ? "border-emerald-500 bg-emerald-950/40" : "border-slate-700 bg-slate-950"
               }`}
             >
-              <span className="block font-semibold">{item.name}</span>
-              <span className="block text-xs text-slate-400">
-                {tr("rentalPrice", {
-                  price: money(
-                    item.variantId === room?.rateVariantId
-                      ? room.sessionPrice ?? item.unitPrice
-                      : item.unitPrice
-                  ),
-                  minutes: item.blockMinutes,
-                })}
-              </span>
-            </button>
-          ))}
-        </div>
+              <button
+                type="button"
+                aria-pressed={units > 0}
+                onClick={() => onToggle(item.variantId)}
+                className="min-w-0 flex-1 text-left"
+              >
+                <span className="block font-semibold">{item.name}</span>
+                <span className="block text-xs text-slate-400">
+                  {tr("rentalPrice", {
+                    price: money(rentalPrice(item)),
+                    minutes: item.blockMinutes,
+                  })}
+                </span>
+              </button>
+              <div className="flex items-center rounded bg-slate-800">
+                <button
+                  type="button"
+                  aria-label={tr("fewerRental", { name: item.name })}
+                  className="h-9 w-9 text-lg disabled:opacity-40"
+                  disabled={!units}
+                  onClick={() => onChange(item.variantId, -1)}
+                >
+                  −
+                </button>
+                <span className="w-8 text-center font-semibold">{units}</span>
+                <button
+                  type="button"
+                  aria-label={tr("moreRental", { name: item.name })}
+                  className="h-9 w-9 text-lg"
+                  onClick={() => onChange(item.variantId, 1)}
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          );
+        })}
       </div>
     ) : null;
-  const hoursBought = session ? extendCount : sessionCount;
+  /** One rate of the booking: what it costs, how long it runs. */
+  type RatePlan = {
+    variantId?: string;
+    units: number;
+    blockMinutes: number;
+    unitPrice: number;
+    amount: number;
+  };
+  const planFor = (blocks: ReturnType<typeof pickedRentals>, count: number): RatePlan[] =>
+    multiRate
+      ? blocks.map((block) => ({
+          variantId: block.rental.variantId,
+          units: block.units,
+          blockMinutes: block.rental.blockMinutes,
+          unitPrice: blockPrice(block.rental, room?.rateVariantId, room?.sessionPrice),
+          amount: block.amount,
+        }))
+      : [
+          {
+            variantId: rental?.variantId,
+            units: count,
+            blockMinutes: unitMinutes,
+            unitPrice: roomSessionPrice || 0,
+            amount: (roomSessionPrice || 0) * count,
+          },
+        ];
+  const startBlocks = pickedRentals(
+    rentals,
+    startPicks,
+    room?.rateVariantId,
+    room?.sessionPrice
+  );
+  const extendBlocks = pickedRentals(
+    rentals,
+    extendPicks,
+    room?.rateVariantId,
+    room?.sessionPrice
+  );
+  const startPlan = planFor(startBlocks, sessionCount);
+  const extendPlan = planFor(extendBlocks, extendCount);
   // Packages a running "buy X, get Y free" adds on top, with their time.
   const freePackagesFor = (running: RunningPromotion[]) =>
     chosenPackages(booking, spaPackages).flatMap(({ package: item, quantity }) => {
@@ -561,9 +643,13 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         variantId: item.variantId,
         quantity,
       })),
-      ...(rental && roomSessionPrice !== undefined
-        ? [{ variantId: rental.variantId, quantity: hoursBought, unitPrice: roomSessionPrice }]
-        : []),
+      ...(session ? extendPlan : startPlan)
+        .filter((entry) => entry.variantId && entry.unitPrice > 0)
+        .map((entry) => ({
+          variantId: entry.variantId!,
+          quantity: entry.units,
+          unitPrice: entry.unitPrice,
+        })),
       ...(session
         ? []
         : (roomChargesFor(running)?.now ?? [])
@@ -590,7 +676,6 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     0
   );
   const roomChargesDue = (roomCharges?.total || 0) - roomChargesSaving;
-  const hoursSaving = saving(rental?.variantId);
   const optionalCharges = isSpa ? placeCharges.filter((charge) => !charge.autoApply) : [];
   // While a treatment runs, the room's charges that can be added later: not clocks,
   // which start with the treatment.
@@ -627,9 +712,40 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         ))}
       </div>
     ) : null;
-  const freeTime = !isSpa && rental ? freeTimeFor(rental.variantId, sessionCount, promotions.running) : null;
-  const extendFreeTime =
-    !isSpa && rental ? freeTimeFor(rental.variantId, extendCount, promotions.running) : null;
+  /** The free time each bought rate earns, so several rates each show their own deal. */
+  const freeFor = (plan: RatePlan[]) =>
+    plan.flatMap((entry) => {
+      const free = entry.variantId
+        ? freeTimeFor(entry.variantId, entry.units, promotions.running)
+        : null;
+      return free ? [{ ...free, minutes: free.units * entry.blockMinutes }] : [];
+    });
+  const startFree = isSpa ? [] : freeFor(startPlan);
+  const extendFree = isSpa ? [] : freeFor(extendPlan);
+  const freeMinutes = (offers: { minutes: number }[]) =>
+    offers.reduce((sum, offer) => sum + offer.minutes, 0);
+  const planSaving = (plan: RatePlan[]) =>
+    plan.reduce((sum, entry) => sum + saving(entry.variantId), 0);
+  const planMinutes = (plan: RatePlan[]) =>
+    plan.reduce((sum, entry) => sum + entry.units * entry.blockMinutes, 0);
+  const planAmount = (plan: RatePlan[]) => plan.reduce((sum, entry) => sum + entry.amount, 0);
+  // Bought time, and bought plus any free time a running deal adds.
+  const startBoughtMinutes = planMinutes(startPlan);
+  const extendBoughtMinutes = planMinutes(extendPlan);
+  const startMinutes = startBoughtMinutes + freeMinutes(startFree);
+  const extendMinutes = extendBoughtMinutes + freeMinutes(extendFree);
+  const startSaving = planSaving(startPlan);
+  const extendSaving = planSaving(extendPlan);
+  const startPriced = multiRate ? startPlan.length > 0 : roomSessionPrice !== undefined;
+  const extendPriced = multiRate ? extendPlan.length > 0 : roomSessionPrice !== undefined;
+  const startCharge = planAmount(startPlan) - (session ? 0 : startSaving);
+  const extendCharge = planAmount(extendPlan) - (session ? extendSaving : 0);
+  const freeTimeNotes = (offers: ReturnType<typeof freeFor>, className: string) =>
+    offers.map((free, index) => (
+      <p key={`${free.name}-${index}`} className={className}>
+        {tr("freeTimeAdded", { count: free.units, name: free.name })}
+      </p>
+    ));
   const rateProductIds = useMemo(
     () => new Set(rooms.map((item) => item.rateProductId).filter(Boolean)),
     [rooms]
@@ -649,8 +765,6 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       ),
     [area, isSpa, products, rateProductIds]
   );
-  const startCharge = (roomSessionPrice || 0) * sessionCount - (session ? 0 : hoursSaving);
-  const extendCharge = (roomSessionPrice || 0) * extendCount - (session ? hoursSaving : 0);
   const freePackageNotes = freePackages.length ? (
     <div className="space-y-1">
       {freePackages.map(({ package: item, free }) => (
@@ -832,6 +946,9 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     setSelectedRoomId(next.id);
     setRentalVariantId("");
     setPickedCharges([]);
+    setStartPicks({});
+    setExtendPicks({});
+    startPicksRoom.current = "";
     setSession(null);
     clearQuote();
     setGuestCount("1");
@@ -844,6 +961,15 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     }
     setStep("sessions");
   };
+
+  // A new party starts on the room's own rate, at its minimum; the cashier adds the
+  // other rates (a half hour on top of two hours) on the same form.
+  useEffect(() => {
+    if (isSpa || !room || rentals.length < 2 || startPicksRoom.current === room.id) return;
+    startPicksRoom.current = room.id;
+    const own = defaultRentalPicks(rentals, room.rateVariantId);
+    if (Object.keys(own).length) setStartPicks(own);
+  }, [isSpa, rentals, room]);
 
   const keyFor = (action: CardAction) => {
     if (!tapKeys.current[action]) {
@@ -929,15 +1055,48 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     }
   };
 
+  /**
+   * The rest of a multi-rate booking. The room opens (or is extended) on its first
+   * rate; the other rates the party bought go on as more time, charged the same way
+   * and on their own idempotency keys so no charge is swallowed as a repeat.
+   */
+  const addOtherRates = async (
+    sessionId: string,
+    plan: RatePlan[],
+    charge?: {
+      guestCardId?: string;
+      paymentMethodId?: string;
+      posSessionId?: string;
+      idempotencyKey?: string;
+    }
+  ): Promise<{ charged: number; balanceAfter: string } | null> => {
+    let charged = 0;
+    let balanceAfter = "";
+    for (const [index, entry] of plan.slice(1).entries()) {
+      if (!entry.variantId) continue;
+      const result = await extendSession(sessionId, {
+        ...(charge
+          ? { ...charge, idempotencyKey: `${charge.idempotencyKey}-${index + 2}` }
+          : {}),
+        sessions: entry.units,
+        rentalVariantId: entry.variantId,
+      });
+      charged += Number(result.charged || 0);
+      balanceAfter = result.balanceAfter || balanceAfter;
+    }
+    return charged || balanceAfter ? { charged, balanceAfter } : null;
+  };
+
   const openTreatment = async (
     payer: GuestWallet | null,
     payerCard: GuestCard | null,
     method?: PaymentMethod
   ) => {
-    if (!room) return;
+    if (!room || !startPlan.length) return;
     setActionError(null);
     try {
       const { context, charge } = await chargeFrom("open", payerCard, method);
+      const first = startPlan[0];
       const created = await openSession({
         roomId: room.id,
         ...(payer ? { guestWalletId: payer.id } : {}),
@@ -947,12 +1106,13 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               packages: packageOrders(packageChoice, spaPackages),
               roomCharges: pickedCharges.map((variantId) => ({ variantId })),
             }
-          : { sessions: sessionCount, rentalVariantId: rental?.variantId }),
+          : { sessions: first.units, rentalVariantId: first.variantId }),
         prepay: charge,
         posRegisterId: context.posRegisterId,
         openedByPosSessionId: context.posSessionId,
         salesChannel: "POS",
       });
+      await addOtherRates(created.id, startPlan, charge);
       tapKeys.current.open = undefined;
       void printNewTickets(created.salesOrderId, new Set());
       await fetchBoard();
@@ -966,10 +1126,11 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
 
   /** Pay at the end: the room starts with what was booked on its bill, no card tap. */
   const openOnBill = async () => {
-    if (!room) return;
+    if (!room || !startPlan.length) return;
     setActionError(null);
     try {
       const context = await requireCashierContext();
+      const first = startPlan[0];
       const created = await openSession({
         roomId: room.id,
         ...(wallet ? { guestWalletId: wallet.id } : {}),
@@ -979,11 +1140,12 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               packages: packageOrders(packageChoice, spaPackages),
               roomCharges: pickedCharges.map((variantId) => ({ variantId })),
             }
-          : { sessions: sessionCount, rentalVariantId: rental?.variantId }),
+          : { sessions: first.units, rentalVariantId: first.variantId }),
         posRegisterId: context.posRegisterId,
         openedByPosSessionId: context.posSessionId,
         salesChannel: "POS",
       });
+      await addOtherRates(created.id, startPlan);
       void printNewTickets(created.salesOrderId, new Set());
       await fetchBoard();
       await selectSession(created);
@@ -995,17 +1157,23 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
 
   /** Pay at the end: more time goes on the bill, no card tap. */
   const extendOnBill = async () => {
-    if (!session) return;
+    if (!session || !extendPlan.length) return;
     setActionError(null);
     setIsAdding(true);
     try {
       const before = await kitchenTicketIds(session.salesOrderId);
+      const first = extendPlan[0];
       await extendSession(
         session.id,
         isSpa
           ? { packages: packageOrders(extendChoice, spaPackages), idempotencyKey: keyFor("extend") }
-          : { sessions: extendCount, rentalVariantId: rental?.variantId, idempotencyKey: keyFor("extend") }
+          : {
+              sessions: first.units,
+              rentalVariantId: first.variantId,
+              idempotencyKey: keyFor("extend"),
+            }
       );
+      if (!isSpa) await addOtherRates(session.id, extendPlan);
       tapKeys.current.extend = undefined;
       void printNewTickets(session.salesOrderId, before);
       setShowExtend(false);
@@ -1013,9 +1181,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         ...session,
         plannedMinutes:
           (session.plannedMinutes || 0) +
-          (isSpa
-            ? choiceTotals(extendChoice, spaPackages).minutes
-            : (extendCount + (extendFreeTime?.units || 0)) * unitMinutes),
+          (isSpa ? choiceTotals(extendChoice, spaPackages).minutes : extendMinutes),
       });
       setExtendChoice({});
       setNotice(tr("addedToBillNotice"));
@@ -1063,18 +1229,20 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     payerCard: GuestCard | null,
     method?: PaymentMethod
   ) => {
-    if (!session) return;
+    if (!session || !extendPlan.length) return;
     setActionError(null);
     setIsAdding(true);
     try {
       const { charge } = await chargeFrom("extend", payerCard, method);
       const before = await kitchenTicketIds(session.salesOrderId);
+      const first = extendPlan[0];
       const result = await extendSession(
         session.id,
         isSpa
           ? { ...charge, packages: packageOrders(extendChoice, spaPackages) }
-          : { ...charge, sessions: extendCount, rentalVariantId: rental?.variantId }
+          : { ...charge, sessions: first.units, rentalVariantId: first.variantId }
       );
+      const extra = isSpa ? null : await addOtherRates(session.id, extendPlan, charge);
       tapKeys.current.extend = undefined;
       void printNewTickets(session.salesOrderId, before);
       setShowExtend(false);
@@ -1082,12 +1250,15 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         ...session,
         plannedMinutes:
           (session.plannedMinutes || 0) +
-          (isSpa
-            ? choiceTotals(extendChoice, spaPackages).minutes
-            : (extendCount + (extendFreeTime?.units || 0)) * unitMinutes),
+          (isSpa ? choiceTotals(extendChoice, spaPackages).minutes : extendMinutes),
       });
       setExtendChoice({});
-      showCharged(payer, result.charged, result.balanceAfter, method);
+      showCharged(
+        payer,
+        String(Number(result.charged || 0) + Number(extra?.charged || 0)),
+        extra?.balanceAfter || result.balanceAfter,
+        method
+      );
       await fetchBoard();
       await refreshBill(session);
     } catch (caught) {
@@ -1944,7 +2115,9 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       : cardPrompt === "open"
         ? tr("confirmStartTitle", { room: room?.roomNumber || "" })
         : cardPrompt === "extend"
-          ? tr("confirmExtendTitle", { count: isSpa ? bookingTotals.count : extendCount })
+          ? multiRate
+            ? tr("confirmExtendMinutes", { minutes: extendBoughtMinutes })
+            : tr("confirmExtendTitle", { count: isSpa ? bookingTotals.count : extendCount })
           : tr("confirmPayTitle");
 
   return (
@@ -2150,47 +2323,54 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                 </>
               ) : (
               <>
-              {rentalPicker((item) => setSessionCount((count) => Math.max(item.minimumUnits, count)))}
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-sm text-slate-300">{tr("sessions")}</span>
-                <div className="flex items-center rounded bg-slate-800">
-                  <button
-                    type="button"
-                    aria-label={tr("fewerSessions")}
-                    className="h-9 w-9 text-lg disabled:opacity-40"
-                    disabled={sessionCount <= minimumUnits}
-                    onClick={() => setSessionCount((count) => Math.max(minimumUnits, count - 1))}
-                  >
-                    −
-                  </button>
-                  <span className="w-8 text-center font-semibold">{sessionCount}</span>
-                  <button
-                    type="button"
-                    aria-label={tr("moreSessions")}
-                    className="h-9 w-9 text-lg"
-                    onClick={() => setSessionCount((count) => count + 1)}
-                  >
-                    +
-                  </button>
+              {rentalPicksPicker(
+                startPicks,
+                (variantId, delta) =>
+                  setStartPicks((current) => changeRentalPick(current, rentals, variantId, delta)),
+                (variantId) =>
+                  setStartPicks((current) => toggleRentalPick(current, rentals, variantId))
+              )}
+              {multiRate ? null : (
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm text-slate-300">{tr("sessions")}</span>
+                  <div className="flex items-center rounded bg-slate-800">
+                    <button
+                      type="button"
+                      aria-label={tr("fewerSessions")}
+                      className="h-9 w-9 text-lg disabled:opacity-40"
+                      disabled={sessionCount <= minimumUnits}
+                      onClick={() => setSessionCount((count) => Math.max(minimumUnits, count - 1))}
+                    >
+                      −
+                    </button>
+                    <span className="w-8 text-center font-semibold">{sessionCount}</span>
+                    <button
+                      type="button"
+                      aria-label={tr("moreSessions")}
+                      className="h-9 w-9 text-lg"
+                      onClick={() => setSessionCount((count) => count + 1)}
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
               <p className="text-sm text-slate-300">
                 {tr("sessionsSummary", {
-                  minutes: (sessionCount + (freeTime?.units || 0)) * unitMinutes,
+                  minutes: startMinutes,
                   perSession: unitMinutes,
                 })}
-                {roomSessionPrice ? ` · ${money(startCharge)}` : ""}
+                {startPriced ? ` · ${money(startCharge)}` : ""}
               </p>
-              {hoursSaving > 0 && !session ? (
+              {startSaving > 0 && !session ? (
                 <p className="text-sm text-emerald-300">
-                  {tr("promotionDiscount")} −{money(hoursSaving)}
+                  {tr("promotionDiscount")} −{money(startSaving)}
                 </p>
               ) : null}
-              {freeTime ? (
-                <p className="rounded border border-emerald-700/60 bg-emerald-950/40 px-2 py-1 text-sm text-emerald-200">
-                  {tr("freeTimeAdded", { count: freeTime.units, name: freeTime.name })}
-                </p>
-              ) : null}
+              {freeTimeNotes(
+                startFree,
+                "rounded border border-emerald-700/60 bg-emerald-950/40 px-2 py-1 text-sm text-emerald-200"
+              )}
               </>
               )}
               <label className="block text-sm text-slate-300">
@@ -2213,8 +2393,12 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                       : tr("startAndPay", { amount: money(bookingDue + roomChargesDue) })}
                 </Button>
               ) : (
-                <Button type="submit" isLoading={isLoading}>
-                  {roomSessionPrice === undefined
+                <Button
+                  type="submit"
+                  isLoading={isLoading}
+                  disabled={multiRate && !startPlan.length}
+                >
+                  {!startPriced
                     ? tr("startSession")
                     : startsAtEnd
                       ? tr("startOnBill", { amount: money(startCharge) })
@@ -2268,6 +2452,11 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             onExtend={() => {
               setRentalVariantId(billRental?.variantId || "");
               setExtendCount(isSpa ? 1 : billRental?.minimumUnits || 1);
+              setExtendPicks(
+                billRental
+                  ? { [billRental.variantId]: Math.max(1, billRental.minimumUnits) }
+                  : {}
+              );
               setExtendChoice({});
               setShowExtend(true);
             }}
@@ -2737,29 +2926,35 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             <p className="flex justify-between font-semibold">
               <span>
                 {tr("sessionsSummary", {
-                  minutes: (extendCount + (extendFreeTime?.units || 0)) * unitMinutes,
+                  minutes: extendMinutes,
                   perSession: unitMinutes,
                 })}
               </span>
-              {roomSessionPrice ? <span>{money(extendCharge)}</span> : null}
+              {extendPriced ? <span>{money(extendCharge)}</span> : null}
             </p>
           ) : cardPrompt === "open" ? (
             <>
               <p className="flex justify-between gap-2">
                 <span>
-                  {tr("startSummary", {
-                    room: room?.roomNumber || "",
-                    sessions: sessionCount,
-                    minutes: (sessionCount + (freeTime?.units || 0)) * unitMinutes,
-                    count: Math.max(1, Number(guestCount) || 1),
-                  })}
+                  {multiRate
+                    ? tr("startSummaryMinutes", {
+                        room: room?.roomNumber || "",
+                        minutes: startMinutes,
+                        count: Math.max(1, Number(guestCount) || 1),
+                      })
+                    : tr("startSummary", {
+                        room: room?.roomNumber || "",
+                        sessions: sessionCount,
+                        minutes: startMinutes,
+                        count: Math.max(1, Number(guestCount) || 1),
+                      })}
                 </span>
-                {roomSessionPrice !== undefined ? <span>{money(startCharge)}</span> : null}
+                {startPriced ? <span>{money(startCharge)}</span> : null}
               </p>
-              {hoursSaving ? (
+              {startSaving ? (
                 <p className="flex justify-between text-emerald-300">
                   <span>{tr("promotionDiscount")}</span>
-                  <span>−{money(hoursSaving)}</span>
+                  <span>−{money(startSaving)}</span>
                 </p>
               ) : null}
             </>
@@ -2871,47 +3066,54 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               </>
             ) : (
               <>
-            {rentalPicker((item) => setExtendCount((count) => Math.max(item.minimumUnits, count)))}
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-300">{tr("moreSessionsLabel")}</span>
-              <div className="flex items-center rounded bg-slate-800">
-                <button
-                  type="button"
-                  aria-label={tr("fewerSessions")}
-                  className="h-9 w-9 text-lg disabled:opacity-40"
-                  disabled={extendCount <= minimumUnits}
-                  onClick={() => setExtendCount((count) => Math.max(minimumUnits, count - 1))}
-                >
-                  −
-                </button>
-                <span className="w-8 text-center font-semibold">{extendCount}</span>
-                <button
-                  type="button"
-                  aria-label={tr("moreSessions")}
-                  className="h-9 w-9 text-lg"
-                  onClick={() => setExtendCount((count) => count + 1)}
-                >
-                  +
-                </button>
+            {rentalPicksPicker(
+              extendPicks,
+              (variantId, delta) =>
+                setExtendPicks((current) => changeRentalPick(current, rentals, variantId, delta)),
+              (variantId) =>
+                setExtendPicks((current) => toggleRentalPick(current, rentals, variantId))
+            )}
+            {multiRate ? null : (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-300">{tr("moreSessionsLabel")}</span>
+                <div className="flex items-center rounded bg-slate-800">
+                  <button
+                    type="button"
+                    aria-label={tr("fewerSessions")}
+                    className="h-9 w-9 text-lg disabled:opacity-40"
+                    disabled={extendCount <= minimumUnits}
+                    onClick={() => setExtendCount((count) => Math.max(minimumUnits, count - 1))}
+                  >
+                    −
+                  </button>
+                  <span className="w-8 text-center font-semibold">{extendCount}</span>
+                  <button
+                    type="button"
+                    aria-label={tr("moreSessions")}
+                    className="h-9 w-9 text-lg"
+                    onClick={() => setExtendCount((count) => count + 1)}
+                  >
+                    +
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
             <p className="text-sm text-slate-300">
               {tr("sessionsSummary", {
-                minutes: (extendCount + (extendFreeTime?.units || 0)) * unitMinutes,
+                minutes: extendMinutes,
                 perSession: unitMinutes,
               })}
-              {roomSessionPrice ? ` · ${money(extendCharge)}` : ""}
+              {extendPriced ? ` · ${money(extendCharge)}` : ""}
             </p>
-            {hoursSaving > 0 ? (
+            {extendSaving > 0 ? (
               <p className="text-sm text-emerald-300">
-                {tr("promotionDiscount")} −{money(hoursSaving)}
+                {tr("promotionDiscount")} −{money(extendSaving)}
               </p>
             ) : null}
-            {extendFreeTime ? (
-              <p className="rounded border border-emerald-700/60 bg-emerald-950/40 px-2 py-1 text-sm text-emerald-200">
-                {tr("freeTimeAdded", { count: extendFreeTime.units, name: extendFreeTime.name })}
-              </p>
-            ) : null}
+            {freeTimeNotes(
+              extendFree,
+              "rounded border border-emerald-700/60 bg-emerald-950/40 px-2 py-1 text-sm text-emerald-200"
+            )}
               </>
             )}
             <div className="grid grid-cols-2 gap-2">
@@ -2920,7 +3122,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               </Button>
               <Button
                 isLoading={isAdding}
-                disabled={isSpa && !bookingTotals.count}
+                disabled={isSpa ? !bookingTotals.count : !extendPlan.length}
                 onClick={() => (atEnd ? void extendOnBill() : requestCard("extend"))}
               >
                 {atEnd ? tr("addToBillShort") : tr("extendAndPay")}
