@@ -66,6 +66,69 @@ export interface SettleSalesOrderDTO {
   idempotencyKey?: string;
 }
 
+export interface EditOrderLineDTO {
+  /** A line already on the order; left out for a new line. */
+  id?: string;
+  variantId?: string;
+  quantity: string;
+  unitPrice: string;
+  lineDiscount?: string;
+  hostessId?: string | null;
+}
+
+/** The order as it should be after the edit; a line left out is taken off. */
+export interface EditSalesOrderPreviewDTO {
+  lines: EditOrderLineDTO[];
+  billDiscount?: string;
+  discountReasonId?: string;
+  includeTax?: boolean;
+  includeServiceCharge?: boolean;
+  customerId?: string | null;
+  paymentMethods?: { paymentId: string; paymentMethodId: string }[];
+  posSessionId?: string;
+}
+
+export interface EditSalesOrderDTO extends EditSalesOrderPreviewDTO {
+  reason: string;
+  /** How the difference is taken or given back when the total changes. */
+  settlement?: {
+    paymentMethodId: string;
+    guestCardId?: string;
+    transactionReference?: string;
+  };
+}
+
+export interface EditSalesOrderPreviewResultDTO {
+  previousTotal: string;
+  subtotal: string;
+  totalDiscount: string;
+  totalTax: string;
+  serviceCharge: string;
+  tipAmount: string;
+  newTotal: string;
+  /** To take when positive, to give back when negative. */
+  difference: string;
+}
+
+export interface EditSalesOrderResultDTO {
+  editId: string;
+  orderId: string;
+  orderNumber: string;
+  previousTotal: string;
+  newTotal: string;
+  difference: string;
+}
+
+export interface SalesOrderEditDTO {
+  id: string;
+  reason: string;
+  editedByName: string;
+  approvedByName: string;
+  previousTotal: string;
+  newTotal: string;
+  createdAt: string;
+}
+
 export interface SalesOrderBillQueryDTO {
   /** Nonnegative decimal string for the order discount. */
   discount?: string;

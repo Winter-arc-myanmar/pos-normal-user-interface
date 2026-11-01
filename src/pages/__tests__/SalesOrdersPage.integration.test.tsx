@@ -54,6 +54,10 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
+vi.mock("../salesOrders/EditOrderDialog", () => ({
+  EditOrderDialog: () => null,
+}));
+
 vi.mock("@/lib/i18n/formatters", () => ({
   useDateFormatter: () => ({
     formatDateTime: (value: string) => value,
@@ -118,6 +122,9 @@ vi.mock("@/core/presentation/hooks/useSalesOrderManagement", () => ({
     serveOrderLine: vi.fn(),
     voidOrderLine: vi.fn(),
     compOrderLine: vi.fn(),
+    previewOrderEdit: vi.fn(),
+    editOrder: vi.fn(),
+    fetchOrderEdits: vi.fn().mockResolvedValue([]),
     clearSelectedOrder: vi.fn(),
     clearError: vi.fn(),
   }),

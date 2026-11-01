@@ -12,6 +12,11 @@ import {
   VoidSalesOrderLineDTO,
   SettleSalesOrderDTO,
   SettleSalesOrderResultDTO,
+  EditSalesOrderDTO,
+  EditSalesOrderPreviewDTO,
+  EditSalesOrderPreviewResultDTO,
+  EditSalesOrderResultDTO,
+  SalesOrderEditDTO,
 } from "../../application/dtos/SalesOrderDTO";
 import { SalesOrder, SalesOrderLine } from "../entities/Cashier";
 
@@ -29,6 +34,16 @@ export interface ISalesOrderService {
     id: string,
     payload: SettleSalesOrderDTO
   ): Promise<SettleSalesOrderResultDTO>;
+  previewSalesOrderEdit(
+    id: string,
+    payload: EditSalesOrderPreviewDTO
+  ): Promise<EditSalesOrderPreviewResultDTO>;
+  editSalesOrder(
+    id: string,
+    payload: EditSalesOrderDTO,
+    approverToken: string
+  ): Promise<EditSalesOrderResultDTO>;
+  getSalesOrderEdits(id: string): Promise<SalesOrderEditDTO[]>;
   getSalesOrderLines(
     salesOrderId: string,
     params?: SalesOrderFilterDTO

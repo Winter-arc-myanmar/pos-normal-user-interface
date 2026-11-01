@@ -478,6 +478,50 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     rental && rental.variantId !== room?.rateVariantId ? rental.unitPrice : room?.sessionPrice;
   const unitMinutes = !isSpa && rental ? rental.blockMinutes : sessionMinutes(room);
   const minimumUnits = !isSpa && rental ? rental.minimumUnits : 1;
+  // A running room is extended on the rental last sold on its bill, as the server does.
+  const billRental =
+    [...orderLines]
+      .reverse()
+      .map((line) => rentals.find((item) => item.variantId === line.variantId))
+      .find(Boolean) ||
+    rentals.find((item) => item.variantId === room?.rateVariantId) ||
+    rentals[0];
+  const rentalPicker = (onPick: (item: (typeof rentals)[number]) => void) =>
+    rentals.length > 1 ? (
+      <div className="space-y-1">
+        <span className="text-sm text-slate-300">{tr("chooseRental")}</span>
+        <div className="grid grid-cols-2 gap-2">
+          {rentals.map((item) => (
+            <button
+              key={item.variantId}
+              type="button"
+              aria-pressed={rental?.variantId === item.variantId}
+              onClick={() => {
+                setRentalVariantId(item.variantId);
+                onPick(item);
+              }}
+              className={`rounded border p-2 text-left text-sm ${
+                rental?.variantId === item.variantId
+                  ? "border-emerald-500 bg-emerald-950/40"
+                  : "border-slate-700 bg-slate-950"
+              }`}
+            >
+              <span className="block font-semibold">{item.name}</span>
+              <span className="block text-xs text-slate-400">
+                {tr("rentalPrice", {
+                  price: money(
+                    item.variantId === room?.rateVariantId
+                      ? room.sessionPrice ?? item.unitPrice
+                      : item.unitPrice
+                  ),
+                  minutes: item.blockMinutes,
+                })}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    ) : null;
   const hoursBought = session ? extendCount : sessionCount;
   // Packages a running "buy X, get Y free" adds on top, with their time.
   const freePackagesFor = (running: RunningPromotion[]) =>
@@ -957,7 +1001,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         session.id,
         isSpa
           ? { packages: packageOrders(extendChoice, spaPackages), idempotencyKey: keyFor("extend") }
-          : { sessions: extendCount, idempotencyKey: keyFor("extend") }
+          : { sessions: extendCount, rentalVariantId: rental?.variantId, idempotencyKey: keyFor("extend") }
       );
       tapKeys.current.extend = undefined;
       void printNewTickets(session.salesOrderId, before);
@@ -1026,7 +1070,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         session.id,
         isSpa
           ? { ...charge, packages: packageOrders(extendChoice, spaPackages) }
-          : { ...charge, sessions: extendCount }
+          : { ...charge, sessions: extendCount, rentalVariantId: rental?.variantId }
       );
       tapKeys.current.extend = undefined;
       void printNewTickets(session.salesOrderId, before);
@@ -2098,41 +2142,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                 </>
               ) : (
               <>
-              {rentals.length > 1 ? (
-                <div className="space-y-1">
-                  <span className="text-sm text-slate-300">{tr("chooseRental")}</span>
-                  <div className="grid grid-cols-2 gap-2">
-                    {rentals.map((item) => (
-                      <button
-                        key={item.variantId}
-                        type="button"
-                        aria-pressed={rental?.variantId === item.variantId}
-                        onClick={() => {
-                          setRentalVariantId(item.variantId);
-                          setSessionCount((count) => Math.max(item.minimumUnits, count));
-                        }}
-                        className={`rounded border p-2 text-left text-sm ${
-                          rental?.variantId === item.variantId
-                            ? "border-emerald-500 bg-emerald-950/40"
-                            : "border-slate-700 bg-slate-950"
-                        }`}
-                      >
-                        <span className="block font-semibold">{item.name}</span>
-                        <span className="block text-xs text-slate-400">
-                          {tr("rentalPrice", {
-                            price: money(
-                              item.variantId === room.rateVariantId
-                                ? room.sessionPrice ?? item.unitPrice
-                                : item.unitPrice
-                            ),
-                            minutes: item.blockMinutes,
-                          })}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
+              {rentalPicker((item) => setSessionCount((count) => Math.max(item.minimumUnits, count)))}
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm text-slate-300">{tr("sessions")}</span>
                 <div className="flex items-center rounded bg-slate-800">
@@ -2248,7 +2258,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                   : setStep("menu")
             }
             onExtend={() => {
-              setExtendCount(1);
+              setRentalVariantId(billRental?.variantId || "");
+              setExtendCount(isSpa ? 1 : billRental?.minimumUnits || 1);
               setExtendChoice({});
               setShowExtend(true);
             }}
@@ -2718,8 +2729,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             <p className="flex justify-between font-semibold">
               <span>
                 {tr("sessionsSummary", {
-                  minutes: extendCount * sessionMinutes(room),
-                  perSession: sessionMinutes(room),
+                  minutes: (extendCount + (extendFreeTime?.units || 0)) * unitMinutes,
+                  perSession: unitMinutes,
                 })}
               </span>
               {roomSessionPrice ? <span>{money(extendCharge)}</span> : null}
@@ -2731,7 +2742,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                   {tr("startSummary", {
                     room: room?.roomNumber || "",
                     sessions: sessionCount,
-                    minutes: sessionCount * sessionMinutes(room),
+                    minutes: (sessionCount + (freeTime?.units || 0)) * unitMinutes,
                     count: Math.max(1, Number(guestCount) || 1),
                   })}
                 </span>
@@ -2852,6 +2863,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               </>
             ) : (
               <>
+            {rentalPicker((item) => setExtendCount((count) => Math.max(item.minimumUnits, count)))}
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-300">{tr("moreSessionsLabel")}</span>
               <div className="flex items-center rounded bg-slate-800">
@@ -2859,8 +2871,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                   type="button"
                   aria-label={tr("fewerSessions")}
                   className="h-9 w-9 text-lg disabled:opacity-40"
-                  disabled={extendCount <= 1}
-                  onClick={() => setExtendCount((count) => Math.max(1, count - 1))}
+                  disabled={extendCount <= minimumUnits}
+                  onClick={() => setExtendCount((count) => Math.max(minimumUnits, count - 1))}
                 >
                   −
                 </button>
@@ -2877,11 +2889,21 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             </div>
             <p className="text-sm text-slate-300">
               {tr("sessionsSummary", {
-                minutes: extendCount * sessionMinutes(room),
-                perSession: sessionMinutes(room),
+                minutes: (extendCount + (extendFreeTime?.units || 0)) * unitMinutes,
+                perSession: unitMinutes,
               })}
               {roomSessionPrice ? ` · ${money(extendCharge)}` : ""}
             </p>
+            {hoursSaving > 0 ? (
+              <p className="text-sm text-emerald-300">
+                {tr("promotionDiscount")} −{money(hoursSaving)}
+              </p>
+            ) : null}
+            {extendFreeTime ? (
+              <p className="rounded border border-emerald-700/60 bg-emerald-950/40 px-2 py-1 text-sm text-emerald-200">
+                {tr("freeTimeAdded", { count: extendFreeTime.units, name: extendFreeTime.name })}
+              </p>
+            ) : null}
               </>
             )}
             <div className="grid grid-cols-2 gap-2">
