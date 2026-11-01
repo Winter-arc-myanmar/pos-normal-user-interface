@@ -216,6 +216,8 @@ const toPlace = (value: unknown): SalesOrderPlace | null => {
     number: String(place.number),
     openedAt: String(place.openedAt),
     closedAt: place.closedAt ? String(place.closedAt) : null,
+    manualInAt: place.manualInAt ? String(place.manualInAt) : null,
+    manualOutAt: place.manualOutAt ? String(place.manualOutAt) : null,
   };
 };
 

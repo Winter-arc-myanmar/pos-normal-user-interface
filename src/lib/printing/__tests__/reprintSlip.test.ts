@@ -123,10 +123,16 @@ describe("reprintSlip", () => {
           number: "K3",
           openedAt: "2026-11-01T11:40:00.000Z",
           closedAt: "2026-11-01T13:10:00.000Z",
+          manualInAt: new Date(2026, 10, 1, 16, 15).toISOString(),
+          manualOutAt: new Date(2026, 10, 1, 18, 15).toISOString(),
         },
         payments: [{ methodName: "Guest Card", methodKind: "GUEST_CARD", amount: "14250.0000" }],
       }),
-      [line("beer", { hostessId: "mya" }), line("hostess", { hostessId: "mya", askWhoServed: true })]
+      [
+        line("room", { categoryName: "KTV Rooms", courseType: "Hours · Standard" }),
+        line("beer", { hostessId: "mya" }),
+        line("hostess", { hostessId: "mya", askWhoServed: true }),
+      ]
     );
 
     expect(slip).toMatchObject({
@@ -141,6 +147,7 @@ describe("reprintSlip", () => {
     });
     expect(slip.subtotal).toBeUndefined();
     expect(slip.payments).toBeUndefined();
-    expect(slip.lines.map((item) => item.modifiers)).toEqual(["Ordered by Mya", undefined]);
+    expect(slip.lines.map((item) => item.modifiers)).toEqual([undefined, "Ordered by Mya", undefined]);
+    expect(slip.lines[0].name).toBe("room (4:15 - 6:15)");
   });
 });

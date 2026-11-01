@@ -132,6 +132,9 @@ export interface SalesOrderPlace {
   number: string;
   openedAt: string;
   closedAt?: string | null;
+  /** A room's In and Out as the cashier set them, printed beside the room charge. */
+  manualInAt?: string | null;
+  manualOutAt?: string | null;
 }
 
 export interface SalesOrderPaymentSummary {

@@ -85,6 +85,15 @@ import { SpaBillPanel } from "./spa/SpaBillPanel";
 import { RoomFloorDialog, RoomFloorMode } from "./spa/RoomFloorDialog";
 import { PackagePicker } from "./spa/PackagePicker";
 import { SpaRoomTile } from "./spa/SpaRoomTile";
+import { ManualTimesFields } from "./spa/ManualTimesFields";
+import {
+  defaultManualTimes,
+  fromLocalInput,
+  ManualTimes,
+  manualTimesBackwards,
+  roomTimeNamer,
+  slipTimeRange,
+} from "@/lib/spa/manualTimes";
 import { modifierPrintText } from "@/lib/printing/modifierText";
 import { cashierLabel } from "@/lib/printing/cashier";
 
@@ -208,6 +217,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [tip, setTip] = useState("");
+  const [manualTimes, setManualTimes] = useState<ManualTimes>({ inAt: "", outAt: "" });
   // Bill & table for a room: the same bill-level choices the cashier takes.
   const [billDiscount, setBillDiscount] = useState("0.0000");
   const [billDiscountReasonId, setBillDiscountReasonId] = useState("");
@@ -262,6 +272,38 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     [room?.sessions]
   );
   const billClosed = session?.sessionState === "CLOSED";
+  const payingStarts = confirmEnd || step === "pay";
+  const sessionId = session?.id;
+  const sessionOpenedAt = session?.openedAt;
+  const sessionPlanned = session?.plannedMinutes;
+  // The guest's In and Out start from the room's own times each time paying begins.
+  useEffect(() => {
+    if (!payingStarts || billClosed || !sessionId || !sessionOpenedAt) return;
+    setManualTimes(
+      defaultManualTimes({ openedAt: sessionOpenedAt, plannedMinutes: sessionPlanned })
+    );
+  }, [billClosed, payingStarts, sessionId, sessionOpenedAt, sessionPlanned]);
+  const manualClose = () => ({
+    manualInAt: fromLocalInput(manualTimes.inAt),
+    manualOutAt: fromLocalInput(manualTimes.outAt),
+  });
+  const slipNamer = (lines: SalesOrderLine[]) =>
+    roomTimeNamer(
+      lines,
+      slipTimeRange(fromLocalInput(manualTimes.inAt), fromLocalInput(manualTimes.outAt))
+    );
+  const timesBackwards = !billClosed && manualTimesBackwards(manualTimes);
+  const manualTimesFields =
+    session && !billClosed ? (
+      <ManualTimesFields
+        value={manualTimes}
+        onChange={setManualTimes}
+        sessionTime={`${formatDateTime(session.openedAt)} → ${formatDateTime(
+          new Date(nowMs).toISOString()
+        )}`}
+        tr={tr}
+      />
+    ) : null;
   const liveSession = room?.sessions.find((item) => item.id === session?.id);
   const cardMethod = findMemberCardPaymentMethod(paymentMethods);
   const cashMethod = paymentMethods.find(
@@ -1207,6 +1249,10 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
 
   const endTreatment = async () => {
     if (!session) return;
+    if (timesBackwards) {
+      setActionError(tr("errors.manualTimes"));
+      return;
+    }
     if (pending.length) {
       setActionError(tr("errors.pendingItems"));
       return;
@@ -1228,10 +1274,15 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               idempotencyKey: `${kind}-tip-${session.id}`,
             }
           : undefined;
-      const final = await closeSession(session.id, tipPayment ? { tip: tipPayment } : {});
+      const final = await closeSession(session.id, {
+        ...(tipPayment ? { tip: tipPayment } : {}),
+        ...manualClose(),
+      });
       writeResume(kind, null);
       await fetchBoard();
       try {
+        const printedLines = orderLines.filter((line) => !line.voidedAt);
+        const slipName = slipNamer(printedLines);
         await printer.printReceipt({
           title: "RECEIPT",
           sale: true,
@@ -1247,12 +1298,13 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           endTime: formatDateTime(final.asOf || new Date().toISOString()),
           startTimeLabel: t("receipt.startTime"),
           endTimeLabel: t("receipt.endTime"),
-          lines: orderLines
-            .filter((line) => !line.voidedAt)
-            .map((line) => {
+          lines: printedLines.map((line) => {
               const modifiers = printedExtras(line);
               return {
-                name: lineDisplayName(line) || line.productName || itemNames[line.variantId] || tr("item"),
+                name: slipName(
+                  line,
+                  lineDisplayName(line) || line.productName || itemNames[line.variantId] || tr("item")
+                ),
                 quantity: String(line.quantity || "1"),
                 unitPrice: line.unitPrice?.trim() || undefined,
                 modifiers: modifiers.names,
@@ -1472,6 +1524,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   ) => {
     if (!session) return;
     try {
+      const printedLines = orderLines.filter((line) => !line.voidedAt);
+      const slipName = slipNamer(printedLines);
       await printer.printReceipt({
         title: "RECEIPT",
         sale: true,
@@ -1487,12 +1541,13 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         endTime: formatDateTime(endAt),
         startTimeLabel: t("receipt.startTime"),
         endTimeLabel: t("receipt.endTime"),
-        lines: orderLines
-          .filter((line) => !line.voidedAt)
-          .map((line) => {
+        lines: printedLines.map((line) => {
             const modifiers = printedExtras(line);
             return {
-              name: lineDisplayName(line) || line.productName || itemNames[line.variantId] || tr("item"),
+              name: slipName(
+                line,
+                lineDisplayName(line) || line.productName || itemNames[line.variantId] || tr("item")
+              ),
               quantity: String(line.quantity || "1"),
               unitPrice: line.unitPrice?.trim() || undefined,
               modifiers: modifiers.names,
@@ -1514,6 +1569,10 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const handlePayOther = async () => {
     const method = otherMethods.find((item) => item.id === otherMethodId);
     if (!session?.salesOrderId || !method) return;
+    if (timesBackwards) {
+      setActionError(tr("errors.manualTimes"));
+      return;
+    }
     setActionError(null);
     setIsPaying(true);
     try {
@@ -1521,7 +1580,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       let endAt = session.closedAt || session.endsAt || "";
       let due = Number(quote?.amountDue || 0);
       if (!billClosed) {
-        const closed = await closeSession(session.id, {});
+        const closed = await closeSession(session.id, manualClose());
         endAt = closed.asOf || new Date().toISOString();
         due = Number(closed.amountDue ?? closed.runningTotal ?? 0);
         setSession({ ...session, sessionState: "CLOSED" });
@@ -1557,6 +1616,10 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   };
 
   const handlePay = async () => {
+    if (timesBackwards) {
+      setActionError(tr("errors.manualTimes"));
+      return;
+    }
     if (!session?.salesOrderId || !card || !wallet) {
       requestCard("pay");
       return;
@@ -1586,7 +1649,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           setActionError(tr("errors.balanceShort"));
           return;
         }
-        const closed = await closeSession(session.id, {});
+        const closed = await closeSession(session.id, manualClose());
         endAt = closed.asOf || new Date().toISOString();
         setSession({ ...session, sessionState: "CLOSED" });
       }
@@ -1706,6 +1769,10 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
    */
   const handleEndBillPay = async () => {
     if (!session?.salesOrderId) return;
+    if (timesBackwards) {
+      setActionError(tr("errors.manualTimes"));
+      return;
+    }
     const orderDiscount = Math.max(0, Number(billDiscount) || 0);
     if (orderDiscount > 0 && discountReasons.length && !billDiscountReasonId) {
       setActionError(t("cashier.errors.discountReasonRequired"));
@@ -1735,7 +1802,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       const context = await requireCashierContext();
       let endAt = session.closedAt || session.endsAt || "";
       if (!billClosed) {
-        const closed = await closeSession(session.id, {});
+        const closed = await closeSession(session.id, manualClose());
         endAt = closed.asOf || new Date().toISOString();
         setSession({ ...session, sessionState: "CLOSED" });
       }
@@ -2323,6 +2390,11 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                   onRemoveTender={removeEndTender}
                 />
               </div>
+              {manualTimesFields ? (
+                <div className="shrink-0 border-t border-white/10 bg-[#202020] p-3">
+                  {manualTimesFields}
+                </div>
+              ) : null}
               <div className="grid shrink-0 gap-2 border-t border-white/10 bg-[#202020] p-3 sm:grid-cols-[minmax(0,12rem)_1fr_auto] sm:items-end">
                 <label className="block text-sm">
                   {tr("tip")}
@@ -2362,6 +2434,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           ) : (
             <div className="space-y-4 rounded-lg border border-slate-700 p-5">
               <h2 className="text-lg font-bold">{tr("payTitle")}</h2>
+              {manualTimesFields}
               {wallet?.discountBpsSnapshot ? (
                 <p className="text-sm text-slate-300">
                   {tr("memberDiscount", {
@@ -2856,6 +2929,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             <p className="text-sm text-slate-300">
               {tr("endDescription", { amount: money(quote?.paidTotal) })}
             </p>
+            {manualTimesFields}
             <label className="block text-sm">
               {tr("tip")}
               <input

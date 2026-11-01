@@ -6,6 +6,7 @@ import { givenAwayAmount, linePromotionSaving } from "@/lib/pos/promotions";
 import type { PrintLine, SaleReceipt } from "./formatKdsTicket";
 import { sessionPrintTimes } from "./formatKdsTicket";
 import { modifierPrintText } from "./modifierText";
+import { roomTimeNamer, slipTimeRange } from "@/lib/spa/manualTimes";
 
 /** The words a slip prints, in the till's language, as the original slip used them. */
 export interface SlipText {
@@ -116,6 +117,7 @@ export function reprintSlip(input: ReprintInput): SaleReceipt {
   };
 
   if (room) {
+    const named = roomTimeNamer(kept, slipTimeRange(room.manualInAt, room.manualOutAt));
     const prepaid = (order.payments || []).every(
       (payment) => String(payment.methodKind || "").toUpperCase() === "GUEST_CARD"
     );
@@ -130,7 +132,7 @@ export function reprintSlip(input: ReprintInput): SaleReceipt {
       lines: kept.map((line) => {
         const modifiers = withNote(modifierPrintText(line.selectedModifiers), hostessNote(line));
         return {
-          name: lineDisplayName(line) || line.productName || text.item,
+          name: named(line, lineDisplayName(line) || line.productName || text.item),
           quantity: String(line.quantity || "1"),
           unitPrice: line.unitPrice?.trim() || undefined,
           modifiers: modifiers.names,
