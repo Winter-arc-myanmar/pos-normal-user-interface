@@ -1719,10 +1719,14 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     await getQuote(session.id);
   };
 
+  /**
+   * One row per method the guest paid with, so a bill split between a wallet and
+   * cash reads "KBZ pay 100,000" then "Cash 20,000" instead of one joined line.
+   */
   const printPaid = async (
     result: SettleSalesOrderResultDTO,
     endAt: string,
-    methodName: string
+    payments: Array<{ name: string; amount: string }>
   ) => {
     if (!session) return;
     try {
@@ -1762,7 +1766,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         ...totals,
         amounts: tipReceiptRow,
         total: result.grandTotal,
-        payments: [{ name: methodName, amount: result.totalPaid || result.grandTotal }],
+        payments,
         ...(Number(result.change) > 0 ? { change: result.change } : {}),
       });
     } catch (printError) {
@@ -1811,7 +1815,9 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               change: "0.0000",
               status: "COMPLETED",
             };
-      await printPaid(result, endAt, method.name || "Payment");
+      await printPaid(result, endAt, [
+        { name: method.name || "Payment", amount: result.totalPaid || result.grandTotal },
+      ]);
       setPaid(result);
       writeResume(kind, null);
       await fetchBoard();
@@ -1874,7 +1880,15 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         ...(tipValue > 0 ? { tipAmount: tipValue.toFixed(4) } : {}),
         idempotencyKey: spaSettleKey(session.id),
       });
-      await printPaid(result, endAt, cardMethod.name || "Payment");
+      // The cash the guest handed over first, then the card for what it leaves.
+      const paidTotal = Number(result.totalPaid || result.grandTotal);
+      const cash = Math.min(cashValue, paidTotal);
+      await printPaid(result, endAt, [
+        ...(cash > 0
+          ? [{ name: cashMethod?.name || "Cash", amount: cash.toFixed(4) }]
+          : []),
+        { name: cardMethod.name || "Payment", amount: (paidTotal - cash).toFixed(4) },
+      ]);
       setPaid(result);
       writeResume(kind, null);
       setWallet(await getWallet(wallet.id));
@@ -2022,10 +2036,6 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         setActionError(t("cashier.errors.billUpdated", { amount: money(finalTotal) }));
         return;
       }
-      const names = tenders
-        .map((tender) => endPayMethods.find((method) => method.id === tender.paymentMethodId)?.name)
-        .filter(Boolean)
-        .join(" + ");
       const result =
         Number(finalBill.grandTotal) > 0
           ? await settleOrder(session.salesOrderId, {
@@ -2060,7 +2070,21 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               change: "0.0000",
               status: "COMPLETED",
             };
-      await printPaid(result, endAt, names || "Payment");
+      // Each method on its own row, in the order it was taken; the card takes
+      // whatever the others leave, which is how the settle splits it.
+      const paidTotal = Number(result.totalPaid || result.grandTotal);
+      let tendered = 0;
+      const rows = tenders.map((tender) => {
+        const name =
+          endPayMethods.find((method) => method.id === tender.paymentMethodId)?.name || "Payment";
+        if (isCardMethod(tender.paymentMethodId)) return { name, amount: "" };
+        const amount = Number(tender.amount || 0);
+        tendered += amount;
+        return { name, amount: amount.toFixed(4) };
+      });
+      const cardRow = rows.find((row) => !row.amount);
+      if (cardRow) cardRow.amount = Math.max(0, paidTotal - tendered).toFixed(4);
+      await printPaid(result, endAt, rows);
       setPaid(result);
       resetSplit();
       writeResume(kind, null);

@@ -1152,6 +1152,17 @@ describe("SpaBoardPage", () => {
           })
         )
       );
+      // The slip shows each method as its own row, the card taking what cash left.
+      await waitFor(() =>
+        expect(mocks.printReceipt).toHaveBeenCalledWith(
+          expect.objectContaining({
+            payments: [
+              { name: "Cash", amount: "20000.0000" },
+              { name: "Guest Card", amount: "30350.0000" },
+            ],
+          })
+        )
+      );
     });
   });
 
