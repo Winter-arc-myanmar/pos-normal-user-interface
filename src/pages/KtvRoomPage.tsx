@@ -29,6 +29,7 @@ import { lineDisplayName } from "@/lib/pos/orderListDisplay";
 import { toast } from "@/lib/toast";
 import { cashierLabel } from "@/lib/printing/cashier";
 import { toMoney, withOrderTipOnFirstPayment } from "@/lib/pos/checkoutAdjustments";
+import { slipRows } from "@/lib/spa/billLines";
 
 export function KtvRoomPage() {
   const { t } = useTranslation();
@@ -366,13 +367,12 @@ export function KtvRoomPage() {
           endTime: formatDateTime(endAt),
           startTimeLabel: t("receipt.startTime"),
           endTimeLabel: t("receipt.endTime"),
-          lines: result.lines
-            .filter((line) => !line.voidedAt)
-            .map((line) => {
+          lines: slipRows(result.lines.filter((line) => !line.voidedAt))
+            .map(({ line, quantity }) => {
               const modifiers = modifierPrintText(line.selectedModifiers);
               return {
                 name: lineDisplayName(line) || line.productName || line.variantName || "Item",
-                quantity: String(line.quantity || "1"),
+                quantity: String(quantity || line.quantity || "1"),
                 unitPrice: line.unitPrice?.trim() || undefined,
                 modifiers: modifiers.names,
                 modifierPrices: modifiers.prices,
