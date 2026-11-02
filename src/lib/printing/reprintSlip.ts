@@ -19,7 +19,6 @@ export interface SlipText {
   startTime: string;
   endTime: string;
   serviceType: (serviceType: string) => string;
-  orderedBy: (name: string) => string;
   priceNote: (note: "discount" | "changed", name: string) => string;
 }
 
@@ -104,8 +103,10 @@ export function reprintSlip(input: ReprintInput): SaleReceipt {
   }));
   const hostessNote = (line: SalesOrderLine) => {
     if (!line.hostessId) return undefined;
-    const name = input.hostessName(line.hostessId) || text.aHostess;
-    return line.askWhoServed ? (room ? undefined : name) : text.orderedBy(name);
+    // A hostess service prints who served it; anything else she ordered prints
+    // her name alone, with no "Ordered by" wording on the paper.
+    if (line.askWhoServed && room) return undefined;
+    return input.hostessName(line.hostessId) || text.aHostess;
   };
   const base = {
     title: "RECEIPT",

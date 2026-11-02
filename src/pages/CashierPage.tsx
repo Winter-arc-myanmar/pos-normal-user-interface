@@ -690,17 +690,14 @@ export function CashierPage() {
       : listPrice + modifierExtra(line.selectedModifiers);
   };
 
-  /** A printed line's options, then the hostess who gave or ordered it. */
+  /** A printed line's options, then the name of the hostess who gave or ordered it. */
   const withHostessNote = (
     modifiers: { names?: string; prices?: string },
-    hostess?: { name: string; gave: boolean }
+    hostess?: { name: string }
   ) => {
     if (!hostess) return modifiers;
-    const note = hostess.gave
-      ? hostess.name
-      : t("cashier.orderPanel.orderedBy", { name: hostess.name });
     return {
-      names: [modifiers.names, note].filter(Boolean).join(", "),
+      names: [modifiers.names, hostess.name].filter(Boolean).join(", "),
       prices: [modifiers.prices, "-"].filter(Boolean).join(", "),
     };
   };

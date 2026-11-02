@@ -10,7 +10,6 @@ const text: SlipText = {
   startTime: "Start time",
   endTime: "End time",
   serviceType: (service) => (service === "DINE_IN" ? "Dine In" : service),
-  orderedBy: (name) => `Ordered by ${name}`,
   priceNote: (note, name) => `${name} (${note === "discount" ? "Discount" : "Price changed"})`,
 };
 
@@ -98,7 +97,8 @@ describe("reprintSlip", () => {
       ["rice", "1.0000"],
     ]);
     expect(slip.lines[0]).toMatchObject({ promotion: "1+1", promotionAmount: "3000.0000" });
-    expect(slip.lines[2].modifiers).toBe("Ordered by Mya");
+    // Who ordered prints as her name alone, with no "Ordered by" wording.
+    expect(slip.lines[2].modifiers).toBe("Mya");
   });
 
   it("notes a price changed on this bill, and prints a free copy at 0", () => {
@@ -147,7 +147,7 @@ describe("reprintSlip", () => {
     });
     expect(slip.subtotal).toBeUndefined();
     expect(slip.payments).toBeUndefined();
-    expect(slip.lines.map((item) => item.modifiers)).toEqual([undefined, "Ordered by Mya", undefined]);
+    expect(slip.lines.map((item) => item.modifiers)).toEqual([undefined, "Mya", undefined]);
     expect(slip.lines[0].name).toBe("room (4:15 - 6:15)");
   });
 
