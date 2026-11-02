@@ -13,6 +13,7 @@ const PAY_WHEN_ORDERING: VenueSetting = {
   trackStock: true,
   kdsDeleteSlips: true,
   defaultTaxRate: null,
+  taxAllItems: false,
   serviceChargeBps: 0,
   serviceChargeOn: { BAR: true, SPA: true, KTV: true },
   serviceChargeTaxRate: 0,

@@ -2,11 +2,23 @@ import { describe, expect, it } from "vitest";
 import { KdsTicket } from "@/core/domain/entities/Cashier";
 import { defaultPrintTemplateSettings } from "@/core/domain/entities/PrintTemplate";
 import {
+  KitchenSlip,
+  SlipPreviewRow,
   formatKdsTicket,
   formatKitchenSlip,
   kdsTicketPlace,
   kdsTicketSender,
+  kitchenSlipPreview,
 } from "../formatKdsTicket";
+
+type TextRow = Extract<SlipPreviewRow, { kind: "text" }>;
+
+/** The rows a kitchen slip draws as text, as the printer would print them. */
+const textRows = (slip: KitchenSlip): TextRow[] =>
+  kitchenSlipPreview(slip).rows.filter((row): row is TextRow => row.kind === "text");
+
+const sizeOf = (slip: KitchenSlip, text: string) =>
+  textRows(slip).find((row) => row.text.includes(text))?.size;
 
 const ticket = (fields: Partial<KdsTicket>): KdsTicket =>
   ({
@@ -136,5 +148,55 @@ describe("the kitchen slip", () => {
     expect(formatKitchenSlip({ ...slip, template: settings })).toContain(
       "+ Oat milk"
     );
+  });
+});
+
+describe("the kitchen slip's text size switches", () => {
+  const slip = (template?: ReturnType<typeof defaultPrintTemplateSettings>) => ({
+    title: "KDS-0012",
+    place: "KTV K3",
+    lines: [{ name: "Beer", quantity: "2" }],
+    ...(template ? { template } : {}),
+  });
+
+  it("prints the place at the Other text size the template asks for", () => {
+    const settings = defaultPrintTemplateSettings();
+    expect(sizeOf(slip(settings), "KTV K3")).toBe("normal");
+
+    settings.item.otherTextScale = "2H2W";
+    expect(sizeOf(slip(settings), "KTV K3")).toBe("huge");
+
+    // A slip with no template keeps the built-in huge place line.
+    expect(sizeOf(slip(), "KTV K3")).toBe("huge");
+  });
+
+  it("prints a room ticket's items at the Item text size the switch names", () => {
+    const settings = defaultPrintTemplateSettings();
+    // The settings screen leaves the old font size at the kitchen's large once
+    // the switch is used; the switch is what the ticket must print.
+    settings.item.itemTextScale = "1H1W";
+    settings.item.fontSize = "LARGE";
+    const room = { ...slip(settings), room: true };
+
+    expect(sizeOf(room, "2 x BEER")).toBe("normal");
+
+    settings.item.itemTextScale = "2H1W";
+    expect(sizeOf(room, "2 x BEER")).toBe("tall");
+
+    settings.item.itemTextScale = "1H2W";
+    expect(sizeOf(room, "2 x BEER")).toBe("wide");
+  });
+
+  it("prints a counter ticket's items at the Item text size the switch names", () => {
+    const settings = defaultPrintTemplateSettings();
+    expect(sizeOf(slip(settings), "2 x BEER")).toBe("normal");
+
+    // The settings screen leaves the old font size at the kitchen's large, so
+    // Big still prints as the switch asks.
+    Object.assign(settings.item, { itemTextScale: "2H2W", fontSize: "LARGE" });
+    expect(sizeOf(slip(settings), "2 x BEER")).toBe("huge");
+
+    settings.item.itemTextScale = "2H1W";
+    expect(sizeOf(slip(settings), "2 x BEER")).toBe("tall");
   });
 });

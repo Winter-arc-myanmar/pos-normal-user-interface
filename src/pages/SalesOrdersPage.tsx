@@ -277,8 +277,6 @@ export function SalesOrdersPage() {
               const label = t(key);
               return label === key ? service.replaceAll("_", " ") : label;
             },
-            orderedBy: (name) =>
-              isRoom ? tr("orderedBy", { name }) : t("cashier.orderPanel.orderedBy", { name }),
             priceNote: (note, name) => t(`cashier.orderPanel.priceNote.${note}`, { name }),
           },
         })

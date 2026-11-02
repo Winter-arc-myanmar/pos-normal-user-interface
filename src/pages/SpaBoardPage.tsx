@@ -484,14 +484,13 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     line.hostessId && !serviceVariantIds.has(line.variantId)
       ? hostessName(line.hostessId) || tr("aHostess")
       : undefined;
-  /** A printed line's options, then who ordered it when a hostess did. */
+  /** A printed line's options, then the name of the hostess who ordered it. */
   const printedExtras = (line: SalesOrderLine) => {
     const modifiers = modifierPrintText(line.selectedModifiers);
     const who = orderedByName(line);
     if (!who) return modifiers;
-    const note = tr("orderedBy", { name: who });
     return {
-      names: [modifiers.names, note].filter(Boolean).join(", "),
+      names: [modifiers.names, who].filter(Boolean).join(", "),
       prices: [modifiers.prices, "-"].filter(Boolean).join(", "),
     };
   };

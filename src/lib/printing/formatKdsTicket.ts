@@ -520,18 +520,41 @@ const SCALE_SIZE: Record<string, Size> = {
   "2H2W": "huge",
 };
 
+/** The scale a kitchen template starts at; a bill's starts at normal. */
+const KITCHEN_START = "2H2W";
+
+/** The size the text-size switch names, once it is off the value its type started with. */
+const chosenItemSize = (
+  settings: PrintTemplateSettings | undefined,
+  startingScale: string
+): Size | undefined => {
+  const scale = settings?.item.itemTextScale;
+  if (!scale || scale === startingScale) return undefined;
+  return SCALE_SIZE[scale];
+};
+
 /**
  * How big items print. The text-size switch wins once it is moved off the
  * type's starting value; until then the older font-size switch decides, so a
  * template saved before keeps printing as it did.
  */
 const itemSizeFor = (settings: PrintTemplateSettings | undefined, kitchen: boolean): Size => {
-  const startingScale = kitchen ? "2H2W" : "1H1W";
-  const scale = settings?.item.itemTextScale;
-  if (scale && scale !== startingScale && SCALE_SIZE[scale]) return SCALE_SIZE[scale];
+  const chosen = chosenItemSize(settings, kitchen ? KITCHEN_START : "1H1W");
+  if (chosen) return chosen;
   if (kitchen) return kitchenItemSize(settings?.item.fontSize);
   return settings?.item.fontSize === "LARGE" ? "tall" : "normal";
 };
+
+/**
+ * A room's ticket (KTV or SPA) carries the kitchen template, so its switch is
+ * read the way the kitchen reads it: "Normal" there is a real choice, not the
+ * value the switch started at. A template that never moved the switch keeps
+ * printing the height it always gave, and a slip with no template reads like
+ * the room's bill at the bill's single line height.
+ */
+const roomItemSizeFor = (settings?: PrintTemplateSettings): Size =>
+  chosenItemSize(settings, KITCHEN_START) ||
+  (settings ? kitchenItemSize(settings.item.fontSize) : "normal");
 
 /** The text-size switch's value that prints items the size they print now. */
 export function itemTextScaleOf(settings: PrintTemplateSettings, kitchen: boolean): string {
@@ -554,12 +577,15 @@ function kitchenLayout(slip: KitchenSlip): Layout {
   if (settings?.header.outletName && slip.outletName) {
     layout.line(slip.outletName, { align: "center" });
   }
+  const other = otherSizeFor(settings);
   const place = kitchenPlace(slip);
   if (place) {
     layout.gap();
-    layout.line(place, { align: "center", size: "huge", bold: true });
+    // Where the food goes keeps its bold, centred line; the template's Other
+    // text size decides how big it prints, and a slip with no template keeps
+    // the built-in huge line.
+    layout.line(place, { align: "center", size: settings ? other : "huge", bold: true });
   }
-  const other = otherSizeFor(settings);
   layout.line(slip.placeDetail || slip.serviceType, { align: "center", size: other });
   layout.gap();
   layout.pair(`#${slip.title}`, clockText(slip.firedAt), { bold: true, size: other });
@@ -570,9 +596,9 @@ function kitchenLayout(slip: KitchenSlip): Layout {
   layout.rule("=");
 
   const lines = slip.lines || [];
-  // A room's ticket spaces its items like the room's bill: the checkout receipt
-  // is the reference, so items print at its height rather than the kitchen's.
-  const size = slip.room ? itemSizeFor(settings, false) : itemSizeFor(settings, true);
+  // A room's ticket (KTV or SPA) spaces its items like the room's bill, while a
+  // counter ticket uses the kitchen's own item height.
+  const size = slip.room ? roomItemSizeFor(settings) : itemSizeFor(settings, true);
   lines.forEach((item, index) => {
     if (index) layout.gap();
     // The quantity leads the name with an "x" after it, as the receipt prints it.
