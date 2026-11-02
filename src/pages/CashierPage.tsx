@@ -584,6 +584,7 @@ export function CashierPage() {
 
   const {
     defaultTaxRate,
+    taxAllItems,
     serviceChargeBps,
     serviceChargeOn,
     serviceChargeTaxRate,
@@ -604,8 +605,10 @@ export function CashierPage() {
       const unitPrice = line.priceOverride
         ? Number(line.priceOverride)
         : basePrice + variantModifier + modifierExtra(line.selectedModifiers);
-      const ownRateId = product?.taxRateId;
-      const fallback = ownRateId || variant?.taxRate ? null : defaultTaxRate;
+      // A shop that taxes every item uses its default taxes on all but extra fees.
+      const everyItem = taxAllItems && !isFeeLine(line);
+      const ownRateId = everyItem ? undefined : product?.taxRateId;
+      const fallback = everyItem || !(ownRateId || variant?.taxRate) ? defaultTaxRate : null;
       const isPriceInclusive = fallback
         ? fallback.isPriceInclusive
         : (variant?.isPriceInclusive ?? product?.isPriceInclusive);
@@ -613,7 +616,7 @@ export function CashierPage() {
         quantity: line.quantity,
         unitPrice,
         lineDiscount: line.lineDiscount || "0.0000",
-        isTaxable: variant?.isTaxable ?? product?.isTaxable,
+        isTaxable: taxAllItems ? everyItem : (variant?.isTaxable ?? product?.isTaxable),
         taxRate: fallback ? fallback.rate : (variant?.taxRate ?? product?.taxRate),
         isPriceInclusive,
       });
@@ -627,7 +630,7 @@ export function CashierPage() {
         taxAmount: formatAmount(lineTotals.taxAmount),
       };
     },
-    [defaultTaxRate, formatAmount]
+    [defaultTaxRate, formatAmount, isFeeLine, taxAllItems]
   );
 
   const normalizedDirectCartLines = useMemo(
