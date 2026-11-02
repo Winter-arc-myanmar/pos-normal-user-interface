@@ -82,6 +82,12 @@ const renderPanel = (overrides: Record<string, unknown> = {}) => {
   return { onOpenBill, onTogglePause, onExtend, onPrimary };
 };
 
+/** Opens every bill row, as tapping each one does. */
+const openRows = () =>
+  screen
+    .getAllByRole("button", { name: "cashier.orderPanel.lineDetails" })
+    .forEach((row) => fireEvent.click(row));
+
 describe("SpaBillPanel actions", () => {
   it("puts Bill & table beside Extend and the close button, without Pause", () => {
     const { onOpenBill, onExtend, onPrimary } = renderPanel();
@@ -146,11 +152,12 @@ describe("SpaBillPanel actions", () => {
       promotionName: (id?: string) => (id === "promo-1" ? "Buy 1 Get 1" : undefined),
     });
 
+    openRows();
     // The charged copy reads what the promotion leaves, the free copy reads 0.
     expect(
-      screen.getByText(new RegExp(`^${money(5400)} · Buy 1 Get 1$`))
+      screen.getByText(new RegExp(`^@ ${money(5400)} · Buy 1 Get 1$`))
     ).toBeInTheDocument();
-    expect(screen.getByText(/^0 · Buy 1 Get 1$/)).toBeInTheDocument();
+    expect(screen.getByText(/^@ 0 · Buy 1 Get 1$/)).toBeInTheDocument();
   });
 
   it("shows every rate the room sells as room time, with no stepper", () => {
@@ -187,8 +194,9 @@ describe("SpaBillPanel actions", () => {
 
     // Both rates read as room time, and neither can be changed from the bill.
     expect(screen.getAllByText("spa.treatmentCharge")).toHaveLength(2);
-    expect(screen.getByText("× 1")).toBeInTheDocument();
-    expect(screen.getByText("× 2")).toBeInTheDocument();
+    expect(screen.getAllByText("1×")).toHaveLength(2);
+    expect(screen.getByText("2×")).toBeInTheDocument();
+    openRows();
     // Only the menu line keeps its − / + and its remove button.
     expect(screen.getAllByRole("button", { name: "spa.decrease" })).toHaveLength(1);
     expect(screen.getAllByRole("button", { name: "spa.increase" })).toHaveLength(1);
@@ -226,10 +234,11 @@ describe("SpaBillPanel actions", () => {
 
     // The hour bought at the rate, then the hour the promotion gave away.
     expect(screen.getAllByText("spa.treatmentCharge")).toHaveLength(2);
+    openRows();
     expect(
-      screen.getByText(new RegExp(`^${money(40000)} · 1 hour \\+ 1 free$`))
+      screen.getByText(new RegExp(`^@ ${money(40000)} · 1 hour \\+ 1 free$`))
     ).toBeInTheDocument();
-    expect(screen.getByText(/^0 · 1 hour \+ 1 free$/)).toBeInTheDocument();
+    expect(screen.getByText(/^@ 0 · 1 hour \+ 1 free$/)).toBeInTheDocument();
   });
 
   it("lets every row of a bill paid at the end be edited, room time too, and marks a changed price", () => {
@@ -265,6 +274,7 @@ describe("SpaBillPanel actions", () => {
       menuPrice: (line: SalesOrderLine) => (line.variantId === "variant-beer" ? 4000 : undefined),
       onEditLine,
     });
+    openRows();
 
     const edits = screen.getAllByRole("button", { name: "cashier.orderPanel.editItem" });
     expect(edits).toHaveLength(2);
@@ -299,6 +309,7 @@ describe("SpaBillPanel actions", () => {
       ],
       onEditLine: vi.fn(),
     });
+    openRows();
 
     expect(screen.queryByRole("button", { name: "cashier.orderPanel.editItem" })).toBeNull();
   });

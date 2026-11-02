@@ -4,6 +4,12 @@ import { MemoryRouter } from "react-router-dom";
 import { Toaster } from "@/components/ui/Toaster";
 import { SpaBoardPage } from "../SpaBoardPage";
 
+/** Opens every bill row, as tapping each one does. */
+const openBillRows = () =>
+  screen
+    .queryAllByRole("button", { name: /lineDetails/ })
+    .forEach((row) => fireEvent.click(row));
+
 let promotionState: {
   running: Record<string, unknown>[];
   discounts: Record<string, { discount: number; names: string[] }>;
@@ -506,6 +512,7 @@ describe("SpaBoardPage", () => {
       },
     ];
     await openRunningRoom();
+    openBillRows();
 
     fireEvent.click(screen.getByRole("button", { name: "spa.decrease" }));
     await waitFor(() =>
@@ -550,6 +557,7 @@ describe("SpaBoardPage", () => {
     // One product-card label plus two bill rows: the charged copy and the free
     // one, which reads 0 rather than the menu price.
     expect(screen.getAllByText("Foot Scrub")).toHaveLength(3);
+    openBillRows();
     const decreases = screen.getAllByRole("button", { name: "spa.decrease" });
     expect(decreases).toHaveLength(2);
     fireEvent.click(decreases[1]);
@@ -668,6 +676,7 @@ describe("SpaBoardPage", () => {
     await openRunningRoom();
 
     expect(screen.getByText("spa.foc", { selector: "span" })).toBeInTheDocument();
+    openBillRows();
     expect(screen.queryByRole("button", { name: "spa.decrease" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "spa.removeLine" }));
     await waitFor(() =>
@@ -1342,6 +1351,7 @@ describe("SpaBoardPage", () => {
       await openRunningRoom();
 
       expect(screen.getByText("spa.promo")).toBeInTheDocument();
+      openBillRows();
       expect(screen.getByText(/Scrub week/)).toBeInTheDocument();
     });
 
@@ -1379,6 +1389,7 @@ describe("SpaBoardPage", () => {
         },
       ];
       await openRunningRoom();
+      openBillRows();
       fireEvent.click(screen.getByRole("button", { name: "spa.refundLine" }));
 
       expect(await screen.findByText("spa.refundApprovalTitle")).toBeInTheDocument();

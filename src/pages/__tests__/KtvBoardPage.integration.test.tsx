@@ -4,6 +4,12 @@ import { MemoryRouter } from "react-router-dom";
 import { Toaster } from "@/components/ui/Toaster";
 import { KtvBoardPage } from "../KtvBoardPage";
 
+/** Opens every bill row, as tapping each one does. */
+const openBillRows = () =>
+  screen
+    .queryAllByRole("button", { name: /lineDetails/ })
+    .forEach((row) => fireEvent.click(row));
+
 const promotionState: {
   running: Record<string, unknown>[];
   discounts: Record<string, { discount: number; names: string[] }>;
@@ -526,6 +532,7 @@ describe("KtvBoardPage", () => {
 
       // Both rates read as room time; only the drinks keep their bill controls.
       expect(await screen.findAllByText("ktvPos.treatmentCharge")).toHaveLength(2);
+      openBillRows();
       expect(screen.getAllByRole("button", { name: "ktvPos.increase" })).toHaveLength(1);
       expect(screen.getAllByRole("button", { name: "ktvPos.refundLine" })).toHaveLength(1);
     });
