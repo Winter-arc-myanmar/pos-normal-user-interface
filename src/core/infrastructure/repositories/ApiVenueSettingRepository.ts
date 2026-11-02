@@ -19,6 +19,8 @@ export interface VenueSetting {
    * own: the fractions added up (0.05 for 5%), all inside the price or all on top.
    */
   defaultTaxRate: { id: string; rate: number; isPriceInclusive: boolean } | null;
+  /** Every item is taxed at the default taxes, whatever it says itself; extra fees are not. */
+  taxAllItems: boolean;
   /** Service charge in basis points, 1000 for 10%; 0 for none. */
   serviceChargeBps: number;
   serviceChargeOn: { BAR: boolean; SPA: boolean; KTV: boolean };
@@ -65,6 +67,7 @@ const UPDATE_KEYS = [
   "trackStock",
   "defaultTaxRateIds",
   "defaultTaxRateId",
+  "taxAllItems",
   "serviceChargeBps",
   "serviceChargeOnBar",
   "serviceChargeOnSpa",
@@ -115,6 +118,7 @@ export class ApiVenueSettingRepository {
       trackStock: data.trackStock !== false,
       kdsDeleteSlips: data.kdsDeleteSlips !== false,
       defaultTaxRate: toDefaultTaxRate(rates),
+      taxAllItems: data.taxAllItems === true,
       serviceChargeBps: Math.max(0, Number(data.serviceChargeBps) || 0),
       serviceChargeOn: {
         BAR: data.serviceChargeOnBar !== false,

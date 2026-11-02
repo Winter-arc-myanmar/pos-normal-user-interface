@@ -16,6 +16,11 @@ describe("the shop's default tax rate", () => {
   it("is none when the shop has not chosen one", async () => {
     expect((await repositoryReturning({ defaultTaxRate: null }).get()).defaultTaxRate).toBeNull();
   });
+
+  it("taxes every item only when the shop says so", async () => {
+    expect((await repositoryReturning({ taxAllItems: true }).get()).taxAllItems).toBe(true);
+    expect((await repositoryReturning({}).get()).taxAllItems).toBe(false);
+  });
 });
 
 describe("the shop's KDS delete slips", () => {
