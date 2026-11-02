@@ -530,6 +530,41 @@ describe("KtvBoardPage", () => {
       expect(screen.getAllByRole("button", { name: "ktvPos.refundLine" })).toHaveLength(1);
     });
 
+    it("prints the room's rates as one row, while the bill keeps them apart", async () => {
+      rooms = [busyRoom];
+      rentalsState = [ownRate, halfHour];
+      orderLinesState = [
+        { id: "line-1", variantId: "variant-ktv", quantity: "2", unitPrice: "40000" },
+        { id: "line-2", variantId: "variant-half", quantity: "1", unitPrice: "20000" },
+        { id: "line-3", variantId: "variant-beer", quantity: "1", unitPrice: "4000" },
+      ];
+      renderPage();
+      fireEvent.click(screen.getByRole("button", { name: /K1/ }));
+
+      // The screen still lists each rate on its own line.
+      expect(await screen.findAllByText("ktvPos.treatmentCharge")).toHaveLength(2);
+
+      fireEvent.click(screen.getByRole("button", { name: "ktvPos.printBill" }));
+
+      await waitFor(() => expect(mocks.printReceipt).toHaveBeenCalled());
+      const slip = mocks.printReceipt.mock.calls.at(-1)?.[0] as {
+        lines: Array<Record<string, unknown>>;
+      };
+      // The paper gathers the room's time into one row, priced per rate.
+      expect(slip.lines[0]).toEqual({
+        name: "ktvPos.treatmentCharge",
+        quantity: "3",
+        amount: "100000.0000",
+        priceRows: [
+          { quantity: "2", unitPrice: "40000.0000" },
+          { quantity: "1", unitPrice: "20000.0000" },
+        ],
+      });
+      expect(slip.lines[1]).toEqual(
+        expect.objectContaining({ name: "Myanmar Beer", quantity: "1" })
+      );
+    });
+
     it("adds 2 hours and a 30 min block to a running room", async () => {
       rooms = [busyRoom];
       rentalsState = [ownRate, halfHour];

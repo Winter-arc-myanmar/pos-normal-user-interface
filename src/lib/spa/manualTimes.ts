@@ -8,6 +8,9 @@ export interface ManualTimes {
 
 const ROOM_CATEGORIES = ["Spa Packages", "Spa Rooms", "KTV Rooms", "Private VIP Lounges"];
 
+/** The KTV room's own time: the rate rented by the hour or half hour. */
+const KTV_ROOM_CATEGORIES = ["KTV Rooms", "Private VIP Lounges"];
+
 /** Room time on the bill: the room's rate, a rental, a package, or time given free. */
 const ROOM_COURSE = /^(Hours|Extension|Sessions|Package)( ·|$)|^Free · /;
 
@@ -60,6 +63,10 @@ export const slipTimeRange = (inAt?: string | null, outAt?: string | null): stri
 
 export const isRoomTimeLine = (line: Pick<SalesOrderLine, "categoryName" | "courseType">) =>
   ROOM_CATEGORIES.includes(line.categoryName || "") || ROOM_COURSE.test(line.courseType || "");
+
+/** KTV room time, sold by the hour or the half hour, from the room's own rates. */
+export const isKtvRoomTimeLine = (line: Pick<SalesOrderLine, "categoryName">) =>
+  KTV_ROOM_CATEGORIES.includes(line.categoryName || "");
 
 /**
  * The name a line prints with: the first room-time line carries the guest's In

@@ -107,6 +107,7 @@ import {
 import { slipRows } from "@/lib/spa/billLines";
 import { modifierPrintText } from "@/lib/printing/modifierText";
 import { receiptTotals } from "@/lib/printing/receiptTotals";
+import { groupRoomTimeRows, mergedRoomTimeLine } from "@/lib/printing/roomTimeRows";
 import { cashierLabel } from "@/lib/printing/cashier";
 
 type SpaStep = "rooms" | "sessions" | "menu" | "pay";
@@ -497,14 +498,20 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   /** The bill's rows as the slip prints them: one row per item, as the bill shows it. */
   const receiptLines = (printedLines: SalesOrderLine[]) => {
     const name = slipNamer(printedLines);
-    return slipRows(printedLines).map(({ line, quantity }) => {
+    // A room sold at more than one rate is one row on the paper, priced per rate.
+    const isRoomRate = (line: SalesOrderLine) =>
+      line.variantId === room?.rateVariantId || rentalVariantIds.has(line.variantId);
+    return groupRoomTimeRows(slipRows(printedLines), isRoomRate).map((group) => {
+      const { line } = group.rows[0];
+      const printed = name(
+        line,
+        lineDisplayName(line) || line.productName || itemNames[line.variantId] || tr("item")
+      );
+      if (group.rows.length > 1) return mergedRoomTimeLine(group, printed);
       const modifiers = printedExtras(line);
       return {
-        name: name(
-          line,
-          lineDisplayName(line) || line.productName || itemNames[line.variantId] || tr("item")
-        ),
-        quantity: String(quantity || line.quantity || "1"),
+        name: printed,
+        quantity: String(group.rows[0].quantity || line.quantity || "1"),
         unitPrice: line.unitPrice?.trim() || undefined,
         modifiers: modifiers.names,
         modifierPrices: modifiers.prices,
