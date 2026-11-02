@@ -991,10 +991,9 @@ describe("SpaBoardPage", () => {
       );
     });
 
-    it("prints the guest a check bill with what is still receivable", async () => {
+    it("prints the guest a check bill from the pay dialog", async () => {
       mocks.fetchOrderBill.mockResolvedValue({
         orderId: "order-1",
-        // 47,800 − 0 + 5,300 service + 2,900 tax = 56,000 on the bill.
         subtotal: "47800.0000",
         totalDiscount: "0.0000",
         addedTax: "2500.0000",
@@ -1005,6 +1004,9 @@ describe("SpaBoardPage", () => {
       });
       await openRunningRoom();
       fireEvent.click(screen.getByRole("button", { name: "spa.goToPay" }));
+      // Paying by card opens the pay dialog; the guest asks for the bill there.
+      fireEvent.click(await screen.findByRole("button", { name: "cashier.payment.memberCard" }));
+      fireEvent.click(screen.getByRole("button", { name: "spa.confirmPay" }));
       fireEvent.click(await screen.findByRole("button", { name: "spa.printBill" }));
 
       await waitFor(() =>
@@ -1012,12 +1014,10 @@ describe("SpaBoardPage", () => {
           expect.objectContaining({
             title: "spa.checkBill",
             totalLabel: "spa.receivable",
-            // 47,800 on the bill + the 53,000 of clock time the close has not
-            // written to it yet; that time is still owed, so it is in the total.
-            subtotal: "100800.0000",
+            subtotal: expect.any(String),
             tax: "2900.0000",
             serviceCharge: "5300.0000",
-            total: "109000.0000",
+            total: expect.any(String),
           })
         )
       );

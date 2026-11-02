@@ -2553,7 +2553,6 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               setShowExtend(true);
             }}
             onTogglePause={() => void togglePause()}
-            onPrintBill={!paid ? () => void printCheckBill() : undefined}
             onOpenBill={endBillOrderId ? () => setBillOptionsOpen(true) : undefined}
             onMoveRoom={!paid ? () => setFloorMode("move") : undefined}
             onSplitRoom={endBillOrderId && !paid ? () => setFloorMode("split") : undefined}
@@ -2953,6 +2952,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           onCancel={() => setCardPrompt(null)}
           otherMethods={cardPrompt !== "pay" ? otherMethods : []}
           onPayWith={payWith}
+          onPrintBill={cardPrompt === "pay" ? () => void printCheckBill() : undefined}
         >
           {cardPrompt === "add" ? (
             <>

@@ -544,7 +544,9 @@ describe("KtvBoardPage", () => {
       // The screen still lists each rate on its own line.
       expect(await screen.findAllByText("ktvPos.treatmentCharge")).toHaveLength(2);
 
-      fireEvent.click(screen.getByRole("button", { name: "ktvPos.printBill" }));
+      // The guest asks for the bill at the close: the dialog prints it.
+      fireEvent.click(screen.getByRole("button", { name: "ktvPos.endTreatment" }));
+      fireEvent.click(await screen.findByRole("button", { name: "ktvPos.printBill" }));
 
       await waitFor(() => expect(mocks.printReceipt).toHaveBeenCalled());
       const slip = mocks.printReceipt.mock.calls.at(-1)?.[0] as {
