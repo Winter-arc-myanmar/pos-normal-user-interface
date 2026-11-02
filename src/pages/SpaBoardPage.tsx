@@ -2712,13 +2712,23 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                 ) : (
                   <span />
                 )}
-                <Button
-                  isLoading={isPaying}
-                  disabled={billOptions.isLoading || Boolean(billOptions.error)}
-                  onClick={() => void handleEndBillPay()}
-                >
-                  {billClosed ? tr("retryPay") : tr("confirmPay")}
-                </Button>
+                <div className="flex items-end gap-2">
+                  <Button
+                    variant="secondary"
+                    className="min-w-0 px-3 leading-tight"
+                    disabled={isPaying}
+                    onClick={() => void printCheckBill()}
+                  >
+                    {tr("printBill")}
+                  </Button>
+                  <Button
+                    isLoading={isPaying}
+                    disabled={billOptions.isLoading || Boolean(billOptions.error)}
+                    onClick={() => void handleEndBillPay()}
+                  >
+                    {billClosed ? tr("retryPay") : tr("confirmPay")}
+                  </Button>
+                </div>
               </div>
             </div>
           ) : (
@@ -2776,6 +2786,14 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                   {billClosed ? tr("retryPay") : tr("confirmPay")}
                 </Button>
               </div>
+              <Button
+                variant="secondary"
+                className="w-full"
+                disabled={isPaying}
+                onClick={() => void printCheckBill()}
+              >
+                {tr("printBill")}
+              </Button>
               {atEnd && otherMethods.length ? (
                 <div className="space-y-2 border-t border-slate-800 pt-4">
                   <p className="text-sm font-semibold">{tr("payOtherTitle")}</p>

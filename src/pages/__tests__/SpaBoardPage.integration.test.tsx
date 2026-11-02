@@ -1004,9 +1004,7 @@ describe("SpaBoardPage", () => {
       });
       await openRunningRoom();
       fireEvent.click(screen.getByRole("button", { name: "spa.goToPay" }));
-      // Paying by card opens the pay dialog; the guest asks for the bill there.
-      fireEvent.click(await screen.findByRole("button", { name: "cashier.payment.memberCard" }));
-      fireEvent.click(screen.getByRole("button", { name: "spa.confirmPay" }));
+      // The pay screen's right side prints the bill the guest asked for.
       fireEvent.click(await screen.findByRole("button", { name: "spa.printBill" }));
 
       await waitFor(() =>
