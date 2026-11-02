@@ -106,6 +106,7 @@ import {
 } from "@/lib/spa/manualTimes";
 import { slipRows } from "@/lib/spa/billLines";
 import { modifierPrintText } from "@/lib/printing/modifierText";
+import { receiptTotals } from "@/lib/printing/receiptTotals";
 import { cashierLabel } from "@/lib/printing/cashier";
 
 type SpaStep = "rooms" | "sessions" | "menu" | "pay";
@@ -370,6 +371,17 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     fetchBill: fetchOrderBill,
   });
   const serverBill = billOptions.bill ?? billOptions.quote;
+  /**
+   * The bill as the till has it now: a room's time lands on it when the room
+   * closes, so a slip reads the settled bill rather than the one on screen.
+   */
+  const readBill = async (orderId: string) => {
+    try {
+      return await fetchOrderBill(orderId, billOptions.query);
+    } catch {
+      return serverBill;
+    }
+  };
   // Clock time not yet written to a line; the room's close writes it.
   const timeNotOnLines = billClosed
     ? 0
@@ -1463,6 +1475,10 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       try {
         const printedLines = orderLines.filter((line) => !line.voidedAt);
         const slipName = slipNamer(printedLines);
+        // The bill as the till has it now (the room's time lands on it at close),
+        // so the slip's money rows add up to the total it prints.
+        const bill = session.salesOrderId ? await readBill(session.salesOrderId) : serverBill;
+        const totals = receiptTotals(bill, printedLines);
         await printer.printReceipt({
           title: "RECEIPT",
           sale: true,
@@ -1491,6 +1507,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                 modifierPrices: modifiers.prices,
               };
             }),
+          ...totals,
           amounts: tipReceiptRow,
           total: String(final.paidTotal || final.runningTotal || "0"),
         });
@@ -1711,6 +1728,9 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     try {
       const printedLines = orderLines.filter((line) => !line.voidedAt);
       const slipName = slipNamer(printedLines);
+      // The bill as it stands after the settle, as the cashier prints it.
+      const bill = session.salesOrderId ? await readBill(session.salesOrderId) : serverBill;
+      const totals = receiptTotals(bill, printedLines);
       await printer.printReceipt({
         title: "RECEIPT",
         sale: true,
@@ -1739,9 +1759,11 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               modifierPrices: modifiers.prices,
             };
           }),
+        ...totals,
         amounts: tipReceiptRow,
         total: result.grandTotal,
         payments: [{ name: methodName, amount: result.totalPaid || result.grandTotal }],
+        ...(Number(result.change) > 0 ? { change: result.change } : {}),
       });
     } catch (printError) {
       toast.error(

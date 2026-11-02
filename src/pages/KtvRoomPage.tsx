@@ -28,6 +28,7 @@ import { useDateFormatter } from "@/lib/i18n/formatters";
 import { lineDisplayName } from "@/lib/pos/orderListDisplay";
 import { toast } from "@/lib/toast";
 import { cashierLabel } from "@/lib/printing/cashier";
+import { receiptTotals } from "@/lib/printing/receiptTotals";
 import { toMoney, withOrderTipOnFirstPayment } from "@/lib/pos/checkoutAdjustments";
 import { slipRows } from "@/lib/spa/billLines";
 
@@ -63,6 +64,7 @@ export function KtvRoomPage() {
     orderLines,
     isLoading: isOrderLoading,
     fetchOrderLines,
+    fetchOrderBill,
     addOrderLine,
     deleteOrderLine,
   } = useSalesOrderManagement();
@@ -324,6 +326,13 @@ export function KtvRoomPage() {
         page: 1,
         limit: 200,
       });
+      // The closed bill: the room's time, its tax and its service charge, so the
+      // slip reads the way the cashier's receipt does.
+      const bill = await fetchOrderBill(session.salesOrderId, {
+        includeTax: true,
+        includeServiceCharge: true,
+      }).catch(() => null);
+      const totals = receiptTotals(bill, result.lines);
       const context = await requireCashierContext();
       const finalTotal = Number(finalQuote.runningTotal || total) + tipValue;
       await processCheckout({
@@ -378,7 +387,7 @@ export function KtvRoomPage() {
                 modifierPrices: modifiers.prices,
               };
             }),
-          subtotal: finalQuote.runningTotal,
+          ...totals,
           // The tip is inside the total below, so the slip says so.
           ...(tipValue > 0
             ? { amounts: [{ label: t("receipt.tip"), amount: tipValue.toFixed(4) }] }

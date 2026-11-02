@@ -942,6 +942,55 @@ describe("SpaBoardPage", () => {
       );
     });
 
+    it("prints the bill's subtotal, tax and service charge, as the cashier does", async () => {
+      venueState = { paymentTiming: "PAY_AT_END" };
+      let closed = false;
+      // Before the close the room's time is not on the bill yet; the close writes it.
+      mocks.fetchOrderBill.mockImplementation(async () =>
+        closed
+          ? {
+              orderId: "order-1",
+              // 47,800 − 3,000 + 5,300 service + 2,900 tax = the bill's 53,000.
+              subtotal: "47800.0000",
+              totalDiscount: "3000.0000",
+              addedTax: "2500.0000",
+              totalTax: "2900.0000",
+              serviceCharge: "5300.0000",
+              serviceChargeTax: "400.0000",
+              grandTotal: "53000.0000",
+            }
+          : serverBill("0.0000")
+      );
+      mocks.settleOrder.mockResolvedValue({
+        orderId: "order-1",
+        orderNumber: "SO-001",
+        grandTotal: "53000.0000",
+        totalPaid: "60000.0000",
+        change: "7000.0000",
+        status: "COMPLETED",
+      });
+      mocks.closeSession.mockImplementation(async () => {
+        closed = true;
+        return { ...atEndQuote(), state: "CLOSED" };
+      });
+      await openRunningRoom();
+      fireEvent.click(screen.getByRole("button", { name: "spa.goToPay" }));
+      fireEvent.click(await screen.findByRole("button", { name: "CASH" }));
+      fireEvent.click(screen.getByRole("button", { name: "spa.confirmPay" }));
+
+      await waitFor(() =>
+        expect(mocks.printReceipt).toHaveBeenCalledWith(
+          expect.objectContaining({
+            subtotal: "47800.0000",
+            discount: "3000.0000",
+            tax: "2900.0000",
+            serviceCharge: "5300.0000",
+            change: "7000.0000",
+          })
+        )
+      );
+    });
+
     it("moves the guests to a free room", async () => {
       rooms = [
         room("wallet-1"),
