@@ -104,6 +104,7 @@ import {
   roomTimeNamer,
   slipTimeRange,
 } from "@/lib/spa/manualTimes";
+import { slipRows } from "@/lib/spa/billLines";
 import { modifierPrintText } from "@/lib/printing/modifierText";
 import { cashierLabel } from "@/lib/printing/cashier";
 
@@ -1477,14 +1478,14 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           endTime: formatDateTime(final.asOf || new Date().toISOString()),
           startTimeLabel: t("receipt.startTime"),
           endTimeLabel: t("receipt.endTime"),
-          lines: printedLines.map((line) => {
+          lines: slipRows(printedLines).map(({ line, quantity }) => {
               const modifiers = printedExtras(line);
               return {
                 name: slipName(
                   line,
                   lineDisplayName(line) || line.productName || itemNames[line.variantId] || tr("item")
                 ),
-                quantity: String(line.quantity || "1"),
+                quantity: String(quantity || line.quantity || "1"),
                 unitPrice: line.unitPrice?.trim() || undefined,
                 modifiers: modifiers.names,
                 modifierPrices: modifiers.prices,
@@ -1725,14 +1726,14 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         endTime: formatDateTime(endAt),
         startTimeLabel: t("receipt.startTime"),
         endTimeLabel: t("receipt.endTime"),
-        lines: printedLines.map((line) => {
+        lines: slipRows(printedLines).map(({ line, quantity }) => {
             const modifiers = printedExtras(line);
             return {
               name: slipName(
                 line,
                 lineDisplayName(line) || line.productName || itemNames[line.variantId] || tr("item")
               ),
-              quantity: String(line.quantity || "1"),
+              quantity: String(quantity || line.quantity || "1"),
               unitPrice: line.unitPrice?.trim() || undefined,
               modifiers: modifiers.names,
               modifierPrices: modifiers.prices,

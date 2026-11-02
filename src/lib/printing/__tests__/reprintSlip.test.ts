@@ -150,4 +150,26 @@ describe("reprintSlip", () => {
     expect(slip.lines.map((item) => item.modifiers)).toEqual([undefined, "Ordered by Mya", undefined]);
     expect(slip.lines[0].name).toBe("room (4:15 - 6:15)");
   });
+
+  it("prints a room booked and then extended as one row", () => {
+    const room = { categoryName: "KTV Rooms", courseType: "Hours · Standard", unitPrice: "40000.0000" };
+    const slip = build(
+      order({
+        place: {
+          kind: "KTV",
+          number: "102",
+          openedAt: "2026-11-02T08:57:00.000Z",
+          closedAt: "2026-11-02T09:04:00.000Z",
+          manualInAt: new Date(2026, 10, 2, 15, 30).toISOString(),
+          manualOutAt: new Date(2026, 10, 2, 17, 30).toISOString(),
+        },
+      }),
+      [line("room", room), line("jager", { hostessId: "mya" }), line("room", { ...room, id: "room-2" })]
+    );
+
+    expect(slip.lines.map((item) => [item.name, item.quantity, item.unitPrice])).toEqual([
+      ["room (3:30 - 5:30)", "2", "40000.0000"],
+      ["jager", "1", "3000.0000"],
+    ]);
+  });
 });

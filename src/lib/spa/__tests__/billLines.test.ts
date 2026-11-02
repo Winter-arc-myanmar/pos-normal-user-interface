@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SalesOrderLine } from "@/core/domain/entities/Cashier";
-import { groupBillLines } from "../billLines";
+import { groupBillLines, slipRows } from "../billLines";
 
 const line = (id: string, overrides: Partial<SalesOrderLine> = {}) =>
   new SalesOrderLine({
@@ -64,5 +64,16 @@ describe("groupBillLines", () => {
     expect(groups[0].total).toBe(10000);
     expect(groups[1].quantity).toBe(2);
     expect(groups[1].total).toBe(0);
+  });
+});
+
+describe("slipRows", () => {
+  it("prints each group once, its oldest line standing for it", () => {
+    const rows = slipRows([line("a"), line("tea", { variantId: "v-tea" }), line("b", { quantity: "2.0000" })]);
+
+    expect(rows.map((row) => [row.line.id, row.quantity])).toEqual([
+      ["a", 3],
+      ["tea", 1],
+    ]);
   });
 });
