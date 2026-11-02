@@ -6,7 +6,9 @@ import { givenAwayAmount, linePromotionSaving } from "@/lib/pos/promotions";
 import type { PrintLine, SaleReceipt } from "./formatKdsTicket";
 import { sessionPrintTimes } from "./formatKdsTicket";
 import { modifierPrintText } from "./modifierText";
-import { roomTimeNamer, slipTimeRange } from "@/lib/spa/manualTimes";
+import { slipRows } from "@/lib/spa/billLines";
+import { groupRoomTimeRows, mergedRoomTimeLine } from "./roomTimeRows";
+import { isKtvRoomTimeLine, roomTimeNamer, slipTimeRange } from "@/lib/spa/manualTimes";
 
 /** The words a slip prints, in the till's language, as the original slip used them. */
 export interface SlipText {
@@ -129,11 +131,15 @@ export function reprintSlip(input: ReprintInput): SaleReceipt {
       endTime: input.formatDateTime(room.closedAt || order.updatedAt),
       startTimeLabel: text.startTime,
       endTimeLabel: text.endTime,
-      lines: kept.map((line) => {
+      lines: groupRoomTimeRows(slipRows(kept), isKtvRoomTimeLine).map((group) => {
+        const { line } = group.rows[0];
+        const printed = named(line, lineDisplayName(line) || line.productName || text.item);
+        // The room's time sold at more than one rate is one row on the paper.
+        if (group.rows.length > 1) return mergedRoomTimeLine(group, printed);
         const modifiers = withNote(modifierPrintText(line.selectedModifiers), hostessNote(line));
         return {
-          name: named(line, lineDisplayName(line) || line.productName || text.item),
-          quantity: String(line.quantity || "1"),
+          name: printed,
+          quantity: String(group.rows[0].quantity || line.quantity || "1"),
           unitPrice: line.unitPrice?.trim() || undefined,
           modifiers: modifiers.names,
           modifierPrices: modifiers.prices,

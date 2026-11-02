@@ -16,6 +16,7 @@ export function CardTapDialog({
   onCancel,
   otherMethods = [],
   onPayWith,
+  onPrintBill,
 }: {
   kind?: RoomKind;
   title: string;
@@ -26,6 +27,8 @@ export function CardTapDialog({
   onCancel: () => void;
   otherMethods?: { id: string; name: string }[];
   onPayWith?: (methodId: string) => void;
+  /** Prints the guest's bill as it stands, before this one is settled. */
+  onPrintBill?: () => void;
 }) {
   const { t } = useTranslation();
   const tr = useRoomText(kind);
@@ -96,7 +99,12 @@ export function CardTapDialog({
             {error}
           </p>
         ) : null}
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          {onPrintBill ? (
+            <Button type="button" variant="secondary" disabled={isBusy} onClick={onPrintBill}>
+              {tr("printBill")}
+            </Button>
+          ) : null}
           <Button type="button" variant="secondary" onClick={onCancel}>
             {t("common.cancel")}
           </Button>

@@ -28,7 +28,9 @@ import { useDateFormatter } from "@/lib/i18n/formatters";
 import { lineDisplayName } from "@/lib/pos/orderListDisplay";
 import { toast } from "@/lib/toast";
 import { cashierLabel } from "@/lib/printing/cashier";
+import { receiptTotals } from "@/lib/printing/receiptTotals";
 import { toMoney, withOrderTipOnFirstPayment } from "@/lib/pos/checkoutAdjustments";
+import { slipRows } from "@/lib/spa/billLines";
 
 export function KtvRoomPage() {
   const { t } = useTranslation();
@@ -62,6 +64,7 @@ export function KtvRoomPage() {
     orderLines,
     isLoading: isOrderLoading,
     fetchOrderLines,
+    fetchOrderBill,
     addOrderLine,
     deleteOrderLine,
   } = useSalesOrderManagement();
@@ -323,6 +326,13 @@ export function KtvRoomPage() {
         page: 1,
         limit: 200,
       });
+      // The closed bill: the room's time, its tax and its service charge, so the
+      // slip reads the way the cashier's receipt does.
+      const bill = await fetchOrderBill(session.salesOrderId, {
+        includeTax: true,
+        includeServiceCharge: true,
+      }).catch(() => null);
+      const totals = receiptTotals(bill, result.lines);
       const context = await requireCashierContext();
       const finalTotal = Number(finalQuote.runningTotal || total) + tipValue;
       await processCheckout({
@@ -366,19 +376,18 @@ export function KtvRoomPage() {
           endTime: formatDateTime(endAt),
           startTimeLabel: t("receipt.startTime"),
           endTimeLabel: t("receipt.endTime"),
-          lines: result.lines
-            .filter((line) => !line.voidedAt)
-            .map((line) => {
+          lines: slipRows(result.lines.filter((line) => !line.voidedAt))
+            .map(({ line, quantity }) => {
               const modifiers = modifierPrintText(line.selectedModifiers);
               return {
                 name: lineDisplayName(line) || line.productName || line.variantName || "Item",
-                quantity: String(line.quantity || "1"),
+                quantity: String(quantity || line.quantity || "1"),
                 unitPrice: line.unitPrice?.trim() || undefined,
                 modifiers: modifiers.names,
                 modifierPrices: modifiers.prices,
               };
             }),
-          subtotal: finalQuote.runningTotal,
+          ...totals,
           // The tip is inside the total below, so the slip says so.
           ...(tipValue > 0
             ? { amounts: [{ label: t("receipt.tip"), amount: tipValue.toFixed(4) }] }

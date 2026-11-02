@@ -29,6 +29,13 @@ export interface PrintLine {
   categoryName?: string;
   altName?: string;
   unitPrice?: string;
+  /**
+   * The row's own money, when it is not quantity × unitPrice: a room's time sold
+   * at several rates prints as one row, priced per rate by `priceRows` below.
+   */
+  amount?: string;
+  /** The rates behind a merged row: "2 @ 50,000", "1 @ 10,000". */
+  priceRows?: Array<{ quantity: string; unitPrice: string }>;
   modifiers?: string;
   modifierPrices?: string;
   /** A running promotion on this item, such as "1+1". */
@@ -681,12 +688,27 @@ function receiptLayout(receipt: SaleReceipt): Layout {
       const quantity = quantityText(item.quantity);
       const unit = Number(item.unitPrice);
       const hasPrice = showPrices && item.unitPrice?.trim() && Number.isFinite(unit);
-      const amount = hasPrice ? printMoney(unit * (Number(item.quantity) || 0)) : "";
+      const amount = !showPrices
+        ? ""
+        : item.amount !== undefined
+          ? printMoney(Number(item.amount))
+          : hasPrice
+            ? printMoney(unit * (Number(item.quantity) || 0))
+            : "";
       layout.pair(qtyFirst ? `${quantity} x ${item.name}` : `${item.name} x${quantity}`, amount, {
         size: itemSize,
       });
       if (settings?.item.bilingual) layout.indented(4, item.altName);
-      if (hasPrice && Number(item.quantity) !== 1) {
+      const priceRows = showPrices ? item.priceRows || [] : [];
+      if (priceRows.length) {
+        // A merged row prices itself per rate: "2 @ 50,000", "1 @ 10,000".
+        for (const row of priceRows) {
+          layout.indented(
+            4,
+            `${quantityText(row.quantity)} @ ${printMoney(Number(row.unitPrice))}`
+          );
+        }
+      } else if (hasPrice && Number(item.quantity) !== 1) {
         layout.indented(4, `${quantity} @ ${printMoney(unit)}`);
       }
       // A running promotion prints under its item: what the 1+1 took off here.

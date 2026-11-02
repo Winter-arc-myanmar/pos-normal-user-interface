@@ -50,3 +50,12 @@ export function groupBillLines(lines: SalesOrderLine[]): BillLineGroup[] {
   }
   return [...groups.values()];
 }
+
+/**
+ * The bill's lines as the slip prints them: one row per group, as on the bill,
+ * with its oldest line standing for the rest. A room booked and then extended is
+ * one row, not one per round.
+ */
+export function slipRows(lines: SalesOrderLine[]): Array<{ line: SalesOrderLine; quantity: number }> {
+  return groupBillLines(lines).map((group) => ({ line: group.lines[0], quantity: group.quantity }));
+}
