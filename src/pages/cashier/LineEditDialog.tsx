@@ -26,6 +26,8 @@ interface LineEditDialogProps {
   /** Hostesses who may have ordered it; none hides the choice. */
   orderers?: { id: string; name: string }[];
   orderedBy?: string;
+  /** Room time and packages stay on the bill; only their price and FOC change. */
+  canRemove?: boolean;
   isBusy?: boolean;
   onSave: (edit: LineEdit) => void;
   onRemove: () => void;
@@ -48,6 +50,7 @@ export function LineEditDialog({
   isFee = false,
   orderers,
   orderedBy,
+  canRemove = true,
   isBusy = false,
   onSave,
   onRemove,
@@ -243,14 +246,16 @@ export function LineEditDialog({
           </Button>
         </div>
 
-        <button
-          type="button"
-          className="mx-auto block min-h-11 rounded px-3 text-sm font-medium text-red-400 hover:bg-red-950/40 disabled:opacity-40"
-          disabled={isBusy}
-          onClick={onRemove}
-        >
-          {t("cashier.lineEdit.remove")}
-        </button>
+        {canRemove ? (
+          <button
+            type="button"
+            className="mx-auto block min-h-11 rounded px-3 text-sm font-medium text-red-400 hover:bg-red-950/40 disabled:opacity-40"
+            disabled={isBusy}
+            onClick={onRemove}
+          >
+            {t("cashier.lineEdit.remove")}
+          </button>
+        ) : null}
       </div>
     </div>
   );

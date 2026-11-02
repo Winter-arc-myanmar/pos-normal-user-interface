@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { SalesOrderLine } from "@/core/domain/entities/Cashier";
@@ -7,7 +8,8 @@ import type { RoomKind } from "@/core/presentation/hooks/useRoomPos";
 import { useRoomText } from "@/core/presentation/hooks/useRoomText";
 import { getKtvWarning } from "@/lib/ktv/session";
 import { estimateCardCharge } from "@/lib/spa/payment";
-import { groupBillLines } from "@/lib/spa/billLines";
+import { BillLineGroup, groupBillLines, isGivenFree } from "@/lib/spa/billLines";
+import { linePriceNote } from "@/lib/pos/linePrice";
 import { bookedSessions } from "@/lib/spa/session";
 import {
   focPending,
@@ -23,6 +25,11 @@ import { BillBreakdownRows } from "../cashier/BillBreakdownRows";
 
 const money = (value: string | number | undefined) =>
   Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
+
+const rowIconBase =
+  "grid h-8 w-8 shrink-0 place-items-center rounded-md border focus-visible:outline-blue-500 disabled:opacity-40";
+const rowIconButton = `${rowIconBase} border-slate-600 text-slate-200 hover:bg-slate-800`;
+const rowRemoveButton = `${rowIconBase} border-red-900 text-red-300 hover:bg-red-950/60`;
 
 export function SpaBillPanel({
   kind = "spa",
@@ -66,6 +73,8 @@ export function SpaBillPanel({
   orderers = [],
   onOrderedBy,
   orderedByName = () => undefined,
+  menuPrice = () => undefined,
+  onEditLine,
 }: {
   kind?: RoomKind;
   room: SpaRoom | null;
@@ -121,9 +130,14 @@ export function SpaBillPanel({
   onOrderedBy?: (key: string, hostess?: { id: string; name: string }) => void;
   /** The hostess who ordered a menu line, when one did. */
   orderedByName?: (line: SalesOrderLine) => string | undefined;
+  /** What the menu charges for one of a line, to show a price changed on this bill. */
+  menuPrice?: (line: SalesOrderLine) => number | undefined;
+  /** A bill paid at the end: change a row's price, FOC or who ordered it, as on the cashier. */
+  onEditLine?: (group: BillLineGroup) => void;
 }) {
   const tr = useRoomText(kind);
   const { t } = useTranslation();
+  const [openRows, setOpenRows] = useState<Record<string, boolean>>({});
   const warning = getKtvWarning(session.endsAt, nowMs);
   const discountBps = wallet?.discountBpsSnapshot || 0;
   const pendingDue = pendingTotal(pending) - pendingSaving(pending, pendingDiscounts);
@@ -274,7 +288,16 @@ export function SpaBillPanel({
               line.variantId === room?.rateVariantId ||
               Boolean(rentalVariantIds?.has(line.variantId));
             const isTreatment = isRoomTime || isPackage;
-            const isFoc = Boolean(line.compReasonId);
+            const isFoc = isGivenFree(line);
+            const listPrice = menuPrice(line);
+            const priceNote =
+              isFoc || promotedLine ? undefined : linePriceNote(line.unitPrice, listPrice);
+            const lineName =
+              isTreatment && !isPackage
+                ? tr("treatmentCharge")
+                : line.productName || itemNames[line.variantId] || tr("item");
+            // Time a promotion gave free is the promotion's; changing it would charge it.
+            const canEdit = Boolean(onEditLine) && !billClosed && !(isRoomTime && promotedLine);
             // What one of the row is charged: a copy a promotion gave away, or one
             // given free, reads 0 here instead of the menu or session price.
             const chargedUnit =
@@ -282,100 +305,136 @@ export function SpaBillPanel({
                 ? Math.max(0, total / quantity)
                 : unitPrice;
             const editable = !billClosed && !isTreatment;
+            const quantityLabel = Number(quantity.toFixed(4));
+            const shownName = priceNote
+              ? t(`cashier.orderPanel.priceNote.${priceNote}`, { name: lineName })
+              : lineName;
+            const isOpen = openRows[group.key] === true;
+            const promoText = promotedLine ? promotionName(promotedLine.appliedPromotionId) : undefined;
             return (
-              <div key={group.key} className="flex items-center gap-2 py-2 text-sm">
-                <div className="min-w-0 flex-1">
-                  <p className="break-words font-medium leading-snug">
-                    {isFoc ? (
-                      <span className="mr-1.5 rounded border border-slate-500 px-1 text-[10px] font-semibold tracking-wide text-slate-300">
-                        {tr("foc")}
-                      </span>
-                    ) : promotedLine ? (
+              <div key={group.key} role="group" aria-label={shownName} className="py-1.5 text-sm">
+                <button
+                  type="button"
+                  className="flex w-full min-w-0 items-center gap-1.5 text-left"
+                  aria-expanded={isOpen}
+                  aria-label={t("cashier.orderPanel.lineDetails", { name: shownName })}
+                  onClick={() => setOpenRows((current) => ({ ...current, [group.key]: !isOpen }))}
+                >
+                  <span className="flex min-w-0 flex-1 items-center gap-1.5 font-medium">
+                    <span className="shrink-0 text-xs font-semibold tabular-nums text-slate-400">
+                      {quantityLabel}×
+                    </span>
+                    {promotedLine ? (
                       <span
-                        className="mr-1.5 rounded border border-emerald-600 px-1 text-[10px] font-semibold tracking-wide text-emerald-300"
-                        title={promotionName(promotedLine.appliedPromotionId)}
+                        className="shrink-0 rounded border border-emerald-600 px-1 text-[10px] font-semibold tracking-wide text-emerald-300"
+                        title={promoText}
                       >
                         {tr("promo")}
                       </span>
                     ) : null}
-                    {isTreatment && !isPackage
-                      ? tr("treatmentCharge")
-                      : line.productName || itemNames[line.variantId] || tr("item")}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    {money(chargedUnit)}
-                    {promotedLine && promotionName(promotedLine.appliedPromotionId)
-                      ? ` · ${promotionName(promotedLine.appliedPromotionId)}`
-                      : ""}
-                  </p>
-                  {orderedByName(line) ? (
-                    <p className="text-xs text-pink-300">
-                      {tr("orderedBy", { name: orderedByName(line) })}
-                    </p>
-                  ) : null}
-                </div>
-                {editable && isFoc ? (
-                  <span className="shrink-0 text-xs text-slate-400">
-                    × {Number(quantity.toFixed(4))}
-                  </span>
-                ) : editable && prepaid ? (
-                  <div className="flex shrink-0 items-center gap-1">
-                    <span className="text-xs text-slate-400">× {Number(quantity.toFixed(4))}</span>
-                    <button
-                      type="button"
-                      aria-label={tr("increase")}
-                      className="h-7 w-7 rounded bg-slate-800 text-base disabled:opacity-40"
-                      disabled={isBusy}
-                      onClick={() => onAddAnother(line)}
-                    >
-                      +
-                    </button>
-                  </div>
-                ) : editable ? (
-                  <div className="flex shrink-0 items-center rounded bg-slate-800">
-                    <button
-                      type="button"
-                      aria-label={tr("decrease")}
-                      className="h-7 w-7 text-base disabled:opacity-40"
-                      disabled={isBusy}
-                      onClick={() => onChangeQuantity(newest, -1)}
-                    >
-                      −
-                    </button>
-                    <span className="w-6 text-center text-xs font-semibold">
-                      {Number(quantity.toFixed(4))}
+                    {isFoc ? (
+                      <span className="shrink-0 rounded border border-slate-500 px-1 text-[10px] font-semibold tracking-wide text-slate-300">
+                        {tr("foc")}
+                      </span>
+                    ) : null}
+                    <span className="min-w-0 truncate" title={shownName}>
+                      {shownName}
                     </span>
-                    <button
-                      type="button"
-                      aria-label={tr("increase")}
-                      className="h-7 w-7 text-base disabled:opacity-40"
-                      disabled={isBusy}
-                      onClick={() => onAddAnother(line)}
-                    >
-                      +
-                    </button>
-                  </div>
-                ) : (
-                  <span className="shrink-0 text-xs text-slate-400">
-                    × {Number(quantity.toFixed(4))}
                   </span>
-                )}
-                <span className="w-16 shrink-0 text-right font-semibold">
-                  {money(total)}
-                  {prepaid && !isFoc ? (
-                    <span className="ml-1 text-xs text-slate-500">✓</span>
-                  ) : null}
-                </span>
-                {editable ? (
-                  <button
-                    type="button"
-                    aria-label={prepaid && !isFoc ? tr("refundLine") : tr("removeLine")}
-                    className="h-7 w-6 shrink-0 rounded text-slate-500 hover:bg-red-950/60 hover:text-red-300 disabled:opacity-40"
-                    disabled={isBusy}
-                    onClick={() => onRemoveLine(group.lines)}
-                  >
-                    ✕
-                  </button>
+                  <span className="shrink-0 font-semibold tabular-nums">
+                    {money(total)}
+                    {prepaid && !isFoc ? (
+                      <span className="ml-1 text-xs text-slate-500">✓</span>
+                    ) : null}
+                  </span>
+                  <SeatingIcon
+                    name="chevron"
+                    className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${
+                      isOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+                {isOpen ? (
+                  <>
+                    <p className="mt-0.5 truncate text-xs tabular-nums text-slate-500">
+                      {"@ "}
+                      {money(chargedUnit)}
+                      {priceNote ? (
+                        <span
+                          className="ml-1 text-slate-600 line-through"
+                          aria-label={t("cashier.orderPanel.menuPriceWas", {
+                            amount: money(listPrice),
+                          })}
+                        >
+                          {money(listPrice)}
+                        </span>
+                      ) : null}
+                      {promoText ? ` · ${promoText}` : ""}
+                    </p>
+                    {orderedByName(line) ? (
+                      <p className="truncate text-xs font-medium text-pink-300">
+                        {tr("orderedBy", { name: orderedByName(line) })}
+                      </p>
+                    ) : null}
+                    {editable || canEdit ? (
+                      <div className="mt-1 flex items-center justify-between gap-1">
+                        <div className="flex items-center gap-1">
+                          {editable && !isFoc && !prepaid ? (
+                            <button
+                              type="button"
+                              className={rowIconButton}
+                              aria-label={tr("decrease")}
+                              disabled={isBusy}
+                              onClick={() => onChangeQuantity(newest, -1)}
+                            >
+                              <SeatingIcon name="minus" className="h-4 w-4" />
+                            </button>
+                          ) : null}
+                          {editable && !isFoc ? (
+                            <>
+                              <span className="min-w-[2.5ch] text-center font-semibold tabular-nums">
+                                {quantityLabel}
+                              </span>
+                              <button
+                                type="button"
+                                className={rowIconButton}
+                                aria-label={tr("increase")}
+                                disabled={isBusy}
+                                onClick={() => onAddAnother(line)}
+                              >
+                                <SeatingIcon name="plus" className="h-4 w-4" />
+                              </button>
+                            </>
+                          ) : null}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {canEdit ? (
+                            <button
+                              type="button"
+                              className={rowIconButton}
+                              aria-label={t("cashier.orderPanel.editItem", { name: lineName })}
+                              title={t("cashier.lineEdit.title")}
+                              disabled={isBusy}
+                              onClick={() => onEditLine?.(group)}
+                            >
+                              <SeatingIcon name="edit" className="h-4 w-4" />
+                            </button>
+                          ) : null}
+                          {editable ? (
+                            <button
+                              type="button"
+                              className={rowRemoveButton}
+                              aria-label={prepaid && !isFoc ? tr("refundLine") : tr("removeLine")}
+                              disabled={isBusy}
+                              onClick={() => onRemoveLine(group.lines)}
+                            >
+                              <SeatingIcon name="remove" className="h-4 w-4" />
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
                 ) : null}
               </div>
             );

@@ -82,6 +82,12 @@ const renderPanel = (overrides: Record<string, unknown> = {}) => {
   return { onOpenBill, onTogglePause, onExtend, onPrimary };
 };
 
+/** Opens every bill row, as tapping each one does. */
+const openRows = () =>
+  screen
+    .getAllByRole("button", { name: "cashier.orderPanel.lineDetails" })
+    .forEach((row) => fireEvent.click(row));
+
 describe("SpaBillPanel actions", () => {
   it("puts Bill & table beside Extend and the close button, without Pause", () => {
     const { onOpenBill, onExtend, onPrimary } = renderPanel();
@@ -146,11 +152,12 @@ describe("SpaBillPanel actions", () => {
       promotionName: (id?: string) => (id === "promo-1" ? "Buy 1 Get 1" : undefined),
     });
 
+    openRows();
     // The charged copy reads what the promotion leaves, the free copy reads 0.
     expect(
-      screen.getByText(new RegExp(`^${money(5400)} · Buy 1 Get 1$`))
+      screen.getByText(new RegExp(`^@ ${money(5400)} · Buy 1 Get 1$`))
     ).toBeInTheDocument();
-    expect(screen.getByText(/^0 · Buy 1 Get 1$/)).toBeInTheDocument();
+    expect(screen.getByText(/^@ 0 · Buy 1 Get 1$/)).toBeInTheDocument();
   });
 
   it("shows every rate the room sells as room time, with no stepper", () => {
@@ -187,8 +194,9 @@ describe("SpaBillPanel actions", () => {
 
     // Both rates read as room time, and neither can be changed from the bill.
     expect(screen.getAllByText("spa.treatmentCharge")).toHaveLength(2);
-    expect(screen.getByText("× 1")).toBeInTheDocument();
-    expect(screen.getByText("× 2")).toBeInTheDocument();
+    expect(screen.getAllByText("1×")).toHaveLength(2);
+    expect(screen.getByText("2×")).toBeInTheDocument();
+    openRows();
     // Only the menu line keeps its − / + and its remove button.
     expect(screen.getAllByRole("button", { name: "spa.decrease" })).toHaveLength(1);
     expect(screen.getAllByRole("button", { name: "spa.increase" })).toHaveLength(1);
@@ -226,9 +234,83 @@ describe("SpaBillPanel actions", () => {
 
     // The hour bought at the rate, then the hour the promotion gave away.
     expect(screen.getAllByText("spa.treatmentCharge")).toHaveLength(2);
+    openRows();
     expect(
-      screen.getByText(new RegExp(`^${money(40000)} · 1 hour \\+ 1 free$`))
+      screen.getByText(new RegExp(`^@ ${money(40000)} · 1 hour \\+ 1 free$`))
     ).toBeInTheDocument();
-    expect(screen.getByText(/^0 · 1 hour \+ 1 free$/)).toBeInTheDocument();
+    expect(screen.getByText(/^@ 0 · 1 hour \+ 1 free$/)).toBeInTheDocument();
+  });
+
+  it("lets every row of a bill paid at the end be edited, room time too, and marks a changed price", () => {
+    const onEditLine = vi.fn();
+    renderPanel({
+      room: new SpaRoom({
+        id: "room-102",
+        roomNumber: "102",
+        name: "VIP 102",
+        minimumMinutes: 60,
+        status: "OCCUPIED",
+        rateVariantId: "variant-hour",
+        sessionPrice: "40000.0000",
+      }),
+      rentalVariantIds: new Set(["variant-hour"]),
+      lines: [
+        new SalesOrderLine({
+          id: "line-hour",
+          salesOrderId: "order-1",
+          variantId: "variant-hour",
+          quantity: "2.0000",
+          unitPrice: "35000.0000",
+        }),
+        new SalesOrderLine({
+          id: "line-beer",
+          salesOrderId: "order-1",
+          variantId: "variant-beer",
+          productName: "Myanmar Beer",
+          quantity: "1.0000",
+          unitPrice: "3000.0000",
+        }),
+      ],
+      menuPrice: (line: SalesOrderLine) => (line.variantId === "variant-beer" ? 4000 : undefined),
+      onEditLine,
+    });
+    openRows();
+
+    const edits = screen.getAllByRole("button", { name: "cashier.orderPanel.editItem" });
+    expect(edits).toHaveLength(2);
+    expect(screen.getByText("cashier.orderPanel.priceNote.discount")).toBeInTheDocument();
+    fireEvent.click(edits[0]);
+    expect(onEditLine).toHaveBeenCalledWith(
+      expect.objectContaining({ quantity: 2, lines: [expect.objectContaining({ id: "line-hour" })] })
+    );
+  });
+
+  it("keeps the time a promotion gave free out of Edit item", () => {
+    renderPanel({
+      room: new SpaRoom({
+        id: "room-102",
+        roomNumber: "102",
+        name: "VIP 102",
+        minimumMinutes: 60,
+        status: "OCCUPIED",
+        rateVariantId: "variant-hour",
+        sessionPrice: "40000.0000",
+      }),
+      lines: [
+        new SalesOrderLine({
+          id: "line-free",
+          salesOrderId: "order-1",
+          variantId: "variant-hour",
+          quantity: "1.0000",
+          unitPrice: "40000.0000",
+          lineDiscount: "40000.0000",
+          appliedPromotionId: "bogo-hours",
+        }),
+      ],
+      onEditLine: vi.fn(),
+    });
+    openRows();
+
+    expect(screen.queryByRole("button", { name: "cashier.orderPanel.editItem" })).toBeNull();
   });
 });

@@ -196,4 +196,17 @@ describe("ApiSalesOrderRepository", () => {
       status: "COMPLETED",
     });
   });
+
+  it("sends who ordered a line when it changes", async () => {
+    const patch = vi.fn().mockResolvedValue({ data: { id: "line-1" } });
+    const repository = new ApiSalesOrderRepository({ patch } as unknown as HttpClient);
+
+    await repository.updateSalesOrderLine("order-1", "line-1", { hostessId: "hostess-1" });
+    await repository.updateSalesOrderLine("order-1", "line-1", { hostessId: null });
+
+    expect(patch.mock.calls.map(([, body]) => body)).toEqual([
+      { hostessId: "hostess-1" },
+      { hostessId: null },
+    ]);
+  });
 });
