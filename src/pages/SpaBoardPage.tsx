@@ -47,7 +47,7 @@ import {
   cardCanCover,
   estimateCardCharge,
 } from "@/lib/spa/payment";
-import { withOrderTipOnFirstPayment } from "@/lib/pos/checkoutAdjustments";
+import { lineFocDiscount, withOrderTipOnFirstPayment } from "@/lib/pos/checkoutAdjustments";
 import { freeTimeFor } from "@/lib/spa/freeTime";
 import type { RentalChoice } from "@/lib/spa/freeTime";
 import {
@@ -104,7 +104,10 @@ import {
   roomTimeNamer,
   slipTimeRange,
 } from "@/lib/spa/manualTimes";
-import { slipRows } from "@/lib/spa/billLines";
+import { BillLineGroup, isGivenFree, slipRows } from "@/lib/spa/billLines";
+import { linePriceNote } from "@/lib/pos/linePrice";
+import { modifierExtra } from "@/lib/modifiers/choices";
+import { LineEditDialog, type LineEdit } from "./cashier/LineEditDialog";
 import { modifierPrintText } from "@/lib/printing/modifierText";
 import { receiptTotals } from "@/lib/printing/receiptTotals";
 import { groupRoomTimeRows, mergedRoomTimeLine } from "@/lib/printing/roomTimeRows";
@@ -192,6 +195,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     fetchPaymentMethods,
     listKdsTickets,
     addExtraFeeLine,
+    splitOrderLine,
   } = useCashier();
   const {
     orderLines,
@@ -237,7 +241,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const [billOptionsOpen, setBillOptionsOpen] = useState(false);
   const [splitCash, setSplitCash] = useState(false);
   const [cashAmount, setCashAmount] = useState("");
-  const { fees: extraFees } = useExtraFees();
+  const { fees: extraFees, isFeeLine } = useExtraFees();
   const [extraFeeOpen, setExtraFeeOpen] = useState(false);
   const { moveRoom, mergeRoom, splitRoom } = useRoomFloor(kind);
   const [floorMode, setFloorMode] = useState<RoomFloorMode | null>(null);
@@ -257,6 +261,9 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const [confirmEnd, setConfirmEnd] = useState(false);
   // Charged items waiting for a manager before their money goes back to the card.
   const [refundApproval, setRefundApproval] = useState<SalesOrderLine[] | null>(null);
+  // A bill row being changed in Edit item: its price, FOC or who ordered it.
+  const [editingRow, setEditingRow] = useState<BillLineGroup | null>(null);
+  const [isSavingLine, setIsSavingLine] = useState(false);
   const tapKeys = useRef<Partial<Record<CardAction, string>>>({});
   const [showRoomForm, setShowRoomForm] = useState(false);
   const [editingRoom, setEditingRoom] = useState<SpaRoom | null>(null);
@@ -361,6 +368,32 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const chargedLines = orderLines.filter(
     (line) => !["VOIDED", "COMPED"].includes(String(line.status || "").toUpperCase())
   );
+  const menuItemOf = useMemo(() => {
+    const items: Record<string, { product: Product; priceModifier?: string }> = {};
+    for (const product of products) {
+      for (const variant of variantsByProductId[product.id] || []) {
+        items[variant.id] = { product, priceModifier: variant.priceModifier };
+      }
+    }
+    return items;
+  }, [products, variantsByProductId]);
+  /**
+   * What the menu charges for one of a line, so a price changed on this bill shows
+   * as one. Room time has none: its rate changes with the hour.
+   */
+  const menuPriceFor = (line: SalesOrderLine) => {
+    if (isFeeLine(line) || line.variantId === room?.rateVariantId) return undefined;
+    const booked = spaPackages.find((item) => item.variantId === line.variantId);
+    if (booked) return booked.price;
+    const item = menuItemOf[line.variantId];
+    if (item?.product.kind === "RENTAL") return undefined;
+    const listPrice = item
+      ? Number(item.product.basePrice || 0) + Number(item.priceModifier || 0)
+      : line.menuPrice !== undefined
+        ? Number(line.menuPrice)
+        : undefined;
+    return listPrice === undefined ? undefined : listPrice + modifierExtra(line.selectedModifiers);
+  };
   const billOptions = useBillOptions({
     billKey: endBillOrderId || "none",
     orderId: endBillOrderId,
@@ -402,7 +435,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const endBreakdown = endBillOrderId
     ? billBreakdown({
         lines: chargedLines,
-        menuPrice: () => undefined,
+        menuPrice: menuPriceFor,
         itemsTotal: serverBill ? Number(serverBill.subtotal) + timeNotOnLines : endBillDue,
         billDiscount: serverBill ? Number(serverBill.totalDiscount) : 0,
         serviceCharge: serverBill ? Number(serverBill.serviceCharge) : 0,
@@ -508,8 +541,11 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       );
       if (group.rows.length > 1) return mergedRoomTimeLine(group, printed);
       const modifiers = printedExtras(line);
+      const note = isGivenFree(line) || line.appliedPromotionId
+        ? undefined
+        : linePriceNote(line.unitPrice, menuPriceFor(line));
       return {
-        name: printed,
+        name: note ? t(`cashier.orderPanel.priceNote.${note}`, { name: printed }) : printed,
         quantity: String(group.rows[0].quantity || line.quantity || "1"),
         unitPrice: line.unitPrice?.trim() || undefined,
         modifiers: modifiers.names,
@@ -1694,6 +1730,61 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     for (const line of [...group].reverse()) await removeLine(line, approverToken);
   };
 
+  /**
+   * Saves the cashier's Edit item on a row: the newest lines take the change
+   * first, and one only partly covered is split so the rest keeps its price.
+   */
+  const editRow = async (group: BillLineGroup, edit: LineEdit) => {
+    const orderId = session?.salesOrderId;
+    if (!session || !orderId || billClosed) return;
+    const fee = isFeeLine(group.lines[0]);
+    const unitPrice = (entry: SalesOrderLine) =>
+      fee ? entry.unitPrice || "0.0000" : edit.unitPrice.toFixed(4);
+    const hostessOf = (entry: SalesOrderLine) =>
+      edit.orderedBy === undefined ? entry.hostessId : edit.orderedBy || undefined;
+    const unchanged = (entry: SalesOrderLine) =>
+      Number(unitPrice(entry)) === Number(entry.unitPrice || 0) &&
+      edit.foc === isGivenFree(entry) &&
+      (hostessOf(entry) || null) === (entry.hostessId || null);
+    let left = edit.quantity;
+    const plan: Array<{ entry: SalesOrderLine; take: number }> = [];
+    for (const entry of [...group.lines].reverse()) {
+      if (left <= 0) break;
+      const take = Math.min(left, Number(entry.quantity || 0));
+      if (take > 0) plan.push({ entry, take });
+      left -= take;
+    }
+    setActionError(null);
+    setIsSavingLine(true);
+    try {
+      for (const { entry, take } of plan) {
+        if (unchanged(entry)) continue;
+        const quantity = take.toFixed(4);
+        const target =
+          take < Number(entry.quantity || 0) - 0.00005
+            ? await splitOrderLine(orderId, entry.id, quantity)
+            : entry;
+        const price = unitPrice(target);
+        await updateOrderLine(orderId, target.id, {
+          quantity,
+          unitPrice: price,
+          lineDiscount: edit.foc
+            ? lineFocDiscount({ quantity, unitPrice: price })
+            : isGivenFree(entry)
+              ? "0.0000"
+              : target.lineDiscount || "0.0000",
+          ...(edit.orderedBy !== undefined ? { hostessId: edit.orderedBy } : {}),
+        });
+      }
+      setEditingRow(null);
+    } catch (caught) {
+      setActionError(caught instanceof Error ? caught.message : tr("errors.editLine"));
+    } finally {
+      setIsSavingLine(false);
+      await refreshBill(session);
+    }
+  };
+
   const changeRooms = async (
     change: () => Promise<{ roomId: string }>,
     done: (roomNumber: string) => string
@@ -2578,6 +2669,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             orderers={orderers}
             onOrderedBy={(key, hostess) => setPending((current) => setOrderedBy(current, key, hostess))}
             orderedByName={orderedByName}
+            menuPrice={menuPriceFor}
+            onEditLine={endBillOrderId && !paid ? setEditingRow : undefined}
           />
 
           {step === "menu" && !menuAllowed && isSpa ? (
@@ -2941,6 +3034,43 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           onClose={() => setFloorMode(null)}
         />
       ) : null}
+
+      {editingRow ? (() => {
+        const [line] = editingRow.lines;
+        const isBooked =
+          line.variantId === room?.rateVariantId ||
+          rentalVariantIds.has(line.variantId) ||
+          packageVariantIds.has(line.variantId);
+        const fee = isFeeLine(line);
+        return (
+          <LineEditDialog
+            key={editingRow.key}
+            name={
+              isBooked && !packageVariantIds.has(line.variantId)
+                ? tr("treatmentCharge")
+                : line.productName || itemNames[line.variantId] || tr("item")
+            }
+            options={modifierPrintText(line.selectedModifiers).names}
+            quantity={editingRow.quantity}
+            unitPrice={Number(line.unitPrice || 0)}
+            menuPrice={menuPriceFor(line)}
+            isFoc={isGivenFree(line)}
+            isFee={fee}
+            orderers={
+              fee || isBooked || serviceVariantIds.has(line.variantId) ? undefined : orderers
+            }
+            orderedBy={line.hostessId}
+            canRemove={!isBooked}
+            isBusy={isSavingLine}
+            onSave={(edit) => void editRow(editingRow, edit)}
+            onRemove={() => {
+              setEditingRow(null);
+              void removeLines(editingRow.lines);
+            }}
+            onClose={() => setEditingRow(null)}
+          />
+        );
+      })() : null}
 
       {extraFeeOpen ? (
         <ExtraFeeDialog

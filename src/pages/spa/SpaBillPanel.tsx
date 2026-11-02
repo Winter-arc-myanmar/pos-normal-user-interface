@@ -7,7 +7,8 @@ import type { RoomKind } from "@/core/presentation/hooks/useRoomPos";
 import { useRoomText } from "@/core/presentation/hooks/useRoomText";
 import { getKtvWarning } from "@/lib/ktv/session";
 import { estimateCardCharge } from "@/lib/spa/payment";
-import { groupBillLines } from "@/lib/spa/billLines";
+import { BillLineGroup, groupBillLines, isGivenFree } from "@/lib/spa/billLines";
+import { linePriceNote } from "@/lib/pos/linePrice";
 import { bookedSessions } from "@/lib/spa/session";
 import {
   focPending,
@@ -66,6 +67,8 @@ export function SpaBillPanel({
   orderers = [],
   onOrderedBy,
   orderedByName = () => undefined,
+  menuPrice = () => undefined,
+  onEditLine,
 }: {
   kind?: RoomKind;
   room: SpaRoom | null;
@@ -121,6 +124,10 @@ export function SpaBillPanel({
   onOrderedBy?: (key: string, hostess?: { id: string; name: string }) => void;
   /** The hostess who ordered a menu line, when one did. */
   orderedByName?: (line: SalesOrderLine) => string | undefined;
+  /** What the menu charges for one of a line, to show a price changed on this bill. */
+  menuPrice?: (line: SalesOrderLine) => number | undefined;
+  /** A bill paid at the end: change a row's price, FOC or who ordered it, as on the cashier. */
+  onEditLine?: (group: BillLineGroup) => void;
 }) {
   const tr = useRoomText(kind);
   const { t } = useTranslation();
@@ -274,7 +281,16 @@ export function SpaBillPanel({
               line.variantId === room?.rateVariantId ||
               Boolean(rentalVariantIds?.has(line.variantId));
             const isTreatment = isRoomTime || isPackage;
-            const isFoc = Boolean(line.compReasonId);
+            const isFoc = isGivenFree(line);
+            const listPrice = menuPrice(line);
+            const priceNote =
+              isFoc || promotedLine ? undefined : linePriceNote(line.unitPrice, listPrice);
+            const lineName =
+              isTreatment && !isPackage
+                ? tr("treatmentCharge")
+                : line.productName || itemNames[line.variantId] || tr("item");
+            // Time a promotion gave free is the promotion's; changing it would charge it.
+            const canEdit = Boolean(onEditLine) && !billClosed && !(isRoomTime && promotedLine);
             // What one of the row is charged: a copy a promotion gave away, or one
             // given free, reads 0 here instead of the menu or session price.
             const chargedUnit =
@@ -298,12 +314,22 @@ export function SpaBillPanel({
                         {tr("promo")}
                       </span>
                     ) : null}
-                    {isTreatment && !isPackage
-                      ? tr("treatmentCharge")
-                      : line.productName || itemNames[line.variantId] || tr("item")}
+                    {priceNote
+                      ? t(`cashier.orderPanel.priceNote.${priceNote}`, { name: lineName })
+                      : lineName}
                   </p>
                   <p className="text-xs text-slate-500">
                     {money(chargedUnit)}
+                    {priceNote ? (
+                      <span
+                        className="ml-1 text-slate-600 line-through"
+                        aria-label={t("cashier.orderPanel.menuPriceWas", {
+                          amount: money(listPrice),
+                        })}
+                      >
+                        {money(listPrice)}
+                      </span>
+                    ) : null}
                     {promotedLine && promotionName(promotedLine.appliedPromotionId)
                       ? ` · ${promotionName(promotedLine.appliedPromotionId)}`
                       : ""}
@@ -366,6 +392,17 @@ export function SpaBillPanel({
                     <span className="ml-1 text-xs text-slate-500">✓</span>
                   ) : null}
                 </span>
+                {canEdit ? (
+                  <button
+                    type="button"
+                    aria-label={t("cashier.orderPanel.editItem", { name: lineName })}
+                    className="h-7 w-6 shrink-0 rounded text-slate-400 hover:bg-slate-800 hover:text-blue-300 disabled:opacity-40"
+                    disabled={isBusy}
+                    onClick={() => onEditLine?.(group)}
+                  >
+                    ✎
+                  </button>
+                ) : null}
                 {editable ? (
                   <button
                     type="button"

@@ -231,4 +231,75 @@ describe("SpaBillPanel actions", () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/^0 · 1 hour \+ 1 free$/)).toBeInTheDocument();
   });
+
+  it("lets every row of a bill paid at the end be edited, room time too, and marks a changed price", () => {
+    const onEditLine = vi.fn();
+    renderPanel({
+      room: new SpaRoom({
+        id: "room-102",
+        roomNumber: "102",
+        name: "VIP 102",
+        minimumMinutes: 60,
+        status: "OCCUPIED",
+        rateVariantId: "variant-hour",
+        sessionPrice: "40000.0000",
+      }),
+      rentalVariantIds: new Set(["variant-hour"]),
+      lines: [
+        new SalesOrderLine({
+          id: "line-hour",
+          salesOrderId: "order-1",
+          variantId: "variant-hour",
+          quantity: "2.0000",
+          unitPrice: "35000.0000",
+        }),
+        new SalesOrderLine({
+          id: "line-beer",
+          salesOrderId: "order-1",
+          variantId: "variant-beer",
+          productName: "Myanmar Beer",
+          quantity: "1.0000",
+          unitPrice: "3000.0000",
+        }),
+      ],
+      menuPrice: (line: SalesOrderLine) => (line.variantId === "variant-beer" ? 4000 : undefined),
+      onEditLine,
+    });
+
+    const edits = screen.getAllByRole("button", { name: "cashier.orderPanel.editItem" });
+    expect(edits).toHaveLength(2);
+    expect(screen.getByText("cashier.orderPanel.priceNote.discount")).toBeInTheDocument();
+    fireEvent.click(edits[0]);
+    expect(onEditLine).toHaveBeenCalledWith(
+      expect.objectContaining({ quantity: 2, lines: [expect.objectContaining({ id: "line-hour" })] })
+    );
+  });
+
+  it("keeps the time a promotion gave free out of Edit item", () => {
+    renderPanel({
+      room: new SpaRoom({
+        id: "room-102",
+        roomNumber: "102",
+        name: "VIP 102",
+        minimumMinutes: 60,
+        status: "OCCUPIED",
+        rateVariantId: "variant-hour",
+        sessionPrice: "40000.0000",
+      }),
+      lines: [
+        new SalesOrderLine({
+          id: "line-free",
+          salesOrderId: "order-1",
+          variantId: "variant-hour",
+          quantity: "1.0000",
+          unitPrice: "40000.0000",
+          lineDiscount: "40000.0000",
+          appliedPromotionId: "bogo-hours",
+        }),
+      ],
+      onEditLine: vi.fn(),
+    });
+
+    expect(screen.queryByRole("button", { name: "cashier.orderPanel.editItem" })).toBeNull();
+  });
 });

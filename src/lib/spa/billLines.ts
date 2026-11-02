@@ -1,4 +1,5 @@
 import { SalesOrderLine } from "@/core/domain/entities/Cashier";
+import { isFocLine } from "@/lib/pos/checkoutAdjustments";
 
 export interface BillLineGroup {
   key: string;
@@ -15,6 +16,10 @@ const lineTotal = (line: SalesOrderLine) =>
 const isPromotionFree = (line: SalesOrderLine) =>
   Boolean(line.appliedPromotionId) && lineTotal(line) <= 0.005;
 
+/** Given free (FOC) by the staff, rather than by a promotion. */
+export const isGivenFree = (line: SalesOrderLine) =>
+  isFocLine(line) && !line.appliedPromotionId;
+
 /**
  * Every order sent from a room is saved as lines of its own, so a second round of
  * the same drink is a second line. On the bill they read as one row; only lines
@@ -28,7 +33,7 @@ export function groupBillLines(lines: SalesOrderLine[]): BillLineGroup[] {
       line.variantId,
       Number(line.unitPrice || 0),
       line.hostessId ?? "",
-      line.compReasonId ? "foc" : "",
+      line.compReasonId || isGivenFree(line) ? "foc" : "",
       line.appliedPromotionId ?? "",
       isPromotionFree(line) ? "promo-free" : "",
       line.productName ?? "",
