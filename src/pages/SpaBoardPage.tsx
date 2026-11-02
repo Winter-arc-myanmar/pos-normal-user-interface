@@ -494,6 +494,23 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       prices: [modifiers.prices, "-"].filter(Boolean).join(", "),
     };
   };
+  /** The bill's rows as the slip prints them: one row per item, as the bill shows it. */
+  const receiptLines = (printedLines: SalesOrderLine[]) => {
+    const name = slipNamer(printedLines);
+    return slipRows(printedLines).map(({ line, quantity }) => {
+      const modifiers = printedExtras(line);
+      return {
+        name: name(
+          line,
+          lineDisplayName(line) || line.productName || itemNames[line.variantId] || tr("item")
+        ),
+        quantity: String(quantity || line.quantity || "1"),
+        unitPrice: line.unitPrice?.trim() || undefined,
+        modifiers: modifiers.names,
+        modifierPrices: modifiers.prices,
+      };
+    });
+  };
   // Before the room starts, the packages it starts with; once it runs, the ones added.
   const booking = session ? extendChoice : packageChoice;
   // KTV: the rentals this room can be sold under; the room's own rate unless another is picked.
@@ -1474,7 +1491,6 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       await fetchBoard();
       try {
         const printedLines = orderLines.filter((line) => !line.voidedAt);
-        const slipName = slipNamer(printedLines);
         // The bill as the till has it now (the room's time lands on it at close),
         // so the slip's money rows add up to the total it prints.
         const bill = session.salesOrderId ? await readBill(session.salesOrderId) : serverBill;
@@ -1494,19 +1510,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           endTime: formatDateTime(final.asOf || new Date().toISOString()),
           startTimeLabel: t("receipt.startTime"),
           endTimeLabel: t("receipt.endTime"),
-          lines: slipRows(printedLines).map(({ line, quantity }) => {
-              const modifiers = printedExtras(line);
-              return {
-                name: slipName(
-                  line,
-                  lineDisplayName(line) || line.productName || itemNames[line.variantId] || tr("item")
-                ),
-                quantity: String(quantity || line.quantity || "1"),
-                unitPrice: line.unitPrice?.trim() || undefined,
-                modifiers: modifiers.names,
-                modifierPrices: modifiers.prices,
-              };
-            }),
+          lines: receiptLines(printedLines),
           ...totals,
           amounts: tipReceiptRow,
           total: String(final.paidTotal || final.runningTotal || "0"),
@@ -1720,6 +1724,48 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   };
 
   /**
+   * The guest's bill before it is paid: what it owes right now, not how it was
+   * settled. Printed when the customer asks to check the bill.
+   */
+  const printCheckBill = async () => {
+    if (!session) return;
+    try {
+      const printedLines = orderLines.filter((line) => !line.voidedAt);
+      const bill = session.salesOrderId ? await readBill(session.salesOrderId) : serverBill;
+      const totals = receiptTotals(bill, printedLines);
+      // Clock time the close has not written to the bill yet is still owed, so the
+      // check bill counts it in the items and in the receivable.
+      const items = bill ? Number(totals.subtotal || 0) + timeNotOnLines : undefined;
+      const due = bill
+        ? Number(bill.grandTotal) + timeNotOnLines
+        : Number(quote?.amountDue || quote?.runningTotal || 0);
+      await printer.printReceipt({
+        title: tr("checkBill"),
+        place: "CHECKOUT",
+        showLogo: true,
+        showPrices: true,
+        receiptId: quote?.orderNumber || undefined,
+        cashier: cashierLabel(user),
+        serviceType: kind === "ktv" ? "KTV" : "SPA",
+        tableOrRoom: room?.roomNumber || quote?.roomNumber,
+        startTime: formatDateTime(session.openedAt),
+        endTime: formatDateTime(new Date().toISOString()),
+        startTimeLabel: t("receipt.startTime"),
+        endTimeLabel: t("receipt.endTime"),
+        lines: receiptLines(printedLines),
+        ...(items !== undefined ? { subtotal: items.toFixed(4) } : {}),
+        ...(totals.discount ? { discount: totals.discount } : {}),
+        ...(totals.tax ? { tax: totals.tax } : {}),
+        ...(totals.serviceCharge ? { serviceCharge: totals.serviceCharge } : {}),
+        totalLabel: tr("receivable"),
+        total: due.toFixed(4),
+      });
+    } catch (printError) {
+      toast.error(printError instanceof Error ? printError.message : t("receipt.printFailed"));
+    }
+  };
+
+  /**
    * One row per method the guest paid with, so a bill split between a wallet and
    * cash reads "KBZ pay 100,000" then "Cash 20,000" instead of one joined line.
    */
@@ -1731,7 +1777,6 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     if (!session) return;
     try {
       const printedLines = orderLines.filter((line) => !line.voidedAt);
-      const slipName = slipNamer(printedLines);
       // The bill as it stands after the settle, as the cashier prints it.
       const bill = session.salesOrderId ? await readBill(session.salesOrderId) : serverBill;
       const totals = receiptTotals(bill, printedLines);
@@ -1750,19 +1795,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         endTime: formatDateTime(endAt),
         startTimeLabel: t("receipt.startTime"),
         endTimeLabel: t("receipt.endTime"),
-        lines: slipRows(printedLines).map(({ line, quantity }) => {
-            const modifiers = printedExtras(line);
-            return {
-              name: slipName(
-                line,
-                lineDisplayName(line) || line.productName || itemNames[line.variantId] || tr("item")
-              ),
-              quantity: String(quantity || line.quantity || "1"),
-              unitPrice: line.unitPrice?.trim() || undefined,
-              modifiers: modifiers.names,
-              modifierPrices: modifiers.prices,
-            };
-          }),
+        lines: receiptLines(printedLines),
         ...totals,
         amounts: tipReceiptRow,
         total: result.grandTotal,
@@ -2513,6 +2546,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               setShowExtend(true);
             }}
             onTogglePause={() => void togglePause()}
+            onPrintBill={!paid ? () => void printCheckBill() : undefined}
             onOpenBill={endBillOrderId ? () => setBillOptionsOpen(true) : undefined}
             onMoveRoom={!paid ? () => setFloorMode("move") : undefined}
             onSplitRoom={endBillOrderId && !paid ? () => setFloorMode("split") : undefined}
@@ -3258,6 +3292,14 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               </div>
             ) : null}
             <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant="secondary"
+                className="col-span-2"
+                disabled={isPaying}
+                onClick={() => void printCheckBill()}
+              >
+                {tr("printBill")}
+              </Button>
               <Button variant="secondary" onClick={() => setConfirmEnd(false)}>
                 {t("common.cancel")}
               </Button>

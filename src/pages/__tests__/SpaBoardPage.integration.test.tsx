@@ -991,6 +991,43 @@ describe("SpaBoardPage", () => {
       );
     });
 
+    it("prints the guest a check bill with what is still receivable", async () => {
+      mocks.fetchOrderBill.mockResolvedValue({
+        orderId: "order-1",
+        // 47,800 − 0 + 5,300 service + 2,900 tax = 56,000 on the bill.
+        subtotal: "47800.0000",
+        totalDiscount: "0.0000",
+        addedTax: "2500.0000",
+        totalTax: "2900.0000",
+        serviceCharge: "5300.0000",
+        serviceChargeTax: "400.0000",
+        grandTotal: "56000.0000",
+      });
+      await openRunningRoom();
+      fireEvent.click(screen.getByRole("button", { name: "spa.goToPay" }));
+      fireEvent.click(await screen.findByRole("button", { name: "spa.printBill" }));
+
+      await waitFor(() =>
+        expect(mocks.printReceipt).toHaveBeenCalledWith(
+          expect.objectContaining({
+            title: "spa.checkBill",
+            totalLabel: "spa.receivable",
+            // 47,800 on the bill + the 53,000 of clock time the close has not
+            // written to it yet; that time is still owed, so it is in the total.
+            subtotal: "100800.0000",
+            tax: "2900.0000",
+            serviceCharge: "5300.0000",
+            total: "109000.0000",
+          })
+        )
+      );
+      // A bill not yet paid shows what is owed, not how it will be paid.
+      const slip = mocks.printReceipt.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+      expect(slip).not.toHaveProperty("payments");
+      expect(slip).not.toHaveProperty("change");
+      expect(slip.sale).toBeUndefined();
+    });
+
     it("moves the guests to a free room", async () => {
       rooms = [
         room("wallet-1"),

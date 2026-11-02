@@ -41,6 +41,7 @@ export function SpaBillPanel({
   onPrimary,
   primaryLabel,
   onTogglePause,
+  onPrintBill,
   onOpenBill,
   onMoveRoom,
   onSplitRoom,
@@ -84,6 +85,8 @@ export function SpaBillPanel({
   primaryLabel: string;
   /** Restarts the clock of a room paused before pausing was taken away. */
   onTogglePause: () => void;
+  /** Prints the guest's bill as it stands, before it is settled. */
+  onPrintBill?: () => void;
   /** Adjusts the bill as a whole (tax, service charge, discount, tip), as on the cashier. */
   onOpenBill?: () => void;
   /** Move the visit to a free room. */
@@ -139,7 +142,8 @@ export function SpaBillPanel({
   // Bill & table joins the row whenever the bill can still be adjusted; Extend
   // only when the room's time is bought rather than metered. Rooms are no longer
   // paused; one paused before that can still be resumed.
-  const actionCount = (isPaused ? 1 : 0) + (onOpenBill ? 1 : 0) + (canExtend ? 1 : 0) + 1;
+  const actionCount =
+    (isPaused ? 1 : 0) + (onOpenBill ? 1 : 0) + (canExtend ? 1 : 0) + (onPrintBill ? 1 : 0) + 1;
   const actionGrid =
     actionCount >= 4 ? "grid-cols-4" : actionCount === 3 ? "grid-cols-3" : "grid-cols-2";
   const visibleLines = groupBillLines(
@@ -624,6 +628,16 @@ export function SpaBillPanel({
               onClick={onExtend}
             >
               {tr("extend")}
+            </Button>
+          ) : null}
+          {onPrintBill ? (
+            <Button
+              variant="secondary"
+              className="min-w-0 px-2 leading-tight"
+              disabled={isBusy}
+              onClick={onPrintBill}
+            >
+              {tr("printBill")}
             </Button>
           ) : null}
           <Button
