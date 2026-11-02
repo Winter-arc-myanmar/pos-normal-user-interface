@@ -437,7 +437,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         lines: chargedLines,
         menuPrice: menuPriceFor,
         itemsTotal: serverBill ? Number(serverBill.subtotal) + timeNotOnLines : endBillDue,
-        billDiscount: serverBill ? Number(serverBill.totalDiscount) : 0,
+        // The server's total discount holds the items' own (FOC, item discounts) too.
+        billDiscount: Number(billDiscount) || 0,
         serviceCharge: serverBill ? Number(serverBill.serviceCharge) : 0,
         tax: serverBill ? Number(serverBill.addedTax) + Number(serverBill.serviceChargeTax) : 0,
         includedTax: serverBill
@@ -2311,6 +2312,11 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <LanguageSwitcher />
+          {/* Tablet-order printing sits here, not over the bill: the board has no side rail. */}
+          <div
+            id="pos-tablet-print-settings"
+            className="relative [&_details>label]:absolute [&_details>label]:right-0 [&_details>label]:top-full [&_details>label]:z-50 [&_details>label]:mt-1 [&_details>label]:w-60 [&_details>label]:rounded [&_details>label]:border [&_details>label]:border-white/10 [&_details>label]:bg-slate-900"
+          />
           {step !== "rooms" && !(step === "pay" && billClosed) && !paid ? (
             <Button variant="secondary" onClick={goBack}>
               {step === "pay" ? t("cardTopup.back") : tr("backToBoard")}

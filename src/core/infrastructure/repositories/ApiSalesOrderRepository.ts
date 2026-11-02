@@ -393,6 +393,7 @@ const normalizePartialLinePayload = (
   }
   if (payload.courseType !== undefined) normalized.courseType = payload.courseType;
   if (payload.seatNumber !== undefined) normalized.seatNumber = payload.seatNumber;
+  if (payload.hostessId !== undefined) normalized.hostessId = payload.hostessId;
   if (payload.selectedModifiers !== undefined) {
     normalized.selectedModifiers = payload.selectedModifiers.map((modifier) => ({
       ...modifier,
