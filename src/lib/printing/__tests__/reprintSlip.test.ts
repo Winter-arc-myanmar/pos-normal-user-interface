@@ -148,7 +148,8 @@ describe("reprintSlip", () => {
     expect(slip.subtotal).toBeUndefined();
     expect(slip.payments).toBeUndefined();
     expect(slip.lines.map((item) => item.modifiers)).toEqual([undefined, "Mya", undefined]);
-    expect(slip.lines[0].name).toBe("room (4:15 - 6:15)");
+    // A KTV room is sold by the hour: the slip says how many the guest used.
+    expect(slip.lines[0].name).toBe("room (2h) (4:15 - 6:15)");
   });
 
   it("prints a room booked and then extended as one row", () => {
@@ -168,7 +169,7 @@ describe("reprintSlip", () => {
     );
 
     expect(slip.lines.map((item) => [item.name, item.quantity, item.unitPrice])).toEqual([
-      ["room (3:30 - 5:30)", "2", "40000.0000"],
+      ["room (2h) (3:30 - 5:30)", "2", "40000.0000"],
       ["jager", "1", "3000.0000"],
     ]);
   });

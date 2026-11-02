@@ -6,6 +6,7 @@ import {
   isRoomTimeLine,
   manualTimesBackwards,
   roomTimeNamer,
+  slipSessionCount,
   slipTimeRange,
   toLocalInput,
 } from "../manualTimes";
@@ -44,6 +45,16 @@ describe("manual In and Out", () => {
     expect(slipTimeRange(at(16, 15), undefined)).toBeUndefined();
   });
 
+  it("counts the hours a room was used, short enough to fit the row", () => {
+    expect(slipSessionCount(at(9, 33), at(12, 3))).toBe("2.5h");
+    expect(slipSessionCount(at(16, 15), at(18, 15))).toBe("2h");
+    expect(slipSessionCount(at(16, 15), at(17, 15))).toBe("1h");
+    expect(slipSessionCount(at(16, 15), at(16, 45))).toBe("0.5h");
+    expect(slipSessionCount(at(16, 15), undefined)).toBeUndefined();
+    // An Out before the In has no time in it.
+    expect(slipSessionCount(at(18, 15), at(16, 15))).toBeUndefined();
+  });
+
   it("puts them beside the first room charge only", () => {
     const lines = [
       line("beer", { categoryName: "Drinks" }),
@@ -56,5 +67,14 @@ describe("manual In and Out", () => {
     expect(isRoomTimeLine(lines[2])).toBe(true);
     expect(isRoomTimeLine(lines[0])).toBe(false);
     expect(roomTimeNamer(lines, undefined)(lines[1], "room")).toBe("room");
+  });
+
+  it("prints how many hours before the In and Out", () => {
+    const lines = [line("room", { categoryName: "KTV Rooms", courseType: "Hours · Standard" })];
+    const name = roomTimeNamer(lines, "9:33 - 12:03", "2.5h");
+
+    expect(name(lines[0], "KTV Room R-01")).toBe("KTV Room R-01 (2.5h) (9:33 - 12:03)");
+    // Hours without a range still print.
+    expect(roomTimeNamer(lines, undefined, "2.5h")(lines[0], "room")).toBe("room (2.5h)");
   });
 });

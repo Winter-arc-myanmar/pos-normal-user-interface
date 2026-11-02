@@ -102,6 +102,7 @@ import {
   ManualTimes,
   manualTimesBackwards,
   roomTimeNamer,
+  slipSessionCount,
   slipTimeRange,
 } from "@/lib/spa/manualTimes";
 import { slipRows } from "@/lib/spa/billLines";
@@ -308,11 +309,16 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     manualInAt: fromLocalInput(manualTimes.inAt),
     manualOutAt: fromLocalInput(manualTimes.outAt),
   });
-  const slipNamer = (lines: SalesOrderLine[]) =>
-    roomTimeNamer(
+  const slipNamer = (lines: SalesOrderLine[]) => {
+    const inAt = fromLocalInput(manualTimes.inAt);
+    const outAt = fromLocalInput(manualTimes.outAt);
+    return roomTimeNamer(
       lines,
-      slipTimeRange(fromLocalInput(manualTimes.inAt), fromLocalInput(manualTimes.outAt))
+      slipTimeRange(inAt, outAt),
+      // A KTV room is sold by the hour, so the slip says how many it was.
+      isSpa ? undefined : slipSessionCount(inAt, outAt)
     );
+  };
   const timesBackwards = !billClosed && manualTimesBackwards(manualTimes);
   const manualTimesFields =
     session && !billClosed ? (

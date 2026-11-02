@@ -61,6 +61,21 @@ const clock = (iso: string) => {
 export const slipTimeRange = (inAt?: string | null, outAt?: string | null): string | undefined =>
   inAt && outAt ? `${clock(inAt)} - ${clock(outAt)}` : undefined;
 
+/**
+ * The time the guest had, as a KTV room's slip counts it: "2.5h". The room is
+ * sold by the hour and the row has to fit one line, so it prints short.
+ */
+export const slipSessionCount = (
+  inAt?: string | null,
+  outAt?: string | null
+): string | undefined => {
+  if (!inAt || !outAt) return undefined;
+  const minutes = (new Date(outAt).getTime() - new Date(inAt).getTime()) / 60_000;
+  if (!Number.isFinite(minutes) || minutes <= 0) return undefined;
+  const hours = Math.round((minutes / 60) * 100) / 100;
+  return `${hours.toLocaleString("en-US", { maximumFractionDigits: 2 })}h`;
+};
+
 export const isRoomTimeLine = (line: Pick<SalesOrderLine, "categoryName" | "courseType">) =>
   ROOM_CATEGORIES.includes(line.categoryName || "") || ROOM_COURSE.test(line.courseType || "");
 
@@ -69,11 +84,19 @@ export const isKtvRoomTimeLine = (line: Pick<SalesOrderLine, "categoryName">) =>
   KTV_ROOM_CATEGORIES.includes(line.categoryName || "");
 
 /**
- * The name a line prints with: the first room-time line carries the guest's In
- * and Out after it, "VIP Lounge 111 (4:15 - 6:15)"; every other line as it is.
+ * The name a line prints with: the first room-time line carries the time the
+ * guest had after it, "VIP Lounge 111 (2.5h) (4:15 - 6:15)", and every other
+ * line as it is.
  */
-export const roomTimeNamer = (lines: SalesOrderLine[], range?: string) => {
-  const first = range ? lines.find(isRoomTimeLine)?.id : undefined;
+export const roomTimeNamer = (
+  lines: SalesOrderLine[],
+  range?: string,
+  sessions?: string
+) => {
+  const room = range || sessions ? lines.find(isRoomTimeLine) : undefined;
+  const notes: string[] = [];
+  if (sessions) notes.push(`(${sessions})`);
+  if (range) notes.push(`(${range})`);
   return (line: SalesOrderLine, name: string) =>
-    first && line.id === first ? `${name} (${range})` : name;
+    room && line.id === room.id && notes.length ? `${name} ${notes.join(" ")}` : name;
 };
