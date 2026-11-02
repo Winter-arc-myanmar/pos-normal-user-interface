@@ -6,6 +6,7 @@ import { givenAwayAmount, linePromotionSaving } from "@/lib/pos/promotions";
 import type { PrintLine, SaleReceipt } from "./formatKdsTicket";
 import { sessionPrintTimes } from "./formatKdsTicket";
 import { modifierPrintText } from "./modifierText";
+import { slipRows } from "@/lib/spa/billLines";
 import { roomTimeNamer, slipTimeRange } from "@/lib/spa/manualTimes";
 
 /** The words a slip prints, in the till's language, as the original slip used them. */
@@ -129,11 +130,11 @@ export function reprintSlip(input: ReprintInput): SaleReceipt {
       endTime: input.formatDateTime(room.closedAt || order.updatedAt),
       startTimeLabel: text.startTime,
       endTimeLabel: text.endTime,
-      lines: kept.map((line) => {
+      lines: slipRows(kept).map(({ line, quantity }) => {
         const modifiers = withNote(modifierPrintText(line.selectedModifiers), hostessNote(line));
         return {
           name: named(line, lineDisplayName(line) || line.productName || text.item),
-          quantity: String(line.quantity || "1"),
+          quantity: String(quantity || line.quantity || "1"),
           unitPrice: line.unitPrice?.trim() || undefined,
           modifiers: modifiers.names,
           modifierPrices: modifiers.prices,
