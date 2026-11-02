@@ -2146,6 +2146,19 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     else requestCard("pay");
   };
 
+  /**
+   * Closing the room order's menu leaves it for the board, which lists the room
+   * again. Items still in the tray would go with it, so say so instead.
+   */
+  const closeRoomOrder = () => {
+    if (pending.length) {
+      setActionError(tr("errors.pendingItems"));
+      return;
+    }
+    void fetchBoard();
+    backToBoard();
+  };
+
   const handleSaveRoom = async (event: FormEvent) => {
     event.preventDefault();
     if (!activeLocationId) return;
@@ -2625,7 +2638,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                   orderedProductQuantities={pendingByProduct}
                   onLoadVariants={fetchProductVariants}
                   onAdd={handleAddProduct}
-                  onClose={goToPay}
+                  onClose={closeRoomOrder}
                 />
               </div>
             </div>

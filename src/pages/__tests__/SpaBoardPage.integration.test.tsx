@@ -1150,6 +1150,20 @@ describe("SpaBoardPage", () => {
       );
     });
 
+    it("goes back to the room board when the room order's menu is closed", async () => {
+      await openRunningRoom();
+      // The menu's Close leaves the room order for the board.
+      fireEvent.click(
+        screen.getByRole("button", { name: "cashier.productMenu.close" })
+      );
+
+      expect(await screen.findByRole("button", { name: /SUITE1/ })).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "cashier.productMenu.close" })
+      ).not.toBeInTheDocument();
+      await waitFor(() => expect(mocks.fetchBoard).toHaveBeenCalled());
+    });
+
     it("splits the bill between cash and the guest card, without tax", async () => {
       mocks.closeSession.mockImplementation(async () => {
         roomClosed = true;
