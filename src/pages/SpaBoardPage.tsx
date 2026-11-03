@@ -1184,10 +1184,13 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           sentBy: cashierLabel(user),
           lines: printed.map((line) => {
             const modifiers = modifierPrintText(line.selectedModifiers);
+            const menuItem = menuItemOf[line.variantId];
             return {
               name: lineDisplayName(line) || line.productName || tr("item"),
               quantity: String(line.quantity || "1"),
-              categoryId: line.categoryId,
+              // The line the server kept carries no category id, so the station
+              // is named from the menu; without it there is nothing to route.
+              categoryId: line.categoryId || menuItem?.product.categoryId,
               modifiers: modifiers.names,
               modifierPrices: modifiers.prices,
               // The line prints the same name, marked as gone.
@@ -1203,14 +1206,9 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         })),
         { requireStationRouting: true }
       );
+      // A line no station routes never reached the kitchen, so there is nothing
+      // to call back; a station with no printer bound here is worth saying.
       const problems: string[] = [];
-      if (plan.unrouted.length) {
-        problems.push(
-          t("cashier.errors.kdsUnrouted", {
-            items: plan.unrouted.map((line) => line.name).join(", "),
-          })
-        );
-      }
       if (plan.missingPrinterRoutes.length) {
         problems.push(
           t("cashier.errors.kdsPrinterUnavailable", {
