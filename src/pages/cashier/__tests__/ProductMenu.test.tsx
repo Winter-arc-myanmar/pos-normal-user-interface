@@ -377,6 +377,35 @@ describe("ProductMenu", () => {
     expect(onLoadProduct).not.toHaveBeenCalled();
   });
 
+  it("does not ask when the payload says the product has no options", async () => {
+    const onLoadProduct = vi.fn();
+    const plain = new Product({
+      id: "product-7",
+      tenantId: "t1",
+      name: "Water",
+      basePrice: "500.0000",
+      modifierGroups: [],
+    });
+
+    render(
+      <ProductMenu
+        products={[plain]}
+        variantsByProductId={{ "product-7": [new ProductVariant({ id: "v7", productId: "product-7" })] }}
+        onLoadVariants={vi.fn()}
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+        onClose={vi.fn()}
+        offerOptions
+        onLoadProduct={onLoadProduct}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Water/ }));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+    );
+    expect(onLoadProduct).not.toHaveBeenCalled();
+  });
+
   it("asks for a required group before adding", async () => {
     const onAdd = vi.fn().mockResolvedValue(undefined);
     const tea = new Product({
