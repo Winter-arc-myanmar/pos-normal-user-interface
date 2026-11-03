@@ -1,9 +1,12 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/core/presentation/hooks/useAuth";
+import { useKdsDeleteSlipShopSetting } from "@/core/presentation/hooks/useKdsDeleteSlipShopSetting";
+import { useKdsStationManagement } from "@/core/presentation/hooks/useKdsStationManagement";
 import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
 import { useDateFormatter } from "@/lib/i18n/formatters";
 import { lineDisplayName } from "@/lib/pos/orderListDisplay";
+import { isPendingKdsLine } from "@/lib/pos/kdsLines";
 import { useLocation, useNavigate } from "react-router-dom";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Button } from "@/components/ui/Button";
@@ -217,6 +220,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     activePosRegisterId,
     activeLocationId
   );
+  const { listStations } = useKdsStationManagement();
+  const kdsDeleteSlip = useKdsDeleteSlipShopSetting();
 
   const [step, setStep] = useState<SpaStep>("rooms");
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -1140,6 +1145,74 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   };
 
   /**
+   * Tells the kitchen to stop making lines the room no longer has: a DELETE slip
+   * on each line's station printer, when the shop prints them. Nothing prints for
+   * a line the kitchen never got, and a print problem never undoes the removal.
+   * Returns what the shop should be told, or null when all printed.
+   */
+  const printKdsDelete = async (removed: SalesOrderLine[]) => {
+    if (!kdsDeleteSlip.enabled) return null;
+    const printed = removed.filter((line) => !isPendingKdsLine(line));
+    if (!printed.length) return null;
+    const title = t("cashier.orderPanel.kdsDeleteTitle");
+    try {
+      const listed = activeLocationId
+        ? await listStations({ page: 1, limit: 100, locationId: activeLocationId })
+        : { stations: [] };
+      // With no station there is no printer to tell, so the removal stays quiet.
+      if (!listed.stations.length) return null;
+      const plan = await printer.printKitchen(
+        {
+          title,
+          firedAt: new Date().toISOString(),
+          orderRef: quote?.orderNumber || undefined,
+          place: `${kind === "ktv" ? "KTV" : "SPA"} ${room?.roomNumber || ""}`.trim(),
+          sentBy: cashierLabel(user),
+          lines: printed.map((line) => {
+            const modifiers = modifierPrintText(line.selectedModifiers);
+            return {
+              name: lineDisplayName(line) || line.productName || tr("item"),
+              quantity: String(line.quantity || "1"),
+              categoryId: line.categoryId,
+              modifiers: modifiers.names,
+              modifierPrices: modifiers.prices,
+              // The line prints the same name, marked as gone.
+              remarks: title,
+            };
+          }),
+        },
+        listed.stations.map((station) => ({
+          id: station.id,
+          name: station.name,
+          printerIds: station.printerIds,
+          categoryIds: station.routingRules.categoryIds,
+        })),
+        { requireStationRouting: true }
+      );
+      const problems: string[] = [];
+      if (plan.unrouted.length) {
+        problems.push(
+          t("cashier.errors.kdsUnrouted", {
+            items: plan.unrouted.map((line) => line.name).join(", "),
+          })
+        );
+      }
+      if (plan.missingPrinterRoutes.length) {
+        problems.push(
+          t("cashier.errors.kdsPrinterUnavailable", {
+            stations: plan.missingPrinterRoutes
+              .map((route) => route.stationName)
+              .join(", "),
+          })
+        );
+      }
+      return problems.length ? problems.join(" ") : null;
+    } catch (error) {
+      return error instanceof Error ? error.message : t("cashier.errors.kdsFailed");
+    }
+  };
+
+  /**
    * The rest of a multi-rate booking. The room opens (or is extended) on its first
    * rate; the other rates the party bought go on as more time, charged the same way
    * and on their own idempotency keys so no charge is swallowed as a repeat.
@@ -1675,8 +1748,13 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     const next = Number(target.quantity || 0) - 1;
     setActionError(null);
     try {
-      if (next <= 0) await deleteOrderLine(session.salesOrderId, target.id);
-      else await updateOrderLine(session.salesOrderId, target.id, { quantity: next.toFixed(4) });
+      if (next <= 0) {
+        await deleteOrderLine(session.salesOrderId, target.id);
+        const problem = await printKdsDelete([target]);
+        if (problem) setActionError(problem);
+      } else {
+        await updateOrderLine(session.salesOrderId, target.id, { quantity: next.toFixed(4) });
+      }
       await refreshBill(session);
     } catch (caught) {
       setActionError(caught instanceof Error ? caught.message : tr("errors.editLine"));
@@ -1723,6 +1801,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       for (const source of sources) await deleteOrderLine(session.salesOrderId, source.id);
       await refreshBill(session);
       setNotice(tr("lineRemoved"));
+      const problem = await printKdsDelete(sources);
+      if (problem) setActionError(problem);
     } catch (caught) {
       setActionError(caught instanceof Error ? caught.message : tr("errors.editLine"));
     }

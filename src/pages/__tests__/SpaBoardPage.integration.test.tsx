@@ -58,6 +58,8 @@ const mocks = vi.hoisted(() => ({
   requireCashierContext: vi.fn(),
   printReceipt: vi.fn(),
   printTicket: vi.fn(),
+  printKitchen: vi.fn(),
+  listStations: vi.fn(),
   listKdsTickets: vi.fn(),
   noop: vi.fn(),
   moveRoom: vi.fn(),
@@ -298,9 +300,25 @@ vi.mock("@/core/presentation/hooks/usePosWorkspace", () => ({
 vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
   usePrinterConnection: () => ({
     printReceipt: mocks.printReceipt,
-    printKitchen: vi.fn(),
+    printKitchen: mocks.printKitchen,
     printTicket: mocks.printTicket,
     error: null,
+  }),
+}));
+
+vi.mock("@/core/presentation/hooks/useKdsStationManagement", () => ({
+  useKdsStationManagement: () => ({
+    listStations: mocks.listStations,
+  }),
+}));
+
+vi.mock("@/core/presentation/hooks/useKdsDeleteSlipShopSetting", () => ({
+  useKdsDeleteSlipShopSetting: () => ({
+    enabled: true,
+    canWrite: false,
+    isSaving: false,
+    error: null,
+    save: vi.fn(),
   }),
 }));
 
@@ -367,6 +385,10 @@ describe("SpaBoardPage", () => {
     });
     mocks.printReceipt.mockResolvedValue(undefined);
     mocks.printTicket.mockResolvedValue({ jobs: [], unrouted: [], missingPrinterRoutes: [] });
+    mocks.printKitchen.mockReset();
+    mocks.printKitchen.mockResolvedValue({ jobs: [], unrouted: [], missingPrinterRoutes: [] });
+    mocks.listStations.mockReset();
+    mocks.listStations.mockResolvedValue({ stations: [] });
     mocks.listKdsTickets.mockResolvedValue({ tickets: [] });
     promotionState = { running: [], discounts: {}, promotionName: () => undefined };
     spaPackages = [
@@ -525,6 +547,86 @@ describe("SpaBoardPage", () => {
       expect(mocks.deleteOrderLine).toHaveBeenCalledWith("order-1", "line-1")
     );
     expect(mocks.lookupCard).not.toHaveBeenCalled();
+  });
+
+  it("tells the kitchen to stop when a line already sent is removed", async () => {
+    lines = [
+      {
+        id: "line-1",
+        salesOrderId: "order-1",
+        variantId: "variant-scrub",
+        productName: "Foot Scrub",
+        categoryId: "cat-food",
+        quantity: "1.0000",
+        unitPrice: "6000.0000",
+        status: "SERVED",
+      },
+    ];
+    mocks.listStations.mockResolvedValue({
+      stations: [
+        {
+          id: "station-1",
+          name: "Kitchen",
+          printerIds: ["printer-1"],
+          routingRules: { categoryIds: ["cat-food"] },
+        },
+      ],
+    });
+    await openRunningRoom();
+    openBillRows();
+
+    fireEvent.click(screen.getByRole("button", { name: "spa.removeLine" }));
+
+    await waitFor(() => expect(mocks.printKitchen).toHaveBeenCalledTimes(1));
+    const [slip, stations, options] = mocks.printKitchen.mock.calls[0];
+    expect(slip.title).toBe("cashier.orderPanel.kdsDeleteTitle");
+    expect(slip.place).toBe("SPA SUITE1");
+    expect(slip.lines).toEqual([
+      expect.objectContaining({
+        name: "Foot Scrub",
+        quantity: "1.0000",
+        categoryId: "cat-food",
+        remarks: "cashier.orderPanel.kdsDeleteTitle",
+      }),
+    ]);
+    expect(stations).toEqual([
+      expect.objectContaining({ id: "station-1", categoryIds: ["cat-food"] }),
+    ]);
+    expect(options).toEqual({ requireStationRouting: true });
+  });
+
+  it("keeps quiet when the kitchen never got the line", async () => {
+    lines = [
+      {
+        id: "line-1",
+        salesOrderId: "order-1",
+        variantId: "variant-scrub",
+        productName: "Foot Scrub",
+        categoryId: "cat-food",
+        quantity: "1.0000",
+        unitPrice: "6000.0000",
+        status: "PENDING",
+      },
+    ];
+    mocks.listStations.mockResolvedValue({
+      stations: [
+        {
+          id: "station-1",
+          name: "Kitchen",
+          printerIds: ["printer-1"],
+          routingRules: { categoryIds: ["cat-food"] },
+        },
+      ],
+    });
+    await openRunningRoom();
+    openBillRows();
+
+    fireEvent.click(screen.getByRole("button", { name: "spa.removeLine" }));
+
+    await waitFor(() =>
+      expect(mocks.deleteOrderLine).toHaveBeenCalledWith("order-1", "line-1")
+    );
+    expect(mocks.printKitchen).not.toHaveBeenCalled();
   });
 
   it("gives the copy a promotion made free a row of its own", async () => {

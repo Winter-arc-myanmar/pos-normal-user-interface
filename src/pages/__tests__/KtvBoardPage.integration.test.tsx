@@ -59,6 +59,8 @@ const mocks = vi.hoisted(() => ({
   requireCashierContext: vi.fn(),
   printReceipt: vi.fn(),
   loadHostesses: vi.fn(),
+  printKitchen: vi.fn(),
+  listStations: vi.fn(),
   noop: vi.fn(),
 }));
 
@@ -277,8 +279,24 @@ vi.mock("@/core/presentation/hooks/usePosWorkspace", () => ({
 vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
   usePrinterConnection: () => ({
     printReceipt: mocks.printReceipt,
-    printKitchen: vi.fn(),
+    printKitchen: mocks.printKitchen,
     error: null,
+  }),
+}));
+
+vi.mock("@/core/presentation/hooks/useKdsStationManagement", () => ({
+  useKdsStationManagement: () => ({
+    listStations: mocks.listStations,
+  }),
+}));
+
+vi.mock("@/core/presentation/hooks/useKdsDeleteSlipShopSetting", () => ({
+  useKdsDeleteSlipShopSetting: () => ({
+    enabled: true,
+    canWrite: false,
+    isSaving: false,
+    error: null,
+    save: vi.fn(),
   }),
 }));
 vi.mock("@/core/presentation/hooks/useCardCapture", () => ({
@@ -328,6 +346,10 @@ describe("KtvBoardPage", () => {
       posSessionId: "pos-session-1",
     });
     mocks.printReceipt.mockResolvedValue(undefined);
+    mocks.printKitchen.mockReset();
+    mocks.printKitchen.mockResolvedValue({ jobs: [], unrouted: [], missingPrinterRoutes: [] });
+    mocks.listStations.mockReset();
+    mocks.listStations.mockResolvedValue({ stations: [] });
   });
 
   it("shows each room with the hourly price that applies now", () => {
