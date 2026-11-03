@@ -30,6 +30,8 @@ interface ProductMenuProps {
   onClose: () => void;
   /** Asks for the item's options (add-ons) before adding it. */
   offerOptions?: boolean;
+  /** One product as the server keeps it, when the menu list leaves its options out. */
+  onLoadProduct?: (productId: string) => Promise<Product>;
   groupByCategory?: boolean;
   /** Shown under the search, e.g. category filters the page owns. */
   toolbar?: ReactNode;
@@ -150,6 +152,7 @@ export function ProductMenu({
   groupByCategory = false,
   toolbar,
   offerOptions = false,
+  onLoadProduct,
 }: ProductMenuProps) {
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
@@ -161,6 +164,8 @@ export function ProductMenu({
   const [isAdding, setIsAdding] = useState(false);
   const [needsVariantChoice, setNeedsVariantChoice] = useState(false);
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
+  // The option groups of the product being priced: the menu's, or the product's own.
+  const [optionGroups, setOptionGroups] = useState<ModifierGroup[]>([]);
   const [localError, setLocalError] = useState<string | null>(null);
   // Tapping a second product while the first one's variants are still loading
   // must not let the first response open or add the wrong product.
@@ -203,12 +208,34 @@ export function ProductMenu({
     offerOptions && product
       ? (product.modifierGroups || []).filter((group) => group.modifiers.length)
       : [];
-  const optionGroups = optionGroupsOf(selectedProduct);
+  /** Options the menu list left out, fetched once from the product itself. */
+  const fetchedGroups = useRef<Record<string, ModifierGroup[]>>({});
+  /**
+   * A product's option groups. The menu list carries them, and when it does not
+   * the product itself is asked: the picker must show whatever the server has.
+   */
+  const loadOptionGroups = async (product: Product): Promise<ModifierGroup[]> => {
+    const listed = optionGroupsOf(product);
+    if (listed.length || !offerOptions || !onLoadProduct) return listed;
+    const known = fetchedGroups.current[product.id];
+    if (known) return known;
+    try {
+      const detail = await onLoadProduct(product.id);
+      const groups = optionGroupsOf(detail);
+      fetchedGroups.current[product.id] = groups;
+      return groups;
+    } catch {
+      // The menu still works when the product cannot be read.
+      fetchedGroups.current[product.id] = [];
+      return [];
+    }
+  };
 
   const closeVariantModal = () => {
     selectedProductIdRef.current = "";
     setNeedsVariantChoice(false);
     setSelectedOptions([]);
+    setOptionGroups([]);
     setSelectedProduct(null);
     setSelectedVariantId("");
     setVariantOptions([]);
@@ -267,9 +294,11 @@ export function ProductMenu({
       setSelectedVariantId(defaultVariantId);
       setVariantOptions(loaded);
 
-      const groups = optionGroupsOf(product);
+      const groups = await loadOptionGroups(product);
+      if (selectedProductIdRef.current !== product.id) return;
+      setOptionGroups(groups);
+      setSelectedOptions(defaultOptions(groups));
       if (loaded.length > 1 || (defaultVariantId && groups.length)) {
-        setSelectedOptions(defaultOptions(groups));
         setNeedsVariantChoice(true);
         return;
       }

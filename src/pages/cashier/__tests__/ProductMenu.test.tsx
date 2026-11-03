@@ -290,6 +290,93 @@ describe("ProductMenu", () => {
     );
   });
 
+  it("asks the product itself for options the menu list left out", async () => {
+    const onAdd = vi.fn().mockResolvedValue(undefined);
+    // The menu list carries the product without its options, as the server may send it.
+    const listed = new Product({
+      id: "product-5",
+      tenantId: "t1",
+      name: "Noodles",
+      basePrice: "3000.0000",
+    });
+    const detailed = new Product({
+      ...listed,
+      modifierGroups: [
+        {
+          id: "add-ons",
+          name: "Add-ons",
+          minSelection: 0,
+          maxSelection: 2,
+          isRequired: false,
+          modifiers: [{ id: "egg", name: "Egg", priceDelta: "500.0000", isDefault: false }],
+        },
+      ],
+    });
+    const onLoadProduct = vi.fn().mockResolvedValue(detailed);
+    const variant = new ProductVariant({ id: "variant-n5", productId: "product-5" });
+
+    render(
+      <ProductMenu
+        products={[listed]}
+        variantsByProductId={{ "product-5": [variant] }}
+        onLoadVariants={vi.fn()}
+        onAdd={onAdd}
+        onClose={vi.fn()}
+        offerOptions
+        onLoadProduct={onLoadProduct}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Noodles/ }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("checkbox", { name: /Egg/ }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "cashier.productMenu.add" }));
+
+    expect(onLoadProduct).toHaveBeenCalledWith("product-5");
+    // The row is the menu's product; the options it offers came from the product itself.
+    await waitFor(() =>
+      expect(onAdd).toHaveBeenCalledWith(listed, "variant-n5", 1, [
+        { modifierId: "egg", name: "Egg", priceDelta: "500.0000" },
+      ])
+    );
+  });
+
+  it("does not ask for a product whose options the menu already carries", async () => {
+    const onLoadProduct = vi.fn();
+    const tea = new Product({
+      id: "product-6",
+      tenantId: "t1",
+      name: "Tea",
+      basePrice: "1000.0000",
+      modifierGroups: [
+        {
+          id: "sugar",
+          name: "Sugar",
+          minSelection: 1,
+          maxSelection: 1,
+          isRequired: true,
+          modifiers: [{ id: "less", name: "Less", priceDelta: "0", isDefault: true }],
+        },
+      ],
+    });
+
+    render(
+      <ProductMenu
+        products={[tea]}
+        variantsByProductId={{ "product-6": [new ProductVariant({ id: "v6", productId: "product-6" })] }}
+        onLoadVariants={vi.fn()}
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+        onClose={vi.fn()}
+        offerOptions
+        onLoadProduct={onLoadProduct}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Tea/ }));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(onLoadProduct).not.toHaveBeenCalled();
+  });
+
   it("asks for a required group before adding", async () => {
     const onAdd = vi.fn().mockResolvedValue(undefined);
     const tea = new Product({
