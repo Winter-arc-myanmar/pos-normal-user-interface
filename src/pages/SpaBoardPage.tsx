@@ -525,22 +525,36 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         const name = hostessName(id);
         return name ? [{ id, name }] : [];
       });
+  const isHostessService = (line: SalesOrderLine) =>
+    Boolean(line.askWhoServed) || serviceVariantIds.has(line.variantId);
   const orderedByName = (line: SalesOrderLine) =>
-    line.hostessId && !serviceVariantIds.has(line.variantId)
+    line.hostessId && !isHostessService(line)
       ? hostessName(line.hostessId) || tr("aHostess")
       : undefined;
-  /** A printed line's options, then the name of the hostess who ordered it. */
-  const printedExtras = (line: SalesOrderLine) => {
+  /**
+   * The hostess a printed line names: who gave a hostess service, on every slip;
+   * who ordered a dish or drink, except on the check slip.
+   */
+  const slipHostess = (line: SalesOrderLine, withOrderedBy: boolean) => {
+    if (!line.hostessId) return undefined;
+    if (isHostessService(line)) return hostessName(line.hostessId) || tr("aHostess");
+    return withOrderedBy ? orderedByName(line) : undefined;
+  };
+  /** A printed line's options, then the name of its hostess. */
+  const printedExtras = (line: SalesOrderLine, withOrderedBy = true) => {
     const modifiers = modifierPrintText(line.selectedModifiers);
-    const who = orderedByName(line);
+    const who = slipHostess(line, withOrderedBy);
     if (!who) return modifiers;
     return {
       names: [modifiers.names, who].filter(Boolean).join(", "),
       prices: [modifiers.prices, "-"].filter(Boolean).join(", "),
     };
   };
-  /** The bill's rows as the slip prints them: one row per item, as the bill shows it. */
-  const receiptLines = (printedLines: SalesOrderLine[]) => {
+  /**
+   * The bill's rows as the slip prints them: one row per item, as the bill shows it.
+   * The check slip the guests read before paying leaves out which lady ordered what.
+   */
+  const receiptLines = (printedLines: SalesOrderLine[], withOrderedBy = true) => {
     const name = slipNamer(printedLines);
     // A room sold at more than one rate is one row on the paper, priced per rate.
     const isRoomRate = (line: SalesOrderLine) =>
@@ -552,7 +566,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         lineDisplayName(line) || line.productName || itemNames[line.variantId] || tr("item")
       );
       if (group.rows.length > 1) return mergedRoomTimeLine(group, printed);
-      const modifiers = printedExtras(line);
+      const modifiers = printedExtras(line, withOrderedBy);
       const note = isGivenFree(line) || line.appliedPromotionId
         ? undefined
         : linePriceNote(line.unitPrice, menuPriceFor(line));
@@ -1936,7 +1950,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         endTime: formatDateTime(new Date().toISOString()),
         startTimeLabel: t("receipt.startTime"),
         endTimeLabel: t("receipt.endTime"),
-        lines: receiptLines(printedLines),
+        lines: receiptLines(printedLines, false),
         ...(items !== undefined ? { subtotal: items.toFixed(4) } : {}),
         ...(totals.discount ? { discount: totals.discount } : {}),
         ...(totals.tax ? { tax: totals.tax } : {}),
