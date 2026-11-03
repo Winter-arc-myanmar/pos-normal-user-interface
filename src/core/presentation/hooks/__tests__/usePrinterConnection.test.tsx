@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { KitchenPrintPlan } from "@/lib/printing/routeKitchenPrint";
 import { savePrinterBinding } from "@/lib/pos/printerBindingStorage";
-import { defaultPrintTemplateSettings } from "@/core/domain/entities/PrintTemplate";
+import { defaultPrintTemplateSettings, PrintTemplate } from "@/core/domain/entities/PrintTemplate";
 import {
   KdsStation,
   KdsTicket,
@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   printKitchen: vi.fn(),
   printReceipt: vi.fn(),
   resolveTemplate: vi.fn(),
+  listTemplates: vi.fn(),
   getSalesOrderLines: vi.fn(),
   company: vi.fn(),
 }));
@@ -37,6 +38,13 @@ vi.mock("@/core/infrastructure/di/container", () => ({
     resolve: (key: string) => {
       if (key === "salesOrderService") {
         return { getSalesOrderLines: mocks.getSalesOrderLines };
+      }
+      if (key === "printTemplateService") {
+        return {
+          list: mocks.listTemplates,
+          resolve: mocks.resolveTemplate,
+          company: mocks.company,
+        };
       }
       return {
         list: vi.fn().mockResolvedValue({ printers: [] }),
@@ -68,6 +76,111 @@ const renderConnection = () =>
 beforeEach(() => {
   mocks.company.mockReset();
   mocks.company.mockResolvedValue({ name: "" });
+  mocks.listTemplates.mockReset();
+  mocks.listTemplates.mockResolvedValue({ templates: [] });
+});
+
+describe("usePrinterConnection print templates", () => {
+  const bindKds = () =>
+    savePrinterBinding(
+      tenantId,
+      registerId,
+      {
+        id: "backend:printer-kds",
+        backendPrinterId: "printer-kds",
+        transport: "NETWORK",
+        displayName: "KDS printer",
+        sectors: ["KDS"],
+        lastVerifiedAt: "",
+      },
+      true
+    );
+
+  const kitchenTemplate = (settings = defaultPrintTemplateSettings()) =>
+    new PrintTemplate({
+      id: "kitchen-1",
+      type: "KITCHEN",
+      name: "KDS",
+      isDefault: true,
+      locationId: "location-1",
+      paperWidth: "MM80",
+      settings,
+    });
+
+  beforeEach(() => {
+    localStorage.clear();
+    mocks.resolveTemplate.mockReset();
+    mocks.printKitchen.mockReset();
+    mocks.printKitchen.mockResolvedValue(undefined);
+    mocks.getSalesOrderLines.mockReset();
+    mocks.getSalesOrderLines.mockResolvedValue({ lines: [] });
+    bindKds();
+  });
+
+  it("prints at the sizes the outlet saved when the server offers only its built-in layout", async () => {
+    // The server's built-in layout prints big; the shop's own template is Normal.
+    const builtIn = defaultPrintTemplateSettings();
+    builtIn.item.itemTextScale = "2H2W";
+    builtIn.item.otherTextScale = "2H2W";
+    mocks.resolveTemplate.mockResolvedValue({ source: "BUILTIN", settings: builtIn });
+    mocks.listTemplates.mockResolvedValue({ templates: [kitchenTemplate()] });
+
+    const { result } = renderHook(() =>
+      usePrinterConnection(tenantId, registerId, "location-1")
+    );
+    await waitFor(() => expect(result.current.isConnected).toBe(true));
+    await act(async () => {
+      await result.current.printKitchen({
+        title: "KITCHEN",
+        lines: [{ name: "Coffee", quantity: "1" }],
+      });
+    });
+
+    const [, slip] = mocks.printKitchen.mock.calls[0];
+    expect(slip.template).toMatchObject({
+      item: { itemTextScale: "1H1W", otherTextScale: "1H1W" },
+    });
+  });
+
+  it("keeps the server's own template when it is a saved one", async () => {
+    const own = defaultPrintTemplateSettings();
+    own.item.itemTextScale = "2H1W";
+    mocks.resolveTemplate.mockResolvedValue({ source: "LOCATION", settings: own });
+
+    const { result } = renderHook(() =>
+      usePrinterConnection(tenantId, registerId, "location-1")
+    );
+    await waitFor(() => expect(result.current.isConnected).toBe(true));
+    await act(async () => {
+      await result.current.printKitchen({
+        title: "KITCHEN",
+        lines: [{ name: "Coffee", quantity: "1" }],
+      });
+    });
+
+    const [, slip] = mocks.printKitchen.mock.calls[0];
+    expect(slip.template).toMatchObject({ item: { itemTextScale: "2H1W" } });
+    expect(mocks.listTemplates).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the saved template when the server cannot resolve one", async () => {
+    mocks.resolveTemplate.mockRejectedValue(new Error("No print template"));
+    mocks.listTemplates.mockResolvedValue({ templates: [kitchenTemplate()] });
+
+    const { result } = renderHook(() =>
+      usePrinterConnection(tenantId, registerId, "location-1")
+    );
+    await waitFor(() => expect(result.current.isConnected).toBe(true));
+    await act(async () => {
+      await result.current.printKitchen({
+        title: "KITCHEN",
+        lines: [{ name: "Coffee", quantity: "1" }],
+      });
+    });
+
+    const [, slip] = mocks.printKitchen.mock.calls[0];
+    expect(slip.template).toMatchObject({ item: { itemTextScale: "1H1W" } });
+  });
 });
 
 describe("usePrinterConnection station routing", () => {
