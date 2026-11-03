@@ -6,6 +6,8 @@ import { SalesOrderLine } from "@/core/domain/entities/Cashier";
 import { GuestCard, GuestWallet } from "@/core/domain/entities/GuestWallet";
 import { SpaRoom, SpaSession, SpaSessionQuote } from "@/core/domain/entities/Spa";
 import type { RoomKind } from "@/core/presentation/hooks/useRoomPos";
+import type { Hostess } from "@/core/domain/entities/Hostess";
+import { LadyPicker } from "../ktv/LadyPicker";
 import { useRoomText } from "@/core/presentation/hooks/useRoomText";
 import { getKtvWarning } from "@/lib/ktv/session";
 import { estimateCardCharge } from "@/lib/spa/payment";
@@ -72,6 +74,7 @@ export function SpaBillPanel({
   extraFeeLabel,
   onAddExtraFee,
   orderers = [],
+  allLadies,
   onOrderedBy,
   onNotePending,
   orderedByName = () => undefined,
@@ -129,6 +132,8 @@ export function SpaBillPanel({
   onAddExtraFee?: () => void;
   /** Hostesses with this room, who may order a dish or drink. */
   orderers?: { id: string; name: string }[];
+  /** KTV: every lady on duty, so one not with this room can be named too. */
+  allLadies?: Hostess[];
   onOrderedBy?: (key: string, hostess?: { id: string; name: string }) => void;
   /** Writes the note for the kitchen on an item not yet sent. */
   onNotePending?: (key: string) => void;
@@ -142,6 +147,7 @@ export function SpaBillPanel({
   const tr = useRoomText(kind);
   const { t } = useTranslation();
   const [openRows, setOpenRows] = useState<Record<string, boolean>>({});
+  const [ladyFor, setLadyFor] = useState<PendingItem | null>(null);
   const warning = getKtvWarning(session.endsAt, nowMs);
   const discountBps = wallet?.discountBpsSnapshot || 0;
   const pendingDue = pendingTotal(pending) - pendingSaving(pending, pendingDiscounts);
@@ -498,10 +504,16 @@ export function SpaBillPanel({
                     )}
                   </span>
                 </div>
-                {!item.service && orderers.length && onOrderedBy ? (
+                {!item.service && (orderers.length || allLadies) && onOrderedBy ? (
                   <div className="flex flex-wrap items-center gap-1 text-[11px]">
                     <span className="text-slate-500">{tr("orderedByLabel")}</span>
-                    {[undefined, ...orderers].map((hostess) => {
+                    {[
+                      undefined,
+                      ...orderers,
+                      ...(item.hostessId && !orderers.some((entry) => entry.id === item.hostessId)
+                        ? [{ id: item.hostessId, name: item.hostessName || tr("aHostess") }]
+                        : []),
+                    ].map((hostess) => {
                       const chosen = (item.hostessId || undefined) === hostess?.id;
                       return (
                         <button
@@ -519,6 +531,15 @@ export function SpaBillPanel({
                         </button>
                       );
                     })}
+                    {allLadies ? (
+                      <button
+                        type="button"
+                        className="min-h-7 rounded border border-dashed border-slate-600 px-2 text-slate-300"
+                        onClick={() => setLadyFor(item)}
+                      >
+                        {tr("allLadies")}
+                      </button>
+                    ) : null}
                   </div>
                 ) : null}
                 {deal?.discount ? (
@@ -729,6 +750,21 @@ export function SpaBillPanel({
           {paid ? tr("billPaid") : tr("billClosed")}
         </p>
       )}
+      {ladyFor && allLadies && onOrderedBy ? (
+        <LadyPicker
+          itemName={ladyFor.name}
+          ladies={allLadies}
+          roomNumber={room?.roomNumber}
+          onPick={(hostess) => {
+            onOrderedBy(pendingKey(ladyFor), {
+              id: hostess.id,
+              name: hostess.nickname || hostess.name,
+            });
+            setLadyFor(null);
+          }}
+          onCancel={() => setLadyFor(null)}
+        />
+      ) : null}
     </aside>
   );
 }

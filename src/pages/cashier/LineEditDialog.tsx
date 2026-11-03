@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { formatPosMoney } from "@/lib/pos/orderListDisplay";
+import type { Hostess } from "@/core/domain/entities/Hostess";
+import { LadyPicker } from "../ktv/LadyPicker";
 import { ItemNoteField } from "@/components/notes/ItemNoteField";
 import { cleanNote } from "@/lib/notes/itemNote";
 
@@ -29,6 +31,9 @@ interface LineEditDialogProps {
   isFee?: boolean;
   /** Hostesses who may have ordered it; none hides the choice. */
   orderers?: { id: string; name: string }[];
+  /** KTV: every lady on duty, so one not with this room can be named too. */
+  allLadies?: Hostess[];
+  roomNumber?: string;
   orderedBy?: string;
   note?: string;
   /** The shop's quick notes; left out, the dialog does not ask for a note. */
@@ -56,6 +61,8 @@ export function LineEditDialog({
   isFoc,
   isFee = false,
   orderers,
+  allLadies,
+  roomNumber,
   orderedBy,
   note,
   quickNotes,
@@ -69,6 +76,22 @@ export function LineEditDialog({
   const [price, setPrice] = useState(String(unitPrice));
   const [foc, setFoc] = useState(isFoc);
   const [orderer, setOrderer] = useState<string | null>(orderedBy ?? null);
+  const [picked, setPicked] = useState<{ id: string; name: string } | null>(null);
+  const [pickingLady, setPickingLady] = useState(false);
+  const canOrder = Boolean(orderers?.length || allLadies);
+  const ordererOptions = (() => {
+    const options = [...(orderers || [])];
+    const extra = (id: string | null | undefined, name?: string) => {
+      if (id && !options.some((option) => option.id === id)) options.push({ id, name: name || id });
+    };
+    const ladyName = (id: string | null | undefined) => {
+      const lady = allLadies?.find((entry) => entry.id === id);
+      return lady ? lady.nickname || lady.name : undefined;
+    };
+    extra(orderedBy, ladyName(orderedBy) || t("spa.aHostess"));
+    extra(picked?.id, picked?.name);
+    return options;
+  })();
   const [noteText, setNoteText] = useState(note ?? "");
   // Part of an item can be priced on its own only in whole units.
   const canSplit = quantity > 1 && Number.isInteger(quantity);
@@ -90,7 +113,7 @@ export function LineEditDialog({
       quantity: count,
       unitPrice: value,
       foc,
-      ...(orderers?.length ? { orderedBy: orderer } : {}),
+      ...(canOrder ? { orderedBy: orderer } : {}),
       ...(quickNotes && cleanNote(noteText) !== cleanNote(note)
         ? { note: cleanNote(noteText) ?? null }
         : {}),
@@ -207,11 +230,11 @@ export function LineEditDialog({
           />
         </label>
 
-        {orderers?.length ? (
+        {canOrder ? (
           <div className="space-y-2">
             <p className="text-sm text-slate-300">{t("cashier.lineEdit.orderedBy")}</p>
             <div className="flex flex-wrap gap-2">
-              {[{ id: null, name: t("cashier.lineEdit.customer") }, ...orderers].map((option) => (
+              {[{ id: null, name: t("cashier.lineEdit.customer") }, ...ordererOptions].map((option) => (
                 <button
                   key={option.id ?? "customer"}
                   type="button"
@@ -226,6 +249,15 @@ export function LineEditDialog({
                   {option.name}
                 </button>
               ))}
+              {allLadies ? (
+                <button
+                  type="button"
+                  onClick={() => setPickingLady(true)}
+                  className="min-h-11 rounded-md border border-dashed border-slate-600 px-3 text-sm text-slate-300"
+                >
+                  {t("ktvPos.allLadies")}
+                </button>
+              ) : null}
             </div>
           </div>
         ) : null}
@@ -274,6 +306,19 @@ export function LineEditDialog({
           </button>
         ) : null}
       </div>
+      {pickingLady && allLadies ? (
+        <LadyPicker
+          itemName={name}
+          ladies={allLadies}
+          roomNumber={roomNumber}
+          onPick={(hostess) => {
+            setPicked({ id: hostess.id, name: hostess.nickname || hostess.name });
+            setOrderer(hostess.id);
+            setPickingLady(false);
+          }}
+          onCancel={() => setPickingLady(false)}
+        />
+      ) : null}
     </div>
   );
 }
