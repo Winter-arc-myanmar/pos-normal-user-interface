@@ -377,8 +377,10 @@ describe("ProductMenu", () => {
     expect(onLoadProduct).not.toHaveBeenCalled();
   });
 
-  it("does not ask when the payload says the product has no options", async () => {
-    const onLoadProduct = vi.fn();
+  it("asks the product once when the menu's record shows no options, and remembers it", async () => {
+    const onLoadProduct = vi.fn().mockResolvedValue(
+      new Product({ id: "product-7", tenantId: "t1", name: "Water", basePrice: "500.0000", modifierGroups: [] })
+    );
     const plain = new Product({
       id: "product-7",
       tenantId: "t1",
@@ -387,7 +389,7 @@ describe("ProductMenu", () => {
       modifierGroups: [],
     });
 
-    render(
+    const view = render(
       <ProductMenu
         products={[plain]}
         variantsByProductId={{ "product-7": [new ProductVariant({ id: "v7", productId: "product-7" })] }}
@@ -403,7 +405,12 @@ describe("ProductMenu", () => {
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
     );
-    expect(onLoadProduct).not.toHaveBeenCalled();
+    expect(onLoadProduct).toHaveBeenCalledTimes(1);
+
+    // Tapping it again uses what was already read.
+    fireEvent.click(screen.getByRole("button", { name: /Water/ }));
+    await waitFor(() => expect(onLoadProduct).toHaveBeenCalledTimes(1));
+    view.unmount();
   });
 
   it("asks for a required group before adding", async () => {

@@ -211,13 +211,13 @@ export function ProductMenu({
   /** Options the menu list left out, fetched once from the product itself. */
   const fetchedGroups = useRef<Record<string, ModifierGroup[]>>({});
   /**
-   * A product's option groups. The product carries them, and when a payload left
-   * them out entirely (not an empty list) the product itself is asked once.
+   * A product's option groups. The product carries them; when the record the
+   * menu holds shows none, the product itself is asked once and the answer kept,
+   * so a light list never hides the picker and ordinary items cost one look.
    */
   const loadOptionGroups = async (product: Product): Promise<ModifierGroup[]> => {
     const listed = optionGroupsOf(product);
-    const omitted = product.modifierGroups === undefined;
-    if (!omitted || listed.length || !offerOptions || !onLoadProduct) return listed;
+    if (listed.length || !offerOptions || !onLoadProduct) return listed;
     const known = fetchedGroups.current[product.id];
     if (known) return known;
     try {
