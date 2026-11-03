@@ -113,6 +113,7 @@ import { linePriceNote } from "@/lib/pos/linePrice";
 import { modifierExtra } from "@/lib/modifiers/choices";
 import { LineEditDialog, type LineEdit } from "./cashier/LineEditDialog";
 import { modifierPrintText } from "@/lib/printing/modifierText";
+import { applyKdsTicketHostess } from "@/lib/printing/kdsTicketModifiers";
 import { receiptTotals } from "@/lib/printing/receiptTotals";
 import { groupRoomTimeRows, mergedRoomTimeLine } from "@/lib/printing/roomTimeRows";
 import { cashierLabel } from "@/lib/printing/cashier";
@@ -1146,8 +1147,20 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     if (!salesOrderId || !before) return;
     try {
       const { tickets } = await listKdsTickets({ salesOrderId, limit: 100 });
-      for (const ticket of tickets.filter((item) => !before.has(item.id))) {
-        await printer.printTicket(ticket);
+      const fresh = tickets.filter((item) => !before.has(item.id));
+      if (!fresh.length) return;
+      // The kitchen slip names the lady who ordered a line; the ticket the server
+      // sends need not, so the order lines fill her in before it prints.
+      const needsNames = fresh.some((ticket) =>
+        ticket.kdsTicketLines?.some((line) => !line.orderedBy?.trim())
+      );
+      const lines = needsNames
+        ? await fetchOrderLines(salesOrderId, { page: 1, limit: 200 })
+            .then((result) => result.lines || [])
+            .catch(() => orderLines)
+        : orderLines;
+      for (const ticket of fresh) {
+        await printer.printTicket(applyKdsTicketHostess(ticket, lines, hostessName));
       }
     } catch (caught) {
       setActionError(
