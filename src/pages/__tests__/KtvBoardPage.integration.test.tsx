@@ -370,6 +370,32 @@ describe("KtvBoardPage", () => {
     expect(screen.getByText("35,000")).toBeInTheDocument();
   });
 
+  it("changes a room's status from Manage room", async () => {
+    mocks.updateRoom.mockResolvedValue({ ...freeRoom, status: "CLEANING" });
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "ktvPos.manageRoom" }));
+    fireEvent.change(screen.getByLabelText("ktvPos.statusLabel"), {
+      target: { value: "CLEANING" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "common.save" }));
+
+    await waitFor(() =>
+      expect(mocks.updateRoom).toHaveBeenCalledWith(
+        "ktv-1",
+        expect.objectContaining({ status: "CLEANING" })
+      )
+    );
+  });
+
+  it("leaves the status alone when a party is in the room", () => {
+    rooms = [busyRoom];
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "ktvPos.manageRoom" }));
+
+    expect(screen.queryByLabelText("ktvPos.statusLabel")).not.toBeInTheDocument();
+    expect(screen.getByText("ktvPos.statusInUseHint")).toBeInTheDocument();
+  });
+
   it("starts a room for the chosen hours after one card tap", async () => {
     mocks.openSession.mockResolvedValue({
       id: "ktv-session-1",

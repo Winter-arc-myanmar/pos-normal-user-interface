@@ -2002,6 +2002,8 @@
       "extend": "Unable to add time to this room."
     },
     "timeUp": "Booked time is up",
+    "statusLabel": "Room status",
+    "statusInUseHint": "The party in this room sets its status. Close the room to change it.",
     "status": {
       "occupied": "In use",
       "open": "In use"

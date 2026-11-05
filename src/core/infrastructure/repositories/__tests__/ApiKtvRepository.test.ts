@@ -228,4 +228,34 @@ describe("ApiKtvRepository", () => {
       ],
     });
   });
+
+  it("patches a room's status to its own endpoint", async () => {
+    const patch = vi.fn().mockResolvedValue({
+      success: true,
+      data: {
+        id: "room-1",
+        tenantId: "tenant-1",
+        locationId: "location-1",
+        roomNumber: "A1",
+        name: "Grand Room",
+        capacity: 12,
+        rateVariantId: "variant-1",
+        minimumMinutes: 60,
+        incrementMinutes: 30,
+        graceMinutes: 5,
+        roundingMode: "UP",
+        status: "CLEANING",
+      },
+    });
+    const repository = new ApiKtvRepository({
+      patch,
+    } as unknown as HttpClient);
+
+    const room = await repository.updateRoom("room-1", { status: "CLEANING" });
+
+    expect(patch).toHaveBeenCalledWith("/api/v1/ktv-rooms/room-1", {
+      status: "CLEANING",
+    });
+    expect(room.status).toBe("CLEANING");
+  });
 });

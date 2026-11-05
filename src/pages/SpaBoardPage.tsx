@@ -25,7 +25,11 @@ import {
 import { ChosenModifier, PaymentMethod, Product, SalesOrderLine } from "@/core/domain/entities/Cashier";
 import { ItemNoteDialog } from "@/components/notes/ItemNoteDialog";
 import { GuestCard, GuestWallet } from "@/core/domain/entities/GuestWallet";
-import { SpaRoom, SpaSession } from "@/core/domain/entities/Spa";
+import {
+  SpaRoom,
+  SpaRoomStatus,
+  SpaSession,
+} from "@/core/domain/entities/Spa";
 import { useCashier } from "@/core/presentation/hooks/useCashier";
 import { useGuestWalletManagement } from "@/core/presentation/hooks/useGuestWalletManagement";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
@@ -152,7 +156,14 @@ const emptyRoomForm = {
   sessionPrice: "",
   treatmentMinutes: "60",
   graceMinutes: "15",
+  status: "AVAILABLE",
 };
+
+/**
+ * The KTV room states a cashier sets by hand. In use and paused belong to the
+ * party in the room, so the room's own status only changes between parties.
+ */
+const KTV_ROOM_STATUSES: SpaRoomStatus[] = ["AVAILABLE", "CLEANING", "OUT_OF_SERVICE"];
 
 /** The products behind room time and SPA packages, which are not on the menu. */
 /**
@@ -2414,6 +2425,11 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           incrementMinutes: minutes,
           graceMinutes: Number(roomForm.graceMinutes),
           roundingMode: "DOWN" as const,
+          // PATCH takes the room's status too, but only a change is sent: a room
+          // with a party in it keeps the state the party gave it.
+          ...(editingRoom && roomForm.status !== editingRoom.status
+            ? { status: roomForm.status as SpaRoomStatus }
+            : {}),
         };
     try {
       if (editingRoom) await updateRoom(editingRoom.id, terms);
@@ -2436,9 +2452,13 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       sessionPrice: managed.sessionPrice == null ? "" : String(managed.sessionPrice),
       treatmentMinutes: String(managed.minimumMinutes),
       graceMinutes: String(managed.graceMinutes),
+      status: managed.status || "AVAILABLE",
     });
     setShowRoomForm(true);
   };
+
+  /** A room with a party in it shows that party's state, so its status is not picked. */
+  const editingRoomInUse = Boolean(editingRoom && findActiveSpaSession(editingRoom));
 
   const goBack = () => {
     setActionError(null);
@@ -3732,6 +3752,29 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               />
             </label>
             ) : null}
+            {editingRoom && !isSpa && !editingRoomInUse ? (
+              <label className="text-sm">
+                {tr("statusLabel")}
+                <select
+                  value={roomForm.status}
+                  onChange={(event) =>
+                    setRoomForm((current) => ({ ...current, status: event.target.value }))
+                  }
+                  className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2"
+                >
+                  {KTV_ROOM_STATUSES.map((status) => (
+                    <option key={status} value={status}>
+                      {tr(`status.${status.toLowerCase()}`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            {editingRoom && !isSpa && editingRoomInUse ? (
+              <p className="sm:col-span-2 text-xs text-slate-400">
+                {tr("statusInUseHint")}
+              </p>
+            ) : null}
             <p className="sm:col-span-2 text-xs text-slate-400">
               {isSpa
                 ? tr("roomNoPriceHint")
@@ -3747,7 +3790,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               {editingRoom ? (
                 <Button
                   variant="destructive"
-                  disabled={Boolean(findActiveSpaSession(editingRoom))}
+                  disabled={editingRoomInUse}
                   onClick={() =>
                     void deleteRoom(editingRoom.id).then(() => setShowRoomForm(false))
                   }
