@@ -7,7 +7,7 @@ import {
   RoomOrderView,
   TabletChargeResult,
   TabletHistoryEntry,
-  TabletMenuCategory,
+  TabletMenu,
   TabletRoom,
   TabletStartResult,
   TabletVisit,
@@ -16,7 +16,7 @@ import {
 export interface IRoomTabletRepository {
   getVisit(cardUid: string): Promise<TabletVisit>;
   getHistory(cardUid: string): Promise<TabletHistoryEntry[]>;
-  getMenu(): Promise<TabletMenuCategory[]>;
+  getMenu(): Promise<TabletMenu>;
   getRooms(): Promise<TabletRoom[]>;
   startRoom(payload: TabletStartDTO): Promise<TabletStartResult>;
   placeOrder(payload: TabletOrderDTO): Promise<TabletChargeResult>;
