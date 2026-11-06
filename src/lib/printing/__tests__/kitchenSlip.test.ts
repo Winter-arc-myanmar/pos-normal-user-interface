@@ -35,7 +35,8 @@ describe("the kitchen slip", () => {
     const items = [{ name: "Beer", quantity: "2" }];
     const itemMode = (slip: string) => {
       const index = slip.indexOf("2 x BEER");
-      const escape = slip.lastIndexOf("\u001b!", index);
+      // The size travels on GS ! (0x1d 0x21); ESC ! only carries bold.
+      const escape = slip.lastIndexOf("\u001d!", index);
       return slip.charCodeAt(escape + 2);
     };
 
@@ -198,5 +199,26 @@ describe("the kitchen slip's text size switches", () => {
 
     settings.item.itemTextScale = "2H1W";
     expect(sizeOf(slip(settings), "2 x BEER")).toBe("tall");
+  });
+
+  it("sends the item size as GS ! so every printer magnifies the same", () => {
+    const settings = defaultPrintTemplateSettings();
+    settings.item.itemTextScale = "1H1W";
+    settings.item.fontSize = "LARGE";
+    const line = (scale: string) => {
+      settings.item.itemTextScale = scale;
+      return formatKitchenSlip({
+        title: "KDS-1",
+        lines: [{ name: "Beef", quantity: "1" }],
+        template: settings,
+      });
+    };
+
+    // ESC ! carries bold only; the size is the GS ! parameter, which also
+    // overrides a magnification a printer was left configured with.
+    expect(line("1H1W")).toContain("\x1b!\x08\x1d!\x00");
+    expect(line("2H1W")).toContain("\x1b!\x08\x1d!\x10");
+    expect(line("1H2W")).toContain("\x1b!\x08\x1d!\x01");
+    expect(line("2H2W")).toContain("\x1b!\x08\x1d!\x11");
   });
 });

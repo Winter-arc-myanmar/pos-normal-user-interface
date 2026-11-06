@@ -223,7 +223,9 @@ describe("the template's other switches", () => {
     const cashier = rows.find((row) => row.kind === "text" && row.text.includes("Aung Aung"));
     expect(item).toMatchObject({ size: "huge" });
     expect(cashier).toMatchObject({ size: "tall" });
-    expect(formatSaleReceipt(bill({ template }))).toContain(`${ESC}!\x302 x Fried`);
+    expect(formatSaleReceipt(bill({ template }))).toContain(
+      `${ESC}!\x00${GS}!\x112 x Fried`
+    );
   });
 
   it("keeps an older template's large font printing tall", () => {

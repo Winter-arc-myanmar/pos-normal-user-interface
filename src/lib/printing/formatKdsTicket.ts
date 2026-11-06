@@ -279,11 +279,23 @@ class Layout {
 
 const alignCode: Record<Align, string> = { left: "\x00", center: "\x01", right: "\x02" };
 
-const printMode = (style: TextStyle) =>
+/** Bold only: the size travels on its own command, see characterScale. */
+const printMode = (style: TextStyle) => String.fromCharCode(style.bold ? 0x08 : 0);
+
+/**
+ * Character magnification as ESC/POS `GS !` takes it: the high nibble is the
+ * height and the low nibble the width, minus one.
+ *
+ * Size used to ride on the `ESC !` bits, and printers disagree there: the same
+ * slip and the same setting print at the right size on one machine and at
+ * double size on another, and a printer left configured with a magnification of
+ * its own keeps printing that. `GS !` is what the vendors' own drivers send,
+ * and setting it on every row also overrides whatever a printer was left at.
+ */
+const characterScale = (style: TextStyle) =>
   String.fromCharCode(
-    (style.bold ? 0x08 : 0) |
-      (style.size === "tall" || style.size === "huge" ? 0x10 : 0) |
-      (isWide(style.size) ? 0x20 : 0)
+    (style.size === "tall" || style.size === "huge" ? 0x10 : 0) |
+      (isWide(style.size) ? 0x01 : 0)
   );
 
 const centered = (text: string, columns: number) => {
@@ -306,7 +318,7 @@ const unicodeRow = (text: string, style: TextStyle, columns: number) => {
     bold: style.bold,
     invert: style.invert,
   });
-  return image ? `${ESC}a\x00${ESC}!\x00${GS}B\x00${rasterCommand(image)}` : null;
+  return image ? `${ESC}a\x00${ESC}!\x00${GS}!\x00${GS}B\x00${rasterCommand(image)}` : null;
 };
 
 const pairText = (left: string, right: string, columns: number) =>
@@ -320,12 +332,13 @@ const unicodePairRow = (left: string, right: string, style: TextStyle, columns: 
     bold: style.bold,
     invert: style.invert,
   });
-  return image ? `${ESC}a\x00${ESC}!\x00${GS}B\x00${rasterCommand(image)}` : null;
+  return image ? `${ESC}a\x00${ESC}!\x00${GS}!\x00${GS}B\x00${rasterCommand(image)}` : null;
 };
 
 const toEscPos = (layout: Layout) =>
   [
     `${ESC}@`,
+    `${GS}!\x00`,
     lineSpacing,
     ...layout.rows.map((row) => {
       if (row.kind === "gap") return "\n";
@@ -337,10 +350,10 @@ const toEscPos = (layout: Layout) =>
           layout.width
         );
         if (unicode) return unicode;
-        return `${ESC}a\x01${ESC}!\x00${inlineIconCommand(row.icon)} ${row.text}\n`;
+        return `${ESC}a\x01${ESC}!\x00${GS}!\x00${inlineIconCommand(row.icon)} ${row.text}\n`;
       }
       if (row.kind === "rule") {
-        return `${ESC}a\x00${ESC}!\x00${row.char.repeat(layout.width)}\n`;
+        return `${ESC}a\x00${ESC}!\x00${GS}!\x00${row.char.repeat(layout.width)}\n`;
       }
       if (row.kind === "pair") {
         const columns = layout.columns(row.size);
@@ -348,7 +361,7 @@ const toEscPos = (layout: Layout) =>
         if (unicode) return unicode;
         return [
           `${ESC}a${alignCode.left}`,
-          `${ESC}!${printMode(row)}`,
+          `${ESC}!${printMode(row)}${GS}!${characterScale(row)}`,
           pairText(row.left, row.right, columns),
           "\n",
         ].join("");
@@ -358,14 +371,14 @@ const toEscPos = (layout: Layout) =>
       if (unicode) return unicode;
       return [
         `${ESC}a${alignCode[row.invert ? "left" : row.align || "left"]}`,
-        `${ESC}!${printMode(row)}`,
+        `${ESC}!${printMode(row)}${GS}!${characterScale(row)}`,
         row.invert ? `${GS}B\x01` : "",
         text,
         row.invert ? `${GS}B\x00` : "",
         "\n",
       ].join("");
     }),
-    `${ESC}!\x00${ESC}a\x00`,
+    `${ESC}!\x00${GS}!\x00${ESC}a\x00`,
     bottomMargin,
     `${GS}V\x00`,
   ].join("");
