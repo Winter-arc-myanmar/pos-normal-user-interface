@@ -243,4 +243,61 @@ describe("QzTrayClient", () => {
     expect(mocks.sendData).toHaveBeenCalled();
     expect(mocks.print).not.toHaveBeenCalled();
   });
+
+  it("prints through the Windows queue before claiming the USB device", async () => {
+    mocks.details.mockResolvedValue([{ name: "POS-80", connection: "USB" }]);
+    mocks.find.mockResolvedValue(["POS-80"]);
+    mocks.listDevices.mockResolvedValue([
+      { vendorId: "1f9d", productId: "2016", product: "POS-80", manufacturer: "XPrinter" },
+    ]);
+    const client = new QzTrayClient();
+
+    await client.testPrint(usbBinding);
+
+    expect(mocks.create).toHaveBeenCalledWith("POS-80");
+    expect(mocks.print).toHaveBeenCalledTimes(1);
+    // The printer's driver owns the device, so claiming it could only fail.
+    expect(mocks.claimDevice).not.toHaveBeenCalled();
+    expect(mocks.sendData).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the USB device when no Windows queue can print", async () => {
+    mocks.details.mockResolvedValue([]);
+    mocks.find.mockResolvedValue([]);
+    mocks.print.mockRejectedValue(new Error('Cannot find printer with name "POS-80"'));
+    mocks.listDevices.mockResolvedValue([
+      { vendorId: "1f9d", productId: "2016", product: "POS-80", manufacturer: "XPrinter" },
+    ]);
+    mocks.listInterfaces.mockResolvedValue(["00"]);
+    mocks.listEndpoints.mockResolvedValue(["01"]);
+    const client = new QzTrayClient();
+
+    await client.testPrint(usbBinding);
+
+    expect(mocks.print).toHaveBeenCalledTimes(1);
+    expect(mocks.sendData).toHaveBeenCalled();
+  });
+
+  it("says to install the driver when neither a queue nor a device can print", async () => {
+    mocks.details.mockResolvedValue([]);
+    mocks.find.mockResolvedValue([]);
+    mocks.listDevices.mockResolvedValue([]);
+    const client = new QzTrayClient();
+
+    await expect(
+      client.testPrint({ ...usbBinding, deviceName: "USB 1f9d:2016" })
+    ).rejects.toThrow(/install its driver/i);
+  });
+
+  it("reports why the USB device could not be claimed", async () => {
+    mocks.details.mockResolvedValue([]);
+    mocks.find.mockResolvedValue([]);
+    mocks.listDevices.mockResolvedValue([{ vendorId: "1f9d", productId: "2016" }]);
+    mocks.listInterfaces.mockRejectedValue(new Error("Unable to claim device"));
+    const client = new QzTrayClient();
+
+    await expect(
+      client.testPrint({ ...usbBinding, deviceName: "USB 1f9d:2016" })
+    ).rejects.toThrow(/interfaces unreadable.*Unable to claim device/i);
+  });
 });
