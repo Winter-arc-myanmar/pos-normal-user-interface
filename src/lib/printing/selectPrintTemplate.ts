@@ -65,6 +65,47 @@ export function pickPrintTemplate(
   return candidates[0];
 }
 
+/**
+ * The template the outlet saved for a section, whether or not it is flagged as
+ * the default one.
+ *
+ * A slip that falls back to the server's built-in layout prints the sizes the
+ * server ships with, not the ones the shop set: the built-in kitchen layout
+ * prints every item at double height, which reads as "the text size in Print
+ * Template does nothing". So a saved template still has to win over the
+ * built-in when nothing is flagged default, and when more than one is (the
+ * strict picker refuses to choose there) the most recently updated one prints.
+ *
+ * The strict picker above stays the rule for deciding what the *server* would
+ * print; this one only decides which saved sizes fill in when it answers with
+ * its built-in layout.
+ */
+export function pickSavedPrintTemplate(
+  place: PrintPlace,
+  templates: PrintTemplate[],
+  locationId?: string
+): PrintTemplate | undefined {
+  const defaulted = templatesForPrintPlace(place, templates, locationId);
+  if (defaulted.length === 1) return defaulted[0];
+
+  const active = templates.filter(
+    (template) =>
+      template.type === printPlaceToTemplateType(place) &&
+      !template.deletedAt &&
+      PRINT_TEMPLATE_TYPES.includes(template.type)
+  );
+  const own = locationId
+    ? active.filter((template) => template.locationId === locationId)
+    : [];
+  const pool = own.length ? own : active.filter((template) => !template.locationId);
+  if (!pool.length) return undefined;
+
+  const flagged = pool.filter((template) => template.isDefault);
+  return [...(flagged.length ? flagged : pool)].sort((left, right) =>
+    String(right.updatedAt || "").localeCompare(String(left.updatedAt || ""))
+  )[0];
+}
+
 export function selectPrintTemplate(
   place: PrintPlace,
   templates: PrintTemplate[],

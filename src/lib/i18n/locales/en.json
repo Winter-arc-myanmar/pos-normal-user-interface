@@ -511,6 +511,20 @@
       "logout": "Logout"
     },
     "cashier": {
+    "credit": {
+      "title": "Whose account?",
+      "search": "Name or phone…",
+      "none": "No customer has a credit account. Turn it on for a customer on the Customers page.",
+      "owes": "Owes {{amount}}",
+      "available": "available {{amount}}",
+      "limitReached": "limit reached",
+      "hint": "Only customers with a credit account. A new customer is added on the Customers page.",
+      "onAccountOf": "On account of:",
+      "change": "Change",
+      "choose": "Choose whose account this goes on",
+      "required": "Choose whose account this bill goes on.",
+      "loadFailed": "Couldn't load customers"
+    },
       "shortcutKey": "Shortcut key",
       "editShortcut": "Edit shortcut key",
       "behaviorTitle": "Cashier behavior",
@@ -1866,6 +1880,7 @@
     },
     "yourOrder": "Your order",
     "cartEmpty": "Tap items to add them.",
+    "addItem": "Add · {{amount}}",
     "less": "Less",
     "more": "More",
     "total": "Total",
@@ -2001,6 +2016,8 @@
       "extend": "Unable to add time to this room."
     },
     "timeUp": "Booked time is up",
+    "statusLabel": "Room status",
+    "statusInUseHint": "The party in this room sets its status. Close the room to change it.",
     "status": {
       "occupied": "In use",
       "open": "In use"
@@ -2026,6 +2043,13 @@
     "whoServes": "Who gives {{service}}?",
     "whoServesHint": "Pick the hostess. One already in a room can still be picked.",
     "noHostesses": "No hostesses are working now. Add them in admin under Hostesses.",
+    "allLadies": "All ladies…",
+    "whoOrdered": "Who ordered {{item}}?",
+    "searchLady": "Search lady…",
+    "ladiesInThisRoom": "In this room",
+    "ladiesFree": "Free",
+    "ladiesInOtherRooms": "In other rooms",
+    "noLadyMatch": "No lady matches.",
     "hostessFree": "Free",
     "hostessInRoom": "In room {{room}}",
     "hostessInRoomUntil": "In room {{room}} until {{time}}",
@@ -2171,6 +2195,21 @@
     "nextPage": "Next page"
   },
   "shift": {
+    "groups": {
+      "staffMeal": "Staff meal",
+      "other": "Other",
+      "rooms": "Rooms",
+      "takeaway": "Take away",
+      "credit": "Credit",
+      "noAccount": "No account",
+      "qty": "Qty",
+      "hours": "Hours",
+      "orders": "Orders",
+      "bill": "Bill no",
+      "amount": "Amount",
+      "total": "{{name}} total",
+      "note": "Net sales: after discounts, before tax and service charge. FOC counts at 0; voids are left out."
+    },
     "openHint": "Your shift starts now, so your sales are put to you.",
     "openButton": "Open shift",
     "openBy": "{{name}} has a shift open on this POS device.",
@@ -2208,5 +2247,14 @@
     "perLoginShift": "Shift: per login",
     "managerApproval": "Manager approval",
     "managerRequired": "A manager must type their User ID and password."
+  },
+  "itemNote": {
+    "short": "Note",
+    "quickNotes": "Quick notes",
+    "label": "Note for the kitchen",
+    "placeholder": "Note for the kitchen…",
+    "button": "Note",
+    "title": "Note · {{name}}",
+    "save": "Save note"
   }
 }

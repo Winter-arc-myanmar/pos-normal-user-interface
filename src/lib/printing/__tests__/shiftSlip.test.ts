@@ -116,4 +116,58 @@ describe("the shift report slip", () => {
     }).join("\n");
     expect(withoutTips).not.toContain("Tips");
   });
+
+  it("prints the sales by group: each station, rooms in hours, take-away and credit", () => {
+    const text = buildSaleReceiptLines({
+      ...shiftSlip({
+        ...summary,
+        groups: {
+          sections: [
+            {
+              key: "k",
+              kind: "STATION",
+              name: "Kitchen",
+              items: [{ variantId: "v", name: "Fried rice", quantity: 27, amount: 135000 }],
+              quantity: 27,
+              amount: 135000,
+            },
+            { key: "staff-meal", kind: "STAFF_MEAL", name: null, items: [], quantity: 0, amount: 0 },
+          ],
+          rooms: { rows: [{ room: "3", hours: 6.5, amount: 195000 }], hours: 6.5, amount: 195000 },
+          takeaway: { orders: 3, amount: 42000 },
+          credit: {
+            rows: [{ account: "U Kyaw", orderNumber: "SO-1234", amount: 85000 }],
+            amount: 85000,
+          },
+        },
+      }),
+      template: shiftTemplate(),
+    }).join("\n");
+
+    expect(text).toContain("KITCHEN");
+    expect(text).toMatch(/27 x Fried rice\s+135,000/);
+    expect(text).toContain("STAFF MEAL");
+    expect(text).toMatch(/6\.5 h x 3\s+195,000/);
+    expect(text).toMatch(/Total 3 orders\s+42,000/);
+    expect(text).toMatch(/U Kyaw SO-1234\s+85,000/);
+    expect(text.indexOf("KITCHEN")).toBeLessThan(text.indexOf("NET"));
+  });
+
+  it("says 1 order, not 1 orders, for a single take-away", () => {
+    const text = buildSaleReceiptLines({
+      ...shiftSlip({
+        ...summary,
+        groups: {
+          sections: [],
+          rooms: { rows: [], hours: 0, amount: 0 },
+          takeaway: { orders: 1, amount: 18000 },
+          credit: { rows: [], amount: 0 },
+        },
+      }),
+      template: shiftTemplate(),
+    }).join("\n");
+
+    expect(text).toMatch(/Total 1 order\s+18,000/);
+    expect(text).not.toContain("1 orders");
+  });
 });

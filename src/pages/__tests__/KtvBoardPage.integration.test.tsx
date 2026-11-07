@@ -1,8 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { Toaster } from "@/components/ui/Toaster";
 import { KtvBoardPage } from "../KtvBoardPage";
+
+/** Opens every bill row, as tapping each one does. */
+const openBillRows = () =>
+  screen
+    .queryAllByRole("button", { name: /lineDetails/ })
+    .forEach((row) => fireEvent.click(row));
 
 const promotionState: {
   running: Record<string, unknown>[];
@@ -18,7 +24,16 @@ let rentalsState: {
   blockMinutes: number;
   minimumUnits: number;
 }[] = [];
-let orderLinesState: { id: string; variantId: string; quantity: string; unitPrice: string }[] = [];
+let orderLinesState: {
+  id: string;
+  variantId: string;
+  quantity: string;
+  unitPrice: string;
+  hostessId?: string;
+  askWhoServed?: boolean;
+  productName?: string;
+  note?: string;
+}[] = [];
 
 const spaPackages: {
   id: string;
@@ -33,12 +48,14 @@ let venueState: {
   paymentTiming: "PAY_WHEN_ORDERING" | "PAY_AT_END";
   spaMenuOrdering?: boolean;
   ktvMenuOrdering?: boolean;
+  quickNotes?: string[];
 } = {
   paymentTiming: "PAY_WHEN_ORDERING",
 };
 
 const mocks = vi.hoisted(() => ({
   approve: vi.fn(),
+  fetchProduct: vi.fn(),
   fetchBoard: vi.fn(),
   fetchOrderBill: vi.fn(),
   getQuote: vi.fn(),
@@ -53,6 +70,8 @@ const mocks = vi.hoisted(() => ({
   requireCashierContext: vi.fn(),
   printReceipt: vi.fn(),
   loadHostesses: vi.fn(),
+  printKitchen: vi.fn(),
+  listStations: vi.fn(),
   noop: vi.fn(),
 }));
 
@@ -239,6 +258,7 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
     discountReasons: [],
     fetchDiscountReasons: () => Promise.resolve(),
     fetchProducts: mocks.noop,
+    fetchProduct: mocks.fetchProduct,
     fetchProductVariants: mocks.noop,
     fetchPaymentMethods: mocks.noop,
   }),
@@ -271,8 +291,24 @@ vi.mock("@/core/presentation/hooks/usePosWorkspace", () => ({
 vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
   usePrinterConnection: () => ({
     printReceipt: mocks.printReceipt,
-    printKitchen: vi.fn(),
+    printKitchen: mocks.printKitchen,
     error: null,
+  }),
+}));
+
+vi.mock("@/core/presentation/hooks/useKdsStationManagement", () => ({
+  useKdsStationManagement: () => ({
+    listStations: mocks.listStations,
+  }),
+}));
+
+vi.mock("@/core/presentation/hooks/useKdsDeleteSlipShopSetting", () => ({
+  useKdsDeleteSlipShopSetting: () => ({
+    enabled: true,
+    canWrite: false,
+    isSaving: false,
+    error: null,
+    save: vi.fn(),
   }),
 }));
 vi.mock("@/core/presentation/hooks/useCardCapture", () => ({
@@ -322,12 +358,42 @@ describe("KtvBoardPage", () => {
       posSessionId: "pos-session-1",
     });
     mocks.printReceipt.mockResolvedValue(undefined);
+    mocks.printKitchen.mockReset();
+    mocks.printKitchen.mockResolvedValue({ jobs: [], unrouted: [], missingPrinterRoutes: [] });
+    mocks.listStations.mockReset();
+    mocks.listStations.mockResolvedValue({ stations: [] });
   });
 
   it("shows each room with the hourly price that applies now", () => {
     renderPage();
     expect(screen.getByText("ktvPos.boardTitle")).toBeInTheDocument();
     expect(screen.getByText("35,000")).toBeInTheDocument();
+  });
+
+  it("changes a room's status from Manage room", async () => {
+    mocks.updateRoom.mockResolvedValue({ ...freeRoom, status: "CLEANING" });
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "ktvPos.manageRoom" }));
+    fireEvent.change(screen.getByLabelText("ktvPos.statusLabel"), {
+      target: { value: "CLEANING" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "common.save" }));
+
+    await waitFor(() =>
+      expect(mocks.updateRoom).toHaveBeenCalledWith(
+        "ktv-1",
+        expect.objectContaining({ status: "CLEANING" })
+      )
+    );
+  });
+
+  it("leaves the status alone when a party is in the room", () => {
+    rooms = [busyRoom];
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "ktvPos.manageRoom" }));
+
+    expect(screen.queryByLabelText("ktvPos.statusLabel")).not.toBeInTheDocument();
+    expect(screen.getByText("ktvPos.statusInUseHint")).toBeInTheDocument();
   });
 
   it("starts a room for the chosen hours after one card tap", async () => {
@@ -526,6 +592,7 @@ describe("KtvBoardPage", () => {
 
       // Both rates read as room time; only the drinks keep their bill controls.
       expect(await screen.findAllByText("ktvPos.treatmentCharge")).toHaveLength(2);
+      openBillRows();
       expect(screen.getAllByRole("button", { name: "ktvPos.increase" })).toHaveLength(1);
       expect(screen.getAllByRole("button", { name: "ktvPos.refundLine" })).toHaveLength(1);
     });
@@ -565,6 +632,83 @@ describe("KtvBoardPage", () => {
       expect(slip.lines[1]).toEqual(
         expect.objectContaining({ name: "Myanmar Beer", quantity: "1" })
       );
+    });
+
+    it("still names who gave a hostess service on the check slip", async () => {
+      rooms = [busyRoom];
+      orderLinesState = [
+        { id: "line-1", variantId: "variant-ktv", quantity: "1", unitPrice: "40000" },
+        {
+          id: "line-2",
+          variantId: "variant-hostess",
+          quantity: "1",
+          unitPrice: "20000",
+          hostessId: "hostess-snow",
+        },
+        {
+          // A service the board's menu does not list: the line itself says so.
+          id: "line-3",
+          variantId: "variant-off-menu",
+          quantity: "1",
+          unitPrice: "50000",
+          hostessId: "hostess-snow",
+          askWhoServed: true,
+          productName: "Cus Name",
+        },
+        {
+          id: "line-4",
+          variantId: "variant-beer",
+          quantity: "1",
+          unitPrice: "4000",
+          hostessId: "hostess-snow",
+          note: "No ice",
+        },
+      ];
+      renderPage();
+      fireEvent.click(screen.getByRole("button", { name: /K1/ }));
+      expect(await screen.findAllByText("ktvPos.treatmentCharge")).toHaveLength(1);
+
+      fireEvent.click(screen.getByRole("button", { name: "ktvPos.endTreatment" }));
+      fireEvent.click(await screen.findByRole("button", { name: "ktvPos.printBill" }));
+
+      await waitFor(() => expect(mocks.printReceipt).toHaveBeenCalled());
+      const slip = mocks.printReceipt.mock.calls.at(-1)?.[0] as {
+        lines: Array<Record<string, unknown>>;
+      };
+      const row = (name: string) => slip.lines.find((line) => line.name === name);
+      expect(row("Hostess per hour")?.modifiers).toBe("Snow");
+      expect(row("Cus Name")?.modifiers).toBe("Snow");
+      expect(row("Myanmar Beer")?.modifiers).toBeUndefined();
+      // The note for the bar prints under the drink.
+      expect(row("Myanmar Beer")?.remarks).toBe("No ice");
+    });
+
+    it("leaves the lady who ordered a drink off the check slip", async () => {
+      rooms = [busyRoom];
+      orderLinesState = [
+        { id: "line-1", variantId: "variant-ktv", quantity: "1", unitPrice: "40000" },
+        {
+          id: "line-2",
+          variantId: "variant-beer",
+          quantity: "1",
+          unitPrice: "4000",
+          hostessId: "hostess-snow",
+        },
+      ];
+      renderPage();
+      fireEvent.click(screen.getByRole("button", { name: /K1/ }));
+      expect(await screen.findAllByText("ktvPos.treatmentCharge")).toHaveLength(1);
+
+      fireEvent.click(screen.getByRole("button", { name: "ktvPos.endTreatment" }));
+      fireEvent.click(await screen.findByRole("button", { name: "ktvPos.printBill" }));
+
+      await waitFor(() => expect(mocks.printReceipt).toHaveBeenCalled());
+      const slip = mocks.printReceipt.mock.calls.at(-1)?.[0] as {
+        lines: Array<Record<string, unknown>>;
+      };
+      const beer = slip.lines.find((line) => line.name === "Myanmar Beer");
+      expect(beer).toBeDefined();
+      expect(beer?.modifiers).toBeUndefined();
     });
 
     it("adds 2 hours and a 30 min block to a running room", async () => {
@@ -707,6 +851,87 @@ describe("KtvBoardPage", () => {
           "ktv-session-1",
           expect.objectContaining({
             items: [{ variantId: "variant-hostess", quantity: 1, hostessId: "hostess-snow" }],
+          })
+        )
+      );
+    });
+
+    it("sends the note written for the kitchen with the drink", async () => {
+      rooms = [busyRoom];
+      venueState = { ...venueState, quickNotes: ["No ice", "Less sugar"] };
+      mocks.chargeItems.mockResolvedValue({
+        charged: "4000.0000",
+        balanceAfter: "196000.0000",
+        quote: paidQuote,
+      });
+      renderPage();
+      fireEvent.click(screen.getByRole("button", { name: /K1/ }));
+      fireEvent.click(await screen.findByRole("button", { name: /Myanmar Beer/ }));
+
+      fireEvent.click(await screen.findByRole("button", { name: "itemNote.title" }));
+      const dialog = await screen.findByRole("dialog", { name: "itemNote.title" });
+      fireEvent.click(within(dialog).getByRole("button", { name: "No ice" }));
+      fireEvent.click(within(dialog).getByRole("button", { name: "itemNote.save" }));
+
+      expect(await screen.findByText("* No ice")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /ktvPos.addToBill/ }));
+      await tapCard();
+
+      await waitFor(() =>
+        expect(mocks.chargeItems).toHaveBeenCalledWith(
+          "ktv-session-1",
+          expect.objectContaining({
+            items: [{ variantId: "variant-beer", quantity: 1, note: "No ice" }],
+          })
+        )
+      );
+    });
+
+    it("offers the options the menu list leaves out, as the cashier does", async () => {
+      rooms = [busyRoom];
+      mocks.fetchProduct.mockResolvedValueOnce({
+        id: "product-beer",
+        name: "Myanmar Beer",
+        categoryName: "Beer",
+        basePrice: "4000.0000",
+        modifierGroups: [
+          {
+            id: "ice",
+            name: "Ice",
+            minSelection: 0,
+            maxSelection: 1,
+            isRequired: false,
+            modifiers: [{ id: "extra-ice", name: "Extra ice", priceDelta: "500.0000", isDefault: false }],
+          },
+        ],
+      });
+      mocks.chargeItems.mockResolvedValue({
+        charged: "4500.0000",
+        balanceAfter: "195500.0000",
+        quote: paidQuote,
+      });
+      renderPage();
+      fireEvent.click(screen.getByRole("button", { name: /K1/ }));
+      fireEvent.click(await screen.findByRole("button", { name: /Myanmar Beer/ }));
+
+      const dialog = await screen.findByRole("dialog");
+      fireEvent.click(within(dialog).getByRole("radio", { name: /Extra ice/ }));
+      fireEvent.click(within(dialog).getByRole("button", { name: "cashier.productMenu.add" }));
+      expect(mocks.fetchProduct).toHaveBeenCalledWith("product-beer");
+
+      fireEvent.click(await screen.findByRole("button", { name: /ktvPos.addToBill/ }));
+      await tapCard();
+
+      await waitFor(() =>
+        expect(mocks.chargeItems).toHaveBeenCalledWith(
+          "ktv-session-1",
+          expect.objectContaining({
+            items: [
+              expect.objectContaining({
+                variantId: "variant-beer",
+                selectedModifiers: [{ modifierId: "extra-ice" }],
+              }),
+            ],
           })
         )
       );

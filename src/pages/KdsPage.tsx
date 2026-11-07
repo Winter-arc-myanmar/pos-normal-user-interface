@@ -6,6 +6,7 @@ import { KdsTicket } from "@/core/domain/entities/Cashier";
 import { useKdsBoard } from "@/core/presentation/hooks/useKdsBoard";
 import { useKdsStationManagement } from "@/core/presentation/hooks/useKdsStationManagement";
 import { cashierLabel } from "@/lib/printing/cashier";
+import { withOrderedBy } from "@/lib/printing/formatKdsTicket";
 
 const STATION_KEY = "kds-station";
 const POLL_MS = 5000;
@@ -189,14 +190,16 @@ export function KdsPage() {
                                 key: line.id,
                                 name: line.productName,
                                 quantity: line.quantity,
-                                modifiers: line.kitchenModifiers,
+                                modifiers: withOrderedBy(line.kitchenModifiers, line.orderedBy),
+                                note: line.note,
                                 seat: line.seatNumber,
                               }))
                             : (ticket.lines || []).map((line, index) => ({
                                 key: `${ticket.id}-${index}`,
                                 name: line.name,
                                 quantity: line.quantity,
-                                modifiers: line.modifiers,
+                                modifiers: withOrderedBy(line.modifiers, line.orderedBy),
+                                note: line.note,
                                 seat: undefined,
                               }))
                           ).map((line) => (
@@ -214,6 +217,11 @@ export function KdsPage() {
                               </div>
                               {line.modifiers ? (
                                 <p className="break-words text-sm text-amber-300">{line.modifiers}</p>
+                              ) : null}
+                              {line.note ? (
+                                <p className="break-words text-sm font-semibold text-white">
+                                  ** {line.note} **
+                                </p>
                               ) : null}
                             </li>
                           ))}

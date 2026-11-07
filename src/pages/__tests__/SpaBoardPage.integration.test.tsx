@@ -4,6 +4,12 @@ import { MemoryRouter } from "react-router-dom";
 import { Toaster } from "@/components/ui/Toaster";
 import { SpaBoardPage } from "../SpaBoardPage";
 
+/** Opens every bill row, as tapping each one does. */
+const openBillRows = () =>
+  screen
+    .queryAllByRole("button", { name: /lineDetails/ })
+    .forEach((row) => fireEvent.click(row));
+
 let promotionState: {
   running: Record<string, unknown>[];
   discounts: Record<string, { discount: number; names: string[] }>;
@@ -52,6 +58,8 @@ const mocks = vi.hoisted(() => ({
   requireCashierContext: vi.fn(),
   printReceipt: vi.fn(),
   printTicket: vi.fn(),
+  printKitchen: vi.fn(),
+  listStations: vi.fn(),
   listKdsTickets: vi.fn(),
   noop: vi.fn(),
   moveRoom: vi.fn(),
@@ -112,6 +120,7 @@ const scrub = {
   id: "product-scrub",
   tenantId: "tenant-1",
   name: "Foot Scrub",
+  categoryId: "cat-spa-services",
   categoryName: "Spa Services",
   trackingType: "SERVICE",
   basePrice: "6000.0000",
@@ -240,6 +249,7 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
     fetchDiscountReasons: () => Promise.resolve(),
     fetchProducts: mocks.noop,
     fetchProductVariants: mocks.noop,
+    fetchProduct: () => Promise.resolve(undefined),
     fetchPaymentMethods: mocks.noop,
     listKdsTickets: mocks.listKdsTickets,
   }),
@@ -292,9 +302,25 @@ vi.mock("@/core/presentation/hooks/usePosWorkspace", () => ({
 vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
   usePrinterConnection: () => ({
     printReceipt: mocks.printReceipt,
-    printKitchen: vi.fn(),
+    printKitchen: mocks.printKitchen,
     printTicket: mocks.printTicket,
     error: null,
+  }),
+}));
+
+vi.mock("@/core/presentation/hooks/useKdsStationManagement", () => ({
+  useKdsStationManagement: () => ({
+    listStations: mocks.listStations,
+  }),
+}));
+
+vi.mock("@/core/presentation/hooks/useKdsDeleteSlipShopSetting", () => ({
+  useKdsDeleteSlipShopSetting: () => ({
+    enabled: true,
+    canWrite: false,
+    isSaving: false,
+    error: null,
+    save: vi.fn(),
   }),
 }));
 
@@ -361,6 +387,10 @@ describe("SpaBoardPage", () => {
     });
     mocks.printReceipt.mockResolvedValue(undefined);
     mocks.printTicket.mockResolvedValue({ jobs: [], unrouted: [], missingPrinterRoutes: [] });
+    mocks.printKitchen.mockReset();
+    mocks.printKitchen.mockResolvedValue({ jobs: [], unrouted: [], missingPrinterRoutes: [] });
+    mocks.listStations.mockReset();
+    mocks.listStations.mockResolvedValue({ stations: [] });
     mocks.listKdsTickets.mockResolvedValue({ tickets: [] });
     promotionState = { running: [], discounts: {}, promotionName: () => undefined };
     spaPackages = [
@@ -506,6 +536,7 @@ describe("SpaBoardPage", () => {
       },
     ];
     await openRunningRoom();
+    openBillRows();
 
     fireEvent.click(screen.getByRole("button", { name: "spa.decrease" }));
     await waitFor(() =>
@@ -518,6 +549,86 @@ describe("SpaBoardPage", () => {
       expect(mocks.deleteOrderLine).toHaveBeenCalledWith("order-1", "line-1")
     );
     expect(mocks.lookupCard).not.toHaveBeenCalled();
+  });
+
+  it("tells the kitchen to stop when a line already sent is removed", async () => {
+    // The server's line carries no category id; the menu names the station.
+    lines = [
+      {
+        id: "line-1",
+        salesOrderId: "order-1",
+        variantId: "variant-scrub",
+        productName: "Foot Scrub",
+        quantity: "1.0000",
+        unitPrice: "6000.0000",
+        status: "SERVED",
+      },
+    ];
+    mocks.listStations.mockResolvedValue({
+      stations: [
+        {
+          id: "station-1",
+          name: "Kitchen",
+          printerIds: ["printer-1"],
+          routingRules: { categoryIds: ["cat-spa-services"] },
+        },
+      ],
+    });
+    await openRunningRoom();
+    openBillRows();
+
+    fireEvent.click(screen.getByRole("button", { name: "spa.removeLine" }));
+
+    await waitFor(() => expect(mocks.printKitchen).toHaveBeenCalledTimes(1));
+    const [slip, stations, options] = mocks.printKitchen.mock.calls[0];
+    expect(slip.title).toBe("cashier.orderPanel.kdsDeleteTitle");
+    expect(slip.place).toBe("SPA SUITE1");
+    expect(slip.lines).toEqual([
+      expect.objectContaining({
+        name: "Foot Scrub",
+        quantity: "1.0000",
+        categoryId: "cat-spa-services",
+        remarks: "cashier.orderPanel.kdsDeleteTitle",
+      }),
+    ]);
+    expect(stations).toEqual([
+      expect.objectContaining({ id: "station-1", categoryIds: ["cat-spa-services"] }),
+    ]);
+    expect(options).toEqual({ requireStationRouting: true });
+  });
+
+  it("keeps quiet when the kitchen never got the line", async () => {
+    lines = [
+      {
+        id: "line-1",
+        salesOrderId: "order-1",
+        variantId: "variant-scrub",
+        productName: "Foot Scrub",
+        categoryId: "cat-food",
+        quantity: "1.0000",
+        unitPrice: "6000.0000",
+        status: "PENDING",
+      },
+    ];
+    mocks.listStations.mockResolvedValue({
+      stations: [
+        {
+          id: "station-1",
+          name: "Kitchen",
+          printerIds: ["printer-1"],
+          routingRules: { categoryIds: ["cat-food"] },
+        },
+      ],
+    });
+    await openRunningRoom();
+    openBillRows();
+
+    fireEvent.click(screen.getByRole("button", { name: "spa.removeLine" }));
+
+    await waitFor(() =>
+      expect(mocks.deleteOrderLine).toHaveBeenCalledWith("order-1", "line-1")
+    );
+    expect(mocks.printKitchen).not.toHaveBeenCalled();
   });
 
   it("gives the copy a promotion made free a row of its own", async () => {
@@ -550,6 +661,7 @@ describe("SpaBoardPage", () => {
     // One product-card label plus two bill rows: the charged copy and the free
     // one, which reads 0 rather than the menu price.
     expect(screen.getAllByText("Foot Scrub")).toHaveLength(3);
+    openBillRows();
     const decreases = screen.getAllByRole("button", { name: "spa.decrease" });
     expect(decreases).toHaveLength(2);
     fireEvent.click(decreases[1]);
@@ -668,6 +780,7 @@ describe("SpaBoardPage", () => {
     await openRunningRoom();
 
     expect(screen.getByText("spa.foc", { selector: "span" })).toBeInTheDocument();
+    openBillRows();
     expect(screen.queryByRole("button", { name: "spa.decrease" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "spa.removeLine" }));
     await waitFor(() =>
@@ -1150,6 +1263,20 @@ describe("SpaBoardPage", () => {
       );
     });
 
+    it("goes back to the room board when the room order's menu is closed", async () => {
+      await openRunningRoom();
+      // The menu's Close leaves the room order for the board.
+      fireEvent.click(
+        screen.getByRole("button", { name: "cashier.productMenu.close" })
+      );
+
+      expect(await screen.findByRole("button", { name: /SUITE1/ })).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "cashier.productMenu.close" })
+      ).not.toBeInTheDocument();
+      await waitFor(() => expect(mocks.fetchBoard).toHaveBeenCalled());
+    });
+
     it("splits the bill between cash and the guest card, without tax", async () => {
       mocks.closeSession.mockImplementation(async () => {
         roomClosed = true;
@@ -1342,6 +1469,7 @@ describe("SpaBoardPage", () => {
       await openRunningRoom();
 
       expect(screen.getByText("spa.promo")).toBeInTheDocument();
+      openBillRows();
       expect(screen.getByText(/Scrub week/)).toBeInTheDocument();
     });
 
@@ -1379,6 +1507,7 @@ describe("SpaBoardPage", () => {
         },
       ];
       await openRunningRoom();
+      openBillRows();
       fireEvent.click(screen.getByRole("button", { name: "spa.refundLine" }));
 
       expect(await screen.findByText("spa.refundApprovalTitle")).toBeInTheDocument();

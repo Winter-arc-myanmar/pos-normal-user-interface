@@ -240,6 +240,8 @@ export interface UpsertSalesOrderLineDTO {
   name?: string;
   /** The hostess who gave a service, or who ordered an item; null for the customer. */
   hostessId?: string | null;
+  /** A note for the kitchen or bar; null clears it. */
+  note?: string | null;
 }
 
 export type UpdateSalesOrderLineDTO = Partial<UpsertSalesOrderLineDTO>;
@@ -295,6 +297,7 @@ export interface CheckoutRequestDTO {
     name?: string;
     selectedModifiers?: Array<{ modifierId: string }>;
     hostessId?: string;
+    note?: string;
   }>;
   payments: CheckoutPaymentEntryDTO[];
 }
@@ -375,6 +378,8 @@ export interface TableSessionCheckoutDTO {
   includeServiceCharge?: boolean;
   discountReasonId?: string;
   totalDiscount?: number;
+  /** Whose account a credit tender goes on. */
+  customerId?: string;
 }
 
 export interface FireKdsDTO {

@@ -205,8 +205,16 @@ export class QzTrayClient {
     });
   }
 
-  /** Sends ESC/POS to a receipt printer that is plugged in now, ignoring stale Windows queues. */
-  private async printConnectedUsb(binding: PrinterBinding, data: string): Promise<boolean> {
+  /**
+   * Writes ESC/POS straight to a printer that is plugged in now. This is the
+   * last resort: a printer with its Windows driver installed is owned by
+   * usbprint.sys, so QZ cannot claim it and every attempt here fails. The error
+   * of the closest attempt is returned so the caller can say why.
+   */
+  private async printConnectedUsb(
+    binding: PrinterBinding,
+    data: string
+  ): Promise<{ printed: boolean; error?: string }> {
     let devices: UsbPrinterDevice[] = [];
     try {
       devices = this.preferUsbDevices(
@@ -217,20 +225,32 @@ export class QzTrayClient {
             usbDeviceMatchesName(device, binding.deviceName)
         )
       );
-    } catch {
-      return false;
+    } catch (caught) {
+      return { printed: false, error: `QZ could not list USB devices: ${qzError(caught).message}` };
     }
     const selected = devices.filter((device) =>
       usbDeviceMatchesName(device, binding.deviceName)
     );
     if (selected.length) devices = selected;
+    if (!devices.length) {
+      return {
+        printed: false,
+        error: `no USB receipt printer is on the bus${
+          binding.deviceName ? ` for "${binding.deviceName}"` : ""
+        }`,
+      };
+    }
+
+    const failures: string[] = [];
     for (const device of devices) {
       const ids = qzUsbDevice(device);
       if (!ids.vendorId || !ids.productId) continue;
+      const label = usbDeviceLabel(device) || `${ids.vendorId}:${ids.productId}`;
       let interfaces: string[] = [];
       try {
         interfaces = asList(await qz.usb.listInterfaces(ids));
-      } catch {
+      } catch (caught) {
+        failures.push(`${label}: interfaces unreadable (${qzError(caught).message})`);
         continue;
       }
       for (const iface of interfaces) {
@@ -244,21 +264,24 @@ export class QzTrayClient {
             })
           );
           const endpoint = endpoints.map(outEndpoint).find(Boolean);
-          if (!endpoint) continue;
+          if (!endpoint) {
+            failures.push(`${label}: interface ${iface} has no output endpoint`);
+            continue;
+          }
           await qz.usb.sendData({
             ...ids,
             endpoint,
             data: { data: escPosHex(data), type: "HEX" },
           });
-          return true;
-        } catch {
-          // This interface is not the live receipt printer. Try the next one.
+          return { printed: true };
+        } catch (caught) {
+          failures.push(`${label}: ${qzError(caught).message}`);
         } finally {
           await qz.usb.releaseDevice(ids).catch(() => undefined);
         }
       }
     }
-    return false;
+    return { printed: false, error: failures.slice(0, 2).join("; ") };
   }
 
   private async listedUsbQueueNames(): Promise<string[]> {
@@ -348,39 +371,71 @@ export class QzTrayClient {
     this.usbQueueOverride.set(key, usedName);
   }
 
+  private send(binding: PrinterBinding, data: string) {
+    return qz.print(this.config(binding), [
+      { type: "raw", format: "command", flavor: "hex", data: escPosHex(data) },
+    ]);
+  }
+
+  /**
+   * A USB printer prints through its Windows queue first. A printer with a
+   * driver installed is owned by usbprint.sys, so claiming it raw always fails,
+   * while the queue prints - and the queue is also what survives a changed USB
+   * port or a switched-off printer coming back. Only a printer with no queue at
+   * all is written to directly.
+   */
+  private async printUsb(binding: PrinterBinding, data: string): Promise<void> {
+    const problems: string[] = [];
+    const candidates = await this.usbQueueCandidates(binding).catch((caught) => {
+      problems.push(qzError(caught).message);
+      return [] as PrinterBinding[];
+    });
+
+    let queueError: Error | null = null;
+    for (const target of candidates) {
+      try {
+        await this.send(target, data);
+        this.rememberUsbQueue(binding, target.deviceName);
+        return;
+      } catch (caught) {
+        queueError = qzError(caught);
+        problems.push(`${target.deviceName || target.displayName}: ${queueError.message}`);
+        // A queue that answers with anything but a "gone/offline" error is not
+        // going to print on the next candidate either.
+        if (!isRetryableUsbQueueError(queueError.message)) throw queueError;
+      }
+    }
+
+    const device = await this.printConnectedUsb(binding, data);
+    if (device.printed) return;
+    if (device.error) problems.push(device.error);
+
+    // A queue that failed keeps its own wording, so the caller can still say
+    // "this printer is not installed" the way it did before.
+    if (queueError) throw queueError;
+    throw new Error(
+      `The USB printer "${binding.deviceName || binding.displayName}" is not reachable. ` +
+        "Install its driver so Windows owns a print queue for it, name that queue like POS-80, " +
+        "then tap Discover and pick the queue. " +
+        (problems.length ? `(${problems.join(" | ")})` : "")
+    );
+  }
+
   private async printRaw(binding: PrinterBinding, data: string): Promise<void> {
     await this.connect();
     try {
-      if (binding.transport === "USB" && (await this.printConnectedUsb(binding, data))) {
+      if (binding.transport === "USB") {
+        await this.printUsb(binding, data);
         return;
       }
-      if (binding.transport === "USB") {
-        const candidates = await this.usbQueueCandidates(binding);
-        let lastError: Error | null = null;
-        for (const target of candidates) {
-          try {
-            await qz.print(this.config(target), [
-              { type: "raw", format: "command", flavor: "hex", data: escPosHex(data) },
-            ]);
-            this.rememberUsbQueue(binding, target.deviceName);
-            return;
-          } catch (caught) {
-            lastError = qzError(caught);
-            if (!isRetryableUsbQueueError(lastError.message)) throw lastError;
-          }
-        }
-        throw lastError ?? new Error("USB printer is not connected. Plug it in and try again.");
-      }
-      await qz.print(this.config(binding), [
-        { type: "raw", format: "command", flavor: "hex", data: escPosHex(data) },
-      ]);
+      await this.send(binding, data);
     } catch (caught) {
       const error = qzError(caught);
       if (/Cannot find printer with name|printer .* not found/i.test(error.message)) {
         if (binding.transport === "USB") {
           throw new Error(
             `USB printer "${binding.deviceName || binding.displayName}" could not be opened. ` +
-              "Tap Discover, pick the connected USB device, then Test print again."
+              "Tap Discover, pick its Windows print queue (name it like POS-80), then Test print again."
           );
         }
         const name = binding.deviceName || binding.displayName;

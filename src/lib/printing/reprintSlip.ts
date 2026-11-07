@@ -8,7 +8,7 @@ import { sessionPrintTimes } from "./formatKdsTicket";
 import { modifierPrintText } from "./modifierText";
 import { slipRows } from "@/lib/spa/billLines";
 import { groupRoomTimeRows, mergedRoomTimeLine } from "./roomTimeRows";
-import { isKtvRoomTimeLine, roomTimeNamer, slipTimeRange } from "@/lib/spa/manualTimes";
+import { isKtvRoomTimeLine, roomTimeNamer, slipSessionCount, slipTimeRange } from "@/lib/spa/manualTimes";
 
 /** The words a slip prints, in the till's language, as the original slip used them. */
 export interface SlipText {
@@ -58,6 +58,7 @@ const merged = (lines: (PrintLine & { variantId: string })[]) => {
       line.modifiers,
       line.modifierPrices,
       line.promotion,
+      line.remarks,
     ]);
     const existing = rows.get(key);
     if (!existing) {
@@ -120,7 +121,14 @@ export function reprintSlip(input: ReprintInput): SaleReceipt {
   };
 
   if (room) {
-    const named = roomTimeNamer(kept, slipTimeRange(room.manualInAt, room.manualOutAt));
+    const named = roomTimeNamer(
+      kept,
+      slipTimeRange(room.manualInAt, room.manualOutAt),
+      // A KTV room is sold by the hour, so the slip says how many it was.
+      room.kind === "KTV"
+        ? slipSessionCount(room.manualInAt, room.manualOutAt)
+        : undefined
+    );
     const prepaid = (order.payments || []).every(
       (payment) => String(payment.methodKind || "").toUpperCase() === "GUEST_CARD"
     );
@@ -144,6 +152,7 @@ export function reprintSlip(input: ReprintInput): SaleReceipt {
           unitPrice: line.unitPrice?.trim() || undefined,
           modifiers: modifiers.names,
           modifierPrices: modifiers.prices,
+          ...(line.note ? { remarks: line.note } : {}),
         };
       }),
       amounts: tipRow ?? [],
@@ -175,6 +184,7 @@ export function reprintSlip(input: ReprintInput): SaleReceipt {
       categoryName: line.categoryName,
       modifiers: modifiers.names,
       modifierPrices: modifiers.prices,
+      ...(line.note ? { remarks: line.note } : {}),
       ...(saving && saving.amount > 0
         ? {
             promotion: line.promotionNames?.join(", ") || text.promo,

@@ -1,9 +1,12 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/core/presentation/hooks/useAuth";
+import { useKdsDeleteSlipShopSetting } from "@/core/presentation/hooks/useKdsDeleteSlipShopSetting";
+import { useKdsStationManagement } from "@/core/presentation/hooks/useKdsStationManagement";
 import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
 import { useDateFormatter } from "@/lib/i18n/formatters";
 import { lineDisplayName } from "@/lib/pos/orderListDisplay";
+import { isPendingKdsLine } from "@/lib/pos/kdsLines";
 import { useLocation, useNavigate } from "react-router-dom";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Button } from "@/components/ui/Button";
@@ -19,9 +22,14 @@ import {
   findMemberCardPaymentMethod,
   LOCAL_MEMBER_CARD_METHOD_ID,
 } from "@/core/application/services/PosPaymentCatalog";
-import { PaymentMethod, Product, SalesOrderLine } from "@/core/domain/entities/Cashier";
+import { ChosenModifier, PaymentMethod, Product, SalesOrderLine } from "@/core/domain/entities/Cashier";
+import { ItemNoteDialog } from "@/components/notes/ItemNoteDialog";
 import { GuestCard, GuestWallet } from "@/core/domain/entities/GuestWallet";
-import { SpaRoom, SpaSession } from "@/core/domain/entities/Spa";
+import {
+  SpaRoom,
+  SpaRoomStatus,
+  SpaSession,
+} from "@/core/domain/entities/Spa";
 import { useCashier } from "@/core/presentation/hooks/useCashier";
 import { useGuestWalletManagement } from "@/core/presentation/hooks/useGuestWalletManagement";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
@@ -47,7 +55,7 @@ import {
   cardCanCover,
   estimateCardCharge,
 } from "@/lib/spa/payment";
-import { withOrderTipOnFirstPayment } from "@/lib/pos/checkoutAdjustments";
+import { lineFocDiscount, withOrderTipOnFirstPayment } from "@/lib/pos/checkoutAdjustments";
 import { freeTimeFor } from "@/lib/spa/freeTime";
 import type { RentalChoice } from "@/lib/spa/freeTime";
 import {
@@ -72,8 +80,10 @@ import {
   focPending,
   paidPending,
   PendingItem,
+  pendingKey,
   pendingOrderItems,
   setOrderedBy,
+  setPendingNote,
   pendingSaving,
   pendingTotal,
   toggleOneFoc,
@@ -102,10 +112,15 @@ import {
   ManualTimes,
   manualTimesBackwards,
   roomTimeNamer,
+  slipSessionCount,
   slipTimeRange,
 } from "@/lib/spa/manualTimes";
-import { slipRows } from "@/lib/spa/billLines";
+import { BillLineGroup, isGivenFree, slipRows } from "@/lib/spa/billLines";
+import { linePriceNote } from "@/lib/pos/linePrice";
+import { modifierExtra } from "@/lib/modifiers/choices";
+import { LineEditDialog, type LineEdit } from "./cashier/LineEditDialog";
 import { modifierPrintText } from "@/lib/printing/modifierText";
+import { applyKdsTicketHostess } from "@/lib/printing/kdsTicketModifiers";
 import { receiptTotals } from "@/lib/printing/receiptTotals";
 import { groupRoomTimeRows, mergedRoomTimeLine } from "@/lib/printing/roomTimeRows";
 import { cashierLabel } from "@/lib/printing/cashier";
@@ -141,7 +156,14 @@ const emptyRoomForm = {
   sessionPrice: "",
   treatmentMinutes: "60",
   graceMinutes: "15",
+  status: "AVAILABLE",
 };
+
+/**
+ * The KTV room states a cashier sets by hand. In use and paused belong to the
+ * party in the room, so the room's own status only changes between parties.
+ */
+const KTV_ROOM_STATUSES: SpaRoomStatus[] = ["AVAILABLE", "CLEANING", "OUT_OF_SERVICE"];
 
 /** The products behind room time and SPA packages, which are not on the menu. */
 /**
@@ -188,10 +210,12 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     discountReasons,
     fetchDiscountReasons,
     fetchProducts,
+    fetchProduct,
     fetchProductVariants,
     fetchPaymentMethods,
     listKdsTickets,
     addExtraFeeLine,
+    splitOrderLine,
   } = useCashier();
   const {
     orderLines,
@@ -212,6 +236,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     activePosRegisterId,
     activeLocationId
   );
+  const { listStations } = useKdsStationManagement();
+  const kdsDeleteSlip = useKdsDeleteSlipShopSetting();
 
   const [step, setStep] = useState<SpaStep>("rooms");
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -237,7 +263,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const [billOptionsOpen, setBillOptionsOpen] = useState(false);
   const [splitCash, setSplitCash] = useState(false);
   const [cashAmount, setCashAmount] = useState("");
-  const { fees: extraFees } = useExtraFees();
+  const { fees: extraFees, isFeeLine } = useExtraFees();
   const [extraFeeOpen, setExtraFeeOpen] = useState(false);
   const { moveRoom, mergeRoom, splitRoom } = useRoomFloor(kind);
   const [floorMode, setFloorMode] = useState<RoomFloorMode | null>(null);
@@ -257,6 +283,9 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const [confirmEnd, setConfirmEnd] = useState(false);
   // Charged items waiting for a manager before their money goes back to the card.
   const [refundApproval, setRefundApproval] = useState<SalesOrderLine[] | null>(null);
+  // A bill row being changed in Edit item: its price, FOC or who ordered it.
+  const [editingRow, setEditingRow] = useState<BillLineGroup | null>(null);
+  const [isSavingLine, setIsSavingLine] = useState(false);
   const tapKeys = useRef<Partial<Record<CardAction, string>>>({});
   const [showRoomForm, setShowRoomForm] = useState(false);
   const [editingRoom, setEditingRoom] = useState<SpaRoom | null>(null);
@@ -277,7 +306,11 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     variantId: string;
     unitPrice: number;
     quantity: number;
+    modifiers?: ChosenModifier[];
+    note?: string;
   } | null>(null);
+  // The pending row whose note for the kitchen is being written.
+  const [noteFor, setNoteFor] = useState<string | null>(null);
 
   const room = rooms.find((item) => item.id === selectedRoomId) || null;
   const isSpa = kind === "spa";
@@ -308,11 +341,16 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     manualInAt: fromLocalInput(manualTimes.inAt),
     manualOutAt: fromLocalInput(manualTimes.outAt),
   });
-  const slipNamer = (lines: SalesOrderLine[]) =>
-    roomTimeNamer(
+  const slipNamer = (lines: SalesOrderLine[]) => {
+    const inAt = fromLocalInput(manualTimes.inAt);
+    const outAt = fromLocalInput(manualTimes.outAt);
+    return roomTimeNamer(
       lines,
-      slipTimeRange(fromLocalInput(manualTimes.inAt), fromLocalInput(manualTimes.outAt))
+      slipTimeRange(inAt, outAt),
+      // A KTV room is sold by the hour, so the slip says how many it was.
+      isSpa ? undefined : slipSessionCount(inAt, outAt)
     );
+  };
   const timesBackwards = !billClosed && manualTimesBackwards(manualTimes);
   const manualTimesFields =
     session && !billClosed ? (
@@ -361,6 +399,32 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const chargedLines = orderLines.filter(
     (line) => !["VOIDED", "COMPED"].includes(String(line.status || "").toUpperCase())
   );
+  const menuItemOf = useMemo(() => {
+    const items: Record<string, { product: Product; priceModifier?: string }> = {};
+    for (const product of products) {
+      for (const variant of variantsByProductId[product.id] || []) {
+        items[variant.id] = { product, priceModifier: variant.priceModifier };
+      }
+    }
+    return items;
+  }, [products, variantsByProductId]);
+  /**
+   * What the menu charges for one of a line, so a price changed on this bill shows
+   * as one. Room time has none: its rate changes with the hour.
+   */
+  const menuPriceFor = (line: SalesOrderLine) => {
+    if (isFeeLine(line) || line.variantId === room?.rateVariantId) return undefined;
+    const booked = spaPackages.find((item) => item.variantId === line.variantId);
+    if (booked) return booked.price;
+    const item = menuItemOf[line.variantId];
+    if (item?.product.kind === "RENTAL") return undefined;
+    const listPrice = item
+      ? Number(item.product.basePrice || 0) + Number(item.priceModifier || 0)
+      : line.menuPrice !== undefined
+        ? Number(line.menuPrice)
+        : undefined;
+    return listPrice === undefined ? undefined : listPrice + modifierExtra(line.selectedModifiers);
+  };
   const billOptions = useBillOptions({
     billKey: endBillOrderId || "none",
     orderId: endBillOrderId,
@@ -402,9 +466,10 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const endBreakdown = endBillOrderId
     ? billBreakdown({
         lines: chargedLines,
-        menuPrice: () => undefined,
+        menuPrice: menuPriceFor,
         itemsTotal: serverBill ? Number(serverBill.subtotal) + timeNotOnLines : endBillDue,
-        billDiscount: serverBill ? Number(serverBill.totalDiscount) : 0,
+        // The server's total discount holds the items' own (FOC, item discounts) too.
+        billDiscount: Number(billDiscount) || 0,
         serviceCharge: serverBill ? Number(serverBill.serviceCharge) : 0,
         tax: serverBill ? Number(serverBill.addedTax) + Number(serverBill.serviceChargeTax) : 0,
         includedTax: serverBill
@@ -480,22 +545,36 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         const name = hostessName(id);
         return name ? [{ id, name }] : [];
       });
+  const isHostessService = (line: SalesOrderLine) =>
+    Boolean(line.askWhoServed) || serviceVariantIds.has(line.variantId);
   const orderedByName = (line: SalesOrderLine) =>
-    line.hostessId && !serviceVariantIds.has(line.variantId)
+    line.hostessId && !isHostessService(line)
       ? hostessName(line.hostessId) || tr("aHostess")
       : undefined;
-  /** A printed line's options, then the name of the hostess who ordered it. */
-  const printedExtras = (line: SalesOrderLine) => {
+  /**
+   * The hostess a printed line names: who gave a hostess service, on every slip;
+   * who ordered a dish or drink, except on the check slip.
+   */
+  const slipHostess = (line: SalesOrderLine, withOrderedBy: boolean) => {
+    if (!line.hostessId) return undefined;
+    if (isHostessService(line)) return hostessName(line.hostessId) || tr("aHostess");
+    return withOrderedBy ? orderedByName(line) : undefined;
+  };
+  /** A printed line's options, then the name of its hostess. */
+  const printedExtras = (line: SalesOrderLine, withOrderedBy = true) => {
     const modifiers = modifierPrintText(line.selectedModifiers);
-    const who = orderedByName(line);
+    const who = slipHostess(line, withOrderedBy);
     if (!who) return modifiers;
     return {
       names: [modifiers.names, who].filter(Boolean).join(", "),
       prices: [modifiers.prices, "-"].filter(Boolean).join(", "),
     };
   };
-  /** The bill's rows as the slip prints them: one row per item, as the bill shows it. */
-  const receiptLines = (printedLines: SalesOrderLine[]) => {
+  /**
+   * The bill's rows as the slip prints them: one row per item, as the bill shows it.
+   * The check slip the guests read before paying leaves out which lady ordered what.
+   */
+  const receiptLines = (printedLines: SalesOrderLine[], withOrderedBy = true) => {
     const name = slipNamer(printedLines);
     // A room sold at more than one rate is one row on the paper, priced per rate.
     const isRoomRate = (line: SalesOrderLine) =>
@@ -507,13 +586,17 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         lineDisplayName(line) || line.productName || itemNames[line.variantId] || tr("item")
       );
       if (group.rows.length > 1) return mergedRoomTimeLine(group, printed);
-      const modifiers = printedExtras(line);
+      const modifiers = printedExtras(line, withOrderedBy);
+      const note = isGivenFree(line) || line.appliedPromotionId
+        ? undefined
+        : linePriceNote(line.unitPrice, menuPriceFor(line));
       return {
-        name: printed,
+        name: note ? t(`cashier.orderPanel.priceNote.${note}`, { name: printed }) : printed,
         quantity: String(group.rows[0].quantity || line.quantity || "1"),
         unitPrice: line.unitPrice?.trim() || undefined,
         modifiers: modifiers.names,
         modifierPrices: modifiers.prices,
+        ...(line.note ? { remarks: line.note } : {}),
       };
     });
   };
@@ -1084,8 +1167,20 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     if (!salesOrderId || !before) return;
     try {
       const { tickets } = await listKdsTickets({ salesOrderId, limit: 100 });
-      for (const ticket of tickets.filter((item) => !before.has(item.id))) {
-        await printer.printTicket(ticket);
+      const fresh = tickets.filter((item) => !before.has(item.id));
+      if (!fresh.length) return;
+      // The kitchen slip names the lady who ordered a line; the ticket the server
+      // sends need not, so the order lines fill her in before it prints.
+      const needsNames = fresh.some((ticket) =>
+        ticket.kdsTicketLines?.some((line) => !line.orderedBy?.trim())
+      );
+      const lines = needsNames
+        ? await fetchOrderLines(salesOrderId, { page: 1, limit: 200 })
+            .then((result) => result.lines || [])
+            .catch(() => orderLines)
+        : orderLines;
+      for (const ticket of fresh) {
+        await printer.printTicket(applyKdsTicketHostess(ticket, lines, hostessName));
       }
     } catch (caught) {
       setActionError(
@@ -1093,6 +1188,72 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           error: caught instanceof Error ? caught.message : t("roomOrders.printFailed"),
         })
       );
+    }
+  };
+
+  /**
+   * Tells the kitchen to stop making lines the room no longer has: a DELETE slip
+   * on each line's station printer, when the shop prints them. Nothing prints for
+   * a line the kitchen never got, and a print problem never undoes the removal.
+   * Returns what the shop should be told, or null when all printed.
+   */
+  const printKdsDelete = async (removed: SalesOrderLine[]) => {
+    if (!kdsDeleteSlip.enabled) return null;
+    const printed = removed.filter((line) => !isPendingKdsLine(line));
+    if (!printed.length) return null;
+    const title = t("cashier.orderPanel.kdsDeleteTitle");
+    try {
+      const listed = activeLocationId
+        ? await listStations({ page: 1, limit: 100, locationId: activeLocationId })
+        : { stations: [] };
+      // With no station there is no printer to tell, so the removal stays quiet.
+      if (!listed.stations.length) return null;
+      const plan = await printer.printKitchen(
+        {
+          title,
+          firedAt: new Date().toISOString(),
+          orderRef: quote?.orderNumber || undefined,
+          place: `${kind === "ktv" ? "KTV" : "SPA"} ${room?.roomNumber || ""}`.trim(),
+          sentBy: cashierLabel(user),
+          lines: printed.map((line) => {
+            const modifiers = modifierPrintText(line.selectedModifiers);
+            const menuItem = menuItemOf[line.variantId];
+            return {
+              name: lineDisplayName(line) || line.productName || tr("item"),
+              quantity: String(line.quantity || "1"),
+              // The line the server kept carries no category id, so the station
+              // is named from the menu; without it there is nothing to route.
+              categoryId: line.categoryId || menuItem?.product.categoryId,
+              modifiers: modifiers.names,
+              modifierPrices: modifiers.prices,
+              // The line prints the same name, marked as gone.
+              remarks: title,
+            };
+          }),
+        },
+        listed.stations.map((station) => ({
+          id: station.id,
+          name: station.name,
+          printerIds: station.printerIds,
+          categoryIds: station.routingRules.categoryIds,
+        })),
+        { requireStationRouting: true }
+      );
+      // A line no station routes never reached the kitchen, so there is nothing
+      // to call back; a station with no printer bound here is worth saying.
+      const problems: string[] = [];
+      if (plan.missingPrinterRoutes.length) {
+        problems.push(
+          t("cashier.errors.kdsPrinterUnavailable", {
+            stations: plan.missingPrinterRoutes
+              .map((route) => route.stationName)
+              .join(", "),
+          })
+        );
+      }
+      return problems.length ? problems.join(" ") : null;
+    } catch (error) {
+      return error instanceof Error ? error.message : t("cashier.errors.kdsFailed");
     }
   };
 
@@ -1358,6 +1519,9 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           quantity: item.quantity.toFixed(4),
           unitPrice: item.unitPrice.toFixed(4),
           lineDiscount: "0.0000",
+          ...(item.modifiers?.length ? { selectedModifiers: item.modifiers } : {}),
+          ...(item.hostessId ? { hostessId: item.hostessId } : {}),
+          ...(item.note ? { note: item.note } : {}),
         });
         remaining = remaining.filter((entry) => entry !== item);
         added += item.quantity;
@@ -1549,7 +1713,13 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     else requestCard("open");
   };
 
-  const handleAddProduct = async (product: Product, variantId: string, quantity: number) => {
+  const handleAddProduct = async (
+    product: Product,
+    variantId: string,
+    quantity: number,
+    modifiers?: ChosenModifier[],
+    note?: string
+  ) => {
     if (!session || billClosed) throw new Error(tr("errors.sessionRequired"));
     const variants = variantsByProductId[product.id]?.length
       ? variantsByProductId[product.id]
@@ -1557,20 +1727,26 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     const variant = variants.find((item) => item.id === variantId) || variants[0];
     if (!variant) throw new Error(t("cashier.productMenu.noVariant"));
     setNotice(null);
-    const unitPrice = Number(product.basePrice || 0) + Number(variant.priceModifier || 0);
+    const unitPrice =
+      Number(product.basePrice || 0) + Number(variant.priceModifier || 0) + modifierExtra(modifiers);
+    const extras = {
+      ...(modifiers?.length ? { modifiers } : {}),
+      ...(note ? { note } : {}),
+    };
     if (!isSpa && product.askWhoServed) {
-      setHostessFor({ product, variantId: variant.id, unitPrice, quantity: Math.max(1, quantity) });
+      setHostessFor({
+        product,
+        variantId: variant.id,
+        unitPrice,
+        quantity: Math.max(1, quantity),
+        ...extras,
+      });
       return;
     }
     setPending((current) =>
       addPending(
         current,
-        {
-          variantId: variant.id,
-          productId: product.id,
-          name: product.name,
-          unitPrice: Number(product.basePrice || 0) + Number(variant.priceModifier || 0),
-        },
+        { variantId: variant.id, productId: product.id, name: product.name, unitPrice, ...extras },
         Math.max(1, quantity)
       )
     );
@@ -1578,7 +1754,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
 
   const pickHostess = (hostess: Hostess) => {
     if (!hostessFor) return;
-    const { product, variantId, unitPrice, quantity } = hostessFor;
+    const { product, variantId, unitPrice, quantity, modifiers, note } = hostessFor;
     const who = hostess.nickname || hostess.name;
     setPending((current) =>
       addPending(
@@ -1591,6 +1767,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           hostessId: hostess.id,
           hostessName: who,
           service: true,
+          ...(modifiers?.length ? { modifiers } : {}),
+          ...(note ? { note } : {}),
         },
         quantity
       )
@@ -1632,8 +1810,13 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     const next = Number(target.quantity || 0) - 1;
     setActionError(null);
     try {
-      if (next <= 0) await deleteOrderLine(session.salesOrderId, target.id);
-      else await updateOrderLine(session.salesOrderId, target.id, { quantity: next.toFixed(4) });
+      if (next <= 0) {
+        await deleteOrderLine(session.salesOrderId, target.id);
+        const problem = await printKdsDelete([target]);
+        if (problem) setActionError(problem);
+      } else {
+        await updateOrderLine(session.salesOrderId, target.id, { quantity: next.toFixed(4) });
+      }
       await refreshBill(session);
     } catch (caught) {
       setActionError(caught instanceof Error ? caught.message : tr("errors.editLine"));
@@ -1680,6 +1863,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       for (const source of sources) await deleteOrderLine(session.salesOrderId, source.id);
       await refreshBill(session);
       setNotice(tr("lineRemoved"));
+      const problem = await printKdsDelete(sources);
+      if (problem) setActionError(problem);
     } catch (caught) {
       setActionError(caught instanceof Error ? caught.message : tr("errors.editLine"));
     }
@@ -1692,6 +1877,65 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       return;
     }
     for (const line of [...group].reverse()) await removeLine(line, approverToken);
+  };
+
+  /**
+   * Saves the cashier's Edit item on a row: the newest lines take the change
+   * first, and one only partly covered is split so the rest keeps its price.
+   */
+  const editRow = async (group: BillLineGroup, edit: LineEdit) => {
+    const orderId = session?.salesOrderId;
+    if (!session || !orderId || billClosed) return;
+    const fee = isFeeLine(group.lines[0]);
+    const unitPrice = (entry: SalesOrderLine) =>
+      fee ? entry.unitPrice || "0.0000" : edit.unitPrice.toFixed(4);
+    const hostessOf = (entry: SalesOrderLine) =>
+      edit.orderedBy === undefined ? entry.hostessId : edit.orderedBy || undefined;
+    const noteOf = (entry: SalesOrderLine) =>
+      edit.note === undefined ? entry.note : edit.note || undefined;
+    const unchanged = (entry: SalesOrderLine) =>
+      Number(unitPrice(entry)) === Number(entry.unitPrice || 0) &&
+      edit.foc === isGivenFree(entry) &&
+      (hostessOf(entry) || null) === (entry.hostessId || null) &&
+      (noteOf(entry) || null) === (entry.note || null);
+    let left = edit.quantity;
+    const plan: Array<{ entry: SalesOrderLine; take: number }> = [];
+    for (const entry of [...group.lines].reverse()) {
+      if (left <= 0) break;
+      const take = Math.min(left, Number(entry.quantity || 0));
+      if (take > 0) plan.push({ entry, take });
+      left -= take;
+    }
+    setActionError(null);
+    setIsSavingLine(true);
+    try {
+      for (const { entry, take } of plan) {
+        if (unchanged(entry)) continue;
+        const quantity = take.toFixed(4);
+        const target =
+          take < Number(entry.quantity || 0) - 0.00005
+            ? await splitOrderLine(orderId, entry.id, quantity)
+            : entry;
+        const price = unitPrice(target);
+        await updateOrderLine(orderId, target.id, {
+          quantity,
+          unitPrice: price,
+          lineDiscount: edit.foc
+            ? lineFocDiscount({ quantity, unitPrice: price })
+            : isGivenFree(entry)
+              ? "0.0000"
+              : target.lineDiscount || "0.0000",
+          ...(edit.orderedBy !== undefined ? { hostessId: edit.orderedBy } : {}),
+          ...(edit.note !== undefined ? { note: edit.note } : {}),
+        });
+      }
+      setEditingRow(null);
+    } catch (caught) {
+      setActionError(caught instanceof Error ? caught.message : tr("errors.editLine"));
+    } finally {
+      setIsSavingLine(false);
+      await refreshBill(session);
+    }
   };
 
   const changeRooms = async (
@@ -1758,7 +2002,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         endTime: formatDateTime(new Date().toISOString()),
         startTimeLabel: t("receipt.startTime"),
         endTimeLabel: t("receipt.endTime"),
-        lines: receiptLines(printedLines),
+        lines: receiptLines(printedLines, false),
         ...(items !== undefined ? { subtotal: items.toFixed(4) } : {}),
         ...(totals.discount ? { discount: totals.discount } : {}),
         ...(totals.tax ? { tax: totals.tax } : {}),
@@ -2146,6 +2390,19 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     else requestCard("pay");
   };
 
+  /**
+   * Closing the room order's menu leaves it for the board, which lists the room
+   * again. Items still in the tray would go with it, so say so instead.
+   */
+  const closeRoomOrder = () => {
+    if (pending.length) {
+      setActionError(tr("errors.pendingItems"));
+      return;
+    }
+    void fetchBoard();
+    backToBoard();
+  };
+
   const handleSaveRoom = async (event: FormEvent) => {
     event.preventDefault();
     if (!activeLocationId) return;
@@ -2168,6 +2425,11 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           incrementMinutes: minutes,
           graceMinutes: Number(roomForm.graceMinutes),
           roundingMode: "DOWN" as const,
+          // PATCH takes the room's status too, but only a change is sent: a room
+          // with a party in it keeps the state the party gave it.
+          ...(editingRoom && roomForm.status !== editingRoom.status
+            ? { status: roomForm.status as SpaRoomStatus }
+            : {}),
         };
     try {
       if (editingRoom) await updateRoom(editingRoom.id, terms);
@@ -2190,9 +2452,13 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       sessionPrice: managed.sessionPrice == null ? "" : String(managed.sessionPrice),
       treatmentMinutes: String(managed.minimumMinutes),
       graceMinutes: String(managed.graceMinutes),
+      status: managed.status || "AVAILABLE",
     });
     setShowRoomForm(true);
   };
+
+  /** A room with a party in it shows that party's state, so its status is not picked. */
+  const editingRoomInUse = Boolean(editingRoom && findActiveSpaSession(editingRoom));
 
   const goBack = () => {
     setActionError(null);
@@ -2220,6 +2486,11 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <LanguageSwitcher />
+          {/* Tablet-order printing sits here, not over the bill: the board has no side rail. */}
+          <div
+            id="pos-tablet-print-settings"
+            className="relative [&_details>label]:absolute [&_details>label]:right-0 [&_details>label]:top-full [&_details>label]:z-50 [&_details>label]:mt-1 [&_details>label]:w-60 [&_details>label]:rounded [&_details>label]:border [&_details>label]:border-white/10 [&_details>label]:bg-slate-900"
+          />
           {step !== "rooms" && !(step === "pay" && billClosed) && !paid ? (
             <Button variant="secondary" onClick={goBack}>
               {step === "pay" ? t("cardTopup.back") : tr("backToBoard")}
@@ -2499,11 +2770,30 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             </form>
           ) : null}
           {openSessions.length === 0 && room.status !== "AVAILABLE" ? (
-            <p className="text-slate-400">
-              {tr("roomNotAvailable", {
-                status: tr(`status.${room.status.toLowerCase()}`),
-              })}
-            </p>
+            <div className="space-y-3">
+              <p className="text-slate-400">
+                {tr("roomNotAvailable", {
+                  status: tr(`status.${room.status.toLowerCase()}`),
+                })}
+              </p>
+              {room.status === "OCCUPIED" || room.status === "CLEANING" ? (
+                <Button
+                  variant="outline"
+                  isLoading={isLoading}
+                  onClick={async () => {
+                    setActionError(null);
+                    try {
+                      await markRoomReady(room.id);
+                      await fetchBoard();
+                    } catch (caught) {
+                      setActionError(caught instanceof Error ? caught.message : tr("errors.saveRoom"));
+                    }
+                  }}
+                >
+                  {tr("markReady")}
+                </Button>
+              ) : null}
+            </div>
           ) : null}
         </div>
       ) : null}
@@ -2576,8 +2866,12 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             extraFeeLabel={t("cashier.extraFee.button")}
             onAddExtraFee={endBillOrderId && !paid ? () => setExtraFeeOpen(true) : undefined}
             orderers={orderers}
+            allLadies={isSpa ? undefined : workingHostesses}
             onOrderedBy={(key, hostess) => setPending((current) => setOrderedBy(current, key, hostess))}
+            onNotePending={setNoteFor}
             orderedByName={orderedByName}
+            menuPrice={menuPriceFor}
+            onEditLine={endBillOrderId && !paid ? setEditingRow : undefined}
           />
 
           {step === "menu" && !menuAllowed && isSpa ? (
@@ -2625,7 +2919,10 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                   orderedProductQuantities={pendingByProduct}
                   onLoadVariants={fetchProductVariants}
                   onAdd={handleAddProduct}
-                  onClose={goToPay}
+                  onClose={closeRoomOrder}
+                  offerOptions
+                  quickNotes={venue.quickNotes}
+                  onLoadProduct={fetchProduct}
                 />
               </div>
             </div>
@@ -2941,6 +3238,67 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           onClose={() => setFloorMode(null)}
         />
       ) : null}
+
+      {noteFor ? (() => {
+        const item = pending.find((entry) => pendingKey(entry) === noteFor);
+        return item ? (
+          <ItemNoteDialog
+            name={item.name}
+            note={item.note}
+            quickNotes={venue.quickNotes}
+            onSave={(note) => {
+              setPending((current) => setPendingNote(current, noteFor, note));
+              setNoteFor(null);
+            }}
+            onClose={() => setNoteFor(null)}
+          />
+        ) : null;
+      })() : null}
+
+      {editingRow ? (() => {
+        const [line] = editingRow.lines;
+        const isBooked =
+          line.variantId === room?.rateVariantId ||
+          rentalVariantIds.has(line.variantId) ||
+          packageVariantIds.has(line.variantId);
+        const fee = isFeeLine(line);
+        return (
+          <LineEditDialog
+            key={editingRow.key}
+            name={
+              isBooked && !packageVariantIds.has(line.variantId)
+                ? tr("treatmentCharge")
+                : line.productName || itemNames[line.variantId] || tr("item")
+            }
+            options={modifierPrintText(line.selectedModifiers).names}
+            quantity={editingRow.quantity}
+            unitPrice={Number(line.unitPrice || 0)}
+            menuPrice={menuPriceFor(line)}
+            isFoc={isGivenFree(line)}
+            isFee={fee}
+            orderers={
+              fee || isBooked || serviceVariantIds.has(line.variantId) ? undefined : orderers
+            }
+            allLadies={
+              isSpa || fee || isBooked || serviceVariantIds.has(line.variantId)
+                ? undefined
+                : workingHostesses
+            }
+            roomNumber={room?.roomNumber}
+            orderedBy={line.hostessId}
+            note={line.note}
+            quickNotes={fee || isBooked ? undefined : venue.quickNotes}
+            canRemove={!isBooked}
+            isBusy={isSavingLine}
+            onSave={(edit) => void editRow(editingRow, edit)}
+            onRemove={() => {
+              setEditingRow(null);
+              void removeLines(editingRow.lines);
+            }}
+            onClose={() => setEditingRow(null)}
+          />
+        );
+      })() : null}
 
       {extraFeeOpen ? (
         <ExtraFeeDialog
@@ -3413,6 +3771,29 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               />
             </label>
             ) : null}
+            {editingRoom && !isSpa && !editingRoomInUse ? (
+              <label className="text-sm">
+                {tr("statusLabel")}
+                <select
+                  value={roomForm.status}
+                  onChange={(event) =>
+                    setRoomForm((current) => ({ ...current, status: event.target.value }))
+                  }
+                  className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2"
+                >
+                  {KTV_ROOM_STATUSES.map((status) => (
+                    <option key={status} value={status}>
+                      {tr(`status.${status.toLowerCase()}`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            {editingRoom && !isSpa && editingRoomInUse ? (
+              <p className="sm:col-span-2 text-xs text-slate-400">
+                {tr("statusInUseHint")}
+              </p>
+            ) : null}
             <p className="sm:col-span-2 text-xs text-slate-400">
               {isSpa
                 ? tr("roomNoPriceHint")
@@ -3428,7 +3809,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               {editingRoom ? (
                 <Button
                   variant="destructive"
-                  disabled={Boolean(findActiveSpaSession(editingRoom))}
+                  disabled={editingRoomInUse}
                   onClick={() =>
                     void deleteRoom(editingRoom.id).then(() => setShowRoomForm(false))
                   }

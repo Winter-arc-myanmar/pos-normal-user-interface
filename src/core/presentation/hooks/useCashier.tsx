@@ -141,6 +141,8 @@ interface UseCashierReturn {
   ) => Promise<string>;
   fetchProducts: (params?: ProductFilterDTO) => Promise<void>;
   fetchProductVariants: (productId: string) => Promise<ProductVariant[]>;
+  /** One product as the server keeps it, for what the menu list leaves out. */
+  fetchProduct: (productId: string) => Promise<Product>;
   fetchSalesOrders: (params?: SalesOrderFilterDTO) => Promise<void>;
   fetchPaymentMethods: () => Promise<void>;
   fetchPosRegisters: (params?: PosRegisterFilterDTO) => Promise<PosRegister[]>;
@@ -217,6 +219,7 @@ interface UseCashierReturn {
       modifiers?: ChosenModifier[];
       unitPrice?: string;
       hostessId?: string;
+      note?: string;
     }
   ) => Promise<SalesOrderLine>;
   splitOrderLine: (
@@ -238,7 +241,8 @@ interface UseCashierReturn {
     keepSelectedOrderId?: string,
     modifiers?: ChosenModifier[],
     unitPrice?: string,
-    hostessId?: string
+    hostessId?: string,
+    note?: string
   ) => Promise<SalesOrderLine>;
   addExtraFeeLine: (
     target: { orderId: string } | { sessionId: string },
@@ -483,6 +487,12 @@ export function useCashier(): UseCashierReturn {
     [clearError, ensureVariants]
   );
 
+  /** One product, as the server keeps it: its options need not ride on the menu list. */
+  const fetchProduct = useCallback(
+    (productId: string) => cashierService.getProduct(productId),
+    [cashierService]
+  );
+
   const addProductToOrder = useCallback(
     async (
       orderId: string,
@@ -494,6 +504,7 @@ export function useCashier(): UseCashierReturn {
         modifiers?: ChosenModifier[];
         unitPrice?: string;
         hostessId?: string;
+        note?: string;
       }
     ) => {
       setIsLoading(true);
@@ -520,6 +531,7 @@ export function useCashier(): UseCashierReturn {
           lineDiscount: "0.0000",
           ...(modifiers?.length ? { selectedModifiers: modifiers } : {}),
           ...(options?.hostessId ? { hostessId: options.hostessId } : {}),
+          ...(options?.note ? { note: options.note } : {}),
         });
         if (options?.refreshLines !== false) {
           const lines = await cashierService.getSalesOrderLines(orderId);
@@ -1391,7 +1403,8 @@ export function useCashier(): UseCashierReturn {
       keepSelectedOrderId?: string,
       modifiers?: ChosenModifier[],
       priceOverride?: string,
-      hostessId?: string
+      hostessId?: string,
+      note?: string
     ) => {
       setIsLoading(true);
       clearError();
@@ -1416,6 +1429,7 @@ export function useCashier(): UseCashierReturn {
           lineDiscount: "0.0000",
           ...(modifiers?.length ? { selectedModifiers: modifiers } : {}),
           ...(hostessId ? { hostessId } : {}),
+          ...(note ? { note } : {}),
         });
 
         if (keepSelectedOrderId && keepSelectedOrderId !== line.salesOrderId) {
@@ -1630,6 +1644,7 @@ export function useCashier(): UseCashierReturn {
       error,
       fetchInventoryLocations,
       fetchProducts,
+      fetchProduct,
       fetchProductVariants,
       fetchSalesOrders,
       fetchPaymentMethods,
@@ -1713,6 +1728,7 @@ export function useCashier(): UseCashierReturn {
       error,
       fetchInventoryLocations,
       fetchProducts,
+      fetchProduct,
       fetchProductVariants,
       fetchSalesOrders,
       fetchPaymentMethods,

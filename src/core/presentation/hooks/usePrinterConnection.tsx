@@ -31,7 +31,7 @@ import {
 } from "@/lib/printing/routeKitchenPrint";
 import { printLogoFor } from "@/lib/printing/printLogo";
 import { checkoutCopies, copySlip } from "@/lib/printing/receiptCopies";
-import { printPlaceToTemplateType } from "@/lib/printing/selectPrintTemplate";
+import { printPlaceToTemplateType, pickSavedPrintTemplate } from "@/lib/printing/selectPrintTemplate";
 import {
   PRINTER_BINDINGS_CHANGED,
   PrinterBinding,
@@ -256,17 +256,41 @@ export function usePrinterConnection(
     [locationId, printerService]
   );
 
+  /**
+   * The template a slip prints with: what the server resolves, and when it
+   * answers with its built-in layout — or does not answer at all — the template
+   * this outlet saved on the Print Template screen. The built-in layout knows
+   * nothing of the sizes the shop set (its kitchen items print at double
+   * height), so a saved template has to win even when it is not the flagged
+   * default, otherwise the text size on that screen never reaches the paper.
+   */
   const templateFor = useCallback(
     async (place: PrintPlace, type: PrintTemplateType = printPlaceToTemplateType(place)) => {
+      const service = container.resolve<IPrintTemplateService>("printTemplateService");
+      const savedFor = async () => {
+        try {
+          const listed = await service.list({
+            page: 1,
+            limit: 100,
+            ...(locationId ? { locationId } : {}),
+          });
+          const picked = pickSavedPrintTemplate(place, listed?.templates || [], locationId);
+          return picked
+            ? { settings: picked.settings, paperWidth: picked.paperWidth }
+            : undefined;
+        } catch {
+          return undefined;
+        }
+      };
       try {
-        const service = container.resolve<IPrintTemplateService>("printTemplateService");
         const resolved = await service.resolve({
           type,
           ...(locationId ? { locationId } : {}),
         });
-        return { settings: resolved.settings, paperWidth: resolved.paperWidth };
+        const own = { settings: resolved.settings, paperWidth: resolved.paperWidth };
+        return resolved.source === "BUILTIN" ? (await savedFor()) || own : own;
       } catch {
-        return undefined;
+        return savedFor();
       }
     },
     [locationId]

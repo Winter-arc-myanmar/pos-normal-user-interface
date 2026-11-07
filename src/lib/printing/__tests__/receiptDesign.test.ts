@@ -125,7 +125,7 @@ describe("receipt design", () => {
 
   it("prints the company name wide and bold on the printer", () => {
     const printed = formatSaleReceipt({ title: "Receipt", company, lines: [], total: "0" });
-    expect(printed).toContain("\x1b!\x28GRAND SPA");
+    expect(printed).toContain("\x1b!\x08\x1d!\x01GRAND SPA");
   });
 
   it("keeps the company off the staff finance slip", () => {
@@ -211,8 +211,8 @@ describe("kitchen slip design", () => {
       lines: [{ name: "Beer", quantity: "2" }],
     });
     expect(printed).toContain("\x1dB\x01");
-    expect(printed).toContain("\x1b!\x38KTV K3");
-    expect(printed).toContain("\x1b!\x182 x BEER");
+    expect(printed).toContain("\x1b!\x08\x1d!\x11KTV K3");
+    expect(printed).toContain("\x1b!\x08\x1d!\x102 x BEER");
   });
 
   it("shows the time sent, notes, seat and how many items", () => {

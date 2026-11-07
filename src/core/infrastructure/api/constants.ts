@@ -36,6 +36,7 @@ export const API_ENDPOINTS = {
 
   AUTH: {
     SIGNIN: "/api/v1/auth/signin",
+    REFRESH: "/api/v1/auth/refresh",
     SESSION: "/api/v1/auth/session",
     PING: "/api/v1/auth/ping",
     SET_ACTIVE_BRANCH: "/api/v1/auth/set-active-branch",
@@ -224,6 +225,7 @@ export const API_ENDPOINTS = {
     DELETE: (id: string) => `/api/v1/pos-sessions/${id}`,
     CLOSE: (id: string) => `/api/v1/pos-sessions/${id}/close`,
     SUMMARY: (id: string) => `/api/v1/pos-sessions/${id}/summary`,
+    SALES_GROUPS: (id: string) => `/api/v1/pos-sessions/${id}/sales-groups`,
     CURRENT: "/api/v1/pos-sessions/current",
   },
 

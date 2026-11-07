@@ -32,6 +32,7 @@ import { useSalesOrderManagement } from "@/core/presentation/hooks/useSalesOrder
 import { CashierBoard } from "./cashier/CashierBoard";
 import { MultiOrderingView } from "./cashier/MultiOrderingView";
 import { OrderPanel, type GroupedSalesOrderLine } from "./cashier/OrderPanel";
+import type { LineEdit } from "./cashier/LineEditDialog";
 import { billBreakdown } from "@/lib/pos/billBreakdown";
 import { linePriceNote } from "@/lib/pos/linePrice";
 import { TableSeatingDialog } from "./cashier/TableSeatingDialog";
@@ -43,6 +44,9 @@ import { useWorkingHostesses } from "@/core/presentation/hooks/useWorkingHostess
 import type { Hostess } from "@/core/domain/entities/Hostess";
 import { SplitItemsDialog, SplitTarget } from "./cashier/SplitItemsDialog";
 import { PaymentView } from "./cashier/PaymentView";
+import { CreditCustomerPicker } from "./cashier/CreditCustomerPicker";
+import type { Customer } from "@/core/domain/entities/Customer";
+import { creditAvailable, isCreditMethod } from "@/lib/pos/credit";
 import { ProductMenu } from "./cashier/ProductMenu";
 import { TableChargesBar } from "./cashier/TableChargesBar";
 import { useTableCharges } from "@/core/presentation/hooks/useTableCharges";
@@ -148,6 +152,7 @@ export function CashierPage() {
     isLoading,
     error,
     fetchProducts,
+    fetchProduct,
     fetchProductVariants,
     fetchSalesOrders,
     fetchPaymentMethods,
@@ -266,6 +271,7 @@ export function CashierPage() {
     variantId: string;
     quantity: number;
     modifiers?: ChosenModifier[];
+    note?: string;
   } | null>(null);
   const { hostesses: workingHostesses, load: loadHostesses } = useWorkingHostesses();
   useEffect(() => {
@@ -589,6 +595,7 @@ export function CashierPage() {
     serviceChargeOn,
     serviceChargeTaxRate,
     kdsDeleteSlips,
+    quickNotes,
   } = useVenueSetting();
   const { hasPermission } = usePermissions();
   const canTakePayment = hasPermission("sales:checkout:write");
@@ -718,6 +725,7 @@ export function CashierPage() {
       categoryName?: string;
       selectedModifiers?: unknown;
       menuPrice?: string;
+      note?: string;
     }>,
     withoutTax = false,
     // On a bill the guest gets, a repriced item says so: "Water (Discount)".
@@ -759,6 +767,7 @@ export function CashierPage() {
           categoryName: line.categoryName || product?.categoryName,
           modifiers: modifiers.names,
           modifierPrices: modifiers.prices,
+          ...(line.note ? { remarks: line.note } : {}),
           ...(promotion
             ? { promotion: promotion.label, promotionAmount: promotion.amount }
             : {}),
@@ -776,6 +785,7 @@ export function CashierPage() {
         line.modifiers,
         line.modifierPrices,
         line.promotion,
+        line.remarks,
       ]);
       const existing = merged.get(key);
       if (!existing) {
@@ -1067,6 +1077,13 @@ export function CashierPage() {
   const selectedPaymentMethod = checkoutPaymentMethods.find(
     (method) => method.id === paymentMethodId
   );
+  // A bill put on account names whose account: picked when a credit method is tapped.
+  const [creditCustomer, setCreditCustomer] = useState<Customer | null>(null);
+  const [creditPickerOpen, setCreditPickerOpen] = useState(false);
+  const creditMethodIds = useMemo(
+    () => new Set(checkoutPaymentMethods.filter(isCreditMethod).map((method) => method.id)),
+    [checkoutPaymentMethods]
+  );
   const memberCardSelected = Boolean(
     selectedPaymentMethod && isMemberCardPaymentMethod(selectedPaymentMethod)
   );
@@ -1176,6 +1193,7 @@ export function CashierPage() {
     if (!wasPay || activeView === "pay") return;
     setIsSplitMode(false);
     setSplitTenders([]);
+    setCreditCustomer(null);
   }, [activeView]);
 
   useEffect(() => {
@@ -1801,7 +1819,8 @@ export function CashierPage() {
     variantId: string,
     quantity: number,
     modifiers?: ChosenModifier[],
-    hostessId?: string
+    hostessId?: string,
+    note?: string
   ) => {
     const startFreshCart = isSettledSalesOrder(selectedOrder);
     if (startFreshCart) {
@@ -1838,14 +1857,15 @@ export function CashierPage() {
     for (const line of [...activeOrderLinesRef.current, ...tableLines]) {
       if (!candidates.has(line.id)) candidates.set(line.id, line);
     }
-    // A line with options stays its own line, even for the same item.
-    const matchingLines = startFreshCart || modifiers?.length
+    // A line with options or a note stays its own line, even for the same item.
+    const matchingLines = startFreshCart || modifiers?.length || note
       ? []
       : [...candidates.values()].filter(
           (line) =>
             line.variantId === variantId &&
             Number(line.unitPrice || 0).toFixed(4) === clickedUnitPrice &&
             !hasModifiers(line) &&
+            !line.note &&
             (line.hostessId || undefined) === hostessId &&
             !line.voidedAt &&
             isPendingKdsLine(line)
@@ -1940,7 +1960,7 @@ export function CashierPage() {
     }
 
     if (shouldUseTableSession && selectedOrderSession) {
-      const line = await addProductToTableSession(
+      const sessionArgs = [
         selectedOrderSession.id,
         product,
         variantId,
@@ -1948,8 +1968,11 @@ export function CashierPage() {
         tableOrderIds.length > 1 ? selectedOrder?.id : undefined,
         modifiers,
         undefined,
-        hostessId
-      );
+        hostessId,
+      ] as const;
+      const line = await (note
+        ? addProductToTableSession(...sessionArgs, note)
+        : addProductToTableSession(...sessionArgs));
       rememberAddedLine(line);
       if (selectedOrderSession.sessionState === "SEATED") {
         await updateTableSessionState(selectedOrderSession.id, {
@@ -1979,7 +2002,7 @@ export function CashierPage() {
         product,
         variantId,
         quantity,
-        { modifiers, hostessId }
+        { modifiers, hostessId, ...(note ? { note } : {}) }
       );
       rememberAddedLine(line);
     } else if (!requiresTableSelection || isDirectCheckoutMode || startFreshCart) {
@@ -1987,7 +2010,7 @@ export function CashierPage() {
       setDirectCartLines((current) => {
         const variants = variantsByProductId[product.id] || [];
         const variant = variants.find((item) => item.id === variantId);
-        const key = [modifierKey(modifiers), hostessId].filter(Boolean).join("-");
+        const key = [modifierKey(modifiers), hostessId, note].filter(Boolean).join("-");
         const lineId = key ? `direct-${variantId}-${key}` : `direct-${variantId}`;
         const existing = current.find((line) => line.id === lineId);
         if (existing) {
@@ -2015,6 +2038,7 @@ export function CashierPage() {
             status: "PENDING",
             ...(modifiers?.length ? { selectedModifiers: modifiers } : {}),
             ...(hostessId ? { hostessId } : {}),
+            ...(note ? { note } : {}),
           },
           product,
           variant
@@ -2034,14 +2058,15 @@ export function CashierPage() {
     variantId: string,
     quantity: number,
     modifiers?: ChosenModifier[],
-    hostessId?: string
+    hostessId?: string,
+    note?: string
   ) => {
     if (product.askWhoServed && !hostessId) {
-      setHostessFor({ product, variantId, quantity: Math.max(1, quantity), modifiers });
+      setHostessFor({ product, variantId, quantity: Math.max(1, quantity), modifiers, note });
       return Promise.resolve();
     }
     const pendingAdd = productAddQueueRef.current.then(() =>
-      addProductToCart(product, variantId, quantity, modifiers, hostessId)
+      addProductToCart(product, variantId, quantity, modifiers, hostessId, note)
     );
     productAddQueueRef.current = pendingAdd.catch(() => undefined);
     return pendingAdd;
@@ -2267,6 +2292,14 @@ export function CashierPage() {
         (payment) =>
           memberCardMethod && payment.paymentMethodId === memberCardMethod.id
       );
+      const usesCredit = checkoutPayments.some((payment) =>
+        creditMethodIds.has(payment.paymentMethodId)
+      );
+      if (usesCredit && !creditCustomer) {
+        setCreditPickerOpen(true);
+        throw new Error(t("cashier.credit.required"));
+      }
+      const onAccount = usesCredit && creditCustomer ? { customerId: creditCustomer.id } : {};
       if (usesMemberCard) {
         if (!memberCard || !memberWallet) {
           throw new Error(t("cashier.errors.memberCardRequired"));
@@ -2336,6 +2369,7 @@ export function CashierPage() {
         await checkoutTableSession(selectedOrderSession.id, {
           posSessionId: context.posSessionId,
           payments: checkoutPayments,
+          ...onAccount,
           ...(tip > 0 ? { tipAmount: tip } : {}),
           ...(discountReasonId ? { discountReasonId } : {}),
           ...(orderDiscount > 0 ? { totalDiscount: orderDiscount } : {}),
@@ -2350,6 +2384,7 @@ export function CashierPage() {
         await settleOrder(selectedOrder.id, {
           payments: checkoutPayments,
           posSessionId: context.posSessionId,
+          ...onAccount,
           ...(tip > 0 ? { tipAmount: toMoney(tip) } : {}),
           ...(orderDiscount > 0 ? { totalDiscount: toMoney(orderDiscount) } : {}),
           ...(discountReasonId ? { discountReasonId } : {}),
@@ -2388,6 +2423,7 @@ export function CashierPage() {
           } : {}),
           items: allocateOrderDiscountToLines(activeOrderLines, orderDiscount, isFeeLine),
           payments: checkoutPayments,
+          ...onAccount,
         });
       }
 
@@ -2649,16 +2685,16 @@ export function CashierPage() {
 
   const pickHostess = (hostess: Hostess) => {
     if (!hostessFor) return;
-    const { product, variantId, quantity, modifiers } = hostessFor;
+    const { product, variantId, quantity, modifiers, note } = hostessFor;
     setHostessFor(null);
-    void handleAddProduct(product, variantId, quantity, modifiers, hostess.id).catch((caught) =>
+    void handleAddProduct(product, variantId, quantity, modifiers, hostess.id, note).catch((caught) =>
       setLocalError(caught instanceof Error ? caught.message : t("cashier.errors.addProduct"))
     );
   };
 
   const handleEditLine = async (
     line: GroupedSalesOrderLine,
-    edit: { quantity: number; unitPrice: number; foc: boolean; orderedBy?: string | null }
+    edit: LineEdit
   ) => {
     setLocalError(null);
     setNotice(null);
@@ -2672,10 +2708,13 @@ export function CashierPage() {
     };
     const hostessOf = (entry: SalesOrderLine) =>
       edit.orderedBy === undefined ? entry.hostessId : edit.orderedBy || undefined;
+    const noteOf = (entry: SalesOrderLine) =>
+      edit.note === undefined ? entry.note : edit.note || undefined;
     const unchanged = (entry: SalesOrderLine) =>
       Number(priceFor(entry)) === Number(entry.unitPrice || 0) &&
       edit.foc === isFocLine(entry) &&
-      (hostessOf(entry) || null) === (entry.hostessId || null);
+      (hostessOf(entry) || null) === (entry.hostessId || null) &&
+      (noteOf(entry) || null) === (entry.note || null);
     // The newest lines take the change first; a line only partly covered is
     // split, so the rest of it keeps its price (3 waters at 2,000, 1 at 1,500).
     let left = edit.quantity;
@@ -2706,6 +2745,7 @@ export function CashierPage() {
               priceOverride: repriced ? unitPrice : undefined,
               lineDiscount: discountFor(entry, unitPrice),
               hostessId: hostessOf(entry),
+              note: noteOf(entry),
             },
             product,
             variant
@@ -2753,6 +2793,7 @@ export function CashierPage() {
           taxAmount: target.taxAmount || "0.0000",
           seatNumber: entry.seatNumber,
           ...(edit.orderedBy !== undefined ? { hostessId: edit.orderedBy } : {}),
+          ...(edit.note !== undefined ? { note: edit.note } : {}),
         });
       }
     } catch (caught) {
@@ -3356,6 +3397,7 @@ export function CashierPage() {
         }}
         menuPrice={menuPriceOf}
         orderers={hostessOrderers}
+        quickNotes={quickNotes}
         lineHostess={lineHostess}
         promotions={promotions.running}
         promotionDiscounts={isDirectCheckoutMode ? promotions.discounts : undefined}
@@ -3530,9 +3572,13 @@ export function CashierPage() {
                 variantsByProductId={variantsByProductId}
                 orderedProductQuantities={orderedProductQuantities}
                 onLoadVariants={fetchProductVariants}
-                onAdd={handleAddProduct}
+                onAdd={(product, variantId, quantity, modifiers, note) =>
+                  handleAddProduct(product, variantId, quantity, modifiers, undefined, note)
+                }
                 onClose={handleCloseMenu}
                 offerOptions
+                quickNotes={quickNotes}
+                onLoadProduct={fetchProduct}
                 toolbar={
                   menuCategories.length ? (
                     <div className="mt-2 min-[1100px]:hidden">
@@ -3569,46 +3615,80 @@ export function CashierPage() {
             </div>
           </div>
         ) : activeView === "pay" ? (
-          <PaymentView
-            methods={checkoutPaymentMethods}
-            selectedMethodId={paymentMethodId}
-            paymentAmount={paymentAmount}
-            total={orderTotal}
-            breakdown={breakdown}
-            billOptions={{
-              includeTax: billOptions.includeTax,
-              includeServiceCharge: billOptions.includeServiceCharge,
-              isLoading: billOptions.isLoading,
-              disabled: isLoading || isPosSessionLoading || isConfirmingPayment,
-              error: billOptions.error,
-              onChange: chooseBillOption,
-            }}
-            isSplitMode={isSplitMode}
-            splitTenders={splitTenders}
-            isLoading={isLoading || isPosSessionLoading || isConfirmingPayment || billOptions.isLoading || Boolean(billOptions.error)}
-            memberCardLookup={{
-              cardUid: memberCardUid,
-              guestName: memberWallet?.guestName,
-              walletNumber: memberWallet?.walletNumber,
-              balance: memberWallet?.balance,
-              status: memberWallet?.status,
-              error: memberCardError,
-              isLoading: isMemberCardLoading,
-              nfcSupported,
-              nfcActive,
-              nfcError,
-              lastUid,
-              onEnableNfc: () => void startNfc(),
-              onCardUidChange: setMemberCardUid,
-              onDetect: () => void handleLookupMemberCard(),
-            }}
-            onSelectMethod={setPaymentMethodId}
-            onPaymentAmountChange={setPaymentAmount}
-            onOpenSplit={handleOpenSplit}
-            onClosePay={handleClosePay}
-            onAddTender={handleAddSplitTender}
-            onRemoveTender={handleRemoveSplitTender}
-          />
+          <>
+            <PaymentView
+              methods={checkoutPaymentMethods}
+              selectedMethodId={paymentMethodId}
+              paymentAmount={paymentAmount}
+              total={orderTotal}
+              breakdown={breakdown}
+              billOptions={{
+                includeTax: billOptions.includeTax,
+                includeServiceCharge: billOptions.includeServiceCharge,
+                isLoading: billOptions.isLoading,
+                disabled: isLoading || isPosSessionLoading || isConfirmingPayment,
+                error: billOptions.error,
+                onChange: chooseBillOption,
+              }}
+              isSplitMode={isSplitMode}
+              splitTenders={splitTenders}
+              isLoading={isLoading || isPosSessionLoading || isConfirmingPayment || billOptions.isLoading || Boolean(billOptions.error)}
+              memberCardLookup={{
+                cardUid: memberCardUid,
+                guestName: memberWallet?.guestName,
+                walletNumber: memberWallet?.walletNumber,
+                balance: memberWallet?.balance,
+                status: memberWallet?.status,
+                error: memberCardError,
+                isLoading: isMemberCardLoading,
+                nfcSupported,
+                nfcActive,
+                nfcError,
+                lastUid,
+                onEnableNfc: () => void startNfc(),
+                onCardUidChange: setMemberCardUid,
+                onDetect: () => void handleLookupMemberCard(),
+              }}
+              onSelectMethod={(methodId) => {
+                setPaymentMethodId(methodId);
+                if (creditMethodIds.has(methodId) && !creditCustomer) setCreditPickerOpen(true);
+              }}
+              creditAccount={
+                creditMethodIds.has(paymentMethodId) ||
+                splitTenders.some((tender) => creditMethodIds.has(tender.paymentMethodId))
+                  ? {
+                      customerName: creditCustomer?.name,
+                      owes: creditCustomer ? Number(creditCustomer.currentCreditBalance || 0) : undefined,
+                      available: creditCustomer ? creditAvailable(creditCustomer) : undefined,
+                      onChange: () => setCreditPickerOpen(true),
+                    }
+                  : undefined
+              }
+              onPaymentAmountChange={setPaymentAmount}
+              onOpenSplit={handleOpenSplit}
+              onClosePay={handleClosePay}
+              onAddTender={handleAddSplitTender}
+              onRemoveTender={handleRemoveSplitTender}
+            />
+            {creditPickerOpen ? (
+              <CreditCustomerPicker
+                amount={
+                  isSplitMode
+                    ? splitTenders
+                        .filter((tender) => creditMethodIds.has(tender.paymentMethodId))
+                        .reduce((sum, tender) => sum + Number(tender.amount || 0), 0) ||
+                      Number(paymentAmount || 0)
+                    : Number(orderTotal || 0)
+                }
+                onPick={(customer) => {
+                  setCreditCustomer(customer);
+                  setCreditPickerOpen(false);
+                  setLocalError(null);
+                }}
+                onCancel={() => setCreditPickerOpen(false)}
+              />
+            ) : null}
+          </>
         ) : activeView === "multi-order" && activeTableId ? (
           <MultiOrderingView
             tableLabel={activeTableLabel}

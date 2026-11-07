@@ -99,6 +99,12 @@ export interface SaleReceipt extends PrintParty {
   // extraFee and tip are not print-template fields, so they stay off the voucher.
   // extraFee?: string;
   // tip?: string;
+  /** Titled blocks of rows after the items, such as a shift's sales by group. */
+  sections?: Array<{
+    title: string;
+    rows: Array<{ left: string; right: string }>;
+    total?: { left: string; right: string };
+  }>;
   /** Labelled amounts above the total, such as a shift's sales and refunds. */
   amounts?: Array<{ label: string; amount: string }>;
   totalLabel?: string;
@@ -273,11 +279,23 @@ class Layout {
 
 const alignCode: Record<Align, string> = { left: "\x00", center: "\x01", right: "\x02" };
 
-const printMode = (style: TextStyle) =>
+/** Bold only: the size travels on its own command, see characterScale. */
+const printMode = (style: TextStyle) => String.fromCharCode(style.bold ? 0x08 : 0);
+
+/**
+ * Character magnification as ESC/POS `GS !` takes it: the high nibble is the
+ * height and the low nibble the width, minus one.
+ *
+ * Size used to ride on the `ESC !` bits, and printers disagree there: the same
+ * slip and the same setting print at the right size on one machine and at
+ * double size on another, and a printer left configured with a magnification of
+ * its own keeps printing that. `GS !` is what the vendors' own drivers send,
+ * and setting it on every row also overrides whatever a printer was left at.
+ */
+const characterScale = (style: TextStyle) =>
   String.fromCharCode(
-    (style.bold ? 0x08 : 0) |
-      (style.size === "tall" || style.size === "huge" ? 0x10 : 0) |
-      (isWide(style.size) ? 0x20 : 0)
+    (style.size === "tall" || style.size === "huge" ? 0x10 : 0) |
+      (isWide(style.size) ? 0x01 : 0)
   );
 
 const centered = (text: string, columns: number) => {
@@ -300,7 +318,7 @@ const unicodeRow = (text: string, style: TextStyle, columns: number) => {
     bold: style.bold,
     invert: style.invert,
   });
-  return image ? `${ESC}a\x00${ESC}!\x00${GS}B\x00${rasterCommand(image)}` : null;
+  return image ? `${ESC}a\x00${ESC}!\x00${GS}!\x00${GS}B\x00${rasterCommand(image)}` : null;
 };
 
 const pairText = (left: string, right: string, columns: number) =>
@@ -314,12 +332,13 @@ const unicodePairRow = (left: string, right: string, style: TextStyle, columns: 
     bold: style.bold,
     invert: style.invert,
   });
-  return image ? `${ESC}a\x00${ESC}!\x00${GS}B\x00${rasterCommand(image)}` : null;
+  return image ? `${ESC}a\x00${ESC}!\x00${GS}!\x00${GS}B\x00${rasterCommand(image)}` : null;
 };
 
 const toEscPos = (layout: Layout) =>
   [
     `${ESC}@`,
+    `${GS}!\x00`,
     lineSpacing,
     ...layout.rows.map((row) => {
       if (row.kind === "gap") return "\n";
@@ -331,10 +350,10 @@ const toEscPos = (layout: Layout) =>
           layout.width
         );
         if (unicode) return unicode;
-        return `${ESC}a\x01${ESC}!\x00${inlineIconCommand(row.icon)} ${row.text}\n`;
+        return `${ESC}a\x01${ESC}!\x00${GS}!\x00${inlineIconCommand(row.icon)} ${row.text}\n`;
       }
       if (row.kind === "rule") {
-        return `${ESC}a\x00${ESC}!\x00${row.char.repeat(layout.width)}\n`;
+        return `${ESC}a\x00${ESC}!\x00${GS}!\x00${row.char.repeat(layout.width)}\n`;
       }
       if (row.kind === "pair") {
         const columns = layout.columns(row.size);
@@ -342,7 +361,7 @@ const toEscPos = (layout: Layout) =>
         if (unicode) return unicode;
         return [
           `${ESC}a${alignCode.left}`,
-          `${ESC}!${printMode(row)}`,
+          `${ESC}!${printMode(row)}${GS}!${characterScale(row)}`,
           pairText(row.left, row.right, columns),
           "\n",
         ].join("");
@@ -352,14 +371,14 @@ const toEscPos = (layout: Layout) =>
       if (unicode) return unicode;
       return [
         `${ESC}a${alignCode[row.invert ? "left" : row.align || "left"]}`,
-        `${ESC}!${printMode(row)}`,
+        `${ESC}!${printMode(row)}${GS}!${characterScale(row)}`,
         row.invert ? `${GS}B\x01` : "",
         text,
         row.invert ? `${GS}B\x00` : "",
         "\n",
       ].join("");
     }),
-    `${ESC}!\x00${ESC}a\x00`,
+    `${ESC}!\x00${GS}!\x00${ESC}a\x00`,
     bottomMargin,
     `${GS}V\x00`,
   ].join("");
@@ -767,6 +786,13 @@ function receiptLayout(receipt: SaleReceipt): Layout {
     }
   }
 
+  for (const section of receipt.sections || []) {
+    layout.rule("-");
+    layout.line(section.title, { bold: true });
+    for (const row of section.rows) layout.pair(row.left, row.right);
+    if (section.total) layout.pair(section.total.left, section.total.right, { bold: true });
+  }
+
   const breakdown: Array<[string, string | undefined]> = showBreakdown
     ? [
         ["Subtotal", receipt.subtotal],
@@ -837,21 +863,27 @@ export function buildSaleReceiptLines(receipt: SaleReceipt): string[] {
   return toPlainLines(receiptLayout(receipt));
 }
 
+/** A kitchen line's options, then the KTV lady who ordered it. */
+export const withOrderedBy = (modifiers?: string, orderedBy?: string) =>
+  [modifiers?.trim(), orderedBy].filter(Boolean).join(", ") || undefined;
+
 export function kdsTicketPrintLines(ticket: KdsTicket): PrintLine[] {
   if (ticket.lines?.length) {
     return ticket.lines.map((line) => ({
       name: line.name,
       quantity: line.quantity,
       categoryId: line.categoryId,
-      modifiers: line.modifiers,
+      modifiers: withOrderedBy(line.modifiers, line.orderedBy),
       modifierPrices: line.modifierPrices,
+      ...(line.note ? { remarks: line.note } : {}),
     }));
   }
   return (ticket.kdsTicketLines || []).map((line) => ({
     name: line.productName || "Item",
     quantity: line.quantity || "1",
-    modifiers: line.kitchenModifiers,
+    modifiers: withOrderedBy(line.kitchenModifiers, line.orderedBy),
     modifierPrices: line.modifierPrices,
+    ...(line.note ? { remarks: line.note } : {}),
     seat: line.seatNumber ? String(line.seatNumber) : undefined,
   }));
 }

@@ -180,4 +180,82 @@ describe("ApiKtvRepository", () => {
       lines: [{ name: "Myanmar Beer", quantity: "6.0000" }],
     });
   });
+
+  it("reads each room menu item's options and the shop's quick notes", async () => {
+    const get = vi.fn().mockResolvedValueOnce({
+      data: {
+        roomNumber: "VIP1",
+        quickNotes: ["No ice", "Less sugar"],
+        categories: [
+          {
+            categoryId: "c1",
+            name: "Drinks",
+            items: [
+              {
+                variantId: "variant-1",
+                productId: "product-1",
+                name: "Myanmar Beer",
+                price: "3500.0000",
+                modifierGroups: [
+                  {
+                    id: "ice",
+                    name: "Ice",
+                    minSelection: 0,
+                    maxSelection: 1,
+                    isRequired: false,
+                    modifiers: [{ id: "extra", name: "Extra ice", priceDelta: "500.0000", isDefault: false }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const repository = new ApiKtvRepository({ get } as unknown as HttpClient);
+
+    const menu = await repository.getRoomTabletMenu();
+
+    expect(menu.quickNotes).toEqual(["No ice", "Less sugar"]);
+    expect(menu.categories[0].items[0]).toMatchObject({
+      productId: "product-1",
+      modifierGroups: [
+        {
+          id: "ice",
+          maxSelection: 1,
+          modifiers: [{ id: "extra", name: "Extra ice", priceDelta: "500.0000", isDefault: false }],
+        },
+      ],
+    });
+  });
+
+  it("patches a room's status to its own endpoint", async () => {
+    const patch = vi.fn().mockResolvedValue({
+      success: true,
+      data: {
+        id: "room-1",
+        tenantId: "tenant-1",
+        locationId: "location-1",
+        roomNumber: "A1",
+        name: "Grand Room",
+        capacity: 12,
+        rateVariantId: "variant-1",
+        minimumMinutes: 60,
+        incrementMinutes: 30,
+        graceMinutes: 5,
+        roundingMode: "UP",
+        status: "CLEANING",
+      },
+    });
+    const repository = new ApiKtvRepository({
+      patch,
+    } as unknown as HttpClient);
+
+    const room = await repository.updateRoom("room-1", { status: "CLEANING" });
+
+    expect(patch).toHaveBeenCalledWith("/api/v1/ktv-rooms/room-1", {
+      status: "CLEANING",
+    });
+    expect(room.status).toBe("CLEANING");
+  });
 });

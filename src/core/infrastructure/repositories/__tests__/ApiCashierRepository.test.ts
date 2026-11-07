@@ -522,6 +522,49 @@ describe("ApiCashierRepository", () => {
     });
   });
 
+  it("sends each quick-sale item's options, hostess, note and fee price", async () => {
+    const post = vi.fn().mockResolvedValue({ success: true, data: {} });
+    const repository = new ApiCashierRepository({ post } as unknown as HttpClient);
+
+    await repository.checkout({
+      tenantId: "tenant-1",
+      locationId: "location-1",
+      salesChannel: "POS",
+      serviceType: "DINE_IN",
+      items: [
+        {
+          variantId: "variant-rice",
+          quantity: "1",
+          lineDiscount: "0",
+          selectedModifiers: [{ modifierId: "mod-egg" }],
+          hostessId: "hostess-snow",
+          note: "No onion",
+        },
+        { variantId: "variant-fee", quantity: "1", unitPrice: "500", name: "Box" },
+      ],
+      payments: [{ paymentMethodId: "cash", amount: "9000" }],
+    });
+
+    const [, body] = post.mock.calls[0] as [string, { items: unknown[] }];
+    expect(body.items).toEqual([
+      {
+        variantId: "variant-rice",
+        quantity: "1.0000",
+        lineDiscount: "0.0000",
+        selectedModifiers: [{ modifierId: "mod-egg" }],
+        hostessId: "hostess-snow",
+        note: "No onion",
+      },
+      {
+        variantId: "variant-fee",
+        quantity: "1.0000",
+        lineDiscount: "0.0000",
+        unitPrice: "500.0000",
+        name: "Box",
+      },
+    ]);
+  });
+
   it("sends checkout tip, service charge, and discount reason", async () => {
     const post = vi.fn().mockResolvedValue({
       success: true,
@@ -1048,6 +1091,81 @@ describe("ApiCashierRepository", () => {
         modifiers: "No ice",
       },
     ]);
+  });
+
+  it("names the KTV lady who ordered a kitchen ticket line", async () => {
+    const get = vi.fn().mockResolvedValue({
+      success: true,
+      data: {
+        id: "ticket-2",
+        kdsTicketLines: [
+          {
+            id: "line-1",
+            productName: "Fried rice",
+            quantity: "1.0000",
+            salesOrderLine: { hostess: { name: "Su Su", nickname: "Snow" } },
+          },
+          {
+            id: "line-2",
+            productName: "Soda",
+            quantity: "1.0000",
+            salesOrderLine: { hostess: null },
+          },
+        ],
+      },
+    });
+    const repository = new ApiCashierRepository({ get } as unknown as HttpClient);
+
+    const ticket = await repository.getKdsTicketById("ticket-2");
+
+    expect(ticket.kdsTicketLines?.map((line) => line.orderedBy)).toEqual(["Snow", undefined]);
+    expect(ticket.lines?.map((line) => line.orderedBy)).toEqual(["Snow", undefined]);
+  });
+
+  it("reads the option groups a product carries, and tells an empty list from none", async () => {
+    const get = vi.fn().mockResolvedValue({
+      success: true,
+      data: [
+        {
+          id: "product-1",
+          tenantId: "tenant-1",
+          name: "Noodles",
+          basePrice: "3000.0000",
+          modifierGroups: [
+            {
+              id: "add-ons",
+              name: "Add-ons",
+              minSelection: 0,
+              maxSelection: 2,
+              isRequired: false,
+              modifiers: [
+                { id: "egg", name: "Egg", priceDelta: "500.0000", isDefault: false },
+              ],
+            },
+          ],
+        },
+        { id: "product-2", tenantId: "tenant-1", name: "Water", basePrice: "500.0000", modifierGroups: [] },
+        { id: "product-3", tenantId: "tenant-1", name: "Tea", basePrice: "1000.0000" },
+      ],
+      meta: { total: 3, page: 1, limit: 20, totalPages: 1 },
+    });
+    const repository = new ApiCashierRepository({ get } as unknown as HttpClient);
+
+    const [noodles, water, tea] = await repository.getProducts();
+
+    expect(noodles.modifierGroups).toEqual([
+      {
+        id: "add-ons",
+        name: "Add-ons",
+        minSelection: 0,
+        maxSelection: 2,
+        isRequired: false,
+        modifiers: [{ id: "egg", name: "Egg", priceDelta: "500.0000", isDefault: false }],
+      },
+    ]);
+    // An empty list means none attached; a missing field means the payload did not say.
+    expect(water.modifierGroups).toEqual([]);
+    expect(tea.modifierGroups).toBeUndefined();
   });
 
   it("creates a product and variant with decimal prices and matrix options", async () => {

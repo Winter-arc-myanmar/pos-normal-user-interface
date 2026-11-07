@@ -14,6 +14,16 @@ const line = (id: string, overrides: Partial<SalesOrderLine> = {}) =>
   });
 
 describe("groupBillLines", () => {
+  it("keeps a drink made FOC from the bill on a row of its own", () => {
+    const rows = groupBillLines([
+      line("a"),
+      line("b", { lineDiscount: "15000.0000" }),
+    ]);
+
+    expect(rows.map((row) => row.lines.map((item) => item.id))).toEqual([["a"], ["b"]]);
+    expect(rows[1].total).toBe(0);
+  });
+
   it("shows the same drink ordered in two rounds as one row", () => {
     const [jager, tea] = groupBillLines([
       line("a"),

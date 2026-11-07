@@ -10,11 +10,12 @@ import {
 import {
   chosenModifiers,
   defaultOptions,
-  groupLimit,
-  groupNeed,
   missingGroup,
   toggleOption,
 } from "@/lib/modifiers/choices";
+import { OptionGroup } from "@/components/modifiers/OptionGroup";
+import { ItemNoteField } from "@/components/notes/ItemNoteField";
+import { cleanNote } from "@/lib/notes/itemNote";
 
 interface ProductMenuProps {
   products: Product[];
@@ -25,11 +26,16 @@ interface ProductMenuProps {
     product: Product,
     variantId: string,
     quantity: number,
-    modifiers?: ChosenModifier[]
+    modifiers?: ChosenModifier[],
+    note?: string
   ) => Promise<void>;
   onClose: () => void;
+  /** The shop's quick notes, offered with the item's options. */
+  quickNotes?: string[];
   /** Asks for the item's options (add-ons) before adding it. */
   offerOptions?: boolean;
+  /** One product as the server keeps it, when the menu list leaves its options out. */
+  onLoadProduct?: (productId: string) => Promise<Product>;
   groupByCategory?: boolean;
   /** Shown under the search, e.g. category filters the page owns. */
   toolbar?: ReactNode;
@@ -74,71 +80,6 @@ function ProductCardImage({
   );
 }
 
-function OptionGroup({
-  group,
-  selected,
-  onToggle,
-}: {
-  group: ModifierGroup;
-  selected: string[];
-  onToggle: (optionId: string) => void;
-}) {
-  const { t } = useTranslation();
-  const limit = groupLimit(group);
-  const need = groupNeed(group);
-  const picked = group.modifiers.filter((option) => selected.includes(option.id)).length;
-  const hint =
-    limit === 1
-      ? t("cashier.productMenu.pickOne")
-      : limit === Infinity
-        ? t("cashier.productMenu.pickAny")
-        : t("cashier.productMenu.pickUpTo", { count: limit });
-  return (
-    <fieldset className="mt-4">
-      <legend className="flex w-full items-baseline justify-between gap-2 text-sm font-semibold">
-        <span>
-          {group.name}
-          {need > 0 ? (
-            <span className="ml-2 text-xs font-normal text-amber-300">
-              {t("cashier.productMenu.required")}
-            </span>
-          ) : null}
-        </span>
-        <span className="text-xs font-normal text-slate-400">{hint}</span>
-      </legend>
-      <div className="mt-2 grid grid-cols-2 gap-2">
-        {group.modifiers.map((option) => {
-          const on = selected.includes(option.id);
-          const full = !on && limit !== 1 && picked >= limit;
-          const price = Number(option.priceDelta) || 0;
-          return (
-            <button
-              key={option.id}
-              type="button"
-              role={limit === 1 ? "radio" : "checkbox"}
-              aria-checked={on}
-              disabled={full}
-              onClick={() => onToggle(option.id)}
-              className={[
-                "flex items-center justify-between gap-2 rounded border px-3 py-3 text-left text-sm",
-                on ? "border-blue-500 bg-blue-500/10" : "border-slate-700 bg-slate-900",
-                full ? "cursor-not-allowed opacity-50" : "",
-              ].join(" ")}
-            >
-              <span className="min-w-0 break-words">{option.name}</span>
-              {price ? (
-                <span className="shrink-0 text-xs text-blue-300">
-                  {price > 0 ? "+" : ""}
-                  {price}
-                </span>
-              ) : null}
-            </button>
-          );
-        })}
-      </div>
-    </fieldset>
-  );
-}
 
 export function ProductMenu({
   products,
@@ -150,6 +91,8 @@ export function ProductMenu({
   groupByCategory = false,
   toolbar,
   offerOptions = false,
+  quickNotes = [],
+  onLoadProduct,
 }: ProductMenuProps) {
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
@@ -161,6 +104,9 @@ export function ProductMenu({
   const [isAdding, setIsAdding] = useState(false);
   const [needsVariantChoice, setNeedsVariantChoice] = useState(false);
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
+  const [note, setNote] = useState("");
+  // The option groups of the product being priced: the menu's, or the product's own.
+  const [optionGroups, setOptionGroups] = useState<ModifierGroup[]>([]);
   const [localError, setLocalError] = useState<string | null>(null);
   // Tapping a second product while the first one's variants are still loading
   // must not let the first response open or add the wrong product.
@@ -203,12 +149,36 @@ export function ProductMenu({
     offerOptions && product
       ? (product.modifierGroups || []).filter((group) => group.modifiers.length)
       : [];
-  const optionGroups = optionGroupsOf(selectedProduct);
+  /** Options the menu list left out, fetched once from the product itself. */
+  const fetchedGroups = useRef<Record<string, ModifierGroup[]>>({});
+  /**
+   * A product's option groups. The product carries them; when the record the
+   * menu holds shows none, the product itself is asked once and the answer kept,
+   * so a light list never hides the picker and ordinary items cost one look.
+   */
+  const loadOptionGroups = async (product: Product): Promise<ModifierGroup[]> => {
+    const listed = optionGroupsOf(product);
+    if (listed.length || !offerOptions || !onLoadProduct) return listed;
+    const known = fetchedGroups.current[product.id];
+    if (known) return known;
+    try {
+      const detail = await onLoadProduct(product.id);
+      const groups = optionGroupsOf(detail);
+      fetchedGroups.current[product.id] = groups;
+      return groups;
+    } catch {
+      // The menu still works when the product cannot be read.
+      fetchedGroups.current[product.id] = [];
+      return [];
+    }
+  };
 
   const closeVariantModal = () => {
     selectedProductIdRef.current = "";
     setNeedsVariantChoice(false);
     setSelectedOptions([]);
+    setNote("");
+    setOptionGroups([]);
     setSelectedProduct(null);
     setSelectedVariantId("");
     setVariantOptions([]);
@@ -226,13 +196,16 @@ export function ProductMenu({
     product: Product,
     variantId: string,
     nextQuantity: number,
-    modifiers?: ChosenModifier[]
+    modifiers?: ChosenModifier[],
+    itemNote?: string
   ) => {
     if (!variantId) return false;
     setIsAdding(true);
     setLocalError(null);
     try {
-      await onAdd(product, variantId, nextQuantity, modifiers);
+      await (itemNote
+        ? onAdd(product, variantId, nextQuantity, modifiers, itemNote)
+        : onAdd(product, variantId, nextQuantity, modifiers));
       setQuantity(1);
       return true;
     } catch (caught) {
@@ -267,9 +240,11 @@ export function ProductMenu({
       setSelectedVariantId(defaultVariantId);
       setVariantOptions(loaded);
 
-      const groups = optionGroupsOf(product);
+      const groups = await loadOptionGroups(product);
+      if (selectedProductIdRef.current !== product.id) return;
+      setOptionGroups(groups);
+      setSelectedOptions(defaultOptions(groups));
       if (loaded.length > 1 || (defaultVariantId && groups.length)) {
-        setSelectedOptions(defaultOptions(groups));
         setNeedsVariantChoice(true);
         return;
       }
@@ -300,7 +275,8 @@ export function ProductMenu({
       selectedProduct,
       selectedVariantId,
       quantity,
-      modifiers.length ? modifiers : undefined
+      modifiers.length ? modifiers : undefined,
+      cleanNote(note)
     );
     if (added) closeVariantModal();
   };
@@ -467,6 +443,10 @@ export function ProductMenu({
                 }
               />
             ))}
+
+            {offerOptions ? (
+              <ItemNoteField value={note} onChange={setNote} quickNotes={quickNotes} />
+            ) : null}
 
             <div className="mt-4 text-xs text-slate-300">
               <span className="block">{t("cashier.productMenu.quantity")}</span>
