@@ -121,7 +121,13 @@ import { modifierExtra } from "@/lib/modifiers/choices";
 import { LineEditDialog, type LineEdit } from "./cashier/LineEditDialog";
 import { modifierPrintText } from "@/lib/printing/modifierText";
 import { applyKdsTicketHostess } from "@/lib/printing/kdsTicketModifiers";
-import { receiptTotals } from "@/lib/printing/receiptTotals";
+import { receiptTotals, type ReceiptTotals } from "@/lib/printing/receiptTotals";
+import {
+  isLadyChargeLine,
+  ladyChargeDetail,
+  splitLadyCharges,
+  type LadyChargeSplit,
+} from "@/lib/ktv/ladyCharge";
 import { groupRoomTimeRows, mergedRoomTimeLine } from "@/lib/printing/roomTimeRows";
 import { cashierLabel } from "@/lib/printing/cashier";
 
@@ -545,8 +551,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         const name = hostessName(id);
         return name ? [{ id, name }] : [];
       });
-  const isHostessService = (line: SalesOrderLine) =>
-    Boolean(line.askWhoServed) || serviceVariantIds.has(line.variantId);
+  const isHostessService = (line: SalesOrderLine) => isLadyChargeLine(line, serviceVariantIds);
   const orderedByName = (line: SalesOrderLine) =>
     line.hostessId && !isHostessService(line)
       ? hostessName(line.hostessId) || tr("aHostess")
@@ -600,6 +605,34 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       };
     });
   };
+  /**
+   * KTV: the ladies' own charges print as one row below the service charge, with
+   * each lady and her hours under it, instead of a line each among the items. A SPA
+   * bill keeps every line as it is.
+   */
+  const ladyChargesOf = (printedLines: SalesOrderLine[]): LadyChargeSplit =>
+    isSpa
+      ? { items: printedLines, ladyCharge: 0, ladies: [] }
+      : splitLadyCharges(printedLines, serviceVariantIds, hostessName);
+  /** The slip's money rows, with the ladies left out of the subtotal they add to again below. */
+  const withLadyCharge = (totals: ReceiptTotals, ladyCharge: number): ReceiptTotals =>
+    ladyCharge > 0 && totals.subtotal !== undefined
+      ? { ...totals, subtotal: Math.max(0, Number(totals.subtotal) - ladyCharge).toFixed(4) }
+      : totals;
+  /** "Lady Charge", then a row for each lady: Snow with 3 hours, Yuki with 2. */
+  const ladyChargeRow = ({ ladyCharge, ladies }: LadyChargeSplit) =>
+    ladyCharge > 0
+      ? [
+          {
+            label: t("receipt.ladyCharge"),
+            amount: ladyCharge.toFixed(4),
+            detail: ladies.map((lady) => ({
+              label: ladyChargeDetail(lady, tr("aHostess")),
+              amount: lady.amount.toFixed(4),
+            })),
+          },
+        ]
+      : [];
   // Before the room starts, the packages it starts with; once it runs, the ones added.
   const booking = session ? extendChoice : packageChoice;
   // KTV: the rentals this room can be sold under; the room's own rate unless another is picked.
@@ -1661,6 +1694,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       await fetchBoard();
       try {
         const printedLines = orderLines.filter((line) => !line.voidedAt);
+        const ladySplit = ladyChargesOf(printedLines);
         // The bill as the till has it now (the room's time lands on it at close),
         // so the slip's money rows add up to the total it prints.
         const bill = session.salesOrderId ? await readBill(session.salesOrderId) : serverBill;
@@ -1680,9 +1714,9 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           endTime: formatDateTime(final.asOf || new Date().toISOString()),
           startTimeLabel: t("receipt.startTime"),
           endTimeLabel: t("receipt.endTime"),
-          lines: receiptLines(printedLines),
-          ...totals,
-          amounts: tipReceiptRow,
+          lines: receiptLines(ladySplit.items),
+          ...withLadyCharge(totals, ladySplit.ladyCharge),
+          amounts: [...ladyChargeRow(ladySplit), ...tipReceiptRow],
           total: String(final.paidTotal || final.runningTotal || "0"),
         });
       } catch (printError) {
@@ -1981,11 +2015,14 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     if (!session) return;
     try {
       const printedLines = orderLines.filter((line) => !line.voidedAt);
+      const ladySplit = ladyChargesOf(printedLines);
       const bill = session.salesOrderId ? await readBill(session.salesOrderId) : serverBill;
       const totals = receiptTotals(bill, printedLines);
       // Clock time the close has not written to the bill yet is still owed, so the
       // check bill counts it in the items and in the receivable.
-      const items = bill ? Number(totals.subtotal || 0) + timeNotOnLines : undefined;
+      const items = bill
+        ? Math.max(0, Number(totals.subtotal || 0) + timeNotOnLines - ladySplit.ladyCharge)
+        : undefined;
       const due = bill
         ? Number(bill.grandTotal) + timeNotOnLines
         : Number(quote?.amountDue || quote?.runningTotal || 0);
@@ -2002,11 +2039,12 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         endTime: formatDateTime(new Date().toISOString()),
         startTimeLabel: t("receipt.startTime"),
         endTimeLabel: t("receipt.endTime"),
-        lines: receiptLines(printedLines, false),
+        lines: receiptLines(ladySplit.items, false),
         ...(items !== undefined ? { subtotal: items.toFixed(4) } : {}),
         ...(totals.discount ? { discount: totals.discount } : {}),
         ...(totals.tax ? { tax: totals.tax } : {}),
         ...(totals.serviceCharge ? { serviceCharge: totals.serviceCharge } : {}),
+        ...(ladySplit.ladyCharge > 0 ? { amounts: ladyChargeRow(ladySplit) } : {}),
         totalLabel: tr("receivable"),
         total: due.toFixed(4),
       });
@@ -2027,6 +2065,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     if (!session) return;
     try {
       const printedLines = orderLines.filter((line) => !line.voidedAt);
+      const ladySplit = ladyChargesOf(printedLines);
       // The bill as it stands after the settle, as the cashier prints it.
       const bill = session.salesOrderId ? await readBill(session.salesOrderId) : serverBill;
       const totals = receiptTotals(bill, printedLines);
@@ -2045,9 +2084,9 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         endTime: formatDateTime(endAt),
         startTimeLabel: t("receipt.startTime"),
         endTimeLabel: t("receipt.endTime"),
-        lines: receiptLines(printedLines),
-        ...totals,
-        amounts: tipReceiptRow,
+        lines: receiptLines(ladySplit.items),
+        ...withLadyCharge(totals, ladySplit.ladyCharge),
+        amounts: [...ladyChargeRow(ladySplit), ...tipReceiptRow],
         total: result.grandTotal,
         payments,
         ...(Number(result.change) > 0 ? { change: result.change } : {}),

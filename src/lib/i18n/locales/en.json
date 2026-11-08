@@ -3,7 +3,8 @@
     "startTime": "Start time",
     "endTime": "End time",
     "printFailed": "Receipt print failed",
-    "tip": "Tip"
+    "tip": "Tip",
+    "ladyCharge": "Lady Charge"
   },
   "common": {
     "refresh": "Refresh",

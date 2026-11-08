@@ -31,6 +31,7 @@ import { cashierLabel } from "@/lib/printing/cashier";
 import { receiptTotals } from "@/lib/printing/receiptTotals";
 import { toMoney, withOrderTipOnFirstPayment } from "@/lib/pos/checkoutAdjustments";
 import { slipRows } from "@/lib/spa/billLines";
+import { ladyChargeDetail, splitLadyCharges } from "@/lib/ktv/ladyCharge";
 
 export function KtvRoomPage() {
   const { t } = useTranslation();
@@ -329,6 +330,10 @@ export function KtvRoomPage() {
         page: 1,
         limit: 200,
       });
+      // The ladies' own charges print as one row below the service charge, each
+      // lady and her hours under it, rather than a line each among the items.
+      const printedLines = result.lines.filter((line) => !line.voidedAt);
+      const ladySplit = splitLadyCharges(printedLines);
       // The closed bill: the room's time, its tax and its service charge, so the
       // slip reads the way the cashier's receipt does.
       const bill = await fetchOrderBill(session.salesOrderId, {
@@ -379,22 +384,42 @@ export function KtvRoomPage() {
           endTime: formatDateTime(endAt),
           startTimeLabel: t("receipt.startTime"),
           endTimeLabel: t("receipt.endTime"),
-          lines: slipRows(result.lines.filter((line) => !line.voidedAt))
-            .map(({ line, quantity }) => {
-              const modifiers = modifierPrintText(line.selectedModifiers);
-              return {
-                name: lineDisplayName(line) || line.productName || line.variantName || "Item",
-                quantity: String(quantity || line.quantity || "1"),
-                unitPrice: line.unitPrice?.trim() || undefined,
-                modifiers: modifiers.names,
-                modifierPrices: modifiers.prices,
-              };
-            }),
-          ...totals,
+          lines: slipRows(ladySplit.items).map(({ line, quantity }) => {
+            const modifiers = modifierPrintText(line.selectedModifiers);
+            return {
+              name: lineDisplayName(line) || line.productName || line.variantName || "Item",
+              quantity: String(quantity || line.quantity || "1"),
+              unitPrice: line.unitPrice?.trim() || undefined,
+              modifiers: modifiers.names,
+              modifierPrices: modifiers.prices,
+            };
+          }),
+          // The ladies are left out of the subtotal here and added back below it, so
+          // the money rows still add up to the total.
+          ...(ladySplit.ladyCharge > 0 && totals.subtotal !== undefined
+            ? {
+                ...totals,
+                subtotal: Math.max(0, Number(totals.subtotal) - ladySplit.ladyCharge).toFixed(4),
+              }
+            : totals),
           // The tip is inside the total below, so the slip says so.
-          ...(tipValue > 0
-            ? { amounts: [{ label: t("receipt.tip"), amount: tipValue.toFixed(4) }] }
-            : {}),
+          amounts: [
+            ...(ladySplit.ladyCharge > 0
+              ? [
+                  {
+                    label: t("receipt.ladyCharge"),
+                    amount: ladySplit.ladyCharge.toFixed(4),
+                    detail: ladySplit.ladies.map((lady) => ({
+                      label: ladyChargeDetail(lady, t("receipt.ladyCharge")),
+                      amount: lady.amount.toFixed(4),
+                    })),
+                  },
+                ]
+              : []),
+            ...(tipValue > 0
+              ? [{ label: t("receipt.tip"), amount: tipValue.toFixed(4) }]
+              : []),
+          ],
           total: finalTotal.toFixed(4),
           payments: [
             {

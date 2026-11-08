@@ -3,7 +3,8 @@
     "startTime": "စတင်ချိန်",
     "endTime": "ပြီးဆုံးချိန်",
     "printFailed": "ပြေစာ ပုံနှိပ်၍ မရပါ",
-    "tip": "တိပ်"
+    "tip": "တိပ်",
+    "ladyCharge": "Lady ခ"
   },
   "common": {
     "refresh": "ပြန်လည်စစ်မည်",
