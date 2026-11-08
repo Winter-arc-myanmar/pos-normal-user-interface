@@ -3,7 +3,9 @@
     "startTime": "Start time",
     "endTime": "End time",
     "printFailed": "Receipt print failed",
-    "tip": "Tip"
+    "tip": "Tip",
+    "ladyCharge": "Lady Charge",
+    "cardBalanceStale": "The guest card's balance could not be refreshed."
   },
   "common": {
     "refresh": "Refresh",
@@ -1675,6 +1677,8 @@
     "retryPay": "Pay now",
     "paidTitle": "Paid",
     "paidSummary": "Paid {{amount}} · order {{order}}",
+    "cardBalanceStale": "The guest card's balance could not be refreshed.",
+    "boardStale": "The board could not be refreshed; the room may still show as in use.",
     "change": "Change: {{amount}}",
     "nextGuest": "Next guest",
     "insufficientTitle": "Card balance too low",

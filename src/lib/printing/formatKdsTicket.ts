@@ -106,7 +106,12 @@ export interface SaleReceipt extends PrintParty {
     total?: { left: string; right: string };
   }>;
   /** Labelled amounts above the total, such as a shift's sales and refunds. */
-  amounts?: Array<{ label: string; amount: string }>;
+  amounts?: Array<{
+    label: string;
+    amount: string;
+    /** What makes the amount up, printed under it; a lady charge names each lady. */
+    detail?: Array<{ label: string; amount: string }>;
+  }>;
   totalLabel?: string;
   total: string;
   payments?: Array<{ name: string; amount: string }>;
@@ -802,18 +807,26 @@ function receiptLayout(receipt: SaleReceipt): Layout {
         ["Rounding", settings?.bill.rounding ? receipt.rounding : undefined],
       ]
     : [];
-  const shownBreakdown = [
-    ...breakdown,
-    ...(receipt.amounts || []).map((row): [string, string] => [row.label, row.amount]),
-  ].filter(([, value]) => value && Number(value) !== 0);
-  if (shownBreakdown.length || showTotal) layout.rule("-");
+  const shownBreakdown = breakdown.filter(([, value]) => value && Number(value) !== 0);
+  const shownAmounts = (receipt.amounts || []).filter(
+    (row) => row.amount && Number(row.amount) !== 0
+  );
+  if (shownBreakdown.length || shownAmounts.length || showTotal) layout.rule("-");
   const amount = (value?: string | number | null) => printAmount(value, receipt.currency);
   for (const [label, value] of shownBreakdown) {
     const owed = label === "Discount" && Number(value) > 0 ? -Number(value) : value;
     layout.pair(label, amount(owed));
   }
+  // What makes an amount up prints under it, as an item prints under its name.
+  for (const row of shownAmounts) {
+    layout.pair(row.label, amount(row.amount));
+    for (const part of row.detail || []) {
+      if (!part.amount || Number(part.amount) === 0) continue;
+      layout.pair(`    ${part.label}`, amount(part.amount));
+    }
+  }
   if (showTotal) {
-    if (shownBreakdown.length) layout.rule("-");
+    if (shownBreakdown.length || shownAmounts.length) layout.rule("-");
     layout.pair(receipt.totalLabel || "TOTAL", amount(receipt.total), {
       size: "tall",
       bold: true,

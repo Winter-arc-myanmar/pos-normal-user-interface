@@ -634,14 +634,15 @@ describe("KtvBoardPage", () => {
       );
     });
 
-    it("still names who gave a hostess service on the check slip", async () => {
+    it("prints the ladies' services as one lady charge, each lady named under it", async () => {
       rooms = [busyRoom];
       orderLinesState = [
         { id: "line-1", variantId: "variant-ktv", quantity: "1", unitPrice: "40000" },
         {
+          // A hostess service the board's menu sells: Snow, 3 of them.
           id: "line-2",
           variantId: "variant-hostess",
-          quantity: "1",
+          quantity: "3",
           unitPrice: "20000",
           hostessId: "hostess-snow",
         },
@@ -649,9 +650,9 @@ describe("KtvBoardPage", () => {
           // A service the board's menu does not list: the line itself says so.
           id: "line-3",
           variantId: "variant-off-menu",
-          quantity: "1",
+          quantity: "2",
           unitPrice: "50000",
-          hostessId: "hostess-snow",
+          hostessId: "hostess-rose",
           askWhoServed: true,
           productName: "Cus Name",
         },
@@ -674,13 +675,30 @@ describe("KtvBoardPage", () => {
       await waitFor(() => expect(mocks.printReceipt).toHaveBeenCalled());
       const slip = mocks.printReceipt.mock.calls.at(-1)?.[0] as {
         lines: Array<Record<string, unknown>>;
+        amounts: Array<{
+          label: string;
+          amount: string;
+          detail?: Array<{ label: string; amount: string }>;
+        }>;
       };
-      const row = (name: string) => slip.lines.find((line) => line.name === name);
-      expect(row("Hostess per hour")?.modifiers).toBe("Snow");
-      expect(row("Cus Name")?.modifiers).toBe("Snow");
-      expect(row("Myanmar Beer")?.modifiers).toBeUndefined();
-      // The note for the bar prints under the drink.
-      expect(row("Myanmar Beer")?.remarks).toBe("No ice");
+      // The ladies' own charges leave the items: the slip prints them as one row,
+      // below the service charge and above the total, each lady with her hours.
+      const names = slip.lines.map((line) => line.name);
+      expect(names).not.toContain("Hostess per hour");
+      expect(names).not.toContain("Cus Name");
+      expect(slip.amounts).toEqual([
+        {
+          label: "receipt.ladyCharge",
+          amount: "160000.0000",
+          detail: [
+            { label: "Snow 3 × 20,000", amount: "60000.0000" },
+            { label: "Rose 2 × 50,000", amount: "100000.0000" },
+          ],
+        },
+      ]);
+      // The drink a lady ordered for the room stays an item, with the bar's note.
+      const beer = slip.lines.find((line) => line.name === "Myanmar Beer");
+      expect(beer?.remarks).toBe("No ice");
     });
 
     it("leaves the lady who ordered a drink off the check slip", async () => {

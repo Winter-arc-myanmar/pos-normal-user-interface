@@ -190,6 +190,50 @@ describe("a KTV bill", () => {
     expect(text).not.toContain("Private VIP Lounge");
   });
 
+  it("prints the lady charge below the service charge and above the total", () => {
+    const text = buildSaleReceiptLines({
+      title: "Receipt",
+      serviceType: "KTV",
+      tableOrRoom: "K3",
+      lines: [{ name: "Beer", quantity: "1", unitPrice: "4000" }],
+      subtotal: "4000.0000",
+      serviceCharge: "400.0000",
+      amounts: [{ label: "Lady Charge", amount: "20000.0000" }],
+      total: "24400.0000",
+    }).join("\n");
+    expect(text).toMatch(
+      /Subtotal\s+4,000[\s\S]*Service charge\s+400[\s\S]*Lady Charge\s+20,000[\s\S]*TOTAL\s+24,400/
+    );
+  });
+
+  it("names each lady under the lady charge, with her hours and cost", () => {
+    const text = buildSaleReceiptLines({
+      title: "Receipt",
+      serviceType: "KTV",
+      lines: [{ name: "Beer", quantity: "1", unitPrice: "4000" }],
+      subtotal: "4000.0000",
+      serviceCharge: "400.0000",
+      amounts: [
+        {
+          label: "Lady Charge",
+          amount: "100000.0000",
+          detail: [
+            { label: "Snow 3 × 20,000", amount: "60000.0000" },
+            { label: "Yuki 2 × 20,000", amount: "40000.0000" },
+          ],
+        },
+      ],
+      total: "104400.0000",
+    }).join("\n");
+
+    expect(text).toMatch(/Lady Charge\s+100,000/);
+    // Each lady prints under the charge, indented, as an item prints under its name.
+    expect(text).toMatch(/\n {4}Snow 3 × 20,000\s+60,000/);
+    expect(text).toMatch(/\n {4}Yuki 2 × 20,000\s+40,000/);
+    // The ladies' costs come before the total, and they add up to the charge.
+    expect(text).toMatch(/Snow 3 × 20,000[\s\S]*Yuki 2 × 20,000[\s\S]*TOTAL\s+104,400/);
+  });
+
   it("still calls a spa room a room", () => {
     const text = buildSaleReceiptLines({
       title: "Receipt",

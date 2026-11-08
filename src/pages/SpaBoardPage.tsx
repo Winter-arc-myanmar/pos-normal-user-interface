@@ -121,7 +121,13 @@ import { modifierExtra } from "@/lib/modifiers/choices";
 import { LineEditDialog, type LineEdit } from "./cashier/LineEditDialog";
 import { modifierPrintText } from "@/lib/printing/modifierText";
 import { applyKdsTicketHostess } from "@/lib/printing/kdsTicketModifiers";
-import { receiptTotals } from "@/lib/printing/receiptTotals";
+import { receiptTotals, type ReceiptTotals } from "@/lib/printing/receiptTotals";
+import {
+  isLadyChargeLine,
+  ladyChargeDetail,
+  splitLadyCharges,
+  type LadyChargeSplit,
+} from "@/lib/ktv/ladyCharge";
 import { groupRoomTimeRows, mergedRoomTimeLine } from "@/lib/printing/roomTimeRows";
 import { cashierLabel } from "@/lib/printing/cashier";
 
@@ -545,8 +551,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         const name = hostessName(id);
         return name ? [{ id, name }] : [];
       });
-  const isHostessService = (line: SalesOrderLine) =>
-    Boolean(line.askWhoServed) || serviceVariantIds.has(line.variantId);
+  const isHostessService = (line: SalesOrderLine) => isLadyChargeLine(line, serviceVariantIds);
   const orderedByName = (line: SalesOrderLine) =>
     line.hostessId && !isHostessService(line)
       ? hostessName(line.hostessId) || tr("aHostess")
@@ -600,6 +605,34 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       };
     });
   };
+  /**
+   * KTV: the ladies' own charges print as one row below the service charge, with
+   * each lady and her hours under it, instead of a line each among the items. A SPA
+   * bill keeps every line as it is.
+   */
+  const ladyChargesOf = (printedLines: SalesOrderLine[]): LadyChargeSplit =>
+    isSpa
+      ? { items: printedLines, ladyCharge: 0, ladies: [] }
+      : splitLadyCharges(printedLines, serviceVariantIds, hostessName);
+  /** The slip's money rows, with the ladies left out of the subtotal they add to again below. */
+  const withLadyCharge = (totals: ReceiptTotals, ladyCharge: number): ReceiptTotals =>
+    ladyCharge > 0 && totals.subtotal !== undefined
+      ? { ...totals, subtotal: Math.max(0, Number(totals.subtotal) - ladyCharge).toFixed(4) }
+      : totals;
+  /** "Lady Charge", then a row for each lady: Snow with 3 hours, Yuki with 2. */
+  const ladyChargeRow = ({ ladyCharge, ladies }: LadyChargeSplit) =>
+    ladyCharge > 0
+      ? [
+          {
+            label: t("receipt.ladyCharge"),
+            amount: ladyCharge.toFixed(4),
+            detail: ladies.map((lady) => ({
+              label: ladyChargeDetail(lady, tr("aHostess")),
+              amount: lady.amount.toFixed(4),
+            })),
+          },
+        ]
+      : [];
   // Before the room starts, the packages it starts with; once it runs, the ones added.
   const booking = session ? extendChoice : packageChoice;
   // KTV: the rentals this room can be sold under; the room's own rate unless another is picked.
@@ -1658,9 +1691,9 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         ...manualClose(),
       });
       writeResume(kind, null);
-      await fetchBoard();
       try {
         const printedLines = orderLines.filter((line) => !line.voidedAt);
+        const ladySplit = ladyChargesOf(printedLines);
         // The bill as the till has it now (the room's time lands on it at close),
         // so the slip's money rows add up to the total it prints.
         const bill = session.salesOrderId ? await readBill(session.salesOrderId) : serverBill;
@@ -1680,9 +1713,9 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           endTime: formatDateTime(final.asOf || new Date().toISOString()),
           startTimeLabel: t("receipt.startTime"),
           endTimeLabel: t("receipt.endTime"),
-          lines: receiptLines(printedLines),
-          ...totals,
-          amounts: tipReceiptRow,
+          lines: receiptLines(ladySplit.items),
+          ...withLadyCharge(totals, ladySplit.ladyCharge),
+          amounts: [...ladyChargeRow(ladySplit), ...tipReceiptRow],
           total: String(final.paidTotal || final.runningTotal || "0"),
         });
       } catch (printError) {
@@ -1697,6 +1730,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           amount: money(final.paidTotal),
         })
       );
+      // The room is closed and paid: a board that cannot refresh is a warning.
+      await finishPaid();
     } catch (caught) {
       setActionError(caught instanceof Error ? caught.message : tr("errors.pay"));
     } finally {
@@ -1981,11 +2016,14 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     if (!session) return;
     try {
       const printedLines = orderLines.filter((line) => !line.voidedAt);
+      const ladySplit = ladyChargesOf(printedLines);
       const bill = session.salesOrderId ? await readBill(session.salesOrderId) : serverBill;
       const totals = receiptTotals(bill, printedLines);
       // Clock time the close has not written to the bill yet is still owed, so the
       // check bill counts it in the items and in the receivable.
-      const items = bill ? Number(totals.subtotal || 0) + timeNotOnLines : undefined;
+      const items = bill
+        ? Math.max(0, Number(totals.subtotal || 0) + timeNotOnLines - ladySplit.ladyCharge)
+        : undefined;
       const due = bill
         ? Number(bill.grandTotal) + timeNotOnLines
         : Number(quote?.amountDue || quote?.runningTotal || 0);
@@ -2002,11 +2040,12 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         endTime: formatDateTime(new Date().toISOString()),
         startTimeLabel: t("receipt.startTime"),
         endTimeLabel: t("receipt.endTime"),
-        lines: receiptLines(printedLines, false),
+        lines: receiptLines(ladySplit.items, false),
         ...(items !== undefined ? { subtotal: items.toFixed(4) } : {}),
         ...(totals.discount ? { discount: totals.discount } : {}),
         ...(totals.tax ? { tax: totals.tax } : {}),
         ...(totals.serviceCharge ? { serviceCharge: totals.serviceCharge } : {}),
+        ...(ladySplit.ladyCharge > 0 ? { amounts: ladyChargeRow(ladySplit) } : {}),
         totalLabel: tr("receivable"),
         total: due.toFixed(4),
       });
@@ -2027,6 +2066,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     if (!session) return;
     try {
       const printedLines = orderLines.filter((line) => !line.voidedAt);
+      const ladySplit = ladyChargesOf(printedLines);
       // The bill as it stands after the settle, as the cashier prints it.
       const bill = session.salesOrderId ? await readBill(session.salesOrderId) : serverBill;
       const totals = receiptTotals(bill, printedLines);
@@ -2045,9 +2085,9 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         endTime: formatDateTime(endAt),
         startTimeLabel: t("receipt.startTime"),
         endTimeLabel: t("receipt.endTime"),
-        lines: receiptLines(printedLines),
-        ...totals,
-        amounts: tipReceiptRow,
+        lines: receiptLines(ladySplit.items),
+        ...withLadyCharge(totals, ladySplit.ladyCharge),
+        amounts: [...ladyChargeRow(ladySplit), ...tipReceiptRow],
         total: result.grandTotal,
         payments,
         ...(Number(result.change) > 0 ? { change: result.change } : {}),
@@ -2057,6 +2097,29 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         printError instanceof Error ? printError.message : t("receipt.printFailed")
       );
     }
+  };
+
+  /**
+   * The guest has paid: the slip, the card's balance and the board can still fail —
+   * a till that may not read wallets or the board, say — but the money is already
+   * taken, so those read as a warning instead of a failed payment. Printing says so
+   * on its own.
+   */
+  const finishPaid = async ({ card = false }: { card?: boolean } = {}) => {
+    const warnings: string[] = [];
+    if (card && wallet) {
+      try {
+        setWallet(await getWallet(wallet.id));
+      } catch {
+        warnings.push(tr("cardBalanceStale"));
+      }
+    }
+    try {
+      await fetchBoard();
+    } catch {
+      warnings.push(tr("boardStale"));
+    }
+    if (warnings.length) toast.info(`${tr("paidTitle")}. ${warnings.join(" ")}`);
   };
 
   /** Pay at the end with cash or another method: close the room, then settle the bill. */
@@ -2069,9 +2132,10 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     }
     setActionError(null);
     setIsPaying(true);
+    let result: SettleSalesOrderResultDTO;
+    let endAt = session.closedAt || session.endsAt || "";
     try {
       const context = await requireCashierContext();
-      let endAt = session.closedAt || session.endsAt || "";
       let due = Number(quote?.amountDue || 0);
       if (!billClosed) {
         const closed = await closeSession(session.id, manualClose());
@@ -2079,7 +2143,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         due = Number(closed.amountDue ?? closed.runningTotal ?? 0);
         setSession({ ...session, sessionState: "CLOSED" });
       }
-      const result =
+      result =
         due > 0
           ? await settleOrder(session.salesOrderId, {
               payments: withOrderTipOnFirstPayment(
@@ -2098,15 +2162,20 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               change: "0.0000",
               status: "COMPLETED",
             };
+    } catch (caught) {
+      setIsPaying(false);
+      setActionError(caught instanceof Error ? caught.message : tr("errors.pay"));
+      return;
+    }
+    // The bill is paid: nothing below can undo it, so nothing below is an error.
+    try {
       await printPaid(result, endAt, [
         { name: method.name || "Payment", amount: result.totalPaid || result.grandTotal },
       ]);
       setPaid(result);
       writeResume(kind, null);
-      await fetchBoard();
-    } catch (caught) {
-      setActionError(caught instanceof Error ? caught.message : tr("errors.pay"));
     } finally {
+      await finishPaid();
       setIsPaying(false);
     }
   };
@@ -2130,9 +2199,10 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     }
     setActionError(null);
     setIsPaying(true);
+    let result: SettleSalesOrderResultDTO;
+    let endAt = session.closedAt || session.endsAt || "";
     try {
       const context = await requireCashierContext();
-      let endAt = session.closedAt || session.endsAt || "";
       if (!billClosed) {
         const latest = await getQuote(session.id);
         const estimate = estimateCardCharge({
@@ -2142,6 +2212,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           cash: cashValue,
         });
         if (!cardCanCover(wallet, estimate)) {
+          setIsPaying(false);
           setActionError(tr("errors.balanceShort"));
           return;
         }
@@ -2149,7 +2220,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         endAt = closed.asOf || new Date().toISOString();
         setSession({ ...session, sessionState: "CLOSED" });
       }
-      const result = await settleOrder(session.salesOrderId, {
+      result = await settleOrder(session.salesOrderId, {
         payments: withOrderTipOnFirstPayment(
           buildSpaSettlePayments({
             cardMethodId: cardMethod.id,
@@ -2163,9 +2234,16 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         ...(tipValue > 0 ? { tipAmount: tipValue.toFixed(4) } : {}),
         idempotencyKey: spaSettleKey(session.id),
       });
-      // The cash the guest handed over first, then the card for what it leaves.
-      const paidTotal = Number(result.totalPaid || result.grandTotal);
-      const cash = Math.min(cashValue, paidTotal);
+    } catch (caught) {
+      setIsPaying(false);
+      setActionError(caught instanceof Error ? caught.message : tr("errors.pay"));
+      return;
+    }
+    // The cash the guest handed over first, then the card for what it leaves.
+    const paidTotal = Number(result.totalPaid || result.grandTotal);
+    const cash = Math.min(cashValue, paidTotal);
+    // The bill is paid: nothing below can undo it, so nothing below is an error.
+    try {
       await printPaid(result, endAt, [
         ...(cash > 0
           ? [{ name: cashMethod?.name || "Cash", amount: cash.toFixed(4) }]
@@ -2174,11 +2252,8 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       ]);
       setPaid(result);
       writeResume(kind, null);
-      setWallet(await getWallet(wallet.id));
-      await fetchBoard();
-    } catch (caught) {
-      setActionError(caught instanceof Error ? caught.message : tr("errors.pay"));
     } finally {
+      await finishPaid({ card: true });
       setIsPaying(false);
     }
   };
@@ -2302,9 +2377,10 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     }
     setActionError(null);
     setIsPaying(true);
+    let result: SettleSalesOrderResultDTO;
+    let endAt = session.closedAt || session.endsAt || "";
     try {
       const context = await requireCashierContext();
-      let endAt = session.closedAt || session.endsAt || "";
       if (!billClosed) {
         const closed = await closeSession(session.id, manualClose());
         endAt = closed.asOf || new Date().toISOString();
@@ -2316,10 +2392,11 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       if (Math.abs(finalTotal - endBillTotal) > 0.009) {
         resetSplit();
         await refreshBill({ ...session, sessionState: "CLOSED" });
+        setIsPaying(false);
         setActionError(t("cashier.errors.billUpdated", { amount: money(finalTotal) }));
         return;
       }
-      const result =
+      result =
         Number(finalBill.grandTotal) > 0
           ? await settleOrder(session.salesOrderId, {
               // The card pays what the others leave, after its member discount.
@@ -2353,29 +2430,33 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               change: "0.0000",
               status: "COMPLETED",
             };
-      // Each method on its own row, in the order it was taken; the card takes
-      // whatever the others leave, which is how the settle splits it.
-      const paidTotal = Number(result.totalPaid || result.grandTotal);
-      let tendered = 0;
-      const rows = tenders.map((tender) => {
-        const name =
-          endPayMethods.find((method) => method.id === tender.paymentMethodId)?.name || "Payment";
-        if (isCardMethod(tender.paymentMethodId)) return { name, amount: "" };
-        const amount = Number(tender.amount || 0);
-        tendered += amount;
-        return { name, amount: amount.toFixed(4) };
-      });
-      const cardRow = rows.find((row) => !row.amount);
-      if (cardRow) cardRow.amount = Math.max(0, paidTotal - tendered).toFixed(4);
+    } catch (caught) {
+      setIsPaying(false);
+      setActionError(caught instanceof Error ? caught.message : tr("errors.pay"));
+      return;
+    }
+    // Each method on its own row, in the order it was taken; the card takes
+    // whatever the others leave, which is how the settle splits it.
+    const paidTotal = Number(result.totalPaid || result.grandTotal);
+    let tendered = 0;
+    const rows = tenders.map((tender) => {
+      const name =
+        endPayMethods.find((method) => method.id === tender.paymentMethodId)?.name || "Payment";
+      if (isCardMethod(tender.paymentMethodId)) return { name, amount: "" };
+      const amount = Number(tender.amount || 0);
+      tendered += amount;
+      return { name, amount: amount.toFixed(4) };
+    });
+    const cardRow = rows.find((row) => !row.amount);
+    if (cardRow) cardRow.amount = Math.max(0, paidTotal - tendered).toFixed(4);
+    // The bill is paid: nothing below can undo it, so nothing below is an error.
+    try {
       await printPaid(result, endAt, rows);
       setPaid(result);
       resetSplit();
       writeResume(kind, null);
-      if (usesCard && wallet) setWallet(await getWallet(wallet.id));
-      await fetchBoard();
-    } catch (caught) {
-      setActionError(caught instanceof Error ? caught.message : tr("errors.pay"));
     } finally {
+      await finishPaid({ card: usesCard });
       setIsPaying(false);
     }
   };
