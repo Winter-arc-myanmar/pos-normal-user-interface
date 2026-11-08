@@ -433,7 +433,13 @@ export function KtvRoomPage() {
           printError instanceof Error ? printError.message : t("receipt.printFailed")
         );
       }
-      await getWallet(wallet.id);
+      // The bill is paid: a card balance that cannot be read back is a warning,
+      // never a failed payment.
+      try {
+        await getWallet(wallet.id);
+      } catch {
+        toast.info(t("receipt.cardBalanceStale"));
+      }
       navigate("/ktv");
     } catch (caught) {
       setLocalError(

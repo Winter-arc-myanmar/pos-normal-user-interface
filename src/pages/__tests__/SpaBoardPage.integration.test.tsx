@@ -500,6 +500,23 @@ describe("SpaBoardPage", () => {
     );
   });
 
+  it("still shows the bill as paid when the card and board cannot be read back", async () => {
+    await openRunningRoom();
+    fireEvent.click(screen.getByRole("button", { name: "spa.goToPay" }));
+    await tapCard();
+    // A till that may take the payment but not read the wallet or the board again.
+    mocks.getWallet.mockRejectedValue(new Error("Forbidden resource"));
+    mocks.fetchBoard.mockRejectedValue(new Error("Forbidden resource"));
+    fireEvent.click(await screen.findByRole("button", { name: "spa.confirmPay" }));
+
+    await waitFor(() => expect(mocks.settleOrder).toHaveBeenCalled());
+    // The guest has paid: the till says so, and the failed refreshes are a warning.
+    expect(await screen.findByText("spa.paidTitle")).toBeInTheDocument();
+    expect(screen.queryByText("Forbidden resource")).not.toBeInTheDocument();
+    expect(await screen.findByText(/spa.cardBalanceStale/)).toBeInTheDocument();
+    expect(await screen.findByText(/spa.boardStale/)).toBeInTheDocument();
+  });
+
   it("splits the bill with cash when asked", async () => {
     await openRunningRoom();
     fireEvent.click(screen.getByRole("button", { name: "spa.goToPay" }));

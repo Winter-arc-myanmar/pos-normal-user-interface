@@ -1247,6 +1247,12 @@
   "Lady Charge": {
     "my": "Lady ခ"
   },
+  "The guest card's balance could not be refreshed.": {
+    "my": "ဧည့်သည်ကတ် လက်ကျန်ကို ပြန်လည်စစ်၍ မရပါ။"
+  },
+  "The board could not be refreshed; the room may still show as in use.": {
+    "my": "ဘုတ်ကို ပြန်လည်စစ်၍ မရပါ။ အခန်းသည် အသုံးပြုနေသည် ဟု ပြသနေနိုင်ပါသည်။"
+  },
   "Save pool": {
     "my": "ပေါင်းငွေ သိမ်းမည်"
   },
