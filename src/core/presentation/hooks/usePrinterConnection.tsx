@@ -45,6 +45,7 @@ import {
   resolveBindingsForPlace,
   savePrinterBinding,
   setDefaultPrinterBinding,
+  takesArea,
 } from "@/lib/pos/printerBindingStorage";
 
 /** The company prints are headed with, loaded once per signed-in company. */
@@ -229,13 +230,15 @@ export function usePrinterConnection(
   const backendTargets = useCallback(
     async (place: PrintPlace, area?: PrinterArea): Promise<PrinterBinding[]> => {
       if (!isBrowserPrinting()) return [];
+      // A kitchen ticket is not printed for an area, only a slip is.
+      const wanted = takesArea(place) ? area : undefined;
       try {
         const result = await printerService.list({
           page: 1,
           limit: 100,
           locationId: locationId || undefined,
           sector: place,
-          ...(area ? { area } : {}),
+          ...(wanted ? { area: wanted } : {}),
         });
         return result.printers
           .filter((printer) => Boolean(printer.ipAddress))
@@ -246,7 +249,7 @@ export function usePrinterConnection(
           // A printer set up for other areas of the venue never prints this one.
           .filter(
             (printer) =>
-              !area || !printer.printsFor?.length || printer.printsFor.includes(area)
+              !wanted || !printer.printsFor?.length || printer.printsFor.includes(wanted)
           )
           .map((printer) => ({
             id: `backend:${printer.id}`,

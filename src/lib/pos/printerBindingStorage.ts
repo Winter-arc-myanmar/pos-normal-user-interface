@@ -268,12 +268,22 @@ const uniquePhysicalPrinters = (bindings: PrinterBinding[]): PrinterBinding[] =>
 };
 
 /**
+ * A guest slip and the office copy belong to an area of the venue; a kitchen
+ * ticket does not. A KDS printer takes the tickets of the stations it serves,
+ * whatever areas it prints slips for, so areas never narrow kitchen routing.
+ */
+export function takesArea(place: PrinterSector): boolean {
+  return place === "CHECKOUT" || place === "FINANCE";
+}
+
+/**
  * Printers a receipt/kitchen job should go to for one section of one area.
  *
  * A printer's own print sectors are the last word on what it prints: a KDS
- * printer must never take the guest's bill. The areas it prints for come next: a
- * KTV guest slip belongs on the KTV printers, not on the bar counter's, even
- * though both are checkout printers of the same outlet. A printer that names no
+ * printer must never take the guest's bill. The areas it prints for come next, and
+ * only for the slips that have an area: a KTV guest slip belongs on the KTV
+ * printers, not on the bar counter's, even though both are checkout printers of
+ * the same outlet. Kitchen tickets ignore areas entirely. A printer that names no
  * areas serves every area, the same way it serves every section when it names no
  * sections.
  */
@@ -283,11 +293,12 @@ export function resolveBindingsForPlace(
   place: PrinterSector,
   area?: PrinterArea
 ): PrinterBinding[] {
+  const wanted = takesArea(place) ? area : undefined;
   const forArea = (candidates: PrinterBinding[]) =>
-    area
+    wanted
       ? candidates.filter(
           (binding) =>
-            !binding.printsFor?.length || binding.printsFor.includes(area)
+            !binding.printsFor?.length || binding.printsFor.includes(wanted)
         )
       : candidates;
 
