@@ -86,6 +86,15 @@ const bar = {
   sectors: ["KDS"],
   isActive: true,
 };
+const cashier = {
+  id: "printer-cashier",
+  name: "Cashier",
+  ipAddress: "192.168.201.91",
+  port: 9100,
+  sectors: ["CHECKOUT"],
+  printsFor: ["BAR"],
+  isActive: true,
+};
 const barStation = {
   id: "station-bar",
   name: "BarStation",
@@ -164,5 +173,49 @@ describe("PrinterSettingsPanel save", () => {
     expect(binding.sectors).toEqual(["KDS"]);
     expect(binding.host).toBe("192.168.201.92");
     expect(mocks.removeBinding).not.toHaveBeenCalled();
+  });
+
+  // A slip belongs to a part of the venue, so a printer that prints slips says
+  // which ones; a kitchen printer prints tickets for its stations instead.
+  it("offers the places a slip printer prints for", () => {
+    mocks.printers = [cashier];
+    mocks.updatePrinter.mockResolvedValue(cashier);
+    render(<PrinterSettingsPanel />);
+    fireEvent.click(screen.getByRole("button", { name: /Cashier/ }));
+
+    expect(
+      screen.getByRole("checkbox", { name: "settings.printer.areaBar" })
+    ).toBeChecked();
+    expect(
+      screen.getByRole("checkbox", { name: "settings.printer.areaKtv" })
+    ).not.toBeChecked();
+    expect(
+      screen.getByRole("checkbox", { name: "settings.printer.areaSpa" })
+    ).not.toBeChecked();
+  });
+
+  it("offers no places for a kitchen printer", () => {
+    render(<PrinterSettingsPanel />);
+    fireEvent.click(screen.getByRole("button", { name: /Bar/ }));
+
+    expect(
+      screen.queryByRole("checkbox", { name: "settings.printer.areaKtv" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("saves the places the operator chose", async () => {
+    mocks.printers = [cashier];
+    mocks.updatePrinter.mockResolvedValue(cashier);
+    render(<PrinterSettingsPanel />);
+    fireEvent.click(screen.getByRole("button", { name: /Cashier/ }));
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "settings.printer.areaKtv" })
+    );
+    fireEvent.click(saveButton());
+
+    await waitFor(() => expect(mocks.updatePrinter).toHaveBeenCalled());
+    const [, payload] = mocks.updatePrinter.mock.calls[0];
+    expect(payload.printsFor).toEqual(["BAR", "KTV"]);
+    expect(payload.sectors).toEqual(["CHECKOUT"]);
   });
 });

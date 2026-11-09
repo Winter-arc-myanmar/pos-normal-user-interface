@@ -1,5 +1,7 @@
 export type PrinterTransport = "NETWORK" | "USB" | "BLUETOOTH";
 export type PrinterSector = "KDS" | "CHECKOUT" | "FINANCE";
+/** The area of the venue a printer prints for; none means every area. */
+export type PrinterArea = "BAR" | "KTV" | "SPA";
 
 export interface PrinterBinding {
   id: string;
@@ -10,6 +12,7 @@ export interface PrinterBinding {
   host?: string;
   port?: number;
   sectors?: PrinterSector[];
+  printsFor?: PrinterArea[];
   categoryIds?: string[];
   lastVerifiedAt: string;
   lastError?: string | null;
@@ -265,26 +268,53 @@ const uniquePhysicalPrinters = (bindings: PrinterBinding[]): PrinterBinding[] =>
 };
 
 /**
- * Printers a receipt/kitchen job should go to for one section.
+ * A guest slip and the office copy belong to an area of the venue; a kitchen
+ * ticket does not. A KDS printer takes the tickets of the stations it serves,
+ * whatever areas it prints slips for, so areas never narrow kitchen routing.
+ */
+export function takesArea(place: PrinterSector): boolean {
+  return place === "CHECKOUT" || place === "FINANCE";
+}
+
+/**
+ * Printers a receipt/kitchen job should go to for one section of one area.
  *
  * A printer's own print sectors are the last word on what it prints: a KDS
- * printer must never take the guest's bill or the office copy, and a checkout
- * printer must never take kitchen tickets. Only a printer that names no sections
- * at all — a setup from before sectors existed, or a single-printer till — is the
- * register's catch-all, and the default printer is the natural pick among those.
+ * printer must never take the guest's bill. The areas it prints for come next, and
+ * only for the slips that have an area: a KTV guest slip belongs on the KTV
+ * printers, not on the bar counter's, even though both are checkout printers of
+ * the same outlet. Kitchen tickets ignore areas entirely. A printer that names no
+ * areas serves every area, the same way it serves every section when it names no
+ * sections.
  */
 export function resolveBindingsForPlace(
   bindings: PrinterBinding[],
   defaultBinding: PrinterBinding | null,
-  place: PrinterSector
+  place: PrinterSector,
+  area?: PrinterArea
 ): PrinterBinding[] {
+  const wanted = takesArea(place) ? area : undefined;
+  const forArea = (candidates: PrinterBinding[]) =>
+    wanted
+      ? candidates.filter(
+          (binding) =>
+            !binding.printsFor?.length || binding.printsFor.includes(wanted)
+        )
+      : candidates;
+
   const bySector = bindingsForSector(bindings, place);
+  const serving = forArea(bySector);
+  if (serving.length) return uniquePhysicalPrinters(serving);
+  // This section has printers, but none of them serves the area: a slip on one
+  // of them is better than no slip at all.
   if (bySector.length) return uniquePhysicalPrinters(bySector);
 
   const catchAll = bindings.filter((binding) => !binding.sectors?.length);
-  if (!catchAll.length) return [];
-  const preferred = catchAll.filter(
+  const catching = forArea(catchAll);
+  const pool = catching.length ? catching : catchAll;
+  if (!pool.length) return [];
+  const preferred = pool.filter(
     (binding) => binding.id === defaultBinding?.id
   );
-  return uniquePhysicalPrinters(preferred.length ? preferred : catchAll);
+  return uniquePhysicalPrinters(preferred.length ? preferred : pool);
 }

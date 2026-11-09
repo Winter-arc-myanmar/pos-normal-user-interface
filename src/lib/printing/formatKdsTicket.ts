@@ -121,6 +121,8 @@ export interface SaleReceipt extends PrintParty {
   startTimeLabel?: string;
   endTimeLabel?: string;
   place?: PrintPlace;
+  /** The area of the venue this slip belongs to, so it prints on that area's printer. */
+  area?: "BAR" | "KTV" | "SPA";
   /** A paid bill: prints every copy its template asks for at checkout. */
   sale?: boolean;
   /** Which copy of a paid bill this is. */

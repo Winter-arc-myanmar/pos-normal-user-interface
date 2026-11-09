@@ -7,6 +7,7 @@ import {
   removePrinterBinding,
   resolveBindingsForPlace,
   savePrinterBinding,
+  takesArea,
 } from "../printerBindingStorage";
 
 describe("printer binding storage", () => {
@@ -217,6 +218,87 @@ describe("printer binding storage", () => {
     expect(resolveBindingsForPlace([bar], bar, "CHECKOUT")).toEqual([]);
     expect(resolveBindingsForPlace([bar], bar, "FINANCE")).toEqual([]);
     expect(resolveBindingsForPlace([bar], bar, "KDS")).toEqual([bar]);
+  });
+
+  it("prints a slip on the printers of its own area", () => {
+    const bar = {
+      id: "printer-bar",
+      backendPrinterId: "printer-bar",
+      transport: "NETWORK" as const,
+      displayName: "Cashier",
+      host: "192.168.1.51",
+      port: 9100,
+      sectors: ["CHECKOUT" as const],
+      printsFor: ["BAR" as const],
+      lastVerifiedAt: "",
+    };
+    const ktv = {
+      id: "printer-ktv",
+      backendPrinterId: "printer-ktv",
+      transport: "NETWORK" as const,
+      displayName: "KTV counter",
+      host: "192.168.1.50",
+      port: 9100,
+      sectors: ["CHECKOUT" as const, "FINANCE" as const],
+      printsFor: ["KTV" as const],
+      lastVerifiedAt: "",
+    };
+    // A printer that names no areas serves every one of them.
+    const plain = {
+      id: "printer-plain",
+      backendPrinterId: "printer-plain",
+      transport: "NETWORK" as const,
+      displayName: "Counter",
+      host: "192.168.1.52",
+      port: 9100,
+      sectors: ["CHECKOUT" as const],
+      lastVerifiedAt: "",
+    };
+
+    // Without an area every checkout printer is a candidate, as it was before.
+    expect(resolveBindingsForPlace([bar, ktv], bar, "CHECKOUT")).toEqual([bar, ktv]);
+    // A KTV guest slip prints on the KTV counter, never on the bar counter.
+    expect(resolveBindingsForPlace([bar, ktv], bar, "CHECKOUT", "KTV")).toEqual([ktv]);
+    expect(resolveBindingsForPlace([bar, ktv], bar, "CHECKOUT", "BAR")).toEqual([bar]);
+    // A printer set up for no area in particular still prints for every area.
+    expect(resolveBindingsForPlace([plain], plain, "CHECKOUT", "KTV")).toEqual([plain]);
+  });
+
+  it("never narrows kitchen tickets by area", () => {
+    // Two station printers, each set up for a different area. Areas are a slip's
+    // business, not the kitchen's: both stay candidates for a kitchen ticket.
+    const ktvKitchen = {
+      id: "printer-kitchen-ktv",
+      backendPrinterId: "printer-kitchen-ktv",
+      transport: "NETWORK" as const,
+      displayName: "KTV kitchen",
+      host: "192.168.1.60",
+      port: 9100,
+      sectors: ["KDS" as const],
+      printsFor: ["KTV" as const],
+      lastVerifiedAt: "",
+    };
+    const barKitchen = {
+      id: "printer-kitchen-bar",
+      backendPrinterId: "printer-kitchen-bar",
+      transport: "NETWORK" as const,
+      displayName: "Bar kitchen",
+      host: "192.168.1.61",
+      port: 9100,
+      sectors: ["KDS" as const],
+      printsFor: ["BAR" as const],
+      lastVerifiedAt: "",
+    };
+
+    expect(
+      resolveBindingsForPlace([ktvKitchen, barKitchen], null, "KDS", "BAR")
+    ).toEqual([ktvKitchen, barKitchen]);
+    expect(
+      resolveBindingsForPlace([ktvKitchen, barKitchen], null, "KDS", "SPA")
+    ).toEqual([ktvKitchen, barKitchen]);
+    expect(takesArea("KDS")).toBe(false);
+    expect(takesArea("CHECKOUT")).toBe(true);
+    expect(takesArea("FINANCE")).toBe(true);
   });
 
   it("resolves duplicate records for one physical printer only once", () => {
