@@ -3,7 +3,9 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import {
   KitchenPrinter,
+  PRINTER_AREAS,
   PRINTER_SECTORS,
+  PrinterArea,
   PrinterSector,
 } from "@/core/domain/entities/KitchenPrinter";
 import { useAuth } from "@/core/presentation/hooks/useAuth";
@@ -30,6 +32,12 @@ const SECTOR_LABEL_KEYS: Record<PrinterSector, string> = {
   CHECKOUT: "settings.printer.sectorCheckout",
   FINANCE: "settings.printer.sectorFinance",
   KDS: "settings.printer.sectorKds",
+};
+
+const AREA_LABEL_KEYS: Record<PrinterArea, string> = {
+  BAR: "settings.printer.areaBar",
+  KTV: "settings.printer.areaKtv",
+  SPA: "settings.printer.areaSpa",
 };
 
 export function PrinterSettingsPanel() {
@@ -65,6 +73,7 @@ export function PrinterSettingsPanel() {
   const [isActive, setIsActive] = useState(false);
   const [isDefault, setIsDefault] = useState(false);
   const [sectors, setSectors] = useState<PrinterSector[]>([]);
+  const [printsFor, setPrintsFor] = useState<PrinterArea[]>([]);
   const [stationIds, setStationIds] = useState<string[]>([]);
   /**
    * Whether the operator has chosen the stations by hand in this session. Until
@@ -138,6 +147,7 @@ export function PrinterSettingsPanel() {
     setIsActive(false);
     setIsDefault(false);
     setSectors([]);
+    setPrintsFor([]);
     setStationIds([]);
     setStationsTouched(false);
     setVerifiedBinding(null);
@@ -161,6 +171,7 @@ export function PrinterSettingsPanel() {
     setIsActive(printer.isActive);
     setIsDefault(connection.defaultBinding?.id === binding?.id);
     setSectors(printer.sectors || []);
+    setPrintsFor(printer.printsFor || []);
     setStationIds(
       stations
         .filter((station) => station.printerIds.includes(printer.id))
@@ -186,6 +197,8 @@ export function PrinterSettingsPanel() {
   });
 
   const servesKds = sectors.includes("KDS");
+  /** A printer that prints slips has to say which parts of the venue they belong to. */
+  const printsSlips = sectors.some((sector) => sector !== "KDS");
   const canAssignStations =
     servesKds && Boolean(selectedBackendId || transport === "NETWORK");
 
@@ -202,6 +215,14 @@ export function PrinterSettingsPanel() {
       }
       return next;
     });
+  };
+
+  const toggleArea = (area: PrinterArea) => {
+    setPrintsFor((current) =>
+      current.includes(area)
+        ? current.filter((item) => item !== area)
+        : [...current, area]
+    );
   };
 
   const testConnection = async () => {
@@ -291,6 +312,7 @@ export function PrinterSettingsPanel() {
         ...(networkAddress ? { ipAddress: networkAddress } : {}),
         port: portNumber,
         sectors,
+        printsFor,
       };
       // The printer record is shared by every till, so this device never writes
       // its own reachability into it: one till that cannot reach the paper must
@@ -301,6 +323,8 @@ export function PrinterSettingsPanel() {
       setSelectedBackendId(printer.id);
       const printerSectors = printer.sectors?.length ? printer.sectors : sectors;
       setSectors(printerSectors);
+      const printerAreas = printer.printsFor?.length ? printer.printsFor : printsFor;
+      setPrintsFor(printerAreas);
 
       // Save the printer on this device whether or not its test print answered.
       // The operator asked for this printer here; a failed test must not leave
@@ -392,6 +416,11 @@ export function PrinterSettingsPanel() {
                 {printer.sectors?.length
                   ? printer.sectors.join(" · ")
                   : t("settings.printer.noSectors")}
+              </span>
+              <span className="mt-1 block text-xs text-slate-500">
+                {printer.printsFor?.length
+                  ? printer.printsFor.join(" · ")
+                  : t("settings.printer.printForAll")}
               </span>
               <span className="mt-1 block text-xs text-slate-500">
                 {printer.ipAddress
@@ -627,6 +656,31 @@ export function PrinterSettingsPanel() {
             ))}
           </div>
         </fieldset>
+        {printsSlips ? (
+          <fieldset className="mt-4">
+            <legend className="text-sm text-slate-600">
+              {t("settings.printer.printFor")}
+            </legend>
+            <p className="mt-1 text-xs text-slate-500">
+              {t("settings.printer.printForHint")}
+            </p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-3">
+              {PRINTER_AREAS.map((area) => (
+                <label
+                  key={area}
+                  className="flex items-center gap-2 text-sm text-slate-700"
+                >
+                  <input
+                    type="checkbox"
+                    checked={printsFor.includes(area)}
+                    onChange={() => toggleArea(area)}
+                  />
+                  {t(AREA_LABEL_KEYS[area])}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        ) : null}
         <div className="mt-4 flex flex-wrap gap-4 text-sm">
           <label className="flex items-center gap-2">
             <input

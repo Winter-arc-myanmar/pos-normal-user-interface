@@ -11,6 +11,7 @@ export interface CreateKitchenPrinterDTO {
   ipAddress?: string;
   port: number;
   sectors: PrinterSector[];
+  printsFor?: PrinterArea[];
   isActive: boolean;
 }
 
@@ -20,6 +21,7 @@ export interface UpdateKitchenPrinterDTO {
   ipAddress?: string;
   port?: number;
   sectors?: PrinterSector[];
+  printsFor?: PrinterArea[];
   isActive?: boolean;
 }
 
