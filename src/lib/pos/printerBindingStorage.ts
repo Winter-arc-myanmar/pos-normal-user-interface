@@ -267,10 +267,11 @@ const uniquePhysicalPrinters = (bindings: PrinterBinding[]): PrinterBinding[] =>
 /**
  * Printers a receipt/kitchen job should go to for one section.
  *
- * An exact sector match always wins. When nothing is bound to that section we
- * fall back to the default printer, then to the only printer on this register.
- * Without this a single-printer venue (very common on Android tablets) fails
- * with "No checkout printer is connected" even though a printer is configured.
+ * A printer's own print sectors are the last word on what it prints: a KDS
+ * printer must never take the guest's bill or the office copy, and a checkout
+ * printer must never take kitchen tickets. Only a printer that names no sections
+ * at all — a setup from before sectors existed, or a single-printer till — is the
+ * register's catch-all, and the default printer is the natural pick among those.
  */
 export function resolveBindingsForPlace(
   bindings: PrinterBinding[],
@@ -279,7 +280,11 @@ export function resolveBindingsForPlace(
 ): PrinterBinding[] {
   const bySector = bindingsForSector(bindings, place);
   if (bySector.length) return uniquePhysicalPrinters(bySector);
-  if (defaultBinding) return [defaultBinding];
-  const uniqueBindings = uniquePhysicalPrinters(bindings);
-  return uniqueBindings.length === 1 ? uniqueBindings : [];
+
+  const catchAll = bindings.filter((binding) => !binding.sectors?.length);
+  if (!catchAll.length) return [];
+  const preferred = catchAll.filter(
+    (binding) => binding.id === defaultBinding?.id
+  );
+  return uniquePhysicalPrinters(preferred.length ? preferred : catchAll);
 }

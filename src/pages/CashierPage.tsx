@@ -3358,7 +3358,6 @@ export function CashierPage() {
         selectedOrder={selectedOrder}
         selectedOrderLines={displayOrderLines}
         billLines={paymentBillLines}
-        includeTax={billOptions.includeTax}
         products={products}
         variantsByProductId={variantsByProductId}
         paymentMethods={checkoutPaymentMethods}
