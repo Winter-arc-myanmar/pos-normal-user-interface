@@ -533,6 +533,27 @@ describe("CashierPage integration", () => {
       expect(mocks.settleOrder).not.toHaveBeenCalled();
     });
 
+    // The slip prints Tax and Service charge as rows of their own under the
+    // items, so its Subtotal is the items' money and the rows add up to TOTAL.
+    it("prints the items alone as the subtotal when no bill option was changed", async () => {
+      productState = { ...product, basePrice: "100.0000", taxRate: 10 };
+      await startDirectBill();
+      fireEvent.click(screen.getByRole("checkbox", { name: "cashier.payment.printBillOnConfirm" }));
+      fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+
+      await waitFor(() => expect(mocks.printReceipt).toHaveBeenCalled());
+      const slip = mocks.printReceipt.mock.calls[0][0];
+      // The item at 100, then the tax (with the tax on the service charge) and
+      // the service charge on their own rows.
+      expect(slip.subtotal).toBe("100.0000");
+      expect(slip.tax).toBe("11.0000");
+      expect(slip.serviceCharge).toBe("10.0000");
+      expect(slip.total).toBe("121.0000");
+      expect(
+        Number(slip.subtotal) + Number(slip.tax) + Number(slip.serviceCharge)
+      ).toBeCloseTo(Number(slip.total), 2);
+    });
+
     it("asks whose account a credit payment goes on and sends that customer", async () => {
       productState = { ...product, basePrice: "100.0000", taxRate: 10 };
       await startDirectBill();

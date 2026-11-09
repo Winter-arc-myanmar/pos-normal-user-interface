@@ -1008,10 +1008,22 @@ export function CashierPage() {
   );
   const receiptTax = billOptions.bill?.totalTax ?? toMoney(Number(orderTax) + serviceChargeTax);
   const receiptServiceCharge = billOptions.bill?.serviceCharge ?? toMoney(serviceCharge);
-  const receiptSubtotal = billOptions.bill?.subtotal ?? (billOptions.changed
-    ? toMoney(paymentBillLines.reduce((sum, line) => sum + Number(line.quantity) * Number(line.unitPrice)
-      - (!billOptions.includeTax && line.taxInclusive ? Number(line.taxAmount || 0) : 0), 0))
-    : lineSubtotal.toFixed(4));
+  // The slip prints Tax and Service charge as rows of their own under the items,
+  // so its Subtotal is the items' own money. Falling back to the line total —
+  // which adds the line tax — counted that tax twice on the paper and the rows
+  // no longer added up to the TOTAL.
+  const itemsSubtotal = toMoney(
+    paymentBillLines.reduce(
+      (sum, line) =>
+        sum +
+        Number(line.quantity || 0) * Number(line.unitPrice || 0) -
+        (!billOptions.includeTax && line.taxInclusive
+          ? Number(line.taxAmount || 0)
+          : 0),
+      0
+    )
+  );
+  const receiptSubtotal = billOptions.bill?.subtotal ?? itemsSubtotal;
   const receiptDiscount = billOptions.bill?.totalDiscount ?? (billOptions.changed
     ? toMoney(paymentBillLines.reduce((sum, line) => sum + Number(line.lineDiscount || 0), 0)
       + (isDirectCheckoutMode ? 0 : Math.max(0, Number(discountAmount) || 0)))
