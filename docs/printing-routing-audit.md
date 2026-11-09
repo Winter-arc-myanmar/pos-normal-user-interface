@@ -1,8 +1,7 @@
 # Printing routing audit — KDS / CHECKOUT / FINANCE
 
-**Status:** findings only. **No code was changed.** This document is an audit of the
-current production printing/routing behaviour so fixes can be planned and signed
-off deliberately.
+**Status:** findings only when written — the audit itself changed no code. Fixes
+applied since are recorded in [§0 Status updates](#0-status-updates).
 
 **Date:** 2026-11-09
 **Scope:** `src/lib/printing/**`, `src/lib/pos/printerBindingStorage.ts`,
@@ -11,6 +10,16 @@ settings panels, and every page that prints.
 **Method:** full read of the routing core plus three independent read-only audits
 (route, receipt copies, configuration persistence); every claim cross-checked
 against source. Baseline test run recorded in [§10](#10-baseline-test-run).
+
+---
+
+## 0. Status updates
+
+| Date | Finding | Change |
+| --- | --- | --- |
+| 2026-11-09 | **B3, B4** | **Fixed.** `resolveBindingsForPlace` no longer falls back to the default printer (or the only printer) for a section that printer does not declare. A printer's own sectors are now the last word: a `KDS`-only printer marked as the default no longer receives checkout receipts or finance copies. Only a printer that names **no** sectors at all — a pre-sectors setup, or a single-printer till — is still the register's catch-all, and the default printer is preferred among those. `printerBindingStorage.test.ts` updated, plus a regression test for the reported “Bar (KDS, default) prints checkout + finance” case. |
+
+Findings B1, B2, B5–B18 remain open.
 
 ---
 

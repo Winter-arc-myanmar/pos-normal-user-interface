@@ -149,7 +149,7 @@ describe("printer binding storage", () => {
     expect(bindingsForSector([checkout, finance], "KDS")).toEqual([]);
   });
 
-  it("falls back to the default printer, then the only printer, for a section", () => {
+  it("only gives a section to a printer that prints it", () => {
     const counter = {
       id: "printer-1",
       backendPrinterId: "printer-1",
@@ -160,6 +160,8 @@ describe("printer binding storage", () => {
       sectors: ["CHECKOUT" as const],
       lastVerifiedAt: "",
     };
+    // A printer that names no sections is the register's catch-all: the setup
+    // from before print sectors existed, or a single-printer till.
     const office = {
       id: "printer-2",
       backendPrinterId: "printer-2",
@@ -169,19 +171,52 @@ describe("printer binding storage", () => {
       port: 9100,
       lastVerifiedAt: "",
     };
+    const spare = {
+      id: "printer-3",
+      backendPrinterId: "printer-3",
+      transport: "NETWORK" as const,
+      displayName: "Spare",
+      host: "192.168.1.52",
+      port: 9100,
+      lastVerifiedAt: "",
+    };
 
     // An exact sector match always wins over the default printer.
     expect(resolveBindingsForPlace([counter, office], office, "CHECKOUT")).toEqual([
       counter,
     ]);
-    // Nothing bound to the section -> the default printer prints it.
+    // A printer that prints other sections never takes this one, even when it is
+    // the default: a checkout printer must not print kitchen tickets.
     expect(resolveBindingsForPlace([counter, office], counter, "KDS")).toEqual([
-      counter,
+      office,
     ]);
     // A single-printer venue prints everything, even without sector config.
     expect(resolveBindingsForPlace([office], null, "CHECKOUT")).toEqual([office]);
-    // Two printers, no default, no matching sector -> nothing to print to.
-    expect(resolveBindingsForPlace([counter, office], null, "KDS")).toEqual([]);
+    // Among catch-alls the default printer is preferred.
+    expect(resolveBindingsForPlace([office, spare], spare, "FINANCE")).toEqual([
+      spare,
+    ]);
+    // Every printer names its sections and none of them is this one.
+    expect(resolveBindingsForPlace([counter], null, "KDS")).toEqual([]);
+  });
+
+  it("keeps a KDS-only default printer to kitchen tickets", () => {
+    // The bar printer of a venue that also has a counter printer: it prints the
+    // tickets of its KDS stations and nothing the counter is configured for.
+    const bar = {
+      id: "printer-bar",
+      backendPrinterId: "printer-bar",
+      transport: "NETWORK" as const,
+      displayName: "Bar",
+      host: "192.168.201.92",
+      port: 9100,
+      sectors: ["KDS" as const],
+      lastVerifiedAt: "",
+    };
+
+    expect(resolveBindingsForPlace([bar], bar, "CHECKOUT")).toEqual([]);
+    expect(resolveBindingsForPlace([bar], bar, "FINANCE")).toEqual([]);
+    expect(resolveBindingsForPlace([bar], bar, "KDS")).toEqual([bar]);
   });
 
   it("resolves duplicate records for one physical printer only once", () => {
