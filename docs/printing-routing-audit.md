@@ -18,6 +18,7 @@ against source. Baseline test run recorded in [§10](#10-baseline-test-run).
 | Date | Finding | Change |
 | --- | --- | --- |
 | 2026-11-09 | **B3, B4** | **Fixed.** `resolveBindingsForPlace` no longer falls back to the default printer (or the only printer) for a section that printer does not declare. A printer's own sectors are now the last word: a `KDS`-only printer marked as the default no longer receives checkout receipts or finance copies. Only a printer that names **no** sectors at all — a pre-sectors setup, or a single-printer till — is still the register's catch-all, and the default printer is preferred among those. `printerBindingStorage.test.ts` updated, plus a regression test for the reported “Bar (KDS, default) prints checkout + finance” case. |
+| 2026-11-09 | **B3, B4 (part two)** | **Fixed.** Routing reads `sectors` off the **local** `PrinterBinding`, but a binding only stores the sectors its printer had the last time that printer was saved **on this device**, and only when the save's test print succeeded (`PrinterSettingsPanel.tsx:287-296`). A binding could therefore name no sectors at all (saved before sectors existed) or ones the back office has since changed, and the KDS printer kept printing the till's documents while Settings — which shows the *printer record* — looked correct. `usePrinterConnection.bindingsWithSectors` now reads the outlet's printer records and makes their sectors authoritative before routing, matching by `backendPrinterId` and then by network address. |
 
 Findings B1, B2, B5–B18 remain open.
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { KdsTicket } from "../../domain/entities/Cashier";
+import { KitchenPrinter } from "../../domain/entities/KitchenPrinter";
 import { IKitchenPrinterService } from "../../domain/services/IKitchenPrinterService";
 import { IPrintTemplateService } from "../../domain/services/IPrintTemplateService";
 import type { ISalesOrderService } from "../../domain/services/ISalesOrderService";
@@ -35,6 +36,7 @@ import { printPlaceToTemplateType, pickSavedPrintTemplate } from "@/lib/printing
 import {
   PRINTER_BINDINGS_CHANGED,
   PrinterBinding,
+  PrinterSector,
   PrinterTransport,
   listStoredPrinterBindings,
   readPrinterBindings,
@@ -257,6 +259,77 @@ export function usePrinterConnection(
   );
 
   /**
+   * The register's bindings, with the print sectors the back office now gives
+   * their printers.
+   *
+   * A binding only stores the sectors its printer had the last time that printer
+   * was saved on this device, and only when the save's test print succeeded. So a
+   * binding can name no sectors at all (saved before sectors existed) or ones the
+   * back office has since changed — and then a KDS printer prints the guest's
+   * bill. The printer record is the source of truth, so it decides here.
+   */
+  const bindingsWithSectors = useCallback(async () => {
+    const current = currentBindings();
+    if (!current.bindings.length) return current;
+    let printers: KitchenPrinter[];
+    try {
+      const result = await printerService.list({
+        page: 1,
+        limit: 100,
+        locationId: locationId || undefined,
+      });
+      printers = result.printers;
+    } catch {
+      return current;
+    }
+    if (!printers.length) return current;
+
+    const byAddress = new Map<string, string>();
+    const sectorsOf = new Map<string, PrinterSector[]>();
+    for (const printer of printers) {
+      sectorsOf.set(printer.id, printer.sectors || []);
+      if (printer.ipAddress) {
+        byAddress.set(
+          `${printer.ipAddress.trim().toLowerCase()}:${printer.port || 9100}`,
+          printer.id
+        );
+      }
+    }
+    const sectorsFor = (binding: PrinterBinding): PrinterSector[] | undefined => {
+      const id =
+        (binding.backendPrinterId && sectorsOf.has(binding.backendPrinterId)
+          ? binding.backendPrinterId
+          : undefined) ||
+        (binding.transport === "NETWORK" && binding.host
+          ? byAddress.get(
+              `${binding.host.trim().toLowerCase()}:${binding.port || 9100}`
+            )
+          : undefined);
+      const declared = id ? sectorsOf.get(id) : undefined;
+      return declared?.length ? declared : undefined;
+    };
+
+    let changed = false;
+    const bindings = current.bindings.map((binding) => {
+      const sectors = sectorsFor(binding);
+      if (!sectors) return binding;
+      const same =
+        binding.sectors?.length === sectors.length &&
+        sectors.every((sector) => binding.sectors?.includes(sector));
+      if (same) return binding;
+      changed = true;
+      return { ...binding, sectors };
+    });
+    if (!changed) return current;
+    return {
+      bindings,
+      defaultBinding:
+        bindings.find((binding) => binding.id === current.defaultBinding?.id) ||
+        current.defaultBinding,
+    };
+  }, [currentBindings, locationId, printerService]);
+
+  /**
    * The template a slip prints with: what the server resolves, and when it
    * answers with its built-in layout — or does not answer at all — the template
    * this outlet saved on the Print Template screen. The built-in layout knows
@@ -329,9 +402,10 @@ export function usePrinterConnection(
       // returned untouched so the caller can surface the unrouted lines.
       let jobs: PrinterJob[] = plan.jobs;
       if (!options.requireStationRouting && !jobs.length && lines.length) {
+        const kds = await bindingsWithSectors();
         const localTargets = resolveBindingsForPlace(
-          current.bindings,
-          current.defaultBinding,
+          kds.bindings,
+          kds.defaultBinding,
           "KDS"
         );
         const targets = localTargets.length
@@ -362,14 +436,14 @@ export function usePrinterConnection(
       }
       return plan;
     },
-    [backendTargets, currentBindings, registerId, templateFor, tenantId]
+    [backendTargets, bindingsWithSectors, currentBindings, registerId, templateFor, tenantId]
   );
 
   const printReceipt = useCallback(
     async (receipt: SaleReceipt) => {
       const client = await configureClient(tenantId, registerId);
+      const current = await bindingsWithSectors();
       const targetsFor = async (place: PrintPlace) => {
-        const current = currentBindings();
         const local = resolveBindingsForPlace(current.bindings, current.defaultBinding, place);
         return local.length ? local : backendTargets(place);
       };
@@ -430,7 +504,7 @@ export function usePrinterConnection(
         await printOne(copySlip(sale, copy));
       }
     },
-    [backendTargets, currentBindings, registerId, templateFor, tenantId]
+    [backendTargets, bindingsWithSectors, registerId, templateFor, tenantId]
   );
 
   const ticketWithModifiers = useCallback(async (ticket: KdsTicket) => {
