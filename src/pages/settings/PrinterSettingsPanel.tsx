@@ -66,6 +66,13 @@ export function PrinterSettingsPanel() {
   const [isDefault, setIsDefault] = useState(false);
   const [sectors, setSectors] = useState<PrinterSector[]>([]);
   const [stationIds, setStationIds] = useState<string[]>([]);
+  /**
+   * Whether the operator has chosen the stations by hand in this session. Until
+   * they do, the stations a printer already serves are kept as they are: the
+   * checkbox list starts empty while it loads, and saving that would clear every
+   * station the printer belongs to.
+   */
+  const [stationsTouched, setStationsTouched] = useState(false);
   const [verifiedBinding, setVerifiedBinding] = useState<PrinterBinding | null>(
     null
   );
@@ -132,6 +139,7 @@ export function PrinterSettingsPanel() {
     setIsDefault(false);
     setSectors([]);
     setStationIds([]);
+    setStationsTouched(false);
     setVerifiedBinding(null);
     setNotice(null);
     setLocalError(null);
@@ -158,6 +166,7 @@ export function PrinterSettingsPanel() {
         .filter((station) => station.printerIds.includes(printer.id))
         .map((station) => station.id)
     );
+    setStationsTouched(false);
     setVerifiedBinding(binding || null);
     setNotice(null);
     setLocalError(null);
@@ -185,7 +194,12 @@ export function PrinterSettingsPanel() {
       const next = current.includes(sector)
         ? current.filter((item) => item !== sector)
         : [...current, sector];
-      if (!next.includes("KDS")) setStationIds([]);
+      if (!next.includes("KDS")) {
+        setStationIds([]);
+        // Dropping KDS from a printer is a deliberate "stop sending tickets
+        // here", so its station assignments go with it.
+        setStationsTouched(true);
+      }
       return next;
     });
   };
@@ -271,39 +285,54 @@ export function PrinterSettingsPanel() {
     if (transport !== "NETWORK" && (!connected || !verified)) return;
 
     try {
-      const payload = {
+      const base = {
         locationId: activeLocationId,
         name: name.trim(),
         ...(networkAddress ? { ipAddress: networkAddress } : {}),
         port: portNumber,
         sectors,
-        isActive: connected,
       };
+      // The printer record is shared by every till, so this device never writes
+      // its own reachability into it: one till that cannot reach the paper must
+      // not switch the printer off for the others. A new record starts active.
       const printer = selectedBackendId
-        ? await updatePrinter(selectedBackendId, payload)
-        : await createPrinter({ tenantId, ...payload });
+        ? await updatePrinter(selectedBackendId, base)
+        : await createPrinter({ tenantId, ...base, isActive: true });
       setSelectedBackendId(printer.id);
-      setSectors(printer.sectors?.length ? printer.sectors : sectors);
-      if (connected && verified) {
-        const binding = {
-          ...verified,
-          id: verified.id || printer.id,
-          backendPrinterId: printer.id,
-          host: printer.ipAddress,
-          port: printer.port,
-          sectors: printer.sectors?.length ? printer.sectors : sectors,
-        };
-        connection.saveBinding(binding, isDefault);
-        setSelectedBindingId(binding.id);
-        setVerifiedBinding(binding);
-      } else if (selectedBindingId) {
-        connection.removeBinding(selectedBindingId);
-      }
+      const printerSectors = printer.sectors?.length ? printer.sectors : sectors;
+      setSectors(printerSectors);
+
+      // Save the printer on this device whether or not its test print answered.
+      // The operator asked for this printer here; a failed test must not leave
+      // the device running yesterday's configuration, which is what made a till
+      // have to be saved over and over before its paper came out right.
+      const binding: PrinterBinding = {
+        ...draft,
+        ...(verified || {}),
+        id: verified?.id || draft.id,
+        backendPrinterId: printer.id,
+        host: printer.ipAddress,
+        port: printer.port,
+        sectors: printerSectors,
+      };
+      connection.saveBinding(binding, isDefault);
+      setSelectedBindingId(binding.id);
+      setVerifiedBinding(connected ? binding : null);
+
+      // Which stations this printer serves: what the operator ticked, or — when
+      // they did not touch the list — what it already serves. Sending a list
+      // seeded before the stations had loaded is what used to strip a printer
+      // from every station and stop the kitchen printing everywhere.
+      const serves = stations
+        .filter((station) => station.printerIds.includes(printer.id))
+        .map((station) => station.id);
       await syncStationAssignments(
         printer.id,
-        (printer.sectors?.length ? printer.sectors : sectors).includes("KDS")
-          ? stationIds
-          : []
+        !stationsTouched
+          ? serves
+          : printerSectors.includes("KDS")
+            ? stationIds
+            : []
       );
       setNotice(
         connected ? t("settings.printer.saved") : t("settings.printer.savedInactive")
@@ -626,13 +655,14 @@ export function PrinterSettingsPanel() {
                   type="checkbox"
                   checked={stationIds.includes(station.id)}
                   disabled={stationsLoading || !canAssignStations}
-                  onChange={() =>
+                  onChange={() => {
+                    setStationsTouched(true);
                     setStationIds((current) =>
                       current.includes(station.id)
                         ? current.filter((id) => id !== station.id)
                         : [...current, station.id]
-                    )
-                  }
+                    );
+                  }}
                 />
                 {station.name}
               </label>
