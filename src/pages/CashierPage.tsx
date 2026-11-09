@@ -2341,6 +2341,7 @@ export function CashierPage() {
         title: "RECEIPT",
         sale: true,
         place: "CHECKOUT" as const,
+        area: "BAR" as const,
         showLogo: true,
         showPrices: true,
         receiptId: selectedOrder?.orderNumber,
@@ -3456,6 +3457,7 @@ export function CashierPage() {
           void printer.printReceipt({
             title: "FINANCE",
             place: "FINANCE",
+            area: "BAR" as const,
             showLogo: false,
             showPrices: true,
             receiptId: selectedOrder?.orderNumber,

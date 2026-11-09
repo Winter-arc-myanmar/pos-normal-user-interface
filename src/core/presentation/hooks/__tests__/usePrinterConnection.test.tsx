@@ -619,3 +619,99 @@ describe("usePrinterConnection print sectors from the back office", () => {
   });
 });
 
+describe("usePrinterConnection print areas", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    mocks.connect.mockReset();
+    mocks.connect.mockResolvedValue(undefined);
+    mocks.resolveTemplate.mockResolvedValue({ settings: undefined });
+    mocks.printReceipt.mockReset();
+    mocks.printReceipt.mockResolvedValue(undefined);
+  });
+
+  const bind = (
+    id: string,
+    displayName: string,
+    host: string,
+    printsFor?: Array<"BAR" | "KTV" | "SPA">
+  ) =>
+    savePrinterBinding(
+      tenantId,
+      registerId,
+      {
+        id,
+        backendPrinterId: id,
+        transport: "NETWORK",
+        displayName,
+        host,
+        port: 9100,
+        sectors: ["CHECKOUT"],
+        ...(printsFor ? { printsFor } : {}),
+        lastVerifiedAt: "",
+      },
+      id === "printer-bar"
+    );
+
+  const printed = () =>
+    mocks.printReceipt.mock.calls.map(
+      ([binding]) => (binding as { displayName: string }).displayName
+    );
+
+  it("prints a KTV guest slip on the KTV counter only", async () => {
+    bind("printer-bar", "Cashier", "192.168.1.51", ["BAR"]);
+    bind("printer-ktv", "KTV counter", "192.168.1.50", ["KTV"]);
+    const { result } = renderConnection();
+    await waitFor(() => expect(result.current.isConnected).toBe(true));
+
+    await act(async () => {
+      await result.current.printReceipt({
+        title: "RECEIPT",
+        sale: true,
+        area: "KTV",
+        lines: [],
+        total: "1000",
+      });
+    });
+
+    expect(printed()).toEqual(["KTV counter"]);
+  });
+
+  it("prints a bar guest slip on the bar counter only", async () => {
+    bind("printer-bar", "Cashier", "192.168.1.51", ["BAR"]);
+    bind("printer-ktv", "KTV counter", "192.168.1.50", ["KTV"]);
+    const { result } = renderConnection();
+    await waitFor(() => expect(result.current.isConnected).toBe(true));
+
+    await act(async () => {
+      await result.current.printReceipt({
+        title: "RECEIPT",
+        sale: true,
+        area: "BAR",
+        lines: [],
+        total: "1000",
+      });
+    });
+
+    expect(printed()).toEqual(["Cashier"]);
+  });
+
+  it("prints on a printer that lists no area when the area's own is not set up", async () => {
+    bind("printer-plain", "Counter", "192.168.1.52");
+    const { result } = renderConnection();
+    await waitFor(() => expect(result.current.isConnected).toBe(true));
+
+    await act(async () => {
+      await result.current.printReceipt({
+        title: "RECEIPT",
+        sale: true,
+        area: "SPA",
+        lines: [],
+        total: "1000",
+      });
+    });
+
+    expect(printed()).toEqual(["Counter"]);
+  });
+});
+
+

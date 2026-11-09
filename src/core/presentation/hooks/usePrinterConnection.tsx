@@ -35,6 +35,7 @@ import { checkoutCopies, copySlip } from "@/lib/printing/receiptCopies";
 import { printPlaceToTemplateType, pickSavedPrintTemplate } from "@/lib/printing/selectPrintTemplate";
 import {
   PRINTER_BINDINGS_CHANGED,
+  PrinterArea,
   PrinterBinding,
   PrinterSector,
   PrinterTransport,
@@ -226,19 +227,26 @@ export function usePrinterConnection(
    * Desktop always has its local binding, so this never runs there.
    */
   const backendTargets = useCallback(
-    async (place: PrintPlace): Promise<PrinterBinding[]> => {
+    async (place: PrintPlace, area?: PrinterArea): Promise<PrinterBinding[]> => {
       if (!isBrowserPrinting()) return [];
       try {
         const result = await printerService.list({
           page: 1,
           limit: 100,
           locationId: locationId || undefined,
+          sector: place,
+          ...(area ? { area } : {}),
         });
         return result.printers
           .filter((printer) => Boolean(printer.ipAddress))
           .filter(
             (printer) =>
               !printer.sectors?.length || printer.sectors.includes(place)
+          )
+          // A printer set up for other areas of the venue never prints this one.
+          .filter(
+            (printer) =>
+              !area || !printer.printsFor?.length || printer.printsFor.includes(area)
           )
           .map((printer) => ({
             id: `backend:${printer.id}`,
@@ -248,6 +256,7 @@ export function usePrinterConnection(
             host: printer.ipAddress,
             port: printer.port,
             sectors: printer.sectors,
+            printsFor: printer.printsFor,
             lastVerifiedAt: "",
             lastError: null,
           }));
@@ -286,8 +295,10 @@ export function usePrinterConnection(
 
     const byAddress = new Map<string, string>();
     const sectorsOf = new Map<string, PrinterSector[]>();
+    const areasOf = new Map<string, PrinterArea[]>();
     for (const printer of printers) {
       sectorsOf.set(printer.id, printer.sectors || []);
+      areasOf.set(printer.id, printer.printsFor || []);
       if (printer.ipAddress) {
         byAddress.set(
           `${printer.ipAddress.trim().toLowerCase()}:${printer.port || 9100}`,
@@ -295,30 +306,45 @@ export function usePrinterConnection(
         );
       }
     }
+    const recordFor = (binding: PrinterBinding): string | undefined =>
+      (binding.backendPrinterId && sectorsOf.has(binding.backendPrinterId)
+        ? binding.backendPrinterId
+        : undefined) ||
+      (binding.transport === "NETWORK" && binding.host
+        ? byAddress.get(
+            `${binding.host.trim().toLowerCase()}:${binding.port || 9100}`
+          )
+        : undefined);
     const sectorsFor = (binding: PrinterBinding): PrinterSector[] | undefined => {
-      const id =
-        (binding.backendPrinterId && sectorsOf.has(binding.backendPrinterId)
-          ? binding.backendPrinterId
-          : undefined) ||
-        (binding.transport === "NETWORK" && binding.host
-          ? byAddress.get(
-              `${binding.host.trim().toLowerCase()}:${binding.port || 9100}`
-            )
-          : undefined);
+      const id = recordFor(binding);
       const declared = id ? sectorsOf.get(id) : undefined;
+      return declared?.length ? declared : undefined;
+    };
+    const areasFor = (binding: PrinterBinding): PrinterArea[] | undefined => {
+      const id = recordFor(binding);
+      const declared = id ? areasOf.get(id) : undefined;
       return declared?.length ? declared : undefined;
     };
 
     let changed = false;
     const bindings = current.bindings.map((binding) => {
       const sectors = sectorsFor(binding);
-      if (!sectors) return binding;
-      const same =
-        binding.sectors?.length === sectors.length &&
-        sectors.every((sector) => binding.sectors?.includes(sector));
-      if (same) return binding;
+      const printsFor = areasFor(binding);
+      const sectorsSame =
+        !sectors ||
+        (binding.sectors?.length === sectors.length &&
+          sectors.every((sector) => binding.sectors?.includes(sector)));
+      const areasSame =
+        !printsFor ||
+        (binding.printsFor?.length === printsFor.length &&
+          printsFor.every((area) => binding.printsFor?.includes(area)));
+      if (sectorsSame && areasSame) return binding;
       changed = true;
-      return { ...binding, sectors };
+      return {
+        ...binding,
+        ...(sectors ? { sectors } : {}),
+        ...(printsFor ? { printsFor } : {}),
+      };
     });
     if (!changed) return current;
     return {
@@ -443,9 +469,15 @@ export function usePrinterConnection(
     async (receipt: SaleReceipt) => {
       const client = await configureClient(tenantId, registerId);
       const current = await bindingsWithSectors();
+      const area = receipt.area;
       const targetsFor = async (place: PrintPlace) => {
-        const local = resolveBindingsForPlace(current.bindings, current.defaultBinding, place);
-        return local.length ? local : backendTargets(place);
+        const local = resolveBindingsForPlace(
+          current.bindings,
+          current.defaultBinding,
+          place,
+          area
+        );
+        return local.length ? local : backendTargets(place, area);
       };
 
       const printOne = async (slip: SaleReceipt) => {

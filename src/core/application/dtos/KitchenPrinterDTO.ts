@@ -1,5 +1,6 @@
 import {
   KitchenPrinter,
+  PrinterArea,
   PrinterSector,
 } from "../../domain/entities/KitchenPrinter";
 
@@ -30,6 +31,8 @@ export interface KitchenPrinterFilterDTO {
   sortOrder?: "asc" | "desc";
   locationId?: string;
   sector?: PrinterSector;
+  /** Only the printers that serve this area of the venue. */
+  area?: PrinterArea;
 }
 
 export interface KitchenPrinterListDTO {
