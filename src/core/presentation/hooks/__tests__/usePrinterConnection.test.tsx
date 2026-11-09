@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   listTemplates: vi.fn(),
   getSalesOrderLines: vi.fn(),
   company: vi.fn(),
+  listPrinters: vi.fn(),
 }));
 
 vi.mock("@/core/infrastructure/printing/getPrinterClient", () => ({
@@ -45,6 +46,9 @@ vi.mock("@/core/infrastructure/di/container", () => ({
           resolve: mocks.resolveTemplate,
           company: mocks.company,
         };
+      }
+      if (key === "kitchenPrinterService") {
+        return { list: mocks.listPrinters };
       }
       return {
         list: vi.fn().mockResolvedValue({ printers: [] }),
@@ -78,6 +82,8 @@ beforeEach(() => {
   mocks.company.mockResolvedValue({ name: "" });
   mocks.listTemplates.mockReset();
   mocks.listTemplates.mockResolvedValue({ templates: [] });
+  mocks.listPrinters.mockReset();
+  mocks.listPrinters.mockResolvedValue({ printers: [] });
 });
 
 describe("usePrinterConnection print templates", () => {
@@ -507,3 +513,109 @@ describe("usePrinterConnection KTV slips", () => {
     expect(slip.place).toBe("Golden Club 101");
   });
 });
+
+describe("usePrinterConnection print sectors from the back office", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    mocks.connect.mockReset();
+    mocks.connect.mockResolvedValue(undefined);
+    mocks.resolveTemplate.mockResolvedValue({ settings: undefined });
+    mocks.printReceipt.mockReset();
+    mocks.printReceipt.mockResolvedValue(undefined);
+    mocks.printKitchen.mockReset();
+    mocks.printKitchen.mockResolvedValue(undefined);
+  });
+
+  /** The bar printer bound on this till, and ticked as its default. */
+  const bindBar = (sectors?: Array<"KDS" | "CHECKOUT" | "FINANCE">) =>
+    savePrinterBinding(
+      tenantId,
+      registerId,
+      {
+        id: "printer-bar",
+        backendPrinterId: "printer-bar",
+        transport: "NETWORK",
+        displayName: "Bar",
+        host: "192.168.201.92",
+        port: 9100,
+        ...(sectors ? { sectors } : {}),
+        lastVerifiedAt: "",
+      },
+      true
+    );
+
+  /** What the back office says about that printer: kitchen tickets only. */
+  const backendSaysKds = () =>
+    mocks.listPrinters.mockResolvedValue({
+      printers: [
+        {
+          id: "printer-bar",
+          name: "Bar",
+          port: 9100,
+          ipAddress: "192.168.201.92",
+          sectors: ["KDS"],
+          isActive: true,
+        },
+      ],
+      total: 1,
+      page: 1,
+      limit: 100,
+      totalPages: 1,
+    });
+
+  const paidBill = { title: "RECEIPT", sale: true, lines: [], total: "1000" };
+
+  it("keeps a KDS printer to kitchen tickets when its binding names no sectors", async () => {
+    // A binding saved before print sectors existed carries none of its own.
+    bindBar();
+    backendSaysKds();
+    const { result } = renderConnection();
+    await waitFor(() => expect(result.current.isConnected).toBe(true));
+
+    await act(async () => {
+      await expect(result.current.printReceipt(paidBill)).rejects.toThrow(
+        /checkout printer/
+      );
+      await expect(
+        result.current.printReceipt({ ...paidBill, title: "Finance copy", place: "FINANCE" })
+      ).rejects.toThrow(/finance printer/);
+    });
+
+    expect(mocks.printReceipt).not.toHaveBeenCalled();
+  });
+
+  it("keeps a KDS printer to kitchen tickets when its binding still names the till's sections", async () => {
+    // A binding written when this printer was the till's counter printer.
+    bindBar(["CHECKOUT", "FINANCE"]);
+    backendSaysKds();
+    const { result } = renderConnection();
+    await waitFor(() => expect(result.current.isConnected).toBe(true));
+
+    await act(async () => {
+      await expect(result.current.printReceipt(paidBill)).rejects.toThrow(
+        /checkout printer/
+      );
+    });
+
+    expect(mocks.printReceipt).not.toHaveBeenCalled();
+  });
+
+  it("still prints kitchen tickets on that printer", async () => {
+    bindBar();
+    backendSaysKds();
+    const { result } = renderConnection();
+    await waitFor(() => expect(result.current.isConnected).toBe(true));
+
+    await act(async () => {
+      await result.current.printKitchen({
+        title: "KITCHEN",
+        lines: [{ name: "Beer", quantity: "1" }],
+      });
+    });
+
+    expect(mocks.printKitchen).toHaveBeenCalledTimes(1);
+    const [binding] = mocks.printKitchen.mock.calls[0];
+    expect(binding.displayName).toBe("Bar");
+  });
+});
+
