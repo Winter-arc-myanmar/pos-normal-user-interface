@@ -688,7 +688,9 @@ function receiptLayout(receipt: SaleReceipt): Layout {
     layout.image(receipt.logo);
     if (receipt.logo) layout.gap();
   }
-  if (company?.name) {
+  // The header's outlet name switch owns the name at the top: a bill with it off
+  // prints no business name at all, not just the outlet line under the company's.
+  if (company?.name && headed(settings?.header.outletName)) {
     layout.line(company.name.toUpperCase(), { align: "center", size: "wide", bold: true });
     if (company.legalName && company.legalName !== company.name) {
       layout.line(company.legalName, { align: "center" });
