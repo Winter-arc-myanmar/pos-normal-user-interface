@@ -1289,9 +1289,31 @@ export function CashierPage() {
       isOpenTableSession(getLatestSessionByTableId(table.id))
     ).length;
 
-    const countOrdersForService = (serviceType: ServiceType) =>
+    /**
+     * The orders the table board can open: the ones a session that is still
+     * open owns. The Dine In tab draws that same board, so only these belong in
+     * its badge — a draft no table owns (a cart fired to the kitchen and then
+     * dropped, an extra order left behind when its table was released) has no
+     * tile to open, which is what made the tab read "Dine In 8" over a board of
+     * free tables.
+     */
+    const openTableOrderIds = new Set<string>();
+    for (const table of tablesInZone) {
+      const session = getLatestSessionByTableId(table.id);
+      if (!isOpenTableSession(session)) continue;
+      const orderId = session?.salesOrderId;
+      if (orderId) openTableOrderIds.add(orderId);
+    }
+
+    const countOrdersForService = (
+      serviceType: ServiceType,
+      options?: { onOpenTableOnly?: boolean }
+    ) =>
       salesOrders.filter((order) => {
         if (isSettledSalesOrder(order)) return false;
+        if (options?.onOpenTableOnly && !openTableOrderIds.has(order.id)) {
+          return false;
+        }
         const serviceMatches =
           serviceType === "TABLE"
             ? order.serviceType === "DINE_IN"
@@ -1321,7 +1343,8 @@ export function CashierPage() {
       notificationCount: statusTabCounts.DRAFT,
       serviceTabCounts: {
         TABLE: activeTableCount,
-        DINE_IN: countOrdersForService("DINE_IN").length,
+        DINE_IN: countOrdersForService("DINE_IN", { onOpenTableOnly: true })
+          .length,
         TAKE_AWAY: countOrdersForService("TAKE_AWAY").length,
         DELIVERY: countOrdersForService("DELIVERY").length,
         PICK_UP: countOrdersForService("PICK_UP").length,

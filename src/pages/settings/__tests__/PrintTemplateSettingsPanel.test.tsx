@@ -84,6 +84,49 @@ describe("PrintTemplateSettingsPanel", () => {
     );
   });
 
+  it("offers a kitchen template only the switches a ticket can print", () => {
+    render(<PrintTemplateSettingsPanel />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /settings.printTemplate.placeKdsHint/ })
+    );
+
+    // A kitchen ticket has no logo and no money: those switches are not offered.
+    expect(screen.queryByRole("checkbox", { name: "Logo" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("checkbox", { name: "settings.printTemplate.categorySubtotal" })
+    ).not.toBeInTheDocument();
+    // The ones it does print are.
+    for (const name of [
+      "settings.printTemplate.qtyFirst",
+      "settings.printTemplate.price",
+      "settings.printTemplate.cashier",
+    ]) {
+      expect(screen.getByRole("checkbox", { name })).toBeInTheDocument();
+    }
+  });
+
+  it("offers a finance template only the header lines an office copy prints", () => {
+    render(<PrintTemplateSettingsPanel />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /settings.printTemplate.placeFinanceHint/ })
+    );
+
+    // A finance copy carries no letterhead, so those switches are not offered.
+    for (const name of [
+      "Logo",
+      "settings.printTemplate.address",
+      "Phone",
+      "Email",
+    ]) {
+      expect(screen.queryByRole("checkbox", { name })).not.toBeInTheDocument();
+    }
+    expect(
+      screen.getByRole("checkbox", { name: "settings.printTemplate.outletName" })
+    ).toBeInTheDocument();
+  });
+
   it("creates a finance template as its own type", async () => {
     createTemplate.mockResolvedValue({ id: "template-finance" });
     render(<PrintTemplateSettingsPanel />);

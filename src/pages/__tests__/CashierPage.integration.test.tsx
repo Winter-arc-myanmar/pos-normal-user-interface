@@ -57,6 +57,7 @@ const mocks = vi.hoisted(() => ({
   loadHostesses: vi.fn(),
   settleOrder: vi.fn(),
   processCheckout: vi.fn(),
+  getLatestSessionByTableId: vi.fn(),
 }));
 
 const product = {
@@ -142,6 +143,7 @@ let selectedOrderLinesState: Array<
 > = [orderLine];
 let selectedOrderState: typeof order | null = order;
 let activeServiceTypeState = "TABLE";
+let salesOrdersState: Array<typeof order> = [order];
 let productState = product;
 let venueSettingsState = {
   defaultTaxRate: null,
@@ -268,7 +270,7 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
       { ...product, id: "product-hostess", name: "Hostess hour", askWhoServed: true },
     ],
     variantsByProductId: { "product-1": [variant] },
-    salesOrders: [order],
+    salesOrders: salesOrdersState,
     selectedOrder: selectedOrderState,
     selectedOrderLines: selectedOrderLinesState,
     paymentMethods: [
@@ -305,7 +307,7 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
     checkoutTableSession: mocks.checkoutTableSession,
     updateTableSessionState: mocks.updateTableSessionState,
     fireToKds: mocks.fireToKds,
-    getLatestSessionByTableId: vi.fn().mockReturnValue(session),
+    getLatestSessionByTableId: mocks.getLatestSessionByTableId,
     selectOrder: vi.fn(),
     selectOrderById: mocks.selectOrderById,
     createOrder: vi.fn(),
@@ -353,6 +355,8 @@ describe("CashierPage integration", () => {
     selectedOrderLinesState = [orderLine];
     selectedOrderState = order;
     activeServiceTypeState = "TABLE";
+    salesOrdersState = [order];
+    mocks.getLatestSessionByTableId.mockReturnValue(session);
     productState = product;
     venueSettingsState = {
       defaultTaxRate: null,
@@ -457,6 +461,50 @@ describe("CashierPage integration", () => {
       grandTotal: query.includeTax ? "10.5000" : "10.0000",
     }));
     mocks.openTableSession.mockResolvedValue(session);
+  });
+
+  describe("board service tab counts", () => {
+    /** The Dine In service tab, whose badge sits beside its label. */
+    const dineInTab = () =>
+      screen.getByRole("button", { name: /cashier\.serviceTypes\.dineIn/ });
+
+    const dineInDraft = (id: string, orderNumber: string) => ({
+      ...order,
+      id,
+      orderNumber,
+      serviceType: "DINE_IN",
+      status: "DRAFT",
+    });
+
+    it("keeps a dine-in draft no table session owns out of the badge", async () => {
+      activeServiceTypeState = "DINE_IN";
+      salesOrdersState = [dineInDraft("order-orphan", "POS-ORPHAN")];
+      mocks.getLatestSessionByTableId.mockReturnValue(undefined);
+
+      render(<MemoryRouter initialEntries={["/cashier"]}><CashierPage /></MemoryRouter>);
+
+      await waitFor(() =>
+        expect(dineInTab().textContent).toBe("cashier.serviceTypes.dineIn0")
+      );
+      // The draft has no tile on the table board, so it is not on screen either.
+      expect(screen.queryByText("POS-ORPHAN")).not.toBeInTheDocument();
+      expect(screen.getByText("T1")).toBeInTheDocument();
+    });
+
+    it("counts the dine-in order of a table that is still open", async () => {
+      activeServiceTypeState = "DINE_IN";
+      salesOrdersState = [dineInDraft("order-seated", "POS-SEATED")];
+      mocks.getLatestSessionByTableId.mockReturnValue({
+        ...session,
+        salesOrderId: "order-seated",
+      });
+
+      render(<MemoryRouter initialEntries={["/cashier"]}><CashierPage /></MemoryRouter>);
+
+      await waitFor(() =>
+        expect(dineInTab().textContent).toBe("cashier.serviceTypes.dineIn1")
+      );
+    });
   });
 
   describe("direct checkout bill options", () => {
