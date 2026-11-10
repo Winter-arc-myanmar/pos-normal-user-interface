@@ -45,6 +45,7 @@ describe("KitchenPrinterService", () => {
       name: "USB Counter",
       port: 9100,
       sectors: ["CHECKOUT"],
+      printsFor: [],
       isActive: true,
     });
   });
@@ -57,19 +58,23 @@ describe("KitchenPrinterService", () => {
       update,
     } as unknown as IKitchenPrinterRepository);
 
-    // The API rejects a field it does not declare (forbidNonWhitelisted), so the
-    // places a printer serves are never sent with the printer record.
     await service.create({
       tenantId: "tenant-1",
       locationId: "location-1",
       name: "KTV counter",
       port: 9100,
       sectors: ["CHECKOUT"],
+      printsFor: ["KTV", "KTV", "SPA"],
       isActive: true,
     });
-    expect(create.mock.calls[0][0]).not.toHaveProperty("printsFor");
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ printsFor: ["KTV", "SPA"] })
+    );
 
-    await service.update("printer-1", { sectors: ["CHECKOUT"] });
-    expect(update.mock.calls[0][1]).not.toHaveProperty("printsFor");
+    await service.update("printer-1", { printsFor: ["BAR", "BAR"] });
+    expect(update).toHaveBeenCalledWith(
+      "printer-1",
+      expect.objectContaining({ printsFor: ["BAR"] })
+    );
   });
 });

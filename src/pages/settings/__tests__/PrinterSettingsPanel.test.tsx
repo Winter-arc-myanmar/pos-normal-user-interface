@@ -176,22 +176,9 @@ describe("PrinterSettingsPanel save", () => {
   });
 
   // A slip belongs to a part of the venue, so a printer that prints slips says
-  // which ones; the places are kept on this till's binding.
+  // which ones; a kitchen printer prints tickets for its stations instead.
   it("offers the places a slip printer prints for", () => {
     mocks.printers = [cashier];
-    mocks.bindings = [
-      {
-        id: "binding-cashier",
-        backendPrinterId: "printer-cashier",
-        transport: "NETWORK",
-        displayName: "Cashier",
-        host: "192.168.201.91",
-        port: 9100,
-        sectors: ["CHECKOUT"],
-        printsFor: ["BAR"],
-        lastVerifiedAt: "",
-      },
-    ];
     mocks.updatePrinter.mockResolvedValue(cashier);
     render(<PrinterSettingsPanel />);
     fireEvent.click(screen.getByRole("button", { name: /Cashier/ }));
@@ -228,13 +215,8 @@ describe("PrinterSettingsPanel save", () => {
 
     await waitFor(() => expect(mocks.updatePrinter).toHaveBeenCalled());
     const [, payload] = mocks.updatePrinter.mock.calls[0];
-    // The API has no field for the places; sending one is a 400.
-    expect(payload).not.toHaveProperty("printsFor");
+    expect(payload.printsFor).toEqual(["BAR", "KTV"]);
     expect(payload.sectors).toEqual(["CHECKOUT"]);
-    // They are kept on the binding this till saves.
-    await waitFor(() => expect(mocks.saveBinding).toHaveBeenCalled());
-    const [binding] = mocks.saveBinding.mock.calls[0];
-    expect(binding.printsFor).toEqual(["KTV"]);
   });
 
   it("will not save a slip printer with no place ticked", async () => {
@@ -242,7 +224,10 @@ describe("PrinterSettingsPanel save", () => {
     render(<PrinterSettingsPanel />);
     fireEvent.click(screen.getByRole("button", { name: /Cashier/ }));
 
-    // The record carries no places, so this till starts with none ticked.
+    // The Cashier is ticked CHECKOUT and prints the Bar's slips; untick the place.
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "settings.printer.areaBar" })
+    );
     fireEvent.click(saveButton());
 
     await waitFor(() =>

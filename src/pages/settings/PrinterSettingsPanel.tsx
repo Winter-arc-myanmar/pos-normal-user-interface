@@ -171,9 +171,7 @@ export function PrinterSettingsPanel() {
     setIsActive(printer.isActive);
     setIsDefault(connection.defaultBinding?.id === binding?.id);
     setSectors(printer.sectors || []);
-    // The places a printer prints for belong to this till: the API has no field
-    // for them, so they are read from the binding saved here.
-    setPrintsFor(binding?.printsFor || []);
+    setPrintsFor(printer.printsFor || []);
     setStationIds(
       stations
         .filter((station) => station.printerIds.includes(printer.id))
@@ -202,9 +200,6 @@ export function PrinterSettingsPanel() {
   const servesKds = sectors.includes("KDS");
   /** A printer that prints slips has to say which parts of the venue they belong to. */
   const printsSlips = sectors.some((sector) => sector !== "KDS");
-  /** The places this till's binding for a printer prints slips for. */
-  const placesFor = (printerId: string) =>
-    connection.bindings.find((item) => item.backendPrinterId === printerId)?.printsFor || [];
   const canAssignStations =
     servesKds && Boolean(selectedBackendId || transport === "NETWORK");
 
@@ -325,6 +320,7 @@ export function PrinterSettingsPanel() {
         ...(networkAddress ? { ipAddress: networkAddress } : {}),
         port: portNumber,
         sectors,
+        printsFor,
       };
       // The printer record is shared by every till, so this device never writes
       // its own reachability into it: one till that cannot reach the paper must
@@ -335,9 +331,8 @@ export function PrinterSettingsPanel() {
       setSelectedBackendId(printer.id);
       const printerSectors = printer.sectors?.length ? printer.sectors : sectors;
       setSectors(printerSectors);
-      // The places stay where they can be stored: on this till's binding. The API
-      // has no field for them, so the chosen places are what this till prints.
-      setPrintsFor(printsFor);
+      const printerAreas = printer.printsFor?.length ? printer.printsFor : printsFor;
+      setPrintsFor(printerAreas);
 
       // Save the printer on this device whether or not its test print answered.
       // The operator asked for this printer here; a failed test must not leave
@@ -351,9 +346,9 @@ export function PrinterSettingsPanel() {
         host: printer.ipAddress,
         port: printer.port,
         sectors: printerSectors,
-        // Kept on the device: the API has no field for the places, so this is
-        // where "which counter prints which area" lives.
-        printsFor,
+        // Kept on the device as well, so a till that cannot reach the printer list
+        // still knows which counter serves which area of the venue.
+        printsFor: printerAreas,
       };
       connection.saveBinding(binding, isDefault);
       setSelectedBindingId(binding.id);
@@ -434,8 +429,8 @@ export function PrinterSettingsPanel() {
                   : t("settings.printer.noSectors")}
               </span>
               <span className="mt-1 block text-xs text-slate-500">
-                {placesFor(printer.id).length
-                  ? placesFor(printer.id).join(" · ")
+                {printer.printsFor?.length
+                  ? printer.printsFor.join(" · ")
                   : t("settings.printer.printForAll")}
               </span>
               <span className="mt-1 block text-xs text-slate-500">
