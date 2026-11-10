@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { RoomOrderView } from "@/core/domain/entities/RoomTablet";
 import { useRoomOrderAlerts } from "@/core/presentation/hooks/useRoomOrderAlerts";
+import { useRoomOrderCategories } from "@/core/presentation/hooks/useRoomOrderCategories";
 import { KitchenSlip } from "@/lib/printing/formatKdsTicket";
 import type { KitchenPrintPlan } from "@/lib/printing/routeKitchenPrint";
 import { toTabletSlip } from "@/lib/spa/tabletSlip";
@@ -29,6 +30,7 @@ export function RoomOrderAlerts({
   printKitchen: (slip: KitchenSlip) => Promise<KitchenPrintPlan>;
 }) {
   const { t } = useTranslation();
+  const withCategories = useRoomOrderCategories();
   const [printHere, setPrintHere] = useState(readPrintSetting);
   const [error, setError] = useState<string | null>(null);
   const [settingsTarget, setSettingsTarget] = useState<HTMLElement | null>(null);
@@ -60,7 +62,9 @@ export function RoomOrderAlerts({
           try {
             const claim = await claimPrint(order.id);
             if (!claim.claimed) return;
-            const plan = await printKitchen(toTabletSlip(claim.order));
+            // The room-order view names each item but carries no category, which
+            // is what sends the ticket to its station: fill it in from the menu.
+            const plan = await printKitchen(toTabletSlip(await withCategories(claim.order)));
             // An item whose category no station carries, or a station whose printer
             // this device does not have, would leave the kitchen without the order.
             if (plan.unrouted.length) {
