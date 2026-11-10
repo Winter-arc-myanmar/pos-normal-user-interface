@@ -320,9 +320,7 @@ export function PrinterSettingsPanel() {
         ...(networkAddress ? { ipAddress: networkAddress } : {}),
         port: portNumber,
         sectors,
-        // The API refuses an empty list and reads a missing one as "every
-        // area's bills", so a printer with no place ticked sends none.
-        ...(printsFor.length ? { printsFor } : {}),
+        printsFor,
       };
       // The printer record is shared by every till, so this device never writes
       // its own reachability into it: one till that cannot reach the paper must

@@ -427,64 +427,6 @@ export function usePrinterConnection(
     }
   }, [locationId]);
 
-  /**
-   * The outlet's station printers, as bindings this till can print to.
-   *
-   * A kitchen ticket is routed to a printer *id*, and that id only prints if this
-   * till saved that printer here. A station set up on another till - or saved
-   * while a printer save was failing - therefore left the kitchen with no paper at
-   * all, and nothing on the till said why. The back-office printer record knows
-   * the address, so it is used for those ids, the same way a guest slip falls back
-   * to the record when this till has no binding of its own.
-   */
-  const stationBindings = useCallback(
-    async (
-      routes: StationRoute[],
-      bindings: PrinterBinding[]
-    ): Promise<PrinterBinding[]> => {
-      if (!routes.length || !locationId) return [];
-      const bound = new Set(
-        bindings
-          .map((binding) => binding.backendPrinterId)
-          .filter((id): id is string => Boolean(id))
-      );
-      const missing = Array.from(
-        new Set(routes.flatMap((route) => route.printerIds))
-      ).filter((id) => !bound.has(id));
-      if (!missing.length) return [];
-      try {
-        const result = await printerService.list({
-          page: 1,
-          limit: 100,
-          locationId,
-        });
-        const wanted = new Set(missing);
-        return result.printers
-          .filter(
-            (printer) =>
-              wanted.has(printer.id) &&
-              printer.isActive !== false &&
-              Boolean(printer.ipAddress)
-          )
-          .map((printer) => ({
-            id: `backend:${printer.id}`,
-            backendPrinterId: printer.id,
-            transport: "NETWORK" as const,
-            displayName: printer.name,
-            host: printer.ipAddress,
-            port: printer.port,
-            sectors: printer.sectors,
-            printsFor: printer.printsFor,
-            lastVerifiedAt: "",
-            lastError: null,
-          }));
-      } catch {
-        return [];
-      }
-    },
-    [locationId, printerService]
-  );
-
   const printKitchen = useCallback(
     async (
       slip: KitchenSlip,
@@ -496,18 +438,12 @@ export function usePrinterConnection(
       // A caller with no station list (a room tablet's order) still has to reach
       // the station of each item's category, so the outlet's stations are read here.
       const routes = stations.length ? stations : await stationsFor();
-      // A station whose printer this till never saved still has paper to reach: the
-      // back-office record supplies that printer's address.
-      const extra = await stationBindings(routes, current.bindings);
-      const bindings = extra.length
-        ? [...current.bindings, ...extra]
-        : current.bindings;
       const resolved = slip.template ? undefined : await templateFor("KDS");
       const template = slip.template || resolved?.settings;
       const paperWidth = slip.paperWidth || resolved?.paperWidth;
       const plan = groupKitchenJobs(
         slip.lines || [],
-        bindings,
+        current.bindings,
         current.defaultBinding,
         slip.stationId,
         routes,
@@ -556,7 +492,7 @@ export function usePrinterConnection(
       }
       return plan;
     },
-    [backendTargets, bindingsWithSectors, currentBindings, registerId, stationBindings, stationsFor, templateFor, tenantId]
+    [backendTargets, bindingsWithSectors, currentBindings, registerId, stationsFor, templateFor, tenantId]
   );
 
   const printReceipt = useCallback(
