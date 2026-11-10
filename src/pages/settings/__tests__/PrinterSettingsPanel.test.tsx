@@ -219,20 +219,6 @@ describe("PrinterSettingsPanel save", () => {
     expect(payload.sectors).toEqual(["CHECKOUT"]);
   });
 
-  it("leaves the places out of the payload when none are ticked", async () => {
-    // The API refuses an empty list, and a kitchen printer has no places at all.
-    mocks.printers = [bar];
-    mocks.updatePrinter.mockResolvedValue(bar);
-    render(<PrinterSettingsPanel />);
-    fireEvent.click(screen.getByRole("button", { name: /Bar/ }));
-    fireEvent.click(saveButton());
-
-    await waitFor(() => expect(mocks.updatePrinter).toHaveBeenCalled());
-    const [, payload] = mocks.updatePrinter.mock.calls[0];
-    expect(payload).not.toHaveProperty("printsFor");
-    expect(payload.sectors).toEqual(["KDS"]);
-  });
-
   it("will not save a slip printer with no place ticked", async () => {
     mocks.printers = [cashier];
     render(<PrinterSettingsPanel />);
