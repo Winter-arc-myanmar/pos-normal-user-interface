@@ -450,14 +450,19 @@ export function usePrinterConnection(
         options
       );
       const lines = slip.lines || [];
-      // Without stations the ticket can only go to the till's own printer, which is
-      // fine: a single-printer venue prints everything there. With stations set up,
-      // an item that matches none of them must NOT fall back to that printer - it
-      // belongs to another station, and falling back is how a room's rice came out
-      // at the bar. Those lines are returned unrouted so the caller can say so.
+      // Station routing can leave every line unrouted (for example a category
+      // with no station, or a station whose printer is not bound on this
+      // device). Rather than silently printing nothing, fall back to the
+      // KDS/default printer so the kitchen ticket still reaches the paper.
+      //
+      // This fallback must NOT run when the caller requires strict station
+      // routing (`requireStationRouting`). Otherwise a category that is not
+      // assigned to the matching station would be sprayed onto the default KDS
+      // printer (for example "only salad" routed to the drink-station printer
+      // would still receive every other category). In strict mode the plan is
+      // returned untouched so the caller can surface the unrouted lines.
       let jobs: PrinterJob[] = plan.jobs;
-      const stationRouting = options.requireStationRouting || routes.length > 0;
-      if (!stationRouting && !jobs.length && lines.length) {
+      if (!options.requireStationRouting && !jobs.length && lines.length) {
         const kds = await bindingsWithSectors();
         const localTargets = resolveBindingsForPlace(
           kds.bindings,
