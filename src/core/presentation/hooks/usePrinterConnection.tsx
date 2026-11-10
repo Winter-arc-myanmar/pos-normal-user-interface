@@ -240,7 +240,7 @@ export function usePrinterConnection(
           sector: place,
           ...(wanted ? { area: wanted } : {}),
         });
-        return result.printers
+        const reachable = result.printers
           .filter((printer) => Boolean(printer.ipAddress))
           .filter(
             (printer) =>
@@ -250,19 +250,25 @@ export function usePrinterConnection(
           .filter(
             (printer) =>
               !wanted || !printer.printsFor?.length || printer.printsFor.includes(wanted)
-          )
-          .map((printer) => ({
-            id: `backend:${printer.id}`,
-            backendPrinterId: printer.id,
-            transport: "NETWORK" as const,
-            displayName: printer.name,
-            host: printer.ipAddress,
-            port: printer.port,
-            sectors: printer.sectors,
-            printsFor: printer.printsFor,
-            lastVerifiedAt: "",
-            lastError: null,
-          }));
+          );
+        // A printer set up for the area beats one that names no area at all, the
+        // same way the local bindings rank them: an unticked bar counter must not
+        // take the KTV's slip alongside the KTV's own.
+        const declared = wanted
+          ? reachable.filter((printer) => Boolean(printer.printsFor?.length))
+          : [];
+        return (declared.length ? declared : reachable).map((printer) => ({
+          id: `backend:${printer.id}`,
+          backendPrinterId: printer.id,
+          transport: "NETWORK" as const,
+          displayName: printer.name,
+          host: printer.ipAddress,
+          port: printer.port,
+          sectors: printer.sectors,
+          printsFor: printer.printsFor,
+          lastVerifiedAt: "",
+          lastError: null,
+        }));
       } catch {
         return [];
       }
@@ -324,9 +330,10 @@ export function usePrinterConnection(
       return declared?.length ? declared : undefined;
     };
     const areasFor = (binding: PrinterBinding): PrinterArea[] | undefined => {
+      // The record is the authority even when the back office cleared its places:
+      // an empty answer is a printer that names no area, not an answer to ignore.
       const id = recordFor(binding);
-      const declared = id ? areasOf.get(id) : undefined;
-      return declared?.length ? declared : undefined;
+      return id ? areasOf.get(id) : undefined;
     };
 
     let changed = false;
