@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { KdsTicket } from "@/core/domain/entities/Cashier";
-import { defaultPrintTemplateSettings } from "@/core/domain/entities/PrintTemplate";
+import {
+  PrintTemplateSettings,
+  defaultPrintTemplateSettings,
+} from "@/core/domain/entities/PrintTemplate";
 import {
   KitchenSlip,
   SlipPreviewRow,
+  buildKitchenSlipLines,
   formatKdsTicket,
   formatKitchenSlip,
   kdsTicketPlace,
@@ -224,5 +228,67 @@ describe("the kitchen slip's text size switches", () => {
     expect(line("2H1W")).toContain("\x1b!\x08\x1d!\x10");
     expect(line("1H2W")).toContain("\x1b!\x08\x1d!\x01");
     expect(line("2H2W")).toContain("\x1b!\x08\x1d!\x11");
+  });
+});
+
+describe("the kitchen ticket's switches", () => {
+  /** A ticket printed with one switch moved, and everything else as it ships. */
+  const slipWith = (
+    move: (settings: PrintTemplateSettings) => void,
+    extra: Partial<KitchenSlip> = {}
+  ) => {
+    const settings = defaultPrintTemplateSettings();
+    move(settings);
+    return {
+      title: "KDS-1",
+      stationName: "Bar",
+      lines: [{ name: "Beer", quantity: "2", remarks: "No ice" }],
+      sentBy: "Aung",
+      template: settings,
+      ...extra,
+    } as KitchenSlip;
+  };
+  const printed = (slip: KitchenSlip) => buildKitchenSlipLines(slip).join("\n");
+
+  it("prints the name first when quantity-first is off", () => {
+    expect(printed(slipWith((settings) => { settings.item.qtyFirst = false; }))).toContain(
+      "BEER x2"
+    );
+    expect(printed(slipWith((settings) => { settings.item.qtyFirst = true; }))).toContain(
+      "2 x BEER"
+    );
+  });
+
+  it("leaves an item's remark off when product remarks are off", () => {
+    expect(
+      printed(slipWith((settings) => { settings.item.productRemarks = false; }))
+    ).not.toContain("No ice");
+    expect(printed(slipWith(() => undefined))).toContain("No ice");
+  });
+
+  it("leaves the sender off when the cashier switch is off", () => {
+    expect(
+      printed(slipWith((settings) => { settings.other.cashier = false; }))
+    ).not.toContain("Sent by Aung");
+    expect(printed(slipWith(() => undefined))).toContain("Sent by Aung");
+  });
+
+  it("prints the footer at the Other text size", () => {
+    const settings = defaultPrintTemplateSettings();
+    settings.other.footerText = "Kitchen copy";
+    settings.item.otherTextScale = "2H2W";
+    const rows = kitchenSlipPreview({ title: "KDS-1", lines: [], template: settings }).rows;
+    const footer = rows.find(
+      (row): row is TextRow => row.kind === "text" && row.text.includes("Kitchen copy")
+    );
+
+    expect(footer?.size).toBe("huge");
+  });
+
+  it("keeps the switches on a ticket with no template", () => {
+    const text = printed({ title: "KDS-1", lines: [{ name: "Beer", quantity: "2" }] });
+
+    expect(text).toContain("2 x BEER");
+    expect(text).toContain("2 items");
   });
 });

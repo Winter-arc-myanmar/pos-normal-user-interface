@@ -605,6 +605,11 @@ function kitchenLayout(slip: KitchenSlip): Layout {
   const showPrices = settings ? settings.item.price : false;
   const showModifiers = settings ? settings.item.modifiers : true;
   const showOrderNumber = !settings || settings.other.orderNumber;
+  // The switches the Print Template screen offers for a kitchen ticket, read the
+  // same way the bill reads its own: what the shop turned off stays off the paper.
+  const qtyFirst = settings ? settings.item.qtyFirst : true;
+  const showRemarks = settings ? settings.item.productRemarks : true;
+  const showSender = settings ? settings.other.cashier : true;
   const layout = new Layout(columnsFor(slip.paperWidth));
 
   layout.line((slip.stationName || "Kitchen").toUpperCase(), { bold: true, invert: true });
@@ -635,13 +640,29 @@ function kitchenLayout(slip: KitchenSlip): Layout {
   const size = slip.room ? roomItemSizeFor(settings) : itemSizeFor(settings, true);
   lines.forEach((item, index) => {
     if (index) layout.gap();
-    // The quantity leads the name with an "x" after it, as the receipt prints it.
-    const lead = `${quantityText(item.quantity)} x `;
-    const columns = layout.columns(size) - lead.length;
-    const [first, ...rest] = wrapText(item.name.toUpperCase(), columns);
-    layout.rows.push({ kind: "text", text: `${lead}${first}`, size, bold: true });
-    for (const part of rest) {
-      layout.rows.push({ kind: "text", text: `${" ".repeat(lead.length)}${part}`, size, bold: true });
+    const quantity = quantityText(item.quantity);
+    const name = item.name.toUpperCase();
+    const columns = layout.columns(size);
+    if (qtyFirst) {
+      // The quantity leads the name with an "x" after it, as the receipt prints it.
+      const lead = `${quantity} x `;
+      const [first, ...rest] = wrapText(name, columns - lead.length);
+      layout.rows.push({ kind: "text", text: `${lead}${first}`, size, bold: true });
+      for (const part of rest) {
+        layout.rows.push({ kind: "text", text: `${" ".repeat(lead.length)}${part}`, size, bold: true });
+      }
+    } else {
+      // The switch the other way round: the name first, its quantity after it.
+      const trail = ` x${quantity}`;
+      const parts = wrapText(name, columns - trail.length);
+      parts.forEach((part, partIndex) => {
+        layout.rows.push({
+          kind: "text",
+          text: partIndex === parts.length - 1 ? `${part}${trail}` : part,
+          size,
+          bold: true,
+        });
+      });
     }
     if (settings?.item.bilingual) layout.indented(3, item.altName);
     if (showPrices && item.unitPrice) layout.indented(3, `@ ${printMoney(item.unitPrice)}`);
@@ -649,17 +670,19 @@ function kitchenLayout(slip: KitchenSlip): Layout {
       for (const modifier of modifierRows(item, showPrices)) layout.indented(3, modifier);
     }
     if (item.seat) layout.indented(3, `Seat ${item.seat}`);
-    if (item.remarks?.trim()) layout.indented(3, `** ${item.remarks.trim()} **`, { bold: true });
+    if (showRemarks && item.remarks?.trim()) {
+      layout.indented(3, `** ${item.remarks.trim()} **`, { bold: true });
+    }
   });
   if (lines.length) layout.rule("=");
 
   const count = lines.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
   if (count) layout.line(`${count} ${count === 1 ? "item" : "items"}`, { bold: true, size: other });
   const sender = slip.sentBy || slip.cashier;
-  if (sender) layout.line(`Sent by ${sender}`, { size: other });
+  if (sender && showSender) layout.line(`Sent by ${sender}`, { size: other });
   if (settings?.other.footerText) {
     layout.gap();
-    layout.line(settings.other.footerText, { align: "center" });
+    layout.line(settings.other.footerText, { align: "center", size: other });
   }
   return layout;
 }
