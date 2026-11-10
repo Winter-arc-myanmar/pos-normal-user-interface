@@ -80,6 +80,8 @@ describe("CloseShiftDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "shift.confirmCloseYes" }));
 
     await waitFor(() => expect(mocks.close).toHaveBeenCalledWith("shift-1"));
+    // The print question is asked first; answering it brings the shift's end.
+    fireEvent.click(await screen.findByRole("button", { name: "shift.askPrintNo" }));
     fireEvent.click(await screen.findByText("shift.done"));
     expect(onClosed).toHaveBeenCalledWith(expect.objectContaining({ sessionId: "shift-1" }));
   });
@@ -124,32 +126,31 @@ describe("CloseShiftDialog", () => {
     await screen.findByText("Ma Aye");
     fireEvent.click(screen.getByRole("button", { name: "shift.endShift" }));
     fireEvent.click(screen.getByRole("button", { name: "shift.confirmCloseYes" }));
-    fireEvent.click(await screen.findByRole("button", { name: "shift.print" }));
-    // Printing is confirmed once more, so a stray tap does not waste paper.
-    expect(mocks.printShift).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "shift.confirmPrintYes" }));
+    // The till asks for the report as soon as the shift is closed.
+    fireEvent.click(await screen.findByRole("button", { name: "shift.askPrintYes" }));
 
     await waitFor(() => expect(mocks.printShift).toHaveBeenCalledWith(closed));
     expect(browserPrint).not.toHaveBeenCalled();
   });
 
-  it("asks a second time before it prints the shift report", async () => {
+  it("asks whether to print once the shift is closed", async () => {
     mocks.close.mockResolvedValue(summary({ closedAt: "2026-10-07T16:00:00Z" }));
     render(<CloseShiftDialog sessionId="shift-1" title="shift.endShift" onClosed={onClosed} />);
 
     await screen.findByText("Ma Aye");
     fireEvent.click(screen.getByRole("button", { name: "shift.endShift" }));
     fireEvent.click(screen.getByRole("button", { name: "shift.confirmCloseYes" }));
-    fireEvent.click(await screen.findByRole("button", { name: "shift.print" }));
 
-    const confirm = screen.getByRole("alertdialog");
-    expect(confirm).toHaveTextContent("shift.confirmPrintTitle");
-    expect(confirm).toHaveTextContent("shift.confirmPrintBody");
+    const ask = await screen.findByRole("alertdialog");
+    expect(ask).toHaveTextContent("shift.askPrintTitle");
+    expect(ask).toHaveTextContent("shift.askPrintBody");
     expect(mocks.printShift).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: "shift.confirmBack" }));
+    // "No" leaves the paper alone; the report can still be printed by hand.
+    fireEvent.click(screen.getByRole("button", { name: "shift.askPrintNo" }));
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(mocks.printShift).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "shift.print" })).toBeInTheDocument();
   });
 
   it("says when the printer could not print the report", async () => {
@@ -160,8 +161,7 @@ describe("CloseShiftDialog", () => {
     await screen.findByText("Ma Aye");
     fireEvent.click(screen.getByRole("button", { name: "shift.endShift" }));
     fireEvent.click(screen.getByRole("button", { name: "shift.confirmCloseYes" }));
-    fireEvent.click(await screen.findByRole("button", { name: "shift.print" }));
-    fireEvent.click(screen.getByRole("button", { name: "shift.confirmPrintYes" }));
+    fireEvent.click(await screen.findByRole("button", { name: "shift.askPrintYes" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("No checkout printer is connected");
   });
