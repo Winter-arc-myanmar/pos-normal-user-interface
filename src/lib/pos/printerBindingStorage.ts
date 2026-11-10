@@ -283,9 +283,16 @@ export function takesArea(place: PrinterSector): boolean {
  * printer must never take the guest's bill. The areas it prints for come next, and
  * only for the slips that have an area: a KTV guest slip belongs on the KTV
  * printers, not on the bar counter's, even though both are checkout printers of
- * the same outlet. Kitchen tickets ignore areas entirely. A printer that names no
- * areas serves every area, the same way it serves every section when it names no
- * sections.
+ * the same outlet. Kitchen tickets ignore areas entirely.
+ *
+ * A printer set up for the area beats one that names no area at all, the same way
+ * a printer that names its sections beats the register's catch-all: a bar counter
+ * that was never given its places used to take the KTV's slip as well, and the
+ * guest's bill came out twice, on two counters. A printer that names no areas is
+ * still the printer of every area when the outlet has no printer for that area.
+ * The two rules stack in that order: naming the section comes first — so a
+ * catch-all printer never takes the counter's slip — and the area decides within
+ * the printers that name it.
  */
 export function resolveBindingsForPlace(
   bindings: PrinterBinding[],
@@ -294,24 +301,27 @@ export function resolveBindingsForPlace(
   area?: PrinterArea
 ): PrinterBinding[] {
   const wanted = takesArea(place) ? area : undefined;
-  const forArea = (candidates: PrinterBinding[]) =>
-    wanted
-      ? candidates.filter(
-          (binding) =>
-            !binding.printsFor?.length || binding.printsFor.includes(wanted)
-        )
-      : candidates;
+  const declaresArea = (binding: PrinterBinding): boolean =>
+    Boolean(binding.printsFor?.length);
+  const servesArea = (binding: PrinterBinding): boolean =>
+    !wanted || !declaresArea(binding) || Boolean(binding.printsFor?.includes(wanted));
+  /** The printers set up for this area, or every candidate when none is. */
+  const preferringArea = (candidates: PrinterBinding[]): PrinterBinding[] => {
+    if (!wanted) return candidates;
+    const declared = candidates.filter(declaresArea);
+    return declared.length ? declared : candidates;
+  };
 
   const bySector = bindingsForSector(bindings, place);
-  const serving = forArea(bySector);
+  const serving = preferringArea(bySector.filter(servesArea));
   if (serving.length) return uniquePhysicalPrinters(serving);
   // This section has printers, but none of them serves the area: a slip on one
   // of them is better than no slip at all.
   if (bySector.length) return uniquePhysicalPrinters(bySector);
 
   const catchAll = bindings.filter((binding) => !binding.sectors?.length);
-  const catching = forArea(catchAll);
-  const pool = catching.length ? catching : catchAll;
+  const catching = catchAll.filter(servesArea);
+  const pool = preferringArea(catching.length ? catching : catchAll);
   if (!pool.length) return [];
   const preferred = pool.filter(
     (binding) => binding.id === defaultBinding?.id
