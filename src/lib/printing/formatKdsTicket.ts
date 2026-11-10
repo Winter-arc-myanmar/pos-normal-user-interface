@@ -536,7 +536,7 @@ const kitchenPlace = (slip: KitchenSlip) =>
       : undefined);
 
 const kitchenItemSize = (fontSize?: string): Size =>
-  fontSize === "LARGE" ? "huge" : fontSize === "SMALL" ? "normal" : "tall";
+  fontSize === "LARGE" ? "tall" : "normal";
 
 /** ESC/POS magnification, height then width: 2H1W is tall, 1H2W wide, 2H2W both. */
 const SCALE_SIZE: Record<string, Size> = {
@@ -545,9 +545,6 @@ const SCALE_SIZE: Record<string, Size> = {
   "1H2W": "wide",
   "2H2W": "huge",
 };
-
-/** The scale a kitchen template starts at; a bill's starts at normal. */
-const KITCHEN_START = "2H2W";
 
 /** The size the text-size switch names, once it is off the value its type started with. */
 const chosenItemSize = (
@@ -560,27 +557,38 @@ const chosenItemSize = (
 };
 
 /**
+ * How big a kitchen ticket's items print.
+ *
+ * The ticket reads the Item text size switch the way the bill does - "Normal" is
+ * normal, "Big" really is big - so a shop that sets Normal gets a normal ticket.
+ * A template that never set the switch keeps the kitchen's double height, and no
+ * template at all prints like the bill: the built-in ticket used to come out at
+ * double height whatever the Print Template screen said.
+ */
+const kitchenItemSizeFor = (settings?: PrintTemplateSettings): Size => {
+  const scale = settings?.item.itemTextScale;
+  const chosen = scale ? SCALE_SIZE[scale] : undefined;
+  return chosen || kitchenItemSize(settings?.item.fontSize);
+};
+
+/**
  * How big items print. The text-size switch wins once it is moved off the
  * type's starting value; until then the older font-size switch decides, so a
  * template saved before keeps printing as it did.
  */
 const itemSizeFor = (settings: PrintTemplateSettings | undefined, kitchen: boolean): Size => {
-  const chosen = chosenItemSize(settings, kitchen ? KITCHEN_START : "1H1W");
+  if (kitchen) return kitchenItemSizeFor(settings);
+  const chosen = chosenItemSize(settings, "1H1W");
   if (chosen) return chosen;
-  if (kitchen) return kitchenItemSize(settings?.item.fontSize);
   return settings?.item.fontSize === "LARGE" ? "tall" : "normal";
 };
 
 /**
- * A room's ticket (KTV or SPA) carries the kitchen template, so its switch is
- * read the way the kitchen reads it: "Normal" there is a real choice, not the
- * value the switch started at. A template that never moved the switch keeps
- * printing the height it always gave, and a slip with no template reads like
- * the room's bill at the bill's single line height.
+ * A room's ticket (KTV or SPA) carries the kitchen template, so it reads the same
+ * switch, and a slip with no template reads like the room's bill.
  */
 const roomItemSizeFor = (settings?: PrintTemplateSettings): Size =>
-  chosenItemSize(settings, KITCHEN_START) ||
-  (settings ? kitchenItemSize(settings.item.fontSize) : "normal");
+  settings ? kitchenItemSizeFor(settings) : "normal";
 
 /** The text-size switch's value that prints items the size they print now. */
 export function itemTextScaleOf(settings: PrintTemplateSettings, kitchen: boolean): string {
@@ -608,9 +616,9 @@ function kitchenLayout(slip: KitchenSlip): Layout {
   if (place) {
     layout.gap();
     // Where the food goes keeps its bold, centred line; the template's Other
-    // text size decides how big it prints, and a slip with no template keeps
-    // the built-in huge line.
-    layout.line(place, { align: "center", size: settings ? other : "huge", bold: true });
+    // text size decides how big it prints, and a slip with no template prints it
+    // like the rest of the ticket.
+    layout.line(place, { align: "center", size: other, bold: true });
   }
   layout.line(slip.placeDetail || slip.serviceType, { align: "center", size: other });
   layout.gap();

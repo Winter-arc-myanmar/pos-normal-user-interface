@@ -31,7 +31,7 @@ const ticket = (fields: Partial<KdsTicket>): KdsTicket =>
   }) as KdsTicket;
 
 describe("the kitchen slip", () => {
-  it("spaces a room ticket's items like the bill, not the kitchen", () => {
+  it("prints a ticket's items at the size its template asks for", () => {
     const items = [{ name: "Beer", quantity: "2" }];
     const itemMode = (slip: string) => {
       const index = slip.indexOf("2 x BEER");
@@ -40,14 +40,18 @@ describe("the kitchen slip", () => {
       return slip.charCodeAt(escape + 2);
     };
 
-    // 0x10 is the printer's double-height bit: the gap between items grows with
-    // it, so a room ticket prints at the checkout bill's normal line height.
-    expect(itemMode(formatKitchenSlip({ title: "0012", lines: items })) & 0x10).toBe(
-      0x10
-    );
+    // No template: the ticket prints like the bill rather than at the kitchen's
+    // old double height, so the Print Template screen's Normal is what comes out.
+    expect(itemMode(formatKitchenSlip({ title: "0012", lines: items }))).toBe(0);
+    expect(itemMode(formatKitchenSlip({ title: "0012", room: true, lines: items }))).toBe(0);
+
+    // Big is still big, on a counter ticket and on a room's.
+    const template = defaultPrintTemplateSettings();
+    template.item.itemTextScale = "2H2W";
+    expect(itemMode(formatKitchenSlip({ title: "0012", lines: items, template }))).toBe(0x11);
     expect(
-      itemMode(formatKitchenSlip({ title: "0012", room: true, lines: items })) & 0x10
-    ).toBe(0);
+      itemMode(formatKitchenSlip({ title: "0012", room: true, lines: items, template }))
+    ).toBe(0x11);
   });
 
   it("says which room or table the food goes to", () => {
@@ -167,8 +171,8 @@ describe("the kitchen slip's text size switches", () => {
     settings.item.otherTextScale = "2H2W";
     expect(sizeOf(slip(settings), "KTV K3")).toBe("huge");
 
-    // A slip with no template keeps the built-in huge place line.
-    expect(sizeOf(slip(), "KTV K3")).toBe("huge");
+    // A slip with no template prints the place like the rest of the ticket.
+    expect(sizeOf(slip(), "KTV K3")).toBe("normal");
   });
 
   it("prints a room ticket's items at the Item text size the switch names", () => {
