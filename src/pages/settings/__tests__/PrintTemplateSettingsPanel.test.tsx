@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PrintTemplateSettingsPanel } from "../PrintTemplateSettingsPanel";
 
@@ -214,5 +214,26 @@ describe("PrintTemplateSettingsPanel", () => {
 
     fireEvent.click(toggle);
     expect(saveKdsDeleteSlip).toHaveBeenCalledWith(false);
+  });
+
+  it("saves the header lines the operator switched off", async () => {
+    createTemplate.mockResolvedValue({ id: "template-1" });
+    render(<PrintTemplateSettingsPanel />);
+
+    // The address label has no translation in this test's mock, so it reads as its key.
+    for (const name of ["Email", "Phone", "settings.printTemplate.address"]) {
+      fireEvent.click(screen.getByRole("checkbox", { name }));
+    }
+    fireEvent.click(
+      screen.getByRole("button", { name: "settings.printTemplate.save" })
+    );
+
+    await waitFor(() => expect(createTemplate).toHaveBeenCalled());
+    const [payload] = createTemplate.mock.calls[0];
+    expect(payload.settings.header).toMatchObject({
+      address: false,
+      contact: false,
+      email: false,
+    });
   });
 });
