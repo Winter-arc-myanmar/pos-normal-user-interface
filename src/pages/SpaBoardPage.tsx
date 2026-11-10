@@ -5,7 +5,11 @@ import { useKdsDeleteSlipShopSetting } from "@/core/presentation/hooks/useKdsDel
 import { useKdsStationManagement } from "@/core/presentation/hooks/useKdsStationManagement";
 import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
 import { useDateFormatter } from "@/lib/i18n/formatters";
-import { lineDisplayName } from "@/lib/pos/orderListDisplay";
+import {
+  lineDisplayName,
+  variantOptionsName,
+  withVariant,
+} from "@/lib/pos/orderListDisplay";
 import { isPendingKdsLine } from "@/lib/pos/kdsLines";
 import { useLocation, useNavigate } from "react-router-dom";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -1702,6 +1706,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
           title: "RECEIPT",
           sale: true,
           place: "CHECKOUT",
+          area: kind === "ktv" ? "KTV" : "SPA",
           showLogo: true,
           showPrices: true,
           receiptId: final.orderNumber || quote?.orderNumber || undefined,
@@ -1781,7 +1786,13 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     setPending((current) =>
       addPending(
         current,
-        { variantId: variant.id, productId: product.id, name: product.name, unitPrice, ...extras },
+        {
+          variantId: variant.id,
+          productId: product.id,
+          name: withVariant(product.name, variantOptionsName(variant)),
+          unitPrice,
+          ...extras,
+        },
         Math.max(1, quantity)
       )
     );
@@ -1828,7 +1839,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       addPending(current, {
         variantId: line.variantId,
         productId: product?.id || line.variantId,
-        name: line.productName || itemNames[line.variantId] || tr("item"),
+        name: lineDisplayName(line) || itemNames[line.variantId] || tr("item"),
         unitPrice: Number(line.unitPrice || 0),
       })
     );
@@ -2030,6 +2041,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       await printer.printReceipt({
         title: tr("checkBill"),
         place: "CHECKOUT",
+        area: kind === "ktv" ? "KTV" : "SPA",
         showLogo: true,
         showPrices: true,
         receiptId: quote?.orderNumber || undefined,
@@ -2074,6 +2086,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         title: "RECEIPT",
         sale: true,
         place: "CHECKOUT",
+        area: kind === "ktv" ? "KTV" : "SPA",
         showLogo: true,
         showPrices: true,
         receiptId: result.orderNumber || quote?.orderNumber || undefined,
@@ -3349,7 +3362,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
             name={
               isBooked && !packageVariantIds.has(line.variantId)
                 ? tr("treatmentCharge")
-                : line.productName || itemNames[line.variantId] || tr("item")
+                : lineDisplayName(line) || itemNames[line.variantId] || tr("item")
             }
             options={modifierPrintText(line.selectedModifiers).names}
             quantity={editingRow.quantity}

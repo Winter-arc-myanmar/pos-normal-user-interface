@@ -40,6 +40,8 @@ import {
   formatPosMoney,
   lineDisplayName,
   variantDisplayName,
+  variantOptionsName,
+  withVariant,
 } from "@/lib/pos/orderListDisplay";
 
 export type GroupedSalesOrderLine = SalesOrderLine & {
@@ -107,7 +109,6 @@ interface OrderPanelProps {
   paymentInputRef: RefObject<HTMLInputElement | null>;
   isLoading: boolean;
   checkoutBlocked?: boolean;
-  includeTax?: boolean;
   canCreateOrder?: boolean;
   isDineInService?: boolean;
   feedback?: string | null;
@@ -208,7 +209,6 @@ export function OrderPanel({
   selectedSession,
   isLoading,
   checkoutBlocked = false,
-  includeTax = true,
   canCreateOrder = true,
   isDineInService = false,
   feedback,
@@ -309,7 +309,9 @@ export function OrderPanel({
     // only a fallback for lines built in this session, which carry no name yet.
     return (
       lineDisplayName(line) ||
-      product?.name ||
+      (product?.name
+        ? withVariant(product.name, variantOptionsName(variant ?? {}))
+        : "") ||
       variant?.variantSku ||
       line.variantId.slice(0, 8)
     );
@@ -544,27 +546,17 @@ export function OrderPanel({
                   (entry) =>
                     billLines?.find((priced) => priced.id === entry.id) || entry
                 );
-                const tax = pricedLines.reduce(
+                // A row shows what the item itself costs. Tax is a bill-level row
+                // in the breakdown, so it is never added to — or taken out of — a
+                // single item's price here.
+                const lineTotal = pricedLines.reduce(
                   (sum, pricedLine) =>
                     sum +
-                    (includeTax
-                      ? pricedLine.taxInclusive
-                        ? 0
-                        : Number(pricedLine.taxAmount || 0)
-                      : pricedLine.taxInclusive
-                        ? -Number(pricedLine.taxAmount || 0)
-                        : 0),
+                    Number(pricedLine.quantity || 0) *
+                      Number(pricedLine.unitPrice || 0) -
+                    Number(pricedLine.lineDiscount || 0),
                   0
                 );
-                const lineTotal =
-                  pricedLines.reduce(
-                    (sum, pricedLine) =>
-                      sum +
-                      Number(pricedLine.quantity || 0) *
-                        Number(pricedLine.unitPrice || 0) -
-                      Number(pricedLine.lineDiscount || 0),
-                    0
-                  ) + tax;
                 const quantity = Number(line.quantity || 0);
                 const quantityLabel =
                   Number.isFinite(quantity) && quantity % 1 === 0
@@ -670,7 +662,7 @@ export function OrderPanel({
                       <>
                     <p
                       className="mt-0.5 truncate text-xs tabular-nums text-slate-500"
-                      title={[lineVariant !== lineName ? lineVariant : "", lineOptions].filter(Boolean).join(" · ")}
+                      title={[lineVariant && !lineName.includes(lineVariant) ? lineVariant : "", lineOptions].filter(Boolean).join(" · ")}
                     >
                       {"@ "}
                       {formatPosMoney(line.unitPrice)}
@@ -684,7 +676,7 @@ export function OrderPanel({
                           {formatPosMoney(listPrice)}
                         </span>
                       ) : null}
-                      {lineVariant && lineVariant !== lineName ? ` · ${lineVariant}` : ""}
+                      {lineVariant && !lineName.includes(lineVariant) ? ` · ${lineVariant}` : ""}
                       {lineOptions ? ` · ${lineOptions}` : ""}
                       {hostess?.gave ? ` · ${hostess.name}` : ""}
                     </p>
