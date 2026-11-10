@@ -3153,8 +3153,15 @@ export function CashierPage() {
             : t("cashier.errors.kdsFailed");
       }
 
+      if (kitchenPrintError) {
+        // The kitchen did not get its paper. Stay on this view: the message is
+        // shown here, and switching away is how a failing print went unnoticed.
+        setNotice(null);
+        setLocalError(kitchenPrintError);
+        return;
+      }
+
       if (activeTableId && tableOrderIds.length > 0 && selectedOrder) {
-        if (kitchenPrintError) setLocalError(kitchenPrintError);
         setNotice(t("cashier.orderPanel.kdsSent"));
         setSearchParams({ view: "menu" });
         return;
@@ -3163,7 +3170,7 @@ export function CashierPage() {
       clearOrderSelection();
       setIsDirectCheckoutMode(false);
       setDirectCartLines([]);
-      setLocalError(kitchenPrintError);
+      setLocalError(null);
       setNotice(t("cashier.orderPanel.kdsSent"));
       setSearchParams({ view: "orders" });
     } catch (caught) {

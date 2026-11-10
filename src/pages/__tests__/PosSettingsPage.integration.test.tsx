@@ -166,6 +166,8 @@ describe("PosSettingsPage integration", () => {
     fireEvent.click(
       screen.getByRole("checkbox", { name: "settings.printer.sectorCheckout" })
     );
+    // A slip printer serves a place of the venue, so the save names one.
+    fireEvent.click(screen.getByRole("checkbox", { name: "settings.printer.areaBar" }));
 
     fireEvent.click(screen.getByRole("button", { name: "settings.printer.save" }));
 
@@ -190,9 +192,10 @@ describe("PosSettingsPage integration", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "settings.printer.save" }));
     await screen.findByText("settings.printer.savedInactive");
-    expect(printerMocks.update).toHaveBeenCalledWith(
-      "printer-1",
-      expect.objectContaining({ isActive: false })
-    );
+    // This device never writes its own reachability into the shared record: one
+    // till that cannot reach the paper must not switch the printer off for the
+    // others. A failed test print is reported on this till instead.
+    expect(printerMocks.update).toHaveBeenCalledWith("printer-1", expect.any(Object));
+    expect(printerMocks.update.mock.calls[0][1]).not.toHaveProperty("isActive");
   });
 });
