@@ -40,7 +40,6 @@ export class KitchenPrinterService implements IKitchenPrinterService {
       name: payload.name.trim(),
       port: payload.port,
       sectors: Array.from(new Set(payload.sectors)),
-      printsFor: Array.from(new Set(payload.printsFor || [])),
       isActive: payload.isActive,
       ...(ipAddress ? { ipAddress } : {}),
     });
@@ -55,9 +54,6 @@ export class KitchenPrinterService implements IKitchenPrinterService {
       ...payload,
       sectors: payload.sectors
         ? Array.from(new Set(payload.sectors))
-        : undefined,
-      printsFor: payload.printsFor
-        ? Array.from(new Set(payload.printsFor))
         : undefined,
       ipAddress: payload.ipAddress?.trim() || undefined,
     });

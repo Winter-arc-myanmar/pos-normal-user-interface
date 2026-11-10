@@ -34,7 +34,6 @@ describe("ApiKitchenPrinterRepository", () => {
       limit: 10,
       locationId: "location-1",
       sector: "KDS",
-      area: "KTV",
     });
     await repository.create({
       tenantId: "tenant-1",
@@ -55,7 +54,6 @@ describe("ApiKitchenPrinterRepository", () => {
         limit: 10,
         locationId: "location-1",
         sector: "KDS",
-        area: "KTV",
       },
     });
     expect(post).toHaveBeenCalledWith("/api/v1/printers", {

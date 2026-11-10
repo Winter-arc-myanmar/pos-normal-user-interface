@@ -238,8 +238,8 @@ export function usePrinterConnection(
           page: 1,
           limit: 100,
           locationId: locationId || undefined,
+          // The API filters by sector only: the area is decided on this till.
           sector: place,
-          ...(wanted ? { area: wanted } : {}),
         });
         const reachable = result.printers
           .filter((printer) => Boolean(printer.ipAddress))
@@ -305,10 +305,8 @@ export function usePrinterConnection(
 
     const byAddress = new Map<string, string>();
     const sectorsOf = new Map<string, PrinterSector[]>();
-    const areasOf = new Map<string, PrinterArea[]>();
     for (const printer of printers) {
       sectorsOf.set(printer.id, printer.sectors || []);
-      areasOf.set(printer.id, printer.printsFor || []);
       if (printer.ipAddress) {
         byAddress.set(
           `${printer.ipAddress.trim().toLowerCase()}:${printer.port || 9100}`,
@@ -330,32 +328,17 @@ export function usePrinterConnection(
       const declared = id ? sectorsOf.get(id) : undefined;
       return declared?.length ? declared : undefined;
     };
-    const areasFor = (binding: PrinterBinding): PrinterArea[] | undefined => {
-      // The record is the authority even when the back office cleared its places:
-      // an empty answer is a printer that names no area, not an answer to ignore.
-      const id = recordFor(binding);
-      return id ? areasOf.get(id) : undefined;
-    };
 
     let changed = false;
     const bindings = current.bindings.map((binding) => {
       const sectors = sectorsFor(binding);
-      const printsFor = areasFor(binding);
       const sectorsSame =
         !sectors ||
         (binding.sectors?.length === sectors.length &&
           sectors.every((sector) => binding.sectors?.includes(sector)));
-      const areasSame =
-        !printsFor ||
-        (binding.printsFor?.length === printsFor.length &&
-          printsFor.every((area) => binding.printsFor?.includes(area)));
-      if (sectorsSame && areasSame) return binding;
+      if (sectorsSame) return binding;
       changed = true;
-      return {
-        ...binding,
-        ...(sectors ? { sectors } : {}),
-        ...(printsFor ? { printsFor } : {}),
-      };
+      return { ...binding, ...(sectors ? { sectors } : {}) };
     });
     if (!changed) return current;
     return {

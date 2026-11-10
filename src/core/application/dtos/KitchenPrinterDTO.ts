@@ -1,6 +1,5 @@
 import {
   KitchenPrinter,
-  PrinterArea,
   PrinterSector,
 } from "../../domain/entities/KitchenPrinter";
 
@@ -11,7 +10,6 @@ export interface CreateKitchenPrinterDTO {
   ipAddress?: string;
   port: number;
   sectors: PrinterSector[];
-  printsFor?: PrinterArea[];
   isActive: boolean;
 }
 
@@ -21,7 +19,6 @@ export interface UpdateKitchenPrinterDTO {
   ipAddress?: string;
   port?: number;
   sectors?: PrinterSector[];
-  printsFor?: PrinterArea[];
   isActive?: boolean;
 }
 
@@ -33,8 +30,6 @@ export interface KitchenPrinterFilterDTO {
   sortOrder?: "asc" | "desc";
   locationId?: string;
   sector?: PrinterSector;
-  /** Only the printers that serve this area of the venue. */
-  area?: PrinterArea;
 }
 
 export interface KitchenPrinterListDTO {
