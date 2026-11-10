@@ -15,6 +15,15 @@ const sha = 'a'.repeat(40);
 const oldSha = 'b'.repeat(40);
 const source = readFileSync(path.join(__dirname, 'deploy-production.sh'), 'utf8');
 
+test('production workflow targets only the active PrivateVIP site', () => {
+  const workflow = readFileSync(path.join(__dirname, '../.github/workflows/deploy.yml'), 'utf8');
+  assert.doesNotMatch(workflow, /yankin|api1\.mmlnkits\.com/i);
+  assert.match(workflow, /https:\/\/privatevip\.mmlnkits\.com\/healthz/);
+  assert.match(workflow, /https:\/\/privatevip\.mmlnkits\.com\/login/);
+  assert.match(workflow, /needs: ci/);
+  assert.match(workflow, /StrictHostKeyChecking=yes/);
+});
+
 function runDeployment(scenario, command = `deploy ${sha}`) {
   const directory = mkdtempSync(path.join(tmpdir(), 'vision-deploy-test-'));
   const shellDirectory = directory.replaceAll('\\', '/');

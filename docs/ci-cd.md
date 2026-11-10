@@ -19,13 +19,13 @@ review changes to `main`, especially the Dockerfile and workflow.
 1. Validate Compose and Bash syntax and run the required sandboxed deployment
    tests. Compile with the Dockerfile's Node 24 build stage using SHA-pinned Docker
    Buildx actions and persistent GitHub Actions layer caches. Build-stage,
-   PrivateVIP runtime, and Yankin runtime caches have separate scopes.
+   PrivateVIP runtime caches have separate scopes.
 2. Run the repository test suite. **Tests are currently advisory** because the
    baseline has a cashier table-state failure and two Burmese locale failures.
    Failures produce a workflow warning and summary. Remove `continue-on-error`
    once the baseline is fixed to make tests a required deployment gate.
-3. Build both site-specific runtime images, including Nginx configuration
-   validation. Start each with the default VPS ceilings (0.5 CPU / 128 MB RAM),
+3. Build the PrivateVIP runtime image, including Nginx configuration
+   validation. Start it with the default VPS ceilings (0.5 CPU / 128 MB RAM),
    wait for container health, check the SPA login route and precompressed assets.
 4. SSH to the server and request deployment of the triggering commit SHA.
 5. The server only accepts the current `main` tip. It reuses an existing commit
@@ -82,11 +82,12 @@ or the server-owned Compose file. Reinstall explicitly after reviewing changes.
 Nginx, Certbot, and their certificates are not changed during application deploys.
 
 **Rollout requirement:** these repository edits do not change a running VPS.
-Review and reinstall the trusted deployment command (preserving any server-only
-dual-site logic) before expecting image reuse/retention changes. The checked-in
-script handles PrivateVIP; the workflow also verifies Yankin, whose installed
-server-side orchestration is not present in this checkout. Apply equivalent
-changes there after inspecting its actual configuration. Merge the runtime limits
+Review and reinstall the trusted deployment command before expecting
+image reuse/retention changes. The checked-in script and workflow target only
+PrivateVIP. Yankin's domain is retired: do not build or probe it in this pipeline.
+Inspect the installed forced SSH command for legacy dual-site logic before
+replacing it; its actual configuration is not present in this checkout.
+Merge the runtime limits
 and Nginx tuning into the relevant server-owned configuration as appropriate.
 Do not replace `/etc/privatevip/compose.yml` blindly: retain its site-specific
 ports/environment, `${APP_IMAGE}` selection, and any additional frontend services.

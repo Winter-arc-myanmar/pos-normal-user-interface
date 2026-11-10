@@ -1,4 +1,4 @@
-name: CI and dual frontend production deployment
+name: CI and PrivateVIP production deployment
 
 on:
   push:
@@ -73,53 +73,31 @@ jobs:
             type=gha,scope=vision-pos-build
           cache-to: type=gha,scope=vision-pos-runtime,mode=max
 
-      - name: Validate Yankin production image and backend configuration
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          load: true
-          tags: yankinfoodhouse-ci-runtime:latest
-          build-args: VITE_API_URL=https://api1.mmlnkits.com
-          cache-from: |
-            type=gha,scope=yankin-runtime
-            type=gha,scope=vision-pos-runtime
-            type=gha,scope=vision-pos-build
-          cache-to: type=gha,scope=yankin-runtime,mode=max
-
-      - name: Smoke test both production containers with VPS resource limits
+      - name: Smoke test PrivateVIP production container with VPS resource limits
         run: |
           set -euo pipefail
           cleanup() { docker rm -f vision-pos-smoke >/dev/null 2>&1 || true; }
           trap cleanup EXIT
-          for site in privatevip yankin; do
-            image=vision-pos-ci-runtime:latest
-            upstream=https://apivision.winterarc.asia
-            if [[ "$site" == yankin ]]; then
-              image=yankinfoodhouse-ci-runtime:latest
-              upstream=https://api1.mmlnkits.com
-            fi
-            docker run -d --name vision-pos-smoke --cpus 0.5 --memory 128m \
-              --pids-limit 64 -e "API_UPSTREAM=$upstream" "$image"
-            status=starting
-            for attempt in {1..30}; do
-              status=$(docker inspect --format '{{.State.Health.Status}}' vision-pos-smoke)
-              [[ "$status" == healthy ]] && break
-              sleep 2
-            done
-            if [[ "$status" != healthy ]]; then
-              docker logs vision-pos-smoke
-              echo "::error::$site container did not become healthy within 60 seconds."
-              exit 1
-            fi
-            docker exec vision-pos-smoke nginx -t
-            docker exec vision-pos-smoke wget -q -O /dev/null http://127.0.0.1/login
-            docker exec vision-pos-smoke sh -ec \
-              'test -n "$(find /usr/share/nginx/html/assets -name "*.gz" -print -quit)"'
-            cleanup
+          docker run -d --name vision-pos-smoke --cpus 0.5 --memory 128m \
+            --pids-limit 64 -e API_UPSTREAM=https://apivision.winterarc.asia vision-pos-ci-runtime:latest
+          status=starting
+          for attempt in {1..30}; do
+            status=$(docker inspect --format '{{.State.Health.Status}}' vision-pos-smoke)
+            [[ "$status" == healthy ]] && break
+            sleep 2
           done
+          if [[ "$status" != healthy ]]; then
+            docker logs vision-pos-smoke
+            echo "::error::PrivateVIP container did not become healthy within 60 seconds."
+            exit 1
+          fi
+          docker exec vision-pos-smoke nginx -t
+          docker exec vision-pos-smoke wget -q -O /dev/null http://127.0.0.1/login
+          docker exec vision-pos-smoke sh -ec \
+            'test -n "$(find /usr/share/nginx/html/assets -name "*.gz" -print -quit)"'
 
   deploy:
-    name: Deploy main to PrivateVIP and Yankin
+    name: Deploy main to PrivateVIP
     needs: ci
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
@@ -138,7 +116,7 @@ jobs:
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/deploy_key" "$HOME/.ssh/known_hosts"
 
-      - name: Deploy both frontends from the exact commit with health checks and rollback
+      - name: Deploy PrivateVIP from the exact commit with health checks and rollback
         env:
           DEPLOY_SHA: ${{ github.sha }}
         run: |
@@ -154,13 +132,6 @@ jobs:
             --connect-timeout 10 --max-time 30 https://privatevip.mmlnkits.com/healthz
           curl --fail --silent --show-error --output /dev/null \
             --connect-timeout 10 --max-time 30 https://privatevip.mmlnkits.com/login
-
-      - name: Verify Yankin public HTTPS
-        run: |
-          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors \
-            --connect-timeout 10 --max-time 30 https://yankinfoodhouse.mmlnkits.com/healthz
-          curl --fail --silent --show-error --output /dev/null \
-            --connect-timeout 10 --max-time 30 https://yankinfoodhouse.mmlnkits.com/login
 
       - name: Remove SSH private key
         if: always()
