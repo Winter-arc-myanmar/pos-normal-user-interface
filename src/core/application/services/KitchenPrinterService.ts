@@ -34,13 +34,18 @@ export class KitchenPrinterService implements IKitchenPrinterService {
       throw new Error("Printer port must be between 1 and 65535");
     }
     const ipAddress = payload.ipAddress?.trim();
+    // The API refuses an empty list but reads a missing one as "every area", so
+    // an empty choice is left out: sending [] made saving a printer a 400.
+    const printsFor = payload.printsFor?.length
+      ? { printsFor: Array.from(new Set(payload.printsFor)) }
+      : {};
     return this.repository.create({
       tenantId: payload.tenantId,
       locationId: payload.locationId,
       name: payload.name.trim(),
       port: payload.port,
       sectors: Array.from(new Set(payload.sectors)),
-      printsFor: Array.from(new Set(payload.printsFor || [])),
+      ...printsFor,
       isActive: payload.isActive,
       ...(ipAddress ? { ipAddress } : {}),
     });
@@ -56,7 +61,7 @@ export class KitchenPrinterService implements IKitchenPrinterService {
       sectors: payload.sectors
         ? Array.from(new Set(payload.sectors))
         : undefined,
-      printsFor: payload.printsFor
+      printsFor: payload.printsFor?.length
         ? Array.from(new Set(payload.printsFor))
         : undefined,
       ipAddress: payload.ipAddress?.trim() || undefined,
