@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { KdsTicket } from "../../domain/entities/Cashier";
 import { KitchenPrinter } from "../../domain/entities/KitchenPrinter";
 import { IKitchenPrinterService } from "../../domain/services/IKitchenPrinterService";
+import { IKdsStationService } from "../../domain/services/IKdsStationService";
 import { IPrintTemplateService } from "../../domain/services/IPrintTemplateService";
 import type { ISalesOrderService } from "../../domain/services/ISalesOrderService";
 import {
@@ -405,6 +406,27 @@ export function usePrinterConnection(
     [locationId]
   );
 
+  /**
+   * The outlet's KDS stations, for a kitchen print from a caller that has none to
+   * hand - a room tablet's order, say. Without them a ticket can only go to the
+   * till's default printer, which is how a room's drink came out at the kitchen.
+   */
+  const stationsFor = useCallback(async (): Promise<StationRoute[]> => {
+    if (!locationId) return [];
+    try {
+      const service = container.resolve<IKdsStationService>("kdsStationService");
+      const listed = await service.list({ page: 1, limit: 100, locationId });
+      return (listed?.stations || []).map((station) => ({
+        id: station.id,
+        name: station.name,
+        printerIds: station.printerIds || [],
+        categoryIds: station.routingRules?.categoryIds || [],
+      }));
+    } catch {
+      return [];
+    }
+  }, [locationId]);
+
   const printKitchen = useCallback(
     async (
       slip: KitchenSlip,
@@ -413,6 +435,9 @@ export function usePrinterConnection(
     ): Promise<KitchenPrintPlan> => {
       const client = await configureClient(tenantId, registerId);
       const current = currentBindings();
+      // A caller with no station list (a room tablet's order) still has to reach
+      // the station of each item's category, so the outlet's stations are read here.
+      const routes = stations.length ? stations : await stationsFor();
       const resolved = slip.template ? undefined : await templateFor("KDS");
       const template = slip.template || resolved?.settings;
       const paperWidth = slip.paperWidth || resolved?.paperWidth;
@@ -421,7 +446,7 @@ export function usePrinterConnection(
         current.bindings,
         current.defaultBinding,
         slip.stationId,
-        stations,
+        routes,
         options
       );
       const lines = slip.lines || [];
@@ -472,7 +497,7 @@ export function usePrinterConnection(
       }
       return plan;
     },
-    [backendTargets, bindingsWithSectors, currentBindings, registerId, templateFor, tenantId]
+    [backendTargets, bindingsWithSectors, currentBindings, registerId, stationsFor, templateFor, tenantId]
   );
 
   const printReceipt = useCallback(

@@ -1985,6 +1985,8 @@
     "printSettings": "Printing",
     "printHere": "Print tablet orders here",
     "printFailed": "Could not print the ticket.",
+    "unrouted": "No KDS station prints {{items}}. Add their category to a station.",
+    "stationPrinterMissing": "This till has no printer for {{stations}}.",
     "started": "Started from tablet"
   },
   "ktvPos": {

@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   getSalesOrderLines: vi.fn(),
   company: vi.fn(),
   listPrinters: vi.fn(),
+  listStations: vi.fn(),
 }));
 
 vi.mock("@/core/infrastructure/printing/getPrinterClient", () => ({
@@ -49,6 +50,9 @@ vi.mock("@/core/infrastructure/di/container", () => ({
       }
       if (key === "kitchenPrinterService") {
         return { list: mocks.listPrinters };
+      }
+      if (key === "kdsStationService") {
+        return { list: mocks.listStations };
       }
       return {
         list: vi.fn().mockResolvedValue({ printers: [] }),
@@ -84,6 +88,8 @@ beforeEach(() => {
   mocks.listTemplates.mockResolvedValue({ templates: [] });
   mocks.listPrinters.mockReset();
   mocks.listPrinters.mockResolvedValue({ printers: [] });
+  mocks.listStations.mockReset();
+  mocks.listStations.mockResolvedValue({ stations: [] });
 });
 
 describe("usePrinterConnection print templates", () => {
@@ -280,6 +286,80 @@ describe("usePrinterConnection station routing", () => {
     });
 
     expect(mocks.printKitchen).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("usePrinterConnection station routing", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    mocks.printKitchen.mockReset();
+    mocks.printKitchen.mockResolvedValue(undefined);
+  });
+
+  /** A KDS printer bound on this till, as Settings saves one. */
+  const bind = (id: string, backendPrinterId: string, host: string) =>
+    savePrinterBinding(
+      tenantId,
+      registerId,
+      {
+        id,
+        backendPrinterId,
+        transport: "NETWORK",
+        displayName: id,
+        host,
+        port: 9100,
+        sectors: ["KDS"],
+        lastVerifiedAt: "",
+      },
+      false
+    );
+
+  it("reads the outlet's stations for a caller that has none to hand", async () => {
+    // A room tablet's order arrives with no station list: the hook reads the
+    // outlet's stations so each item still reaches the station of its category.
+    bind("Chinese KDS", "printer-chinese", "10.4.0.1");
+    bind("Beverage KDS", "printer-drinks", "10.4.0.2");
+    mocks.listStations.mockResolvedValue({
+      stations: [
+        {
+          id: "st-chinese",
+          name: "Chinese KDS",
+          printerIds: ["printer-chinese"],
+          routingRules: { categoryIds: ["cat-chinese"] },
+        },
+        {
+          id: "st-drinks",
+          name: "Beverage KDS",
+          printerIds: ["printer-drinks"],
+          routingRules: { categoryIds: ["cat-drinks"] },
+        },
+      ],
+    });
+
+    const { result } = renderHook(() =>
+      usePrinterConnection(tenantId, registerId, "location-1")
+    );
+    await waitFor(() => expect(result.current.isConnected).toBe(true));
+
+    await act(async () => {
+      await result.current.printKitchen({
+        title: "Room order 4",
+        place: "Room S2",
+        lines: [
+          { name: "Chinese fried noodle", quantity: "1", categoryId: "cat-chinese" },
+          { name: "Beer", quantity: "2", categoryId: "cat-drinks" },
+        ],
+      });
+    });
+
+    const printed = mocks.printKitchen.mock.calls.map(([binding, slip]) => [
+      binding.displayName,
+      slip.lines.map((line: { name: string }) => line.name),
+    ]);
+    expect(printed).toEqual([
+      ["Chinese KDS", ["Chinese fried noodle"]],
+      ["Beverage KDS", ["Beer"]],
+    ]);
   });
 });
 
