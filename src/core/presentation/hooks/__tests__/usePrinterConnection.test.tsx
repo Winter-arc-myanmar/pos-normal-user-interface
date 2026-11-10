@@ -366,6 +366,60 @@ describe("usePrinterConnection station routing", () => {
     ]);
   });
 
+  it("prints a station ticket on a printer only the back office knows", async () => {
+    // This till never saved the kitchen printer: it was set up on another till, or
+    // while a printer save was failing. The station still has paper - the printer
+    // record names its address - so the ticket reaches the kitchen, not nowhere.
+    mocks.listPrinters.mockResolvedValue({
+      printers: [
+        {
+          id: "printer-chinese",
+          name: "Chinese KDS",
+          ipAddress: "10.4.0.7",
+          port: 9100,
+          sectors: ["KDS"],
+          printsFor: [],
+          isActive: true,
+        },
+      ],
+    });
+    mocks.listStations.mockResolvedValue({
+      stations: [
+        {
+          id: "st-chinese",
+          name: "Chinese KDS",
+          printerIds: ["printer-chinese"],
+          routingRules: { categoryIds: ["cat-chinese"] },
+        },
+      ],
+    });
+
+    const { result } = renderHook(() =>
+      usePrinterConnection(tenantId, registerId, "location-1")
+    );
+    await waitFor(() => expect(result.current.isConnected).toBe(true));
+
+    let plan: KitchenPrintPlan | undefined;
+    await act(async () => {
+      plan = await result.current.printKitchen({
+        title: "KITCHEN",
+        lines: [
+          { name: "Chinese fried noodle", quantity: "1", categoryId: "cat-chinese" },
+        ],
+      });
+    });
+
+    expect(plan?.missingPrinterRoutes).toEqual([]);
+    expect(mocks.printKitchen).toHaveBeenCalledTimes(1);
+    const [binding, slip] = mocks.printKitchen.mock.calls[0];
+    expect(binding.displayName).toBe("Chinese KDS");
+    expect(binding.host).toBe("10.4.0.7");
+    expect(binding.port).toBe(9100);
+    expect(slip.lines.map((line: { name: string }) => line.name)).toEqual([
+      "Chinese fried noodle",
+    ]);
+  });
+
   it("reports an item no station carries instead of using the till's printer", async () => {
     bind("Beverage KDS", "printer-drinks", "10.4.0.9");
     mocks.listStations.mockResolvedValue({
