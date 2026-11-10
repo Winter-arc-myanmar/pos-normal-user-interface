@@ -79,6 +79,33 @@ const toRoom = (value: unknown): TabletVisitRoom => {
   };
 };
 
+/**
+ * The menu category of a room-order item, whichever way the API names it.
+ *
+ * The station that prints the ticket is chosen by this id, so a shape the client
+ * did not expect sent the item to the till's own printer instead of its station.
+ */
+const categoryIdOf = (line: RecordValue): string | null => {
+  const direct = line.categoryId ?? line.category_id ?? line.productCategoryId;
+  if (direct) return String(direct);
+  for (const key of ["category", "product", "variant"]) {
+    const nested = asRecord(line[key]);
+    const id =
+      nested?.categoryId ??
+      nested?.category_id ??
+      (key === "category" ? nested?.id : undefined);
+    if (id) return String(id);
+  }
+  return null;
+};
+
+/** The category's name, when the API sends one, for saying what could not route. */
+const categoryNameOf = (line: RecordValue): string | null => {
+  const category = asRecord(line.category);
+  const name = line.categoryName ?? line.category_name ?? category?.name;
+  return name ? String(name) : null;
+};
+
 const toRoomOrder = (value: unknown): RoomOrderView => {
   const item = asRecord(value);
   return {
@@ -102,7 +129,8 @@ const toRoomOrder = (value: unknown): RoomOrderView => {
         quantity: Number(line.quantity || 0),
         status: text(line.status, "PENDING"),
         // The station that prints the ticket is chosen by this category.
-        categoryId: orNull(line.categoryId),
+        categoryId: categoryIdOf(line),
+        categoryName: categoryNameOf(line),
       };
     }),
   };

@@ -41,7 +41,9 @@ describe("ApiRoomTabletRepository", () => {
           roomNumber: "S2",
           items: [
             { name: "Chinese fried noodle", quantity: 1, categoryId: "cat-chinese" },
-            { name: "Beer", quantity: 2, categoryId: "cat-drinks" },
+            { name: "Beer", quantity: 2, category: { id: "cat-drinks", name: "Beverage" } },
+            { name: "Rice", quantity: 1, product: { categoryId: "cat-food" } },
+            { name: "Whisky", quantity: 1, category_id: "cat-spirits" },
             { name: "No category item", quantity: 1 },
           ],
         },
@@ -54,8 +56,11 @@ describe("ApiRoomTabletRepository", () => {
     expect(order.items.map((item) => item.categoryId)).toEqual([
       "cat-chinese",
       "cat-drinks",
+      "cat-food",
+      "cat-spirits",
       null,
     ]);
+    expect(order.items[1].categoryName).toBe("Beverage");
   });
 
   it("places an order and claims a print", async () => {
