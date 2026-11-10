@@ -192,6 +192,7 @@ export function PrinterSettingsPanel() {
     host: transport === "NETWORK" ? ipAddress.trim() : undefined,
     port: transport === "NETWORK" ? Number(port) : undefined,
     sectors,
+    printsFor,
     lastVerifiedAt: "",
     lastError: null,
   });
@@ -305,6 +306,13 @@ export function PrinterSettingsPanel() {
     }
     if (transport !== "NETWORK" && (!connected || !verified)) return;
 
+    // A slip printer serves a place of the venue: Bar, KTV or SPA. Without one it
+    // would take every place's slips, which is how a KTV bill reached the bar.
+    if (printsSlips && !printsFor.length) {
+      setLocalError(t("settings.printer.placesRequired"));
+      return;
+    }
+
     try {
       const base = {
         locationId: activeLocationId,
@@ -338,6 +346,9 @@ export function PrinterSettingsPanel() {
         host: printer.ipAddress,
         port: printer.port,
         sectors: printerSectors,
+        // Kept on the device as well, so a till that cannot reach the printer list
+        // still knows which counter serves which area of the venue.
+        printsFor: printerAreas,
       };
       connection.saveBinding(binding, isDefault);
       setSelectedBindingId(binding.id);
@@ -679,6 +690,11 @@ export function PrinterSettingsPanel() {
                 </label>
               ))}
             </div>
+            {!printsFor.length ? (
+              <p className="mt-1 text-xs text-amber-700">
+                {t("settings.printer.placesRequired")}
+              </p>
+            ) : null}
           </fieldset>
         ) : null}
         <div className="mt-4 flex flex-wrap gap-4 text-sm">

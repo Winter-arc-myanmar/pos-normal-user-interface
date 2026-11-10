@@ -218,4 +218,23 @@ describe("PrinterSettingsPanel save", () => {
     expect(payload.printsFor).toEqual(["BAR", "KTV"]);
     expect(payload.sectors).toEqual(["CHECKOUT"]);
   });
+
+  it("will not save a slip printer with no place ticked", async () => {
+    mocks.printers = [cashier];
+    render(<PrinterSettingsPanel />);
+    fireEvent.click(screen.getByRole("button", { name: /Cashier/ }));
+
+    // The Cashier is ticked CHECKOUT and prints the Bar's slips; untick the place.
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "settings.printer.areaBar" })
+    );
+    fireEvent.click(saveButton());
+
+    await waitFor(() =>
+      expect(
+        screen.getAllByText("settings.printer.placesRequired").length
+      ).toBeGreaterThan(0)
+    );
+    expect(mocks.updatePrinter).not.toHaveBeenCalled();
+  });
 });
