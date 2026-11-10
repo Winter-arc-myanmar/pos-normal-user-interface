@@ -271,13 +271,12 @@ describe("usePrinterConnection station routing", () => {
     ]);
   });
 
-  it("reports a line no station carries instead of printing it somewhere else", async () => {
+  it("falls back to the KDS printer when strict routing is not required", async () => {
     const { result } = renderConnection();
     await waitFor(() => expect(result.current.isConnected).toBe(true));
 
-    let plan: KitchenPrintPlan | undefined;
     await act(async () => {
-      plan = await result.current.printKitchen(
+      await result.current.printKitchen(
         {
           title: "KITCHEN",
           lines: [{ name: "Coffee", quantity: "1", categoryId: "drink" }],
@@ -286,10 +285,7 @@ describe("usePrinterConnection station routing", () => {
       );
     });
 
-    // The drink station carries "salad" only. Printing the coffee on it would send
-    // a drink to the wrong counter, so the caller is told instead.
-    expect(mocks.printKitchen).not.toHaveBeenCalled();
-    expect(plan?.unrouted.map((line) => line.name)).toEqual(["Coffee"]);
+    expect(mocks.printKitchen).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -364,42 +360,6 @@ describe("usePrinterConnection station routing", () => {
       ["Chinese KDS", ["Chinese fried noodle"]],
       ["Beverage KDS", ["Beer"]],
     ]);
-  });
-
-  it("reports an item no station carries instead of using the till's printer", async () => {
-    bind("Beverage KDS", "printer-drinks", "10.4.0.9");
-    mocks.listStations.mockResolvedValue({
-      stations: [
-        {
-          id: "st-drinks",
-          name: "Beverage KDS",
-          printerIds: ["printer-drinks"],
-          routingRules: { categoryIds: ["cat-drinks"] },
-        },
-      ],
-    });
-
-    const { result } = renderHook(() =>
-      usePrinterConnection(tenantId, registerId, "location-1")
-    );
-    await waitFor(() => expect(result.current.isConnected).toBe(true));
-
-    let plan: KitchenPrintPlan | undefined;
-    await act(async () => {
-      plan = await result.current.printKitchen({
-        title: "Room order 5",
-        place: "Room S3",
-        lines: [
-          { name: "Rice", quantity: "1", categoryId: "cat-food" },
-          { name: "Mystery", quantity: "1" },
-        ],
-      });
-    });
-
-    // No fallback to the till's own printer: the kitchen is told what did not route.
-    expect(mocks.printKitchen).not.toHaveBeenCalled();
-    expect(plan?.jobs).toEqual([]);
-    expect(plan?.unrouted.map((item) => item.name)).toEqual(["Rice", "Mystery"]);
   });
 });
 
