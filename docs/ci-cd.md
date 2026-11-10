@@ -1,5 +1,22 @@
 # PrivateVIP CI/CD
 
+## Active dual-site deployment
+
+PrivateVIP (`privatevip.mmlnkits.com`) and App (`app.mmlnkits.com`) deploy
+the same triggering source SHA. App retains `https://api1.mmlnkits.com` as
+its backend; PrivateVIP retains `https://apivision.winterarc.asia`.
+The retired `yankinfoodhouse.mmlnkits.com` domain must never be probed.
+
+`scripts/deploy-both-production.sh` is the reviewed copy of the actual installed
+`/usr/local/sbin/privatevip-deploy` command. It builds both images before rollout,
+checks both sites, checks both running image revision labels against the requested
+SHA, and rolls both containers back on activation/probe/revision failure.
+Legacy App container/image/config names still contain `yankinfoodhouse`; do not
+rename them or replace the site's backend during a frontend deployment.
+The older `scripts/deploy-production.sh` is a PrivateVIP-only reference, not the
+installed dual-site command. Repository edits do not automatically install either
+script on the server.
+
 The workflow in `.github/workflows/deploy.yml` runs CI for pull requests to
 `main`, and CI plus deployment for pushes to `main`. It can also be started
 manually from the GitHub Actions tab (select `main`). Other branches never deploy.
@@ -19,13 +36,13 @@ review changes to `main`, especially the Dockerfile and workflow.
 1. Validate Compose and Bash syntax and run the required sandboxed deployment
    tests. Compile with the Dockerfile's Node 24 build stage using SHA-pinned Docker
    Buildx actions and persistent GitHub Actions layer caches. Build-stage,
-   PrivateVIP runtime caches have separate scopes.
+   PrivateVIP runtime and App runtime caches have separate scopes.
 2. Run the repository test suite. **Tests are currently advisory** because the
    baseline has a cashier table-state failure and two Burmese locale failures.
    Failures produce a workflow warning and summary. Remove `continue-on-error`
    once the baseline is fixed to make tests a required deployment gate.
-3. Build the PrivateVIP runtime image, including Nginx configuration
-   validation. Start it with the default VPS ceilings (0.5 CPU / 128 MB RAM),
+3. Build both site-specific runtime images, including Nginx configuration
+   validation. Start each with the default VPS ceilings (0.5 CPU / 128 MB RAM),
    wait for container health, check the SPA login route and precompressed assets.
 4. SSH to the server and request deployment of the triggering commit SHA.
 5. The server only accepts the current `main` tip. It reuses an existing commit
@@ -84,7 +101,8 @@ Nginx, Certbot, and their certificates are not changed during application deploy
 **Rollout requirement:** these repository edits do not change a running VPS.
 Review and reinstall the trusted deployment command before expecting
 image reuse/retention changes. The checked-in script and workflow target only
-PrivateVIP. Yankin's domain is retired: do not build or probe it in this pipeline.
+PrivateVIP and App using the dual-site command described above. Yankin's old
+domain is retired: do not probe it in this pipeline.
 Inspect the installed forced SSH command for legacy dual-site logic before
 replacing it; its actual configuration is not present in this checkout.
 Merge the runtime limits
