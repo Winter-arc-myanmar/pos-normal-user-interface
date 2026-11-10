@@ -5,6 +5,7 @@ import {
 } from "@/lib/pos/printerBindingStorage";
 import { groupKitchenJobs, type StationRoute } from "../routeKitchenPrint";
 import { cardSlip } from "../cardSlip";
+import { toTabletSlip } from "@/lib/spa/tabletSlip";
 import type { PrintLine } from "../formatKdsTicket";
 
 /**
@@ -199,6 +200,44 @@ describe("KDS: each item prints at the station that carries its category", () =>
       "Fried noodle",
       "Spring roll",
     ]);
+  });
+
+  it("routes a room tablet's order by each item's category", () => {
+    // The tablet sends a category per item; the ticket must reach that station.
+    const slip = toTabletSlip({
+      id: "ro-1",
+      orderNumber: 4,
+      source: "TABLET",
+      kind: "ITEMS",
+      roomNumber: "S2",
+      roomName: null,
+      spaSessionId: "session-1",
+      amount: "12000",
+      deviceName: "Lounge 1",
+      createdAt: "2026-11-10T12:00:00.000Z",
+      acknowledgedAt: null,
+      deliveredAt: null,
+      printClaimedAt: null,
+      items: [
+        { name: "Chinese fried noodle", quantity: 1, status: "PENDING", categoryId: "cat-chinese" },
+        { name: "Beer", quantity: 2, status: "PENDING", categoryId: "cat-drinks" },
+      ],
+    });
+
+    const plan = groupKitchenJobs(slip.lines || [], bound, barCheckout, undefined, stations);
+    const printed = Object.fromEntries(
+      plan.jobs.map((job) => [
+        job.binding.displayName,
+        job.lines.map((item) => item.name),
+      ])
+    );
+
+    expect(printed).toEqual({
+      "Chinese KDS": ["Chinese fried noodle"],
+      "Beverage KDS": ["Beer"],
+    });
+    expect(plan.unrouted).toEqual([]);
+    expect(plan.jobs.map((job) => job.binding.displayName)).not.toContain("Bar counter");
   });
 
   it("prints a category shared by two stations on their one printer, once", () => {
