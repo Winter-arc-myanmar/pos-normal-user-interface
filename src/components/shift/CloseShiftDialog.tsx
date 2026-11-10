@@ -24,6 +24,8 @@ export function CloseShiftDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [printing, setPrinting] = useState(false);
+  /** A second, deliberate tap is what closes a shift or prints its report. */
+  const [confirm, setConfirm] = useState<"close" | "print" | null>(null);
   const printShift = useShiftPrinter();
 
   useEffect(() => {
@@ -89,13 +91,61 @@ export function CloseShiftDialog({
           </p>
         ) : null}
 
+        {confirm ? (
+          <div
+            role="alertdialog"
+            aria-label={
+              confirm === "close"
+                ? t("shift.confirmCloseTitle", { action: title })
+                : t("shift.confirmPrintTitle")
+            }
+            className="space-y-3 rounded-lg border border-amber-600/60 bg-amber-950/40 px-3 py-3 print:hidden"
+          >
+            <p className="text-sm font-semibold text-amber-100">
+              {confirm === "close"
+                ? t("shift.confirmCloseTitle", { action: title })
+                : t("shift.confirmPrintTitle")}
+            </p>
+            <p className="text-xs text-amber-200/80">
+              {confirm === "close"
+                ? t("shift.confirmCloseBody")
+                : t("shift.confirmPrintBody")}
+            </p>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setConfirm(null)}
+                disabled={busy || printing}
+              >
+                {t("shift.confirmBack")}
+              </Button>
+              <Button
+                type="button"
+                variant={confirm === "close" ? "destructive" : "primary"}
+                disabled={busy || printing}
+                isLoading={confirm === "close" ? busy : printing}
+                onClick={() => {
+                  const action = confirm;
+                  setConfirm(null);
+                  if (action === "close") void close();
+                  else void print();
+                }}
+              >
+                {confirm === "close"
+                  ? t("shift.confirmCloseYes", { action: title })
+                  : t("shift.confirmPrintYes")}
+              </Button>
+            </div>
+          </div>
+        ) : (
         <div className="flex flex-wrap justify-end gap-2 print:hidden">
           {closed && report ? (
             <>
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => void print()}
+                onClick={() => setConfirm("print")}
                 disabled={printing}
                 isLoading={printing}
               >
@@ -112,12 +162,13 @@ export function CloseShiftDialog({
                   {t("common.cancel")}
                 </Button>
               ) : null}
-              <Button type="button" variant="destructive" onClick={() => void close()} disabled={busy} isLoading={busy}>
+              <Button type="button" variant="destructive" onClick={() => setConfirm("close")} disabled={busy}>
                 {busy ? t("shift.closing") : title}
               </Button>
             </>
           )}
         </div>
+        )}
       </div>
     </div>
   );
