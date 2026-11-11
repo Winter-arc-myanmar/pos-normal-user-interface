@@ -14,6 +14,5 @@ export const toTabletSlip = (order: RoomOrderView): KitchenSlip => ({
     quantity: String(item.quantity),
     // The category decides which KDS station prints the item.
     categoryId: item.categoryId || undefined,
-    categoryName: item.categoryName || undefined,
   })),
 });
