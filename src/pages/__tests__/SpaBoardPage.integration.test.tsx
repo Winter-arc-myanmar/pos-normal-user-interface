@@ -728,7 +728,9 @@ describe("SpaBoardPage", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "spa.focConfirm" }));
 
-    await waitFor(() => expect(mocks.printTicket).toHaveBeenCalledWith(fresh));
+    await waitFor(() =>
+      expect(mocks.printTicket).toHaveBeenCalledWith(fresh, [], expect.any(Array))
+    );
     expect(mocks.printTicket).toHaveBeenCalledTimes(1);
     expect(mocks.listKdsTickets).toHaveBeenCalledWith({ salesOrderId: "order-1", limit: 100 });
   });

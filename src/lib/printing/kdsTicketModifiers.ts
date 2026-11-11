@@ -63,10 +63,19 @@ const orderLineNameKeys = (line: SalesOrderLine) => {
   return [...keys];
 };
 
+/** The name the order line prints as, with its variant when it names one. */
+const orderLineItemName = (line: SalesOrderLine) => {
+  const product = (line.productName ?? "").trim();
+  if (!product) return undefined;
+  return withVariant(product, line.variantName);
+};
+
 /**
  * Server KDS tickets can arrive with an empty `kitchenModifiers` even though
- * the order line has modifiers. Fill those lines from the sales order before
- * the ticket is printed; tickets that already carry modifiers are left alone.
+ * the order line has modifiers, and with only the product's name even though
+ * the line was sold as a variant. Fill both from the sales order before the
+ * ticket is printed: the item prints as "Coffee (Large)" and its options under
+ * it. Lines that already carry the text are left alone.
  *
  * A ticket line is matched to its order line by id. A ticket that does not
  * carry the id - some servers send only the printed name - is matched by the
@@ -110,41 +119,57 @@ export function applyKdsTicketModifiers(
     orderLineFor(line.salesOrderLineId, line.productName, line.quantity);
 
   let changed = false;
-  const filled = new Set<number>();
+  const matched = new Set<number>();
   const ticketLines = (ticket.kdsTicketLines || []).map((line, index) => {
-    if (line.kitchenModifiers?.trim()) return line;
     const orderLine = ticketLineOrderLine(line);
-    const modifiers = orderLine
-      ? modifierPrintText(orderLine.selectedModifiers)
-      : {};
-    if (!modifiers.names) return line;
+    if (!orderLine) return line;
+    // The variant is part of the item's printed name.
+    const name = orderLineItemName(orderLine);
+    const nextName =
+      name && name !== line.productName ? name : undefined;
+    const modifiers = line.kitchenModifiers?.trim()
+      ? {}
+      : modifierPrintText(orderLine.selectedModifiers);
+    if (!nextName && !modifiers.names) return line;
+    matched.add(index);
     changed = true;
-    filled.add(index);
     return new KdsTicketLine({
       ...line,
-      kitchenModifiers: modifiers.names,
-      modifierPrices: modifiers.prices,
+      ...(nextName ? { productName: nextName } : {}),
+      ...(modifiers.names
+        ? { kitchenModifiers: modifiers.names, modifierPrices: modifiers.prices }
+        : {}),
     });
   });
 
   const lines = ticket.lines?.map((line, index) => {
-    if (line.modifiers?.trim()) return line;
-    // A ticket with its own lines prints the order line that filled the
-    // matching ticket line; a ticket built from plain lines is matched by name.
+    // A ticket with its own lines prints the order line matched to the ticket
+    // line; a ticket built from plain lines is matched by the printed name.
+    const ticketLine = hasTicketLines
+      ? ticket.kdsTicketLines![index]
+      : undefined;
     const orderLine = hasTicketLines
-      ? filled.has(index)
-        ? ticketLineOrderLine(ticket.kdsTicketLines![index])
+      ? matched.has(index) && ticketLine
+        ? ticketLineOrderLine(ticketLine)
         : undefined
       : orderLineFor(undefined, line.name, line.quantity);
-    const modifiers = orderLine
-      ? modifierPrintText(orderLine.selectedModifiers)
-      : {};
-    if (!modifiers.names) return line;
+    if (!orderLine) return line;
+    const name = orderLineItemName(orderLine);
+    const nextName = name && name !== line.name ? name : undefined;
+    // Options the ticket line already names are printed from the ticket line
+    // itself; only missing ones are copied from the order line.
+    const modifiers =
+      line.modifiers?.trim() || ticketLine?.kitchenModifiers?.trim()
+        ? {}
+        : modifierPrintText(orderLine.selectedModifiers);
+    if (!nextName && !modifiers.names) return line;
     changed = true;
     return {
       ...line,
-      modifiers: modifiers.names,
-      modifierPrices: modifiers.prices,
+      ...(nextName ? { name: nextName } : {}),
+      ...(modifiers.names
+        ? { modifiers: modifiers.names, modifierPrices: modifiers.prices }
+        : {}),
     };
   });
 

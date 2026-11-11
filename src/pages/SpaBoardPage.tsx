@@ -124,7 +124,7 @@ import { linePriceNote } from "@/lib/pos/linePrice";
 import { modifierExtra } from "@/lib/modifiers/choices";
 import { LineEditDialog, type LineEdit } from "./cashier/LineEditDialog";
 import { modifierPrintText } from "@/lib/printing/modifierText";
-import { applyKdsTicketHostess, applyKdsTicketModifiers } from "@/lib/printing/kdsTicketModifiers";
+import { applyKdsTicketHostess } from "@/lib/printing/kdsTicketModifiers";
 import { receiptTotals, type ReceiptTotals } from "@/lib/printing/receiptTotals";
 import {
   isLadyChargeLine,
@@ -1220,7 +1220,9 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
         : orderLines;
       for (const ticket of fresh) {
         await printer.printTicket(
-          applyKdsTicketHostess(applyKdsTicketModifiers(ticket, lines), lines, hostessName)
+          applyKdsTicketHostess(ticket, lines, hostessName),
+          [],
+          lines
         );
       }
     } catch (caught) {
