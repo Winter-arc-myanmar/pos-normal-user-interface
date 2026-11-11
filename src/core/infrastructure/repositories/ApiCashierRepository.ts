@@ -74,6 +74,12 @@ import { HttpClient } from "../api/HttpClient";
 import { API_ENDPOINTS, resolveMediaUrl } from "../api/constants";
 import { parseCashier } from "@/lib/printing/cashier";
 
+/**
+ * A bill's lines are read whole. The lines endpoint pages at 10 when a request
+ * names no limit, so an order past its tenth item lost the rest on the till.
+ */
+const ORDER_LINES_LIMIT = 200;
+
 interface ApiEnvelope<T> {
   data: T;
 }
@@ -1514,7 +1520,8 @@ export class ApiCashierRepository implements ICashierRepository {
 
   async getSalesOrderLines(salesOrderId: string): Promise<SalesOrderLine[]> {
     const response = await this.httpClient.get<ApiEnvelope<Record<string, unknown>[]>>(
-      API_ENDPOINTS.SALES_ORDERS.LINES(salesOrderId).LIST
+      API_ENDPOINTS.SALES_ORDERS.LINES(salesOrderId).LIST,
+      { params: { page: 1, limit: ORDER_LINES_LIMIT } }
     );
     const data = asList<Record<string, unknown>>(response);
     return data.map((item) => {

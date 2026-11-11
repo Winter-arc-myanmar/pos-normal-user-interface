@@ -74,6 +74,11 @@ describe("ApiCashierRepository", () => {
 
     const lines = await repository.getSalesOrderLines("order-1");
 
+    // The lines endpoint pages at ten unless the request asks for more.
+    expect(httpClient.get).toHaveBeenCalledWith(
+      "/api/v1/sales-orders/order-1/lines",
+      { params: { page: 1, limit: 200 } }
+    );
     expect(lines[0]).toMatchObject({
       productName: "Fish Ball Stick",
       sku: "FBS-01",
