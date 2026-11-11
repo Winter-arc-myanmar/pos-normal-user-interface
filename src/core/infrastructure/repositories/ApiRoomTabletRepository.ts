@@ -1,4 +1,6 @@
 import { toModifierGroups } from "./ApiCashierRepository";
+import { firstModifierPrintText } from "@/lib/printing/modifierText";
+import { variantOptionsName, withVariant } from "@/lib/pos/orderListDisplay";
 import {
   TabletExtendDTO,
   TabletOrderDTO,
@@ -79,6 +81,49 @@ const toRoom = (value: unknown): TabletVisitRoom => {
   };
 };
 
+/** The variant a room order's item was ordered as, when the server sends one. */
+const roomOrderItemVariant = (line: RecordValue) => {
+  const orderLine = asRecord(line.salesOrderLine);
+  const variant = asRecord(line.variant) || asRecord(orderLine.variant);
+  const name = (value: unknown) =>
+    typeof value === "string" && value.trim() ? value.trim() : undefined;
+  return variantOptionsName({
+    variantName:
+      name(line.variantName) ||
+      name(variant.name) ||
+      name(variant.variantName),
+    matrixOptions:
+      asRecord(variant.matrixOptions) ||
+      asRecord(line.matrixOptions) ||
+      asRecord(orderLine.matrixOptions),
+  });
+};
+
+/**
+ * The options a room order's item prints, wherever the API keeps them: the
+ * ticket's own text, the sold line's choices, or a field the tablet posted.
+ */
+const roomOrderItemModifiers = (line: RecordValue) => {
+  const orderLine = asRecord(line.salesOrderLine);
+  const printed = firstModifierPrintText([
+    line.kitchenModifiers,
+    line.modifiers,
+    line.selectedModifiers,
+    line.options,
+    orderLine.selectedModifiers,
+    orderLine.modifiers,
+  ]);
+  const sentPrices =
+    typeof line.modifierPrices === "string" && line.modifierPrices.trim()
+      ? line.modifierPrices.trim()
+      : undefined;
+  const prices = sentPrices || printed.prices;
+  return {
+    ...(printed.names ? { modifiers: printed.names } : {}),
+    ...(prices ? { modifierPrices: prices } : {}),
+  };
+};
+
 const toRoomOrder = (value: unknown): RoomOrderView => {
   const item = asRecord(value);
   return {
@@ -97,12 +142,21 @@ const toRoomOrder = (value: unknown): RoomOrderView => {
     printClaimedAt: orNull(item.printClaimedAt),
     items: asList(item.items).map((entry) => {
       const line = asRecord(entry);
+      const orderLine = asRecord(line.salesOrderLine);
+      const product = asRecord(line.product) || asRecord(orderLine.product);
+      const name =
+        text(line.name) || text(line.productName) || text(product.name);
       return {
-        name: text(line.name),
+        // The variant is part of the item's name on every slip.
+        name: name ? withVariant(name, roomOrderItemVariant(line)) : name,
         quantity: Number(line.quantity || 0),
         status: text(line.status, "PENDING"),
         // The station that prints the ticket is chosen by this category.
         categoryId: orNull(line.categoryId),
+        ...roomOrderItemModifiers(line),
+        ...(typeof line.note === "string" && line.note.trim()
+          ? { note: line.note.trim() }
+          : {}),
       };
     }),
   };

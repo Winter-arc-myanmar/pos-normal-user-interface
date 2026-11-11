@@ -58,6 +58,43 @@ describe("ApiRoomTabletRepository", () => {
     ]);
   });
 
+  it("prints a room order item's variant, options and note", async () => {
+    const get = vi.fn().mockResolvedValue({
+      data: [
+        {
+          id: "ro-2",
+          orderNumber: 5,
+          roomNumber: "S3",
+          items: [
+            {
+              name: "Coffee",
+              quantity: 1,
+              categoryId: "cat-drinks",
+              note: "No sugar",
+              variant: { matrixOptions: { size: "Large" } },
+              salesOrderLine: {
+                selectedModifiers: [
+                  { modifierId: "mod-1", name: "Oat milk", priceDelta: "1.5000" },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const repository = new ApiRoomTabletRepository({ get } as unknown as HttpClient);
+
+    const [order] = await repository.listRoomOrders(false);
+
+    expect(order.items[0]).toMatchObject({
+      name: "Coffee (Large)",
+      categoryId: "cat-drinks",
+      modifiers: "Oat milk",
+      modifierPrices: "1.5000",
+      note: "No sugar",
+    });
+  });
+
   it("places an order and claims a print", async () => {
     const post = vi
       .fn()

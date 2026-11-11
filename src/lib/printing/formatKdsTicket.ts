@@ -917,14 +917,22 @@ export const withOrderedBy = (modifiers?: string, orderedBy?: string) =>
 
 export function kdsTicketPrintLines(ticket: KdsTicket): PrintLine[] {
   if (ticket.lines?.length) {
-    return ticket.lines.map((line) => ({
-      name: line.name,
-      quantity: line.quantity,
-      categoryId: line.categoryId,
-      modifiers: withOrderedBy(line.modifiers, line.orderedBy),
-      modifierPrices: line.modifierPrices,
-      ...(line.note ? { remarks: line.note } : {}),
-    }));
+    return ticket.lines.map((line, index) => {
+      // The ticket's own line may be the one that carries the options; a print
+      // line built beside it must still show them.
+      const saved = ticket.kdsTicketLines?.[index];
+      return {
+        name: line.name,
+        quantity: line.quantity,
+        categoryId: line.categoryId,
+        modifiers: withOrderedBy(
+          line.modifiers || saved?.kitchenModifiers,
+          line.orderedBy || saved?.orderedBy
+        ),
+        modifierPrices: line.modifierPrices || saved?.modifierPrices,
+        ...(line.note ? { remarks: line.note } : {}),
+      };
+    });
   }
   return (ticket.kdsTicketLines || []).map((line) => ({
     name: line.productName || "Item",

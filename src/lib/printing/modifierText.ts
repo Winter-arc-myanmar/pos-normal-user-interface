@@ -55,3 +55,23 @@ export const modifierPrintText = (value: unknown): ModifierPrintText => {
     prices: modifiers.map((modifier) => modifier.price || "-").join(", "),
   };
 };
+
+/** The prices that name money, or none when every option is free. */
+const pricedText = (prices?: string) =>
+  prices?.split(", ").some((price) => price && price !== "-") ? prices : undefined;
+
+/**
+ * The first of `values` that names options, as they print. A slip line may get
+ * its options from the ticket, the sold line, or a field the API nested them
+ * in; the first field that carries names is the one the guest chose.
+ */
+export const firstModifierPrintText = (values: unknown[]): ModifierPrintText => {
+  for (const value of values) {
+    const printed = modifierPrintText(value);
+    if (printed.names) {
+      const prices = pricedText(printed.prices);
+      return { names: printed.names, ...(prices ? { prices } : {}) };
+    }
+  }
+  return {};
+};

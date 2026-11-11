@@ -237,6 +237,39 @@ describe("ApiCashierRepository", () => {
     expect(lines[2].selectedModifiers).toBeUndefined();
   });
 
+  it("reads a sold line's variant and options from the order line it was joined with", async () => {
+    const httpClient = {
+      get: vi.fn().mockResolvedValue({
+        success: true,
+        data: [
+          {
+            id: "line-1",
+            salesOrderId: "order-1",
+            variantId: "variant-1",
+            quantity: "1.0000",
+            unitPrice: "10000.0000",
+            salesOrderLine: {
+              selectedModifiers: [
+                { modifierId: "mod-1", name: "Oat milk", priceDelta: "1500.0000" },
+              ],
+              variant: { matrixOptions: { size: "Large", color: "Black" } },
+            },
+          },
+        ],
+      }),
+    };
+    const repository = new ApiCashierRepository(
+      httpClient as unknown as HttpClient
+    );
+
+    const lines = await repository.getSalesOrderLines("order-1");
+
+    expect(lines[0].variantName).toBe("Large / Black");
+    expect(lines[0].selectedModifiers).toEqual([
+      { modifierId: "mod-1", name: "Oat milk", priceDelta: "1500.0000" },
+    ]);
+  });
+
   it("normalizes nested paginated list responses", async () => {
     const httpClient = {
       get: vi.fn().mockResolvedValue({
@@ -1125,6 +1158,59 @@ describe("ApiCashierRepository", () => {
 
     expect(ticket.kdsTicketLines?.map((line) => line.orderedBy)).toEqual(["Snow", undefined]);
     expect(ticket.lines?.map((line) => line.orderedBy)).toEqual(["Snow", undefined]);
+  });
+
+  it("prints a ticket line's variant and options, wherever the API keeps them", async () => {
+    const get = vi.fn().mockResolvedValue({
+      success: true,
+      data: {
+        id: "ticket-3",
+        ticketNumber: "KDS-0003",
+        kdsTicketLines: [
+          {
+            id: "line-1",
+            productName: "Coffee",
+            quantity: "1.0000",
+            salesOrderLine: {
+              selectedModifiers: [
+                { modifierId: "mod-1", name: "Oat milk", priceDelta: "1.5000" },
+              ],
+              variant: { matrixOptions: { size: "Large" } },
+            },
+          },
+          {
+            id: "line-2",
+            productName: "Tea",
+            quantity: "1.0000",
+            selectedModifiers: {
+              "mod-3": { modifierId: "mod-3", name: "Extra honey", priceDelta: "2.0000" },
+            },
+          },
+        ],
+      },
+    });
+    const repository = new ApiCashierRepository({ get } as unknown as HttpClient);
+
+    const ticket = await repository.getKdsTicketById("ticket-3");
+
+    expect(ticket.kdsTicketLines?.[0]).toMatchObject({
+      productName: "Coffee (Large)",
+      kitchenModifiers: "Oat milk",
+      modifierPrices: "1.5000",
+    });
+    expect(ticket.kdsTicketLines?.[1]).toMatchObject({
+      productName: "Tea",
+      kitchenModifiers: "Extra honey",
+      modifierPrices: "2.0000",
+    });
+    expect(ticket.lines?.map((line) => line.name)).toEqual([
+      "Coffee (Large)",
+      "Tea",
+    ]);
+    expect(ticket.lines?.[0]).toMatchObject({
+      modifiers: "Oat milk",
+      modifierPrices: "1.5000",
+    });
   });
 
   it("reads the option groups a product carries, and tells an empty list from none", async () => {

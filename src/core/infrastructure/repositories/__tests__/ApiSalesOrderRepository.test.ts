@@ -129,6 +129,31 @@ describe("ApiSalesOrderRepository", () => {
     });
   });
 
+  it("names a line's variant by its options when no variant name was saved", async () => {
+    const get = vi.fn().mockResolvedValue({
+      data: [
+        {
+          id: "line-1",
+          variantId: "variant-1",
+          quantity: "1.0000",
+          unitPrice: "10.0000",
+          product: { name: "Coffee" },
+          variant: { matrixOptions: { size: "Large", color: "Black" } },
+        },
+      ],
+    });
+    const repository = new ApiSalesOrderRepository({
+      get,
+    } as unknown as HttpClient);
+
+    const result = await repository.getSalesOrderLines("order-1");
+
+    expect(result.lines[0]).toMatchObject({
+      productName: "Coffee",
+      variantName: "Large / Black",
+    });
+  });
+
   it("uses line quantities and _count when list payloads omit itemCount", async () => {
     const get = vi.fn().mockResolvedValue({
       data: [

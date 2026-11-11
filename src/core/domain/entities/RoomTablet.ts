@@ -101,6 +101,11 @@ export interface RoomOrderView {
     status: string;
     /** The menu category, so the ticket prints at that category's station. */
     categoryId?: string | null;
+    /** The options the guest chose, as the kitchen slip prints them. */
+    modifiers?: string;
+    modifierPrices?: string;
+    /** A note for the kitchen on the item. */
+    note?: string;
   }[];
 }
 
