@@ -79,6 +79,35 @@ const toRoom = (value: unknown): TabletVisitRoom => {
   };
 };
 
+/**
+ * The menu category of a room-order item, whichever way the API names it.
+ *
+ * The station that prints the ticket is chosen by this id, so a shape the client
+ * did not expect sent the item to the till's printer instead of its station. The
+ * waiter tablet sends `categoryId` (and `categoryName`) on each item today; the
+ * other spellings are kept so an older or a nested payload still routes.
+ */
+const categoryIdOf = (line: RecordValue): string | null => {
+  const direct = line.categoryId ?? line.category_id ?? line.productCategoryId;
+  if (direct) return String(direct);
+  const nested =
+    asRecord(line.category)?.categoryId ??
+    asRecord(line.category)?.category_id ??
+    asRecord(line.category)?.id ??
+    asRecord(line.product)?.categoryId ??
+    asRecord(line.variant)?.categoryId;
+  return nested ? String(nested) : null;
+};
+
+/** The category's name, for the ticket and for what could not route. */
+const categoryNameOf = (line: RecordValue): string | null => {
+  const name =
+    line.categoryName ??
+    line.category_name ??
+    asRecord(line.category)?.name;
+  return name ? String(name) : null;
+};
+
 const toRoomOrder = (value: unknown): RoomOrderView => {
   const item = asRecord(value);
   return {
@@ -102,7 +131,8 @@ const toRoomOrder = (value: unknown): RoomOrderView => {
         quantity: Number(line.quantity || 0),
         status: text(line.status, "PENDING"),
         // The station that prints the ticket is chosen by this category.
-        categoryId: orNull(line.categoryId),
+        categoryId: categoryIdOf(line),
+        categoryName: categoryNameOf(line),
       };
     }),
   };
