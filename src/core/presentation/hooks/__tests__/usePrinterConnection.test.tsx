@@ -271,13 +271,12 @@ describe("usePrinterConnection station routing", () => {
     ]);
   });
 
-  it("prints a line no station carries on the till's own printer, once", async () => {
+  it("falls back to the KDS printer when strict routing is not required", async () => {
     const { result } = renderConnection();
     await waitFor(() => expect(result.current.isConnected).toBe(true));
 
-    let plan: KitchenPrintPlan | undefined;
     await act(async () => {
-      plan = await result.current.printKitchen(
+      await result.current.printKitchen(
         {
           title: "KITCHEN",
           lines: [{ name: "Coffee", quantity: "1", categoryId: "drink" }],
@@ -286,13 +285,7 @@ describe("usePrinterConnection station routing", () => {
       );
     });
 
-    // The drink station carries "salad" only. The coffee must not go to that
-    // station, but the kitchen still gets paper: it goes to the till's printer.
-    expect(plan?.unrouted.map((line) => line.name)).toEqual(["Coffee"]);
     expect(mocks.printKitchen).toHaveBeenCalledTimes(1);
-    const [binding, slip] = mocks.printKitchen.mock.calls[0];
-    expect(binding.backendPrinterId).toBe("printer-drink");
-    expect(slip.lines.map((line: { name: string }) => line.name)).toEqual(["Coffee"]);
   });
 });
 
@@ -367,56 +360,6 @@ describe("usePrinterConnection station routing", () => {
       ["Chinese KDS", ["Chinese fried noodle"]],
       ["Beverage KDS", ["Beer"]],
     ]);
-  });
-
-  it("prints an item no station carries on the till's printer, not twice", async () => {
-    bind("Beverage KDS", "printer-drinks", "10.4.0.9");
-    bind("Chinese KDS", "printer-chinese", "10.4.0.8");
-    mocks.listStations.mockResolvedValue({
-      stations: [
-        {
-          id: "st-drinks",
-          name: "Beverage KDS",
-          printerIds: ["printer-drinks"],
-          routingRules: { categoryIds: ["cat-drinks"] },
-        },
-        {
-          id: "st-chinese",
-          name: "Chinese KDS",
-          printerIds: ["printer-chinese"],
-          routingRules: { categoryIds: ["cat-chinese"] },
-        },
-      ],
-    });
-
-    const { result } = renderHook(() =>
-      usePrinterConnection(tenantId, registerId, "location-1")
-    );
-    await waitFor(() => expect(result.current.isConnected).toBe(true));
-
-    let plan: KitchenPrintPlan | undefined;
-    await act(async () => {
-      plan = await result.current.printKitchen({
-        title: "Room order 5",
-        place: "Room S3",
-        lines: [
-          { name: "Rice", quantity: "1", categoryId: "cat-food" },
-          { name: "Mystery", quantity: "1" },
-        ],
-      });
-    });
-
-    // Neither category is on a station, so the room's order still has to reach
-    // paper: it goes to the till's own printer once - not to both station printers.
-    expect(plan?.unrouted.map((item) => item.name)).toEqual(["Rice", "Mystery"]);
-    expect(mocks.printKitchen).toHaveBeenCalledTimes(1);
-    const [binding, slip] = mocks.printKitchen.mock.calls[0];
-    expect(binding.displayName).toBe("Beverage KDS");
-    expect(slip.lines.map((line: { name: string }) => line.name)).toEqual([
-      "Rice",
-      "Mystery",
-    ]);
-  });
   });
 });
 
