@@ -118,6 +118,11 @@ describe("ApiSalesOrderRepository", () => {
       ],
     });
     const lines = await repository.getSalesOrderLines("order-1");
+
+    // A bill is read whole even when the caller names no page size.
+    expect(get).toHaveBeenLastCalledWith("/api/v1/sales-orders/order-1/lines", {
+      params: { page: 1, limit: 200 },
+    });
     expect(lines.lines[0]).toMatchObject({
       productName: "Tea",
       sku: "TEA-L",

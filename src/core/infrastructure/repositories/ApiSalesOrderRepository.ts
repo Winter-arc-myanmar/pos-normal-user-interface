@@ -25,6 +25,12 @@ import { HttpClient } from "../api/HttpClient";
 import { API_ENDPOINTS } from "../api/constants";
 import { parseCashier } from "@/lib/printing/cashier";
 
+/**
+ * An order's lines are read whole. The lines endpoint pages at 10 when a request
+ * names no limit, so a call without page/limit must still ask for every line.
+ */
+const ORDER_LINES_LIMIT = 200;
+
 interface ApiEnvelope<T> {
   success?: boolean;
   message?: string;
@@ -559,11 +565,18 @@ export class ApiSalesOrderRepository implements ISalesOrderRepository {
     salesOrderId: string,
     params?: SalesOrderFilterDTO
   ): Promise<SalesOrderLineListResponseDTO> {
+    // A caller that names no page size still gets the whole bill: the endpoint
+    // otherwise answers with its default ten lines.
+    const query = {
+      ...params,
+      page: params?.page ?? 1,
+      limit: params?.limit ?? ORDER_LINES_LIMIT,
+    };
     const response = await this.httpClient.get<
       ApiEnvelope<Record<string, unknown>[]>
-    >(API_ENDPOINTS.SALES_ORDERS.LINES(salesOrderId).LIST, { params });
+    >(API_ENDPOINTS.SALES_ORDERS.LINES(salesOrderId).LIST, { params: query });
     const data = asList<Record<string, unknown>>(response);
-    const meta = toMeta(response, params?.limit || 10, data.length);
+    const meta = toMeta(response, query.limit, data.length);
     return {
       lines: data.map((item) => toSalesOrderLine(item, salesOrderId)),
       ...meta,
