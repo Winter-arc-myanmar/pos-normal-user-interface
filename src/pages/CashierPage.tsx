@@ -104,6 +104,7 @@ import {
   remainingReceivable,
 } from "@/lib/pos/splitPayments";
 import { cashierLabel } from "@/lib/printing/cashier";
+import { variantOptionsName, withVariant } from "@/lib/pos/orderListDisplay";
 
 const BOARD_PAGE_SIZE = 15;
 const TABLE_STATUS_POLL_MS = 60_000;
@@ -596,7 +597,12 @@ export function CashierPage() {
     serviceChargeTaxRate,
     kdsDeleteSlips,
     quickNotes,
+    taxOn,
+    taxShown,
   } = useVenueSetting();
+  // Venue setup can turn tax off for the till, or charge it without showing it.
+  const taxOnBar = taxOn?.BAR !== false;
+  const showTaxBar = taxShown?.BAR !== false;
   const { hasPermission } = usePermissions();
   const canTakePayment = hasPermission("sales:checkout:write");
   const formatAmount = useCallback((value: number) => value.toFixed(4), []);
@@ -616,14 +622,21 @@ export function CashierPage() {
       const everyItem = taxAllItems && !isFeeLine(line);
       const ownRateId = everyItem ? undefined : product?.taxRateId;
       const fallback = everyItem || !(ownRateId || variant?.taxRate) ? defaultTaxRate : null;
-      const isPriceInclusive = fallback
-        ? fallback.isPriceInclusive
-        : (variant?.isPriceInclusive ?? product?.isPriceInclusive);
+      // A till whose area charges no tax sells at the price, with no tax in it.
+      const isPriceInclusive = !taxOnBar
+        ? false
+        : fallback
+          ? fallback.isPriceInclusive
+          : (variant?.isPriceInclusive ?? product?.isPriceInclusive);
       const lineTotals = calcLineTotals({
         quantity: line.quantity,
         unitPrice,
         lineDiscount: line.lineDiscount || "0.0000",
-        isTaxable: taxAllItems ? everyItem : (variant?.isTaxable ?? product?.isTaxable),
+        isTaxable: !taxOnBar
+          ? false
+          : taxAllItems
+            ? everyItem
+            : (variant?.isTaxable ?? product?.isTaxable),
         taxRate: fallback ? fallback.rate : (variant?.taxRate ?? product?.taxRate),
         isPriceInclusive,
       });
@@ -637,7 +650,7 @@ export function CashierPage() {
         taxAmount: formatAmount(lineTotals.taxAmount),
       };
     },
-    [defaultTaxRate, formatAmount, isFeeLine, taxAllItems]
+    [defaultTaxRate, formatAmount, isFeeLine, taxAllItems, taxOnBar]
   );
 
   const normalizedDirectCartLines = useMemo(
@@ -751,7 +764,13 @@ export function CashierPage() {
           : withoutTax && line.taxInclusive && quantity > 0
             ? toMoney(Number(line.unitPrice || 0) - Number(line.taxAmount || 0) / quantity)
             : line.unitPrice?.trim();
-        const name = line.productName || product?.name || line.variantName || "Item";
+        const name = withVariant(
+          line.productName || product?.name || line.variantName || "Item",
+          variantOptionsName({
+            variantName: line.variantName,
+            matrixOptions: variant?.matrixOptions,
+          })
+        );
         const note = notePrices && !givenAway
           ? linePriceNote(line.unitPrice, menuPriceFor(line))
           : undefined;
@@ -935,7 +954,10 @@ export function CashierPage() {
         0
       ) - (isDirectCheckoutMode && billOptions.changed ? 0 : Math.max(0, Number(discountAmount) || 0));
     const charge = (Math.max(0, preTax) * serviceChargeBps) / 10000;
-    return { serviceCharge: charge, serviceChargeTax: billOptions.includeTax ? charge * serviceChargeTaxRate : 0 };
+    return {
+      serviceCharge: charge,
+      serviceChargeTax: billOptions.includeTax && taxOnBar ? charge * serviceChargeTaxRate : 0,
+    };
   }, [
     paymentBillLines,
     billOptions.changed,
@@ -947,6 +969,7 @@ export function CashierPage() {
     serviceChargeBps,
     serviceChargeOn.BAR,
     serviceChargeTaxRate,
+    taxOnBar,
   ]);
 
   const orderTotal = useMemo(() => {
@@ -1073,10 +1096,17 @@ export function CashierPage() {
       // A direct cart's promotions are a preview until the server prices it.
       promotion: isDirectCheckoutMode ? promotionSaving : undefined,
       serviceCharge: quote ? Number(quote.serviceCharge) : serviceCharge,
-      tax: quote ? Number(quote.addedTax) + Number(quote.serviceChargeTax) : taxes.added + serviceChargeTax,
-      includedTax: quote
-        ? Number(quote.totalTax) - Number(quote.addedTax) - Number(quote.serviceChargeTax)
-        : taxes.included,
+      // A shop that hides tax here still charges it; the rows just are not shown.
+      tax: !showTaxBar
+        ? 0
+        : quote
+          ? Number(quote.addedTax) + Number(quote.serviceChargeTax)
+          : taxes.added + serviceChargeTax,
+      includedTax: !showTaxBar
+        ? 0
+        : quote
+          ? Number(quote.totalTax) - Number(quote.addedTax) - Number(quote.serviceChargeTax)
+          : taxes.included,
       tip: Number(tipAmount) || 0,
       total: Number(orderTotal),
     });
@@ -2372,7 +2402,7 @@ export function CashierPage() {
         lines: printableLines(paymentBillLines, !billOptions.includeTax, true, promotionForLine),
         subtotal: receiptItemsSubtotal,
         discount: Number(receiptItemsDiscount) > 0 ? receiptItemsDiscount : undefined,
-        tax: Number(receiptTax) > 0 ? receiptTax : undefined,
+        tax: showTaxBar && Number(receiptTax) > 0 ? receiptTax : undefined,
         serviceCharge: Number(receiptServiceCharge) > 0 ? receiptServiceCharge : undefined,
         // The tip is inside the total below, so the slip says so.
         ...(tip > 0
@@ -3488,7 +3518,7 @@ export function CashierPage() {
             lines: printableLines(paymentBillLines, !billOptions.includeTax, true, promotionForLine),
             subtotal: receiptItemsSubtotal,
             discount: Number(receiptItemsDiscount) > 0 ? receiptItemsDiscount : undefined,
-            tax: Number(receiptTax) > 0 ? receiptTax : undefined,
+            tax: showTaxBar && Number(receiptTax) > 0 ? receiptTax : undefined,
             serviceCharge: Number(receiptServiceCharge) > 0 ? receiptServiceCharge : undefined,
             ...(Number(tipAmount) > 0
               ? { amounts: [{ label: t("receipt.tip"), amount: toMoney(Number(tipAmount)) }] }
