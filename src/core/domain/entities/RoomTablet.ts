@@ -101,6 +101,8 @@ export interface RoomOrderView {
     status: string;
     /** The menu category, so the ticket prints at that category's station. */
     categoryId?: string | null;
+    /** The category's name, for saying which items could not be routed. */
+    categoryName?: string | null;
   }[];
 }
 

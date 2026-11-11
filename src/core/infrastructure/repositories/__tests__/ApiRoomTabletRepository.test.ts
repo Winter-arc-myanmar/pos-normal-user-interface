@@ -80,4 +80,71 @@ describe("ApiRoomTabletRepository", () => {
     expect(result).toEqual({ charged: "10200.0000", balanceAfter: "89800.0000", orderNumber: 4 });
     expect(claim.claimed).toBe(true);
   });
+
+  /** The waiter tablet's order, exactly as the API sends it. */
+  const tabletOrder = {
+    id: "7b1f2c9e-4d3a-4a8e-9f1b-2c6d5e8a9b10",
+    orderNumber: 12,
+    source: "TABLET",
+    kind: "ITEMS",
+    roomKind: "KTV",
+    roomNumber: "101",
+    roomName: "VIP 1",
+    spaSessionId: null,
+    ktvSessionId: "3e9a8b7c-1d2e-4f5a-8b9c-0d1e2f3a4b5c",
+    amount: "23500.0000",
+    deviceName: "Waiter tablet 1",
+    createdAt: "2026-11-10T13:05:12.000Z",
+    acknowledgedAt: null,
+    deliveredAt: null,
+    printClaimedAt: "2026-11-10T13:05:13.000Z",
+    items: [
+      {
+        name: "Fried rice",
+        quantity: 1,
+        status: "FIRED",
+        categoryId: "a1b2c3d4-0000-4000-8000-000000000001",
+        categoryName: "Food",
+      },
+      {
+        name: "Beer",
+        quantity: 2,
+        status: "FIRED",
+        categoryId: "a1b2c3d4-0000-4000-8000-000000000002",
+        categoryName: "Drinks",
+      },
+    ],
+  };
+
+  it("reads the category id and name of a claimed waiter-tablet order", async () => {
+    const post = vi.fn().mockResolvedValue({
+      success: true,
+      message: "Request successful",
+      data: { claimed: true, order: tabletOrder },
+    });
+    const repository = new ApiRoomTabletRepository({ post } as unknown as HttpClient);
+
+    const claim = await repository.claimRoomOrderPrint(tabletOrder.id);
+
+    expect(claim.claimed).toBe(true);
+    expect(claim.order.items.map((item) => item.categoryId)).toEqual([
+      "a1b2c3d4-0000-4000-8000-000000000001",
+      "a1b2c3d4-0000-4000-8000-000000000002",
+    ]);
+    expect(claim.order.items.map((item) => item.categoryName)).toEqual(["Food", "Drinks"]);
+  });
+
+  it("reads the same categories from the room-order list", async () => {
+    const get = vi
+      .fn()
+      .mockResolvedValue({ success: true, message: "Request successful", data: [tabletOrder] });
+    const repository = new ApiRoomTabletRepository({ get } as unknown as HttpClient);
+
+    const [order] = await repository.listRoomOrders(false);
+
+    expect(order.items.map((item) => [item.name, item.categoryId, item.categoryName])).toEqual([
+      ["Fried rice", "a1b2c3d4-0000-4000-8000-000000000001", "Food"],
+      ["Beer", "a1b2c3d4-0000-4000-8000-000000000002", "Drinks"],
+    ]);
+  });
 });
