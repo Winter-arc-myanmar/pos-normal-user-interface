@@ -484,12 +484,14 @@ describe("usePrinterConnection KDS ticket modifiers", () => {
     );
   });
 
-  it("fills a ticket's missing modifiers from its order line", async () => {
+  it("fills a ticket's missing modifiers and variant from its order line", async () => {
     mocks.getSalesOrderLines.mockResolvedValue({
       lines: [
         new SalesOrderLine({
           id: "line-1",
           salesOrderId: "order-1",
+          productName: "Coffee",
+          variantName: "Large",
           selectedModifiers: [
             { modifierId: "mod-1", name: "Oat milk", priceDelta: "1.5000" },
           ],
@@ -527,14 +529,64 @@ describe("usePrinterConnection KDS ticket modifiers", () => {
 
     expect(mocks.getSalesOrderLines).toHaveBeenCalledWith("order-1", {
       page: 1,
-      limit: 100,
+      limit: 200,
     });
     const [, slip] = mocks.printKitchen.mock.calls[0];
     expect(slip.lines).toEqual([
       expect.objectContaining({
-        name: "Coffee",
+        name: "Coffee (Large)",
         modifiers: "Oat milk",
         modifierPrices: "1.5000",
+      }),
+    ]);
+  });
+
+  it("prints a ticket's variant even when the ticket already has its modifiers", async () => {
+    mocks.getSalesOrderLines.mockResolvedValue({
+      lines: [
+        new SalesOrderLine({
+          id: "line-1",
+          salesOrderId: "order-1",
+          productName: "Coffee",
+          variantName: "Large",
+          selectedModifiers: [
+            { modifierId: "mod-1", name: "Oat milk", priceDelta: "1.5000" },
+          ],
+        }),
+      ],
+    });
+    const ticket = new KdsTicket({
+      id: "ticket-2",
+      ticketNumber: "KDS-002",
+      salesOrderId: "order-1",
+      stationId: "station-hot",
+      status: "PENDING",
+      kdsTicketLines: [
+        new KdsTicketLine({
+          id: "ticket-line-2",
+          salesOrderLineId: "line-1",
+          productName: "Coffee",
+          quantity: "1",
+          status: "PENDING",
+          kitchenModifiers: "No sugar",
+        }),
+      ],
+      lines: [
+        { name: "Coffee", quantity: "1", modifiers: "No sugar" },
+      ],
+    });
+    const { result } = renderConnection();
+    await waitFor(() => expect(result.current.isConnected).toBe(true));
+
+    await act(async () => {
+      await result.current.printTicket(ticket);
+    });
+
+    const [, slip] = mocks.printKitchen.mock.calls[0];
+    expect(slip.lines).toEqual([
+      expect.objectContaining({
+        name: "Coffee (Large)",
+        modifiers: "No sugar",
       }),
     ]);
   });

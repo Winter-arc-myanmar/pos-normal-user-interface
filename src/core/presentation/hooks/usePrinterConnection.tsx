@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { KdsTicket } from "../../domain/entities/Cashier";
+import { KdsTicket, type SalesOrderLine } from "../../domain/entities/Cashier";
 import { KitchenPrinter } from "../../domain/entities/KitchenPrinter";
 import { IKitchenPrinterService } from "../../domain/services/IKitchenPrinterService";
 import { IKdsStationService } from "../../domain/services/IKdsStationService";
@@ -574,27 +574,37 @@ export function usePrinterConnection(
     [backendTargets, bindingsWithSectors, registerId, templateFor, tenantId]
   );
 
-  const ticketWithModifiers = useCallback(async (ticket: KdsTicket) => {
-    const missing =
-      ticket.kdsTicketLines?.some((line) => !line.kitchenModifiers?.trim()) ||
-      ticket.lines?.some((line) => !line.modifiers?.trim());
-    if (!missing || !ticket.salesOrderId) return ticket;
-    try {
-      const service = container.resolve<ISalesOrderService>("salesOrderService");
-      const result = await service.getSalesOrderLines(ticket.salesOrderId, {
-        page: 1,
-        limit: 100,
-      });
-      return applyKdsTicketModifiers(ticket, result.lines);
-    } catch {
-      // A ticket still prints if its order lines cannot be reloaded.
-      return ticket;
-    }
-  }, []);
+  const ticketWithDetails = useCallback(
+    async (ticket: KdsTicket, orderLines?: SalesOrderLine[]) => {
+      if (!ticket.kdsTicketLines?.length && !ticket.lines?.length) return ticket;
+      // The caller may already hold the order lines (a room ticket prints them
+      // for its hostess); otherwise read them so the ticket prints its item's
+      // variant and options even when the ticket payload carries neither.
+      const known = orderLines ?? undefined;
+      if (known) return applyKdsTicketModifiers(ticket, known);
+      if (!ticket.salesOrderId) return ticket;
+      try {
+        const service = container.resolve<ISalesOrderService>("salesOrderService");
+        const result = await service.getSalesOrderLines(ticket.salesOrderId, {
+          page: 1,
+          limit: 200,
+        });
+        return applyKdsTicketModifiers(ticket, result.lines);
+      } catch {
+        // A ticket still prints if its order lines cannot be reloaded.
+        return ticket;
+      }
+    },
+    []
+  );
 
   const printTicket = useCallback(
-    async (ticket: KdsTicket, stations: StationRoute[] = []) => {
-      const enriched = await ticketWithModifiers(ticket);
+    async (
+      ticket: KdsTicket,
+      stations: StationRoute[] = [],
+      orderLines?: SalesOrderLine[]
+    ) => {
+      const enriched = await ticketWithDetails(ticket, orderLines);
       const stationId = enriched.stationId || enriched.station?.id;
       const listed = stationId
         ? stations.find((station) => station.id === stationId)
@@ -626,7 +636,7 @@ export function usePrinterConnection(
         station ? [station] : []
       );
     },
-    [printKitchen, tenantId, ticketWithModifiers]
+    [printKitchen, tenantId, ticketWithDetails]
   );
 
   return {

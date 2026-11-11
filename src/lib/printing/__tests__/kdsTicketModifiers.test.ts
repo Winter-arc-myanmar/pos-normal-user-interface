@@ -46,6 +46,21 @@ describe("KDS ticket modifiers", () => {
     expect(formatKdsTicket(enriched)).toContain("+ Oat milk");
   });
 
+  it("names the item with its variant from the order line", () => {
+    const current = ticket();
+    const named = new SalesOrderLine({
+      id: "line-1",
+      productName: "Coffee",
+      variantName: "Large",
+    });
+
+    const enriched = applyKdsTicketModifiers(current, [named]);
+
+    expect(enriched.kdsTicketLines?.[0].productName).toBe("Coffee (Large)");
+    expect(enriched.lines?.[0].name).toBe("Coffee (Large)");
+    expect(formatKdsTicket(enriched)).toContain("COFFEE (LARGE)");
+  });
+
   it("keeps modifiers the ticket already has", () => {
     const current = ticket();
     current.kdsTicketLines![0].kitchenModifiers = "No sugar";
