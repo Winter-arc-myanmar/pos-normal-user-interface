@@ -271,7 +271,7 @@ describe("usePrinterConnection station routing", () => {
     ]);
   });
 
-  it("reports a line no station carries instead of printing it somewhere else", async () => {
+  it("prints a line no station carries on the till's own printer, once", async () => {
     const { result } = renderConnection();
     await waitFor(() => expect(result.current.isConnected).toBe(true));
 
@@ -286,10 +286,13 @@ describe("usePrinterConnection station routing", () => {
       );
     });
 
-    // The drink station carries "salad" only. Printing the coffee on it would send
-    // a drink to the wrong counter, so the caller is told instead.
-    expect(mocks.printKitchen).not.toHaveBeenCalled();
+    // The drink station carries "salad" only. The coffee must not go to that
+    // station, but the kitchen still gets paper: it goes to the till's printer.
     expect(plan?.unrouted.map((line) => line.name)).toEqual(["Coffee"]);
+    expect(mocks.printKitchen).toHaveBeenCalledTimes(1);
+    const [binding, slip] = mocks.printKitchen.mock.calls[0];
+    expect(binding.backendPrinterId).toBe("printer-drink");
+    expect(slip.lines.map((line: { name: string }) => line.name)).toEqual(["Coffee"]);
   });
 });
 
@@ -366,8 +369,9 @@ describe("usePrinterConnection station routing", () => {
     ]);
   });
 
-  it("reports an item no station carries instead of using the till's printer", async () => {
+  it("prints an item no station carries on the till's printer, not twice", async () => {
     bind("Beverage KDS", "printer-drinks", "10.4.0.9");
+    bind("Chinese KDS", "printer-chinese", "10.4.0.8");
     mocks.listStations.mockResolvedValue({
       stations: [
         {
@@ -375,6 +379,12 @@ describe("usePrinterConnection station routing", () => {
           name: "Beverage KDS",
           printerIds: ["printer-drinks"],
           routingRules: { categoryIds: ["cat-drinks"] },
+        },
+        {
+          id: "st-chinese",
+          name: "Chinese KDS",
+          printerIds: ["printer-chinese"],
+          routingRules: { categoryIds: ["cat-chinese"] },
         },
       ],
     });
@@ -396,10 +406,17 @@ describe("usePrinterConnection station routing", () => {
       });
     });
 
-    // No fallback to the till's own printer: the kitchen is told what did not route.
-    expect(mocks.printKitchen).not.toHaveBeenCalled();
-    expect(plan?.jobs).toEqual([]);
+    // Neither category is on a station, so the room's order still has to reach
+    // paper: it goes to the till's own printer once - not to both station printers.
     expect(plan?.unrouted.map((item) => item.name)).toEqual(["Rice", "Mystery"]);
+    expect(mocks.printKitchen).toHaveBeenCalledTimes(1);
+    const [binding, slip] = mocks.printKitchen.mock.calls[0];
+    expect(binding.displayName).toBe("Beverage KDS");
+    expect(slip.lines.map((line: { name: string }) => line.name)).toEqual([
+      "Rice",
+      "Mystery",
+    ]);
+  });
   });
 });
 

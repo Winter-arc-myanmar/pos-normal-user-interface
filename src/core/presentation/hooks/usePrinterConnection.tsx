@@ -449,25 +449,27 @@ export function usePrinterConnection(
         routes,
         options
       );
-      const lines = slip.lines || [];
-      // Without stations the ticket can only go to the till's own printer, which is
-      // fine: a single-printer venue prints everything there. With stations set up,
-      // an item that matches none of them must NOT fall back to that printer - it
-      // belongs to another station, and falling back is how a room's rice came out
-      // at the bar. Those lines are returned unrouted so the caller can say so.
-      let jobs: PrinterJob[] = plan.jobs;
-      const stationRouting = options.requireStationRouting || routes.length > 0;
-      if (!stationRouting && !jobs.length && lines.length) {
+      // Every item still has to reach paper. An item whose category a station
+      // carries prints at that station; one whose category no station carries
+      // prints on the single printer this till falls back to - not on every
+      // station's printer (which is how a room's rice and beer both came out
+      // twice), and never nowhere. A caller that insists on station routing (the
+      // cashier) gets those lines reported instead.
+      const jobs: PrinterJob[] = plan.jobs.map((job) => ({
+        ...job,
+        lines: [...job.lines],
+      }));
+      if (!options.requireStationRouting && plan.unrouted.length) {
         const kds = await bindingsWithSectors();
-        const localTargets = resolveBindingsForPlace(
-          kds.bindings,
-          kds.defaultBinding,
-          "KDS"
-        );
-        const targets = localTargets.length
-          ? localTargets
-          : await backendTargets("KDS");
-        jobs = targets.map((binding) => ({ binding, lines }));
+        const fallback =
+          kds.defaultBinding ||
+          resolveBindingsForPlace(kds.bindings, kds.defaultBinding, "KDS")[0] ||
+          (await backendTargets("KDS"))[0];
+        if (fallback) {
+          const existing = jobs.find((job) => job.binding.id === fallback.id);
+          if (existing) existing.lines.push(...plan.unrouted);
+          else jobs.push({ binding: fallback, lines: [...plan.unrouted] });
+        }
       }
 
       const failures: string[] = [];
