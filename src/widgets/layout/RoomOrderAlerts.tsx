@@ -66,13 +66,7 @@ export function RoomOrderAlerts({
             if (plan.unrouted.length) {
               setError(
                 t("roomOrders.unrouted", {
-                  items: plan.unrouted
-                    .map((item) =>
-                      item.categoryName || item.categoryId
-                        ? `${item.name} (${item.categoryName || item.categoryId})`
-                        : `${item.name} (${t("roomOrders.noCategory")})`
-                    )
-                    .join(", "),
+                  items: plan.unrouted.map((item) => item.name).join(", "),
                 })
               );
             } else if (plan.missingPrinterRoutes.length) {
