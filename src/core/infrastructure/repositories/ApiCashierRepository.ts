@@ -73,6 +73,8 @@ import {
 import { HttpClient } from "../api/HttpClient";
 import { API_ENDPOINTS, resolveMediaUrl } from "../api/constants";
 import { parseCashier } from "@/lib/printing/cashier";
+import { firstModifierPrintText } from "@/lib/printing/modifierText";
+import { variantOptionsName, withVariant } from "@/lib/pos/orderListDisplay";
 
 /**
  * A bill's lines are read whole. The lines endpoint pages at 10 when a request
@@ -447,6 +449,26 @@ const nestedAsName = (value: unknown, keys: string[]): string | undefined => {
 };
 
 /**
+ * The variant a sold or ticket line was rung up as: the name it carries, else
+ * the options the server keeps under `matrixOptions` ("Large / Black"), else
+ * its SKU. Empty when the item has no variant to name.
+ */
+const lineVariantLabel = (row: Record<string, unknown>) => {
+  const salesOrderLine = asRecord(row.salesOrderLine);
+  const variant = asRecord(row.variant) || asRecord(salesOrderLine?.variant);
+  return variantOptionsName({
+    variantName:
+      asName(row.variantName) ||
+      nestedAsName(variant, ["name", "variantName"]) ||
+      nestedAsName(salesOrderLine, ["variantName"]),
+    matrixOptions:
+      asRecord(variant?.matrixOptions) ||
+      asRecord(row.matrixOptions) ||
+      asRecord(salesOrderLine?.matrixOptions),
+  });
+};
+
+/**
  * What an order line's item is called, wherever the API puts it: on the line, or
  * on the product and variant it belongs to. Without these names the till has to
  * look the variant up in the menu it happens to have loaded, so a line read back
@@ -462,9 +484,7 @@ const readSalesOrderLineNames = (item: Record<string, unknown>) => {
       asName(item.name) ||
       nestedAsName(product, ["name", "productName"]) ||
       nestedAsName(variant?.product, ["name"]),
-    variantName:
-      asName(item.variantName) ||
-      nestedAsName(variant, ["name", "variantName", "variantSku"]),
+    variantName: lineVariantLabel(item) || undefined,
     sku:
       asName(item.sku) ||
       asName(item.variantSku) ||
@@ -496,6 +516,20 @@ const readLineModifiers = (
   return record && Object.keys(record).length ? record : undefined;
 };
 
+/**
+ * A sold line's options, wherever the API keeps them: on the row itself or on
+ * the order line it was joined with. The first field that names a choice wins.
+ */
+const readLineModifierChoices = (row: Record<string, unknown>) => {
+  const orderLine = asRecord(row.salesOrderLine);
+  return (
+    readLineModifiers(row.selectedModifiers) ??
+    readLineModifiers(row.modifiers) ??
+    readLineModifiers(orderLine?.selectedModifiers) ??
+    readLineModifiers(orderLine?.modifiers)
+  );
+};
+
 /** The category a sold line was routed by, wherever the API puts it. */
 const readLineCategoryId = (row: Record<string, unknown>) => {
   const salesOrderLine = asRecord(row.salesOrderLine);
@@ -523,17 +557,44 @@ const ticketLineOrderedBy = (row: Record<string, unknown>) => {
   return name ? String(name) : undefined;
 };
 
+/**
+ * The options a ticket line prints. The ticket may carry its own
+ * `kitchenModifiers`, or leave them on the sales order line it was cut from
+ * (the array this till posts, or an object keyed by modifier). Every slip reads
+ * them here, so the KDS screen and the paper show what the guest chose.
+ */
+const ticketLineModifiers = (row: Record<string, unknown>) => {
+  const orderLine = asRecord(row.salesOrderLine);
+  const printed = firstModifierPrintText([
+    row.kitchenModifiers,
+    row.selectedModifiers,
+    row.modifiers,
+    orderLine?.selectedModifiers,
+    orderLine?.modifiers,
+  ]);
+  const sentPrices =
+    typeof row.modifierPrices === "string" && row.modifierPrices.trim()
+      ? row.modifierPrices.trim()
+      : undefined;
+  const prices = sentPrices || printed.prices;
+  return {
+    modifiers: printed.names,
+    ...(prices ? { modifierPrices: prices } : {}),
+  };
+};
+
+/** An item named with its variant, as the kitchen slip prints it. */
+const ticketLineItemName = (row: Record<string, unknown>) =>
+  withVariant(ticketLineName(row), lineVariantLabel(row));
+
 const mapTicketLine = (entry: unknown) => {
   const row = asRecord(entry);
   if (!row) return null;
-  const modifiers = row.kitchenModifiers
-    ? String(row.kitchenModifiers)
-    : undefined;
   return {
-    name: ticketLineName(row),
+    name: ticketLineItemName(row),
     quantity: String(row.quantity || "1"),
     categoryId: readLineCategoryId(row),
-    modifiers,
+    ...ticketLineModifiers(row),
     orderedBy: ticketLineOrderedBy(row),
     note: ticketLineNote(row),
   };
@@ -608,7 +669,7 @@ const toCounterOrderLine = (value: unknown) => {
     voidReasonId: item.voidReasonId ? String(item.voidReasonId) : undefined,
     compReasonId: item.compReasonId ? String(item.compReasonId) : undefined,
     courseType: item.courseType ? String(item.courseType) : undefined,
-    selectedModifiers: asRecord(item.selectedModifiers),
+    selectedModifiers: readLineModifierChoices(item),
     seatNumber: toNumber(item.seatNumber),
     createdAt: item.createdAt ? String(item.createdAt) : undefined,
     updatedAt: item.updatedAt ? String(item.updatedAt) : undefined,
@@ -676,19 +737,16 @@ const toKdsTicket = (item: Record<string, unknown>) => {
     kdsTicketLines: Array.isArray(item.kdsTicketLines)
       ? item.kdsTicketLines.map((value) => {
           const line = asRecord(value) || {};
+          const modifiers = ticketLineModifiers(line);
           return new KdsTicketLine({
             id: String(line.id || ""),
             ticketId: String(line.ticketId || ""),
             salesOrderLineId: String(line.salesOrderLineId || ""),
-            productName: String(line.productName || ""),
+            productName: ticketLineItemName(line),
             quantity: String(line.quantity || "0.0000"),
             seatNumber: toNumber(line.seatNumber),
-            kitchenModifiers: line.kitchenModifiers
-              ? String(line.kitchenModifiers)
-              : undefined,
-            modifierPrices: line.modifierPrices
-              ? String(line.modifierPrices)
-              : undefined,
+            kitchenModifiers: modifiers.modifiers,
+            modifierPrices: modifiers.modifierPrices,
             orderedBy: ticketLineOrderedBy(line),
             note: ticketLineNote(line),
             status: String(line.status || "PENDING"),
@@ -1545,7 +1603,7 @@ export class ApiCashierRepository implements ICashierRepository {
         voidReasonId: item.voidReasonId ? String(item.voidReasonId) : undefined,
         compReasonId: item.compReasonId ? String(item.compReasonId) : undefined,
         courseType: item.courseType ? String(item.courseType) : undefined,
-        selectedModifiers: readLineModifiers(item.selectedModifiers),
+        selectedModifiers: readLineModifierChoices(item),
         seatNumber: typeof item.seatNumber === "number" ? item.seatNumber : undefined,
         createdAt: item.createdAt ? String(item.createdAt) : undefined,
         updatedAt: item.updatedAt ? String(item.updatedAt) : undefined,

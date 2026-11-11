@@ -186,14 +186,22 @@ export function KdsPage() {
                         </div>
                         <ul className="mt-3 space-y-1">
                           {(ticket.kdsTicketLines?.length
-                            ? ticket.kdsTicketLines.map((line) => ({
-                                key: line.id,
-                                name: line.productName,
-                                quantity: line.quantity,
-                                modifiers: withOrderedBy(line.kitchenModifiers, line.orderedBy),
-                                note: line.note,
-                                seat: line.seatNumber,
-                              }))
+                            ? ticket.kdsTicketLines.map((line, index) => {
+                                // The options can sit on the ticket line or on the
+                                // printed lines beside it; show whichever has them.
+                                const printed = ticket.lines?.[index];
+                                return {
+                                  key: line.id,
+                                  name: line.productName,
+                                  quantity: line.quantity,
+                                  modifiers: withOrderedBy(
+                                    line.kitchenModifiers || printed?.modifiers,
+                                    line.orderedBy || printed?.orderedBy
+                                  ),
+                                  note: line.note || printed?.note,
+                                  seat: line.seatNumber,
+                                };
+                              })
                             : (ticket.lines || []).map((line, index) => ({
                                 key: `${ticket.id}-${index}`,
                                 name: line.name,

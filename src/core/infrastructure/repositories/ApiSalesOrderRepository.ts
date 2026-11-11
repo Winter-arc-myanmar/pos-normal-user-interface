@@ -24,6 +24,7 @@ import { SalesOrder, SalesOrderLine, SalesOrderPlace } from "../../domain/entiti
 import { HttpClient } from "../api/HttpClient";
 import { API_ENDPOINTS } from "../api/constants";
 import { parseCashier } from "@/lib/printing/cashier";
+import { variantOptionsName } from "@/lib/pos/orderListDisplay";
 
 /**
  * An order's lines are read whole. The lines endpoint pages at 10 when a request
@@ -143,7 +144,13 @@ const resolveLineCatalog = (item: Record<string, unknown>) => {
       nestedName(variant?.product, ["name"]),
     variantName:
       asHumanName(item.variantName) ||
-      nestedName(variant, ["name", "variantName", "variantSku"]),
+      variantOptionsName({
+        // The saved variant's name, else the options it was sold as.
+        variantName: nestedName(variant, ["name", "variantName", "variantSku"]),
+        matrixOptions:
+          asRecord(variant?.matrixOptions) || asRecord(item.matrixOptions),
+      }) ||
+      undefined,
     sku:
       asHumanName(item.sku) ||
       asHumanName(item.variantSku) ||

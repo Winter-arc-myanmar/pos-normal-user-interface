@@ -62,6 +62,62 @@ describe("KDS ticket modifiers", () => {
 
     expect(applyKdsTicketModifiers(current, [otherLine])).toBe(current);
   });
+
+  it("matches a ticket line that prints with its variant", () => {
+    const current = new KdsTicket({
+      id: "ticket-2",
+      salesOrderId: "order-1",
+      kdsTicketLines: [
+        new KdsTicketLine({
+          id: "ticket-line-2",
+          productName: "Coffee (Large)",
+          quantity: "1",
+          status: "PENDING",
+        }),
+      ],
+    });
+    const named = new SalesOrderLine({
+      id: "line-9",
+      productName: "Coffee",
+      variantName: "Large",
+      quantity: "1.0000",
+      selectedModifiers: [
+        { modifierId: "mod-1", name: "Oat milk", priceDelta: "1.5000" },
+      ],
+    });
+
+    const enriched = applyKdsTicketModifiers(current, [named]);
+
+    expect(enriched.kdsTicketLines?.[0].kitchenModifiers).toBe("Oat milk");
+    expect(enriched.kdsTicketLines?.[0].modifierPrices).toBe("1.5000");
+  });
+
+  it("fills a ticket that arrived with printed lines only", () => {
+    const current = new KdsTicket({
+      id: "ticket-3",
+      salesOrderId: "order-1",
+      lines: [{ name: "Coffee (Large)", quantity: "1", categoryId: "cat-drinks" }],
+    });
+    const named = new SalesOrderLine({
+      id: "line-9",
+      productName: "Coffee",
+      variantName: "Large",
+      quantity: "1.0000",
+      selectedModifiers: [
+        { modifierId: "mod-1", name: "Oat milk", priceDelta: "1.5000" },
+      ],
+    });
+
+    const enriched = applyKdsTicketModifiers(current, [named]);
+
+    expect(enriched.lines?.[0]).toMatchObject({
+      name: "Coffee (Large)",
+      categoryId: "cat-drinks",
+      modifiers: "Oat milk",
+      modifierPrices: "1.5000",
+    });
+    expect(formatKdsTicket(enriched)).toContain("+ Oat milk");
+  });
 });
 
 describe("KDS ticket lady name", () => {

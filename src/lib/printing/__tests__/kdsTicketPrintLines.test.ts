@@ -29,6 +29,26 @@ describe("kdsTicketPrintLines", () => {
     expect(kdsTicketPrintLines(ticket)[0].modifiers).toBe("Snow");
   });
 
+  it("prints the ticket line's options when the print line lacks them", () => {
+    const ticket = new KdsTicket({
+      kdsTicketLines: [
+        new KdsTicketLine({
+          productName: "Coffee (Large)",
+          quantity: "1",
+          kitchenModifiers: "Oat milk",
+          modifierPrices: "1.5000",
+        }),
+      ],
+      lines: [{ name: "Coffee (Large)", quantity: "1" }],
+    });
+
+    expect(kdsTicketPrintLines(ticket)[0]).toMatchObject({
+      name: "Coffee (Large)",
+      modifiers: "Oat milk",
+      modifierPrices: "1.5000",
+    });
+  });
+
   it("prints the note for the kitchen as the line's remark", () => {
     const ticket = new KdsTicket({
       kdsTicketLines: [new KdsTicketLine({ productName: "Soda", quantity: "1", note: "No ice" })],

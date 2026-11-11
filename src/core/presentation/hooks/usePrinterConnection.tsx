@@ -575,9 +575,9 @@ export function usePrinterConnection(
   );
 
   const ticketWithModifiers = useCallback(async (ticket: KdsTicket) => {
-    const missing = ticket.kdsTicketLines?.some(
-      (line) => !line.kitchenModifiers?.trim()
-    );
+    const missing =
+      ticket.kdsTicketLines?.some((line) => !line.kitchenModifiers?.trim()) ||
+      ticket.lines?.some((line) => !line.modifiers?.trim());
     if (!missing || !ticket.salesOrderId) return ticket;
     try {
       const service = container.resolve<ISalesOrderService>("salesOrderService");
