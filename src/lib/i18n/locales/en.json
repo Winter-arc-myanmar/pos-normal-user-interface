@@ -903,7 +903,7 @@
     "table": "Table",
     "sessionState": "Session",
     "payNow": "Pay",
-    "printFinance": "Print finance copy",
+    "printFinance": "Print Bill",
     "confirmPay": "Confirm pay",
     "pickupOrder": "Mark Pickup",
     "emptySelection": "Select an order tile or create a new one.",
