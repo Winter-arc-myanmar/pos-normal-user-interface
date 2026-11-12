@@ -14,11 +14,13 @@ import { PrinterSettingsPanel } from "./settings/PrinterSettingsPanel";
 import { PrintTemplateSettingsPanel } from "./settings/PrintTemplateSettingsPanel";
 import { KdsStationSettingsPanel } from "./settings/KdsStationSettingsPanel";
 import { ShiftSettingsPanel } from "./settings/ShiftSettingsPanel";
+import { ProfileSettingsPanel } from "./settings/ProfileSettingsPanel";
 import { CloseShiftDialog } from "@/components/shift/CloseShiftDialog";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
 
 type SettingsTab =
   | "cashier"
+  | "profile"
   | "devices"
   | "printer"
   | "print-template"
@@ -29,6 +31,7 @@ type SettingsTab =
 
 const tabIds: SettingsTab[] = [
   // "cashier",
+  "profile",
   "shift",
   "devices",
   "printer",
@@ -96,6 +99,7 @@ export function PosSettingsPage() {
     () =>
       ({
         cashier: t("settings.tabs.cashier"),
+        profile: t("settings.tabs.profile"),
         devices: t("settings.tabs.devices"),
         printer: t("settings.tabs.printer"),
         "print-template": t("settings.tabs.printTemplate"),
@@ -236,6 +240,12 @@ export function PosSettingsPage() {
         ) : null}
 
         {activeTab === "shift" ? <ShiftSettingsPanel /> : null}
+
+        {activeTab === "profile" ? (
+          <div className="mx-auto max-w-2xl">
+            <ProfileSettingsPanel />
+          </div>
+        ) : null}
 
         {activeTab === "devices" ? <DevicesSettingsPanel /> : null}
 

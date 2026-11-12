@@ -502,8 +502,9 @@
     }
   },
   "settings": {
-    "profileLabel": "Open settings",
+    "profileLabel": "Open profile",
     "tabs": {
+      "profile": "Profile",
       "cashier": "Cashier Settings",
       "devices": "Devices & IP",
       "printer": "Printer",
@@ -812,6 +813,24 @@
       "receiptHeader": "Receipt header",
       "receiptHeaderPlaceholder": "Store name and address",
       "hint": "Terminal details will bind to the active POS session when connected."
+    },
+    "profile": {
+      "title": "Profile",
+      "name": "Name",
+      "loginId": "User ID",
+      "role": "Role",
+      "roleAdmin": "Admin",
+      "roleStaff": "Staff",
+      "passwordTitle": "Change password",
+      "passwordHint": "Your current password must be right. The new password is {{min}} to {{max}} characters long and must differ from the current one.",
+      "currentPassword": "Current password",
+      "newPassword": "New password",
+      "confirmPassword": "Confirm new password",
+      "submit": "Change password",
+      "saving": "Saving…",
+      "saved": "Password changed.",
+      "fillAll": "Fill in your current password and the new one twice.",
+      "mismatch": "The two new passwords do not match."
     },
     "logout": {
       "title": "Sign out",

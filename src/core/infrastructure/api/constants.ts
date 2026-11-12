@@ -40,6 +40,7 @@ export const API_ENDPOINTS = {
     SESSION: "/api/v1/auth/session",
     PING: "/api/v1/auth/ping",
     SET_ACTIVE_BRANCH: "/api/v1/auth/set-active-branch",
+    CHANGE_PASSWORD: "/api/v1/auth/change-password",
     APPROVE: "/api/v1/auth/approve",
   },
 

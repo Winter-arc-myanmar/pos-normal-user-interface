@@ -2,9 +2,14 @@ import { User } from "../../domain/entities/User";
 import { IAuthService } from "../../domain/services/IAuthService";
 import { IAuthRepository } from "../../domain/repositories/IAuthRepository";
 import {
+  ChangePasswordRequestDTO,
   LoginInputDTO,
   SetActiveBranchRequestDTO,
 } from "../dtos/AuthDTO";
+
+/** The backend accepts new passwords of 8 to 20 characters. */
+export const PASSWORD_MIN_LENGTH = 8;
+export const PASSWORD_MAX_LENGTH = 20;
 
 /**
  * Auth Service implementation
@@ -59,6 +64,48 @@ export class AuthService implements IAuthService {
     });
 
     return result.user;
+  }
+
+  /**
+   * Change the signed-in person's own password. The rules mirror the backend:
+   * the current password is required, and the new one is 8 to 20 characters and
+   * must differ from the current one. A wrong current password comes back as a
+   * validation error (400) — it must never look like a lapsed session.
+   */
+  async changePassword(payload: ChangePasswordRequestDTO): Promise<void> {
+    const currentPassword = payload.currentPassword || "";
+    const newPassword = payload.newPassword || "";
+
+    if (!currentPassword) {
+      throw new Error("Enter your current password.");
+    }
+    if (
+      newPassword.length < PASSWORD_MIN_LENGTH ||
+      newPassword.length > PASSWORD_MAX_LENGTH
+    ) {
+      throw new Error(
+        `The new password must be ${PASSWORD_MIN_LENGTH} to ${PASSWORD_MAX_LENGTH} characters long.`
+      );
+    }
+    if (newPassword === currentPassword) {
+      throw new Error("The new password must be different from the current one.");
+    }
+
+    try {
+      const changed = await this.authRepository.changePassword({
+        currentPassword,
+        newPassword,
+      });
+      if (!changed) {
+        throw new Error("The password was not changed. Please try again.");
+      }
+    } catch (error) {
+      console.error("Change password failed:", error);
+      if (error instanceof Error && error.message) {
+        throw error;
+      }
+      throw new Error("Unable to change the password. Please try again.");
+    }
   }
 
   /**

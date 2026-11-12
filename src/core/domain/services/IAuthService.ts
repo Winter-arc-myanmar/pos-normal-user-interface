@@ -1,5 +1,6 @@
 import { User } from "../entities/User";
 import {
+  ChangePasswordRequestDTO,
   LoginInputDTO,
   SetActiveBranchRequestDTO,
 } from "../../application/dtos/AuthDTO";
@@ -17,6 +18,12 @@ export interface IAuthService {
    * Switch active branch and refresh auth session token.
    */
   setActiveBranch(payload: SetActiveBranchRequestDTO): Promise<User>;
+
+  /**
+   * Change the signed-in person's own password (8 to 20 characters, different
+   * from the current one). A wrong current password is a validation error.
+   */
+  changePassword(payload: ChangePasswordRequestDTO): Promise<void>;
 
   /**
    * Logout the current user

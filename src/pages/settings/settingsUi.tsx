@@ -99,6 +99,9 @@ type FieldProps = {
   onChange: (value: string) => void;
   placeholder?: string;
   type?: string;
+  name?: string;
+  autoComplete?: string;
+  maxLength?: number;
 };
 
 const fieldClass =
@@ -110,12 +113,18 @@ export function SettingsField({
   onChange,
   placeholder,
   type = "text",
+  name,
+  autoComplete,
+  maxLength,
 }: FieldProps) {
   return (
     <label className="block text-sm text-slate-600">
       {label}
       <input
         type={type}
+        name={name}
+        autoComplete={autoComplete}
+        maxLength={maxLength}
         className={fieldClass}
         value={value}
         placeholder={placeholder}
