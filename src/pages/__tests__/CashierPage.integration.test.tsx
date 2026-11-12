@@ -1082,6 +1082,35 @@ describe("CashierPage integration", () => {
     );
   });
 
+  it("prints selected modifiers on the paid receipt", async () => {
+    selectedOrderLinesState = [
+      {
+        ...orderLine,
+        selectedModifiers: {
+          "modifier-1": { modifierId: "modifier-1", name: "Oat milk", priceDelta: "1.5000" },
+        },
+      },
+    ];
+
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=pay"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "cashier.payment.printBillOnConfirm" })
+    );
+    fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+
+    await waitFor(() => expect(mocks.printReceipt).toHaveBeenCalled());
+    const slip = mocks.printReceipt.mock.calls[0][0] as {
+      lines: Array<Record<string, unknown>>;
+    };
+    expect(slip.lines[0].modifiers).toBe("Oat milk");
+    expect(slip.lines[0].modifierPrices).toBe("1.5000");
+  });
+
   it("syncs totals and connects checkout, KDS, and pickup actions", async () => {
     render(
       <MemoryRouter initialEntries={["/cashier?view=pay"]}>

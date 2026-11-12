@@ -24,6 +24,17 @@ export interface KitchenPrintPlan {
   }>;
 }
 
+/** A kitchen ticket whose station has no printer this device can reach. */
+export class NoKitchenPrinterError extends Error {
+  constructor(
+    readonly stations: string[],
+    readonly items: string[]
+  ) {
+    super(`No printer is connected for ${stations.join(", ")}`);
+    this.name = "NoKitchenPrinterError";
+  }
+}
+
 export interface KitchenRoutingOptions {
   requireStationRouting?: boolean;
 }
@@ -158,8 +169,12 @@ export function groupKitchenJobs(
           ],
         };
       }
+      const printers = stationBindings.filter(
+        (binding, index) =>
+          stationBindings.findIndex((other) => other.id === binding.id) === index
+      );
       return {
-        jobs: stationBindings.map((binding) => ({ binding, lines, station })),
+        jobs: printers.map((binding) => ({ binding, lines, station })),
         unrouted: [],
         missingPrinterRoutes: missingPrinterIds.length
           ? [

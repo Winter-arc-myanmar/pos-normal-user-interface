@@ -428,6 +428,93 @@ describe("ApiCashierRepository", () => {
     );
   });
 
+  it("keeps the options a table session line was added with", async () => {
+    const post = vi.fn().mockResolvedValue({
+      success: true,
+      data: {
+        id: "line-1",
+        salesOrderId: "order-1",
+        variantId: "variant-1",
+        quantity: 1,
+        unitPrice: 10,
+      },
+    });
+    const repository = new ApiCashierRepository({
+      post,
+    } as unknown as HttpClient);
+
+    const line = await repository.addTableSessionLine("session-1", {
+      variantId: "variant-1",
+      quantity: "1.0000",
+      unitPrice: "10.0000",
+      selectedModifiers: [
+        { modifierId: "mod-1", name: "Oat milk", priceDelta: "1.5000" },
+      ],
+    });
+
+    // The till keeps this line as the bill's line, and the slip prints the
+    // options the guest chose from it.
+    expect(line.selectedModifiers).toEqual([
+      { modifierId: "mod-1", name: "Oat milk", priceDelta: "1.5000" },
+    ]);
+  });
+
+  it("reads the options a created line answers with", async () => {
+    const post = vi.fn().mockResolvedValue({
+      success: true,
+      data: {
+        id: "line-1",
+        salesOrderId: "order-2",
+        variantId: "variant-1",
+        quantity: "1.0000",
+        unitPrice: "10.0000",
+        selectedModifiers: [
+          { modifierId: "mod-2", name: "Extra honey", priceDelta: "2.0000" },
+        ],
+      },
+    });
+    const repository = new ApiCashierRepository({
+      post,
+    } as unknown as HttpClient);
+
+    const line = await repository.addSalesOrderLine("order-2", {
+      variantId: "variant-1",
+      quantity: "1.0000",
+      unitPrice: "10.0000",
+    });
+
+    expect(line.selectedModifiers).toEqual([
+      { modifierId: "mod-2", name: "Extra honey", priceDelta: "2.0000" },
+    ]);
+  });
+
+  it("keeps the options a changed line was sent with", async () => {
+    const patch = vi.fn().mockResolvedValue({
+      success: true,
+      data: {
+        id: "line-1",
+        salesOrderId: "order-1",
+        variantId: "variant-1",
+        quantity: "2.0000",
+        unitPrice: "10.0000",
+      },
+    });
+    const repository = new ApiCashierRepository({
+      patch,
+    } as unknown as HttpClient);
+
+    const line = await repository.updateSalesOrderLine("order-1", "line-1", {
+      quantity: "2.0000",
+      selectedModifiers: [
+        { modifierId: "mod-1", name: "No ice", priceDelta: "0.0000" },
+      ],
+    });
+
+    expect(line.selectedModifiers).toEqual([
+      { modifierId: "mod-1", name: "No ice", priceDelta: "0.0000" },
+    ]);
+  });
+
   it("supports pickup responses with and without an order body", async () => {
     const post = vi
       .fn()

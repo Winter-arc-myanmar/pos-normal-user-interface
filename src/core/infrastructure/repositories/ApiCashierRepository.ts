@@ -530,6 +530,19 @@ const readLineModifierChoices = (row: Record<string, unknown>) => {
   );
 };
 
+/**
+ * The options a line keeps after it is added or changed. The API answers with
+ * the line it saved; when that answer leaves `selectedModifiers` out, the ones
+ * this till sent are what the line holds. The till keeps the answer as the line
+ * on the bill, and the bill and its printed slip read the options from there, so
+ * an answer without them printed the item with no options at all.
+ */
+const savedLineModifiers = (
+  item: Record<string, unknown>,
+  payload?: { selectedModifiers?: unknown }
+) =>
+  readLineModifierChoices(item) ?? readLineModifiers(payload?.selectedModifiers);
+
 /** The category a sold line was routed by, wherever the API puts it. */
 const readLineCategoryId = (row: Record<string, unknown>) => {
   const salesOrderLine = asRecord(row.salesOrderLine);
@@ -1512,6 +1525,7 @@ export class ApiCashierRepository implements ICashierRepository {
         typeof item.seatNumber === "number" ? item.seatNumber : payload.seatNumber,
       createdAt: item.createdAt ? String(item.createdAt) : undefined,
       categoryId: readLineCategoryId(item),
+      selectedModifiers: savedLineModifiers(item, payload),
     });
   }
 
@@ -1543,6 +1557,7 @@ export class ApiCashierRepository implements ICashierRepository {
         typeof item.seatNumber === "number" ? item.seatNumber : payload.seatNumber,
       createdAt: item.createdAt ? String(item.createdAt) : undefined,
       categoryId: readLineCategoryId(item),
+      selectedModifiers: savedLineModifiers(item, payload),
     });
   }
 
@@ -1888,6 +1903,7 @@ export class ApiCashierRepository implements ICashierRepository {
         typeof item.seatNumber === "number" ? item.seatNumber : payload.seatNumber,
       categoryId: readLineCategoryId(item),
       note: item.note ? String(item.note) : payload.note || undefined,
+      selectedModifiers: savedLineModifiers(item, payload),
     });
   }
 
