@@ -9,6 +9,8 @@ import {
   AuthResultDTO,
   AuthSessionPayloadDTO,
   BranchAccessDTO,
+  ChangePasswordRequestDTO,
+  ChangePasswordResultDTO,
   SetActiveBranchRequestDTO,
   SignInRequestDTO,
 } from "../../application/dtos/AuthDTO";
@@ -77,6 +79,28 @@ export class ApiAuthRepository implements IAuthRepository {
 
       throw new Error(
         this.resolveApiErrorMessage(error, "Unable to switch branch")
+      );
+    }
+  }
+
+  /**
+   * Change the signed-in person's own password.
+   *
+   * A wrong current password is answered with 400, not 401, so this call never
+   * signs the device out — the message is passed straight to the caller.
+   */
+  async changePassword(payload: ChangePasswordRequestDTO): Promise<boolean> {
+    try {
+      const response = await this.httpClient.post<
+        ApiEnvelopeDTO<ChangePasswordResultDTO>
+      >(API_ENDPOINTS.AUTH.CHANGE_PASSWORD, payload);
+
+      return response?.data?.changed === true;
+    } catch (error: unknown) {
+      console.error("Error changing password:", error);
+
+      throw new Error(
+        this.resolveApiErrorMessage(error, "Unable to change the password")
       );
     }
   }

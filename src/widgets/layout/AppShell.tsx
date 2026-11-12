@@ -478,7 +478,7 @@ export function AppShell() {
       onNavigate={isNarrow ? closeMobileMenu : undefined}
       onNotificationsClick={() => navigate("/cashier?view=orders")}
       onPrinterClick={() => navigate("/settings/printer")}
-      onProfileClick={() => navigate("/settings/devices")}
+      onProfileClick={() => navigate("/settings/profile")}
     />
   );
 

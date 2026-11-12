@@ -25,6 +25,19 @@ export interface SetActiveBranchRequestDTO {
   branchId: string;
 }
 
+/**
+ * The signed-in person changes their own password. A wrong current password is
+ * a validation error (400), never a 401, so the device stays signed in.
+ */
+export interface ChangePasswordRequestDTO {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface ChangePasswordResultDTO {
+  changed: boolean;
+}
+
 export interface AuthSessionUserDTO {
   id: string;
   email?: string;
