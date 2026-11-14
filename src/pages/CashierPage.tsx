@@ -89,6 +89,7 @@ import {
 } from "@/lib/pos/tableSession";
 import {
   clearTableOrderIds,
+  countTableOrders,
   mergeTableOrderIds,
   readTableOrderIds,
   writeTableOrderIds,
@@ -257,6 +258,7 @@ export function CashierPage() {
   const [billGeneration, setBillGeneration] = useState(0);
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
   const confirmingPaymentRef = useRef(false);
+  const tableTapRef = useRef(false);
   const [printBillOnConfirm, setPrintBillOnConfirm] = useState(readPrintBillOnConfirm);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const paymentInputRef = useRef<HTMLInputElement>(null);
@@ -1446,24 +1448,42 @@ export function CashierPage() {
     );
   }, []);
 
+  const closedTableOrderIds = useMemo(
+    () =>
+      new Set(
+        tableSessions
+          .filter((session) => !isOpenTableSession(session))
+          .map((session) => session.salesOrderId)
+          .filter((id): id is string => Boolean(id))
+      ),
+    [tableSessions]
+  );
+
   const bindOrdersToTable = useCallback(
     async (tableId: string, primaryOrderId: string) => {
-      const orderIds = mergeTableOrderIds(tableId, primaryOrderId);
+      const orderIds = mergeTableOrderIds(
+        tableId,
+        primaryOrderId,
+        [],
+        closedTableOrderIds
+      );
       setActiveTableId(tableId);
       setTableOrderIds(orderIds);
       setSelectedMergeOrderIds([]);
       await refreshMultiOrderLines(orderIds);
       return orderIds;
     },
-    [refreshMultiOrderLines]
+    [closedTableOrderIds, refreshMultiOrderLines]
   );
 
   const getTableOrderCount = useCallback(
-    (tableId: string) => {
-      if (tableId === activeTableId) return tableOrderIds.length;
-      return readTableOrderIds(tableId).length;
-    },
-    [activeTableId, tableOrderIds.length]
+    (tableId: string) =>
+      countTableOrders(
+        tableId === activeTableId ? tableOrderIds : readTableOrderIds(tableId),
+        findOpenTableSession(tableSessions, tableId)?.salesOrderId,
+        closedTableOrderIds
+      ),
+    [activeTableId, closedTableOrderIds, tableOrderIds, tableSessions]
   );
 
   const requiresTableAssignment =
@@ -1576,7 +1596,7 @@ export function CashierPage() {
     }
   };
 
-  const handleTableTap = async (tableId: string) => {
+  const openTappedTable = async (tableId: string) => {
     setLocalError(null);
     setNotice(null);
     const pendingLines = isDirectCheckoutMode ? [...directCartLines] : [];
@@ -1692,6 +1712,17 @@ export function CashierPage() {
           ? t("cashier.errors.tooManyRequests")
           : message || t("cashier.errors.openTable")
       );
+    }
+  };
+
+  // A second tap while a table is still opening would open it twice.
+  const handleTableTap = async (tableId: string) => {
+    if (tableTapRef.current) return;
+    tableTapRef.current = true;
+    try {
+      await openTappedTable(tableId);
+    } finally {
+      tableTapRef.current = false;
     }
   };
 

@@ -16,6 +16,8 @@ import {
   isDot,
   needsUnicodeRaster,
   rasterCommand,
+  textPairToImage,
+  textToImage,
 } from "../printImage";
 import { logoSize } from "../printLogo";
 
@@ -107,6 +109,48 @@ describe("printer dots", () => {
       expect(fillText).toHaveBeenCalledWith("5,000", 381, 17);
       expect(text).toContain(`${GS}v0\x00`);
       expect(text).not.toContain("ကြက်သားဟင်း");
+    } finally {
+      getContext.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("draws big Unicode text at the width the layout wrapped it to", () => {
+    vi.stubGlobal("CanvasRenderingContext2D", class CanvasRenderingContext2D {});
+    const scales: number[] = [];
+    const getContext = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue({
+        fillStyle: "",
+        textBaseline: "",
+        font: "",
+        fillRect: vi.fn(),
+        measureText: () => ({ width: 80 }),
+        save: vi.fn(),
+        scale: (x: number) => scales.push(x),
+        fillText: vi.fn(),
+        restore: vi.fn(),
+        getImageData: (_x: number, _y: number, width: number, height: number) => ({
+          data: new Uint8ClampedArray(width * height * 4).fill(255),
+        }),
+      } as unknown as CanvasRenderingContext2D);
+
+    try {
+      textToImage("ကြက်သားဟင်း", { width: 576, size: "tall" });
+      textToImage("ကြက်သားဟင်း", { width: 576, size: "wide" });
+      textToImage("ကြက်သားဟင်း", { width: 576, size: "huge" });
+
+      // Tall keeps every column, so its doubled font is squeezed back to the
+      // normal cell; wide halves the columns, so its normal font is stretched.
+      // Huge halves the columns too, and the doubled font already fills them -
+      // stretching it again drew an item name about twice the paper wide and
+      // printed the amount on top of it.
+      expect(scales).toEqual([0.5, 2, 1]);
+
+      // A pair that still cannot fit (a shaped glyph wider than its column) is
+      // squeezed rather than drawn over the amount.
+      textPairToImage("အမ်းလုံးအမ်းသားခေါက်ဆွဲ", "18,500", { width: 100, size: "huge" });
+      expect(scales[3]).toBeCloseTo(91 / 160, 5);
     } finally {
       getContext.mockRestore();
       vi.unstubAllGlobals();

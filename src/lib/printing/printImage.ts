@@ -138,6 +138,28 @@ export interface TextImageOptions {
 
 export type TextPairImageOptions = Omit<TextImageOptions, "align">;
 
+/**
+ * How wide one glyph is drawn against the column grid the slip is wrapped in.
+ *
+ * The canvas font already grows in both directions when the height doubles, so
+ * only the axis the font did not grow along is stretched - the same rule the
+ * browser print document's CSS uses:
+ *
+ *   tall (2H1W): every column, so the doubled font is squeezed back to 0.5
+ *   wide (1H2W): half the columns, so the normal font is stretched by 2
+ *   huge (2H2W): half the columns, which the doubled font already fills
+ *
+ * Stretching a huge row a second time drew it about twice the paper wide,
+ * which is why a long item name ran into the amount printed beside it.
+ */
+const horizontalScale = (size: TextImageOptions["size"]) => {
+  const doubledHeight = size === "tall" || size === "huge";
+  const doubledWidth = size === "wide" || size === "huge";
+  if (doubledHeight && !doubledWidth) return 0.5;
+  if (doubledWidth && !doubledHeight) return 2;
+  return 1;
+};
+
 /** ESC/POS code pages cannot shape Myanmar (or most other Unicode scripts). */
 export const needsUnicodeRaster = (text: string): boolean =>
   Array.from(text).some((char) => (char.codePointAt(0) || 0) > 0xff);
@@ -158,7 +180,6 @@ export function textToImage(
   }
   const canvas = document.createElement("canvas");
   const doubledHeight = options.size === "tall" || options.size === "huge";
-  const doubledWidth = options.size === "wide" || options.size === "huge";
   const fontSize = doubledHeight ? 42 : 22;
   const height = doubledHeight ? 58 : 34;
   canvas.width = options.width;
@@ -172,7 +193,7 @@ export function textToImage(
   context.textBaseline = "middle";
   context.font = `${options.bold ? 700 : 500} ${fontSize}px "Myanmar Text", "Noto Sans Myanmar", "Noto Sans", sans-serif`;
 
-  const scaleX = doubledWidth ? 2 : 1;
+  const scaleX = horizontalScale(options.size);
   const drawnWidth = context.measureText(text).width * scaleX;
   const padding = 3;
   const x =
@@ -212,7 +233,6 @@ export function textPairToImage(
   }
   const canvas = document.createElement("canvas");
   const doubledHeight = options.size === "tall" || options.size === "huge";
-  const doubledWidth = options.size === "wide" || options.size === "huge";
   const fontSize = doubledHeight ? 42 : 22;
   const height = doubledHeight ? 58 : 34;
   canvas.width = options.width;
@@ -226,8 +246,13 @@ export function textPairToImage(
   context.textBaseline = "middle";
   context.font = `${options.bold ? 700 : 500} ${fontSize}px "Myanmar Text", "Noto Sans Myanmar", "Noto Sans", sans-serif`;
 
-  const scaleX = doubledWidth ? 2 : 1;
   const padding = 3;
+  const measured = context.measureText(left).width + context.measureText(right).width;
+  // The layout wraps in columns, while a shaped Myanmar glyph can be wider than
+  // its column. If the finished pair still does not fit, squeeze it sideways so
+  // the amount is never drawn over the name.
+  const room = canvas.width - padding * 3;
+  const scaleX = Math.min(horizontalScale(options.size), room / Math.max(1, measured));
   context.save();
   context.scale(scaleX, 1);
   context.textAlign = "left";

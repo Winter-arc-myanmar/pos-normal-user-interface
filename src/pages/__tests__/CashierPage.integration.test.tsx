@@ -144,6 +144,8 @@ let selectedOrderLinesState: Array<
 let selectedOrderState: typeof order | null = order;
 let activeServiceTypeState = "TABLE";
 let salesOrdersState: Array<typeof order> = [order];
+let diningTablesState: Array<typeof table> = [table];
+let tableSessionsState: Array<typeof session> = [session];
 let productState = product;
 let venueSettingsState = {
   defaultTaxRate: null,
@@ -278,8 +280,8 @@ vi.mock("@/core/presentation/hooks/useCashier", () => ({
       { id: "credit", tenantId: "tenant-1", name: "House credit", kind: "CUSTOMER_CREDIT" },
     ],
     diningZones: [],
-    diningTables: [table],
-    tableSessions: [session],
+    diningTables: diningTablesState,
+    tableSessions: tableSessionsState,
     activeServiceType: activeServiceTypeState,
     setActiveServiceType: vi.fn(),
     activeLocationId: "location-1",
@@ -356,6 +358,9 @@ describe("CashierPage integration", () => {
     selectedOrderState = order;
     activeServiceTypeState = "TABLE";
     salesOrdersState = [order];
+    diningTablesState = [table];
+    tableSessionsState = [session];
+    sessionStorage.clear();
     mocks.getLatestSessionByTableId.mockReturnValue(session);
     productState = product;
     venueSettingsState = {
@@ -1584,6 +1589,80 @@ describe("CashierPage integration", () => {
         sessionState: "SERVED",
       });
     });
+  });
+
+  describe("table order count", () => {
+    const renderBoard = () =>
+      render(
+        <MemoryRouter initialEntries={["/cashier?view=orders"]}>
+          <CashierPage />
+        </MemoryRouter>
+      );
+    const paidSession = {
+      ...session,
+      id: "session-paid",
+      salesOrderId: "order-paid",
+      closedAt: "2026-08-28T12:00:00Z",
+      sessionState: "CLOSED",
+    };
+
+    it("shows two orders for a table's own second order", () => {
+      writeTableOrderIds("table-1", ["order-1", "order-2"]);
+      renderBoard();
+
+      expect(screen.getByText("cashier.multiOrder.orderCount")).toBeInTheDocument();
+    });
+
+    it("leaves out an order that was paid on another till", () => {
+      tableSessionsState = [session, paidSession];
+      writeTableOrderIds("table-1", ["order-1", "order-paid"]);
+      renderBoard();
+
+      expect(screen.queryByText("cashier.multiOrder.orderCount")).not.toBeInTheDocument();
+    });
+
+    it("ignores a list kept for earlier guests at the table", () => {
+      writeTableOrderIds("table-1", ["order-paid", "order-old-extra"]);
+      renderBoard();
+
+      expect(screen.queryByText("cashier.multiOrder.orderCount")).not.toBeInTheDocument();
+    });
+
+    it("shows no orders on a table the server has free", () => {
+      diningTablesState = [{ ...table, status: "AVAILABLE" }];
+      tableSessionsState = [paidSession];
+      writeTableOrderIds("table-1", ["order-paid", "order-2"]);
+      renderBoard();
+
+      expect(screen.queryByText("cashier.multiOrder.orderCount")).not.toBeInTheDocument();
+    });
+  });
+
+  it("opens a free table once when it is tapped twice", async () => {
+    diningTablesState = [{ ...table, status: "AVAILABLE" }];
+    tableSessionsState = [];
+    let finishOpen: (value: typeof session) => void = () => {};
+    mocks.openTableSession.mockImplementation(
+      () => new Promise((resolve) => (finishOpen = resolve))
+    );
+    render(
+      <MemoryRouter initialEntries={["/cashier?view=orders"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    const tile = screen.getByRole("button", { name: /^T1/ });
+    fireEvent.click(tile);
+    fireEvent.click(tile);
+
+    await waitFor(() => expect(mocks.openTableSession).toHaveBeenCalled());
+    finishOpen(session);
+    await waitFor(() => {
+      expect(
+        screen.getByPlaceholderText("cashier.productMenu.search")
+      ).toBeInTheDocument();
+    });
+    expect(mocks.openTableSession).toHaveBeenCalledTimes(1);
   });
 
   it("opens an occupied table's existing order instead of creating a session", async () => {
