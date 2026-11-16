@@ -8,6 +8,7 @@ import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnec
 import { useDateFormatter } from "@/lib/i18n/formatters";
 import {
   lineDisplayName,
+  linePrintName,
   variantOptionsName,
   withVariant,
 } from "@/lib/pos/orderListDisplay";
@@ -595,7 +596,9 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       const { line } = group.rows[0];
       const printed = name(
         line,
-        lineDisplayName(line) || line.productName || itemNames[line.variantId] || tr("item")
+        linePrintName(line, isFeeLine(line)) ||
+          itemNames[line.variantId] ||
+          tr("item")
       );
       if (group.rows.length > 1) return mergedRoomTimeLine(group, printed);
       const modifiers = printedExtras(line, withOrderedBy);

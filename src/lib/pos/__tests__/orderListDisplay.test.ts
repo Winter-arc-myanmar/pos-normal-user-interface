@@ -3,11 +3,13 @@ import {
   formatPosMoney,
   formatPosQuantity,
   lineDisplayName,
+  linePrintName,
   salesOrderServiceTypeKey,
   salesOrderStatusKey,
   variantDisplayName,
   withVariant,
   variantOptionsName,
+  variantPrintLabel,
 } from "../orderListDisplay";
 
 describe("orderListDisplay", () => {
@@ -75,5 +77,33 @@ describe("variants in item names", () => {
       "Large / Black"
     );
     expect(variantOptionsName({ matrixOptions: {} })).toBe("");
+  });
+});
+
+describe("a variant a shop has not named yet", () => {
+  it("prints its SKU where it has no name or options", () => {
+    expect(variantPrintLabel({ sku: "COFFEE-LARGE" })).toBe("COFFEE-LARGE");
+    expect(variantPrintLabel({ variantName: "Large", sku: "COFFEE-LARGE" })).toBe("Large");
+    expect(variantPrintLabel({ matrixOptions: { size: "Large" }, sku: "COFFEE-LARGE" })).toBe(
+      "Large"
+    );
+    expect(variantPrintLabel({})).toBe("");
+  });
+
+  it("names a printed line by that SKU, so two variants still read apart", () => {
+    expect(linePrintName({ productName: "Beer", variantName: "Large" })).toBe("Beer (Large)");
+    expect(linePrintName({ productName: "Beer", sku: "BEER-L" })).toBe("Beer (BEER-L)");
+    expect(linePrintName({ productName: "Beer", matrixOptions: { size: "Large" } })).toBe(
+      "Beer (Large)"
+    );
+    // An item with no variant prints as it always did.
+    expect(linePrintName({ productName: "Fried rice" })).toBe("Fried rice");
+    expect(linePrintName({ sku: "BEER-L" })).toBe("BEER-L");
+  });
+
+  it("prints an extra fee's own name, never the SKU the server made for it", () => {
+    expect(
+      linePrintName({ productName: "Paper bag", sku: "FEE-OTHER-SHOP-V1" }, true)
+    ).toBe("Paper bag");
   });
 });

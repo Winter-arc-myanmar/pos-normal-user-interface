@@ -106,7 +106,7 @@ import {
   remainingReceivable,
 } from "@/lib/pos/splitPayments";
 import { cashierLabel } from "@/lib/printing/cashier";
-import { variantOptionsName, withVariant } from "@/lib/pos/orderListDisplay";
+import { linePrintName } from "@/lib/pos/orderListDisplay";
 
 const BOARD_PAGE_SIZE = 15;
 const TABLE_STATUS_POLL_MS = 60_000;
@@ -731,6 +731,7 @@ export function CashierPage() {
       variantId: string;
       productName?: string;
       variantName?: string;
+      sku?: string;
       quantity?: string | number;
       unitPrice?: string;
       lineDiscount?: string;
@@ -767,13 +768,16 @@ export function CashierPage() {
           : withoutTax && line.taxInclusive && quantity > 0
             ? toMoney(Number(line.unitPrice || 0) - Number(line.taxAmount || 0) / quantity)
             : line.unitPrice?.trim();
-        const name = withVariant(
-          line.productName || product?.name || line.variantName || "Item",
-          variantOptionsName({
-            variantName: line.variantName,
-            matrixOptions: variant?.matrixOptions,
-          })
-        );
+        const name =
+          linePrintName(
+            {
+              productName: line.productName || product?.name,
+              variantName: line.variantName,
+              matrixOptions: variant?.matrixOptions,
+              sku: line.sku || variant?.variantSku,
+            },
+            isFeeLine(line)
+          ) || "Item";
         const note = notePrices && !givenAway
           ? linePriceNote(line.unitPrice, menuPriceFor(line))
           : undefined;
