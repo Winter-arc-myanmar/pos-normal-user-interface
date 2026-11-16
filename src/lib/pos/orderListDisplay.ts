@@ -95,6 +95,46 @@ export function lineDisplayName(line: {
   return "";
 }
 
+/**
+ * A variant's label on a slip: the name it was saved with, else the options it
+ * was sold as, else its SKU. Some shops have not named their variants yet, so
+ * the SKU is the only text that tells two of them apart on the paper.
+ */
+export function variantPrintLabel(variant: {
+  variantName?: string | null;
+  matrixOptions?: Record<string, unknown> | null;
+  sku?: string | null;
+}): string {
+  const label = variantOptionsName(variant);
+  if (label) return label;
+  return isHumanDisplayName(variant.sku) ? variant.sku.trim() : "";
+}
+
+/**
+ * The name an item prints under: the product with the variant it was sold as,
+ * "Beer (Large)", and the variant's SKU where the shop names none. An extra fee
+ * prints the name the cashier gave it, never the SKU the server made for it.
+ */
+export function linePrintName(
+  line: {
+    productName?: string;
+    variantName?: string;
+    sku?: string;
+    matrixOptions?: Record<string, unknown> | null;
+  },
+  isFee = false
+): string {
+  if (!isHumanDisplayName(line.productName)) return lineDisplayName(line);
+  return withVariant(
+    line.productName.trim(),
+    variantPrintLabel({
+      variantName: line.variantName,
+      matrixOptions: line.matrixOptions,
+      sku: isFee ? undefined : line.sku,
+    })
+  );
+}
+
 /** An order's lines by id, so a refund can show an item's name instead of its line id. */
 export function orderLineLabelsById(
   lines: Array<{

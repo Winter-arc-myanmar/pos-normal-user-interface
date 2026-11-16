@@ -51,7 +51,12 @@ const order = (over: Partial<SalesOrder> = {}) =>
     ...over,
   });
 
-const build = (o: SalesOrder, lines: SalesOrderLine[], showTax?: boolean) =>
+const build = (
+  o: SalesOrder,
+  lines: SalesOrderLine[],
+  showTax?: boolean,
+  isFeeLine: (line: { variantId: string }) => boolean = () => false
+) =>
   reprintSlip({
     showTax,
     order: o,
@@ -59,7 +64,7 @@ const build = (o: SalesOrder, lines: SalesOrderLine[], showTax?: boolean) =>
     outletName: "Yankin",
     cashier: "Ko Aung",
     hostessName: (id) => (id === "mya" ? "Mya" : undefined),
-    isFeeLine: () => false,
+    isFeeLine,
     formatDateTime: (iso) => `at ${iso}`,
     text,
   });
@@ -178,6 +183,26 @@ describe("reprintSlip", () => {
     expect(slip.lines.map((item) => [item.name, item.quantity, item.unitPrice])).toEqual([
       ["room (2h) (3:30 - 5:30)", "2", "40000.0000"],
       ["jager", "1", "3000.0000"],
+    ]);
+  });
+
+  it("prints a variant's SKU where the shop has not named the variant yet", () => {
+    const slip = build(
+      order(),
+      [
+        line("beer", { variantName: "Large" }),
+        line("water", { sku: "WATER-500" }),
+        line("bag", { productName: "Paper bag", sku: "FEE-OTHER-SHOP-V1" }),
+      ],
+      undefined,
+      (fee) => fee.id === "bag"
+    );
+
+    expect(slip.lines.map((item) => item.name)).toEqual([
+      "beer (Large)",
+      "water (WATER-500)",
+      // A fee prints the name the cashier typed, never its generated SKU.
+      "Paper bag",
     ]);
   });
 });

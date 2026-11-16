@@ -1,7 +1,7 @@
 import type { SalesOrder, SalesOrderLine } from "@/core/domain/entities/Cashier";
 import { modifierExtra } from "@/lib/modifiers/choices";
 import { linePriceNote } from "@/lib/pos/linePrice";
-import { lineDisplayName } from "@/lib/pos/orderListDisplay";
+import { linePrintName } from "@/lib/pos/orderListDisplay";
 import { givenAwayAmount, linePromotionSaving } from "@/lib/pos/promotions";
 import type { PrintLine, SaleReceipt } from "./formatKdsTicket";
 import { sessionPrintTimes } from "./formatKdsTicket";
@@ -153,7 +153,7 @@ export function reprintSlip(input: ReprintInput): SaleReceipt {
       endTimeLabel: text.endTime,
       lines: groupRoomTimeRows(slipRows(kept), isKtvRoomTimeLine).map((group) => {
         const { line } = group.rows[0];
-        const printed = named(line, lineDisplayName(line) || line.productName || text.item);
+        const printed = named(line, linePrintName(line, input.isFeeLine(line)) || text.item);
         // The room's time sold at more than one rate is one row on the paper.
         if (group.rows.length > 1) return mergedRoomTimeLine(group, printed);
         const modifiers = withNote(modifierPrintText(line.selectedModifiers), hostessNote(line));
@@ -179,7 +179,7 @@ export function reprintSlip(input: ReprintInput): SaleReceipt {
   const printable = kept.map((line) => {
     const modifiers = withNote(modifierPrintText(line.selectedModifiers), hostessNote(line));
     const away = givenAwayAmount(line) > 0;
-    const name = lineDisplayName(line) || line.variantName || text.item;
+    const name = linePrintName(line, input.isFeeLine(line)) || text.item;
     const menuPrice =
       input.isFeeLine(line) || line.menuPrice === undefined
         ? undefined

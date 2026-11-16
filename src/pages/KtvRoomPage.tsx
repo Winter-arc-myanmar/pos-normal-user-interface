@@ -9,6 +9,7 @@ import { useAuth } from "@/core/presentation/hooks/useAuth";
 import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
 import { useCardCapture } from "@/core/presentation/hooks/useCardCapture";
 import { useCashier } from "@/core/presentation/hooks/useCashier";
+import { useExtraFees } from "@/core/presentation/hooks/useExtraFees";
 import { useGuestWalletManagement } from "@/core/presentation/hooks/useGuestWalletManagement";
 import { useKtvManagement } from "@/core/presentation/hooks/useKtvManagement";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
@@ -25,7 +26,7 @@ import {
 } from "@/lib/ktv/session";
 import { isUnspendableWalletStatus } from "@/lib/pos/guestWalletAmounts";
 import { useDateFormatter } from "@/lib/i18n/formatters";
-import { lineDisplayName } from "@/lib/pos/orderListDisplay";
+import { linePrintName } from "@/lib/pos/orderListDisplay";
 import { toast } from "@/lib/toast";
 import { cashierLabel } from "@/lib/printing/cashier";
 import { receiptTotals } from "@/lib/printing/receiptTotals";
@@ -37,6 +38,8 @@ import { ladyChargeDetail, splitLadyCharges } from "@/lib/ktv/ladyCharge";
 export function KtvRoomPage() {
   const { t } = useTranslation();
   const showTax = useVenueSetting().taxShown?.KTV !== false;
+  // A bill can carry an extra fee the cashier added; it prints its own name.
+  const { isFeeLine } = useExtraFees();
   const navigate = useNavigate();
   const { roomId = "" } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -390,7 +393,7 @@ export function KtvRoomPage() {
           lines: slipRows(ladySplit.items).map(({ line, quantity }) => {
             const modifiers = modifierPrintText(line.selectedModifiers);
             return {
-              name: lineDisplayName(line) || line.productName || line.variantName || "Item",
+              name: linePrintName(line, isFeeLine(line)) || "Item",
               quantity: String(quantity || line.quantity || "1"),
               unitPrice: line.unitPrice?.trim() || undefined,
               modifiers: modifiers.names,
