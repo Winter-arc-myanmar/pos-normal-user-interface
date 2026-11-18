@@ -36,8 +36,10 @@ import { OrderPanel, type GroupedSalesOrderLine } from "./cashier/OrderPanel";
 import type { LineEdit } from "./cashier/LineEditDialog";
 import { billBreakdown } from "@/lib/pos/billBreakdown";
 import { linePriceNote } from "@/lib/pos/linePrice";
+import { asksGuestDetails, guestDetailRows, type GuestDetails } from "@/lib/pos/guestDetails";
 import { TableSeatingDialog } from "./cashier/TableSeatingDialog";
 import { ExtraFeeDialog } from "./cashier/ExtraFeeDialog";
+import { GuestDetailsDialog } from "./cashier/GuestDetailsDialog";
 import { ManagerApprovalDialog } from "@/components/shift/ManagerApprovalDialog";
 import { useNumberFormatter } from "@/lib/i18n/formatters";
 import { HostessPicker } from "./spa/HostessPicker";
@@ -257,7 +259,12 @@ export function CashierPage() {
   const [tipAmount, setTipAmount] = useState("0.0000");
   const [billGeneration, setBillGeneration] = useState(0);
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
+  // A sale taken away asks once, when Confirm pay is pressed, for the details
+  // that print on the cashier's slip.
+  const [guestDetailsOpen, setGuestDetailsOpen] = useState(false);
   const confirmingPaymentRef = useRef(false);
+  // undefined: not asked yet for this sale; null: skipped; values: printed.
+  const guestDetailsRef = useRef<GuestDetails | null | undefined>(undefined);
   const tableTapRef = useRef(false);
   const [printBillOnConfirm, setPrintBillOnConfirm] = useState(readPrintBillOnConfirm);
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -361,6 +368,8 @@ export function CashierPage() {
       setDiscountAmount("0.0000");
       setDiscountReasonId("");
       setTipAmount("0.0000");
+      guestDetailsRef.current = undefined;
+      setGuestDetailsOpen(false);
       setBillGeneration((generation) => generation + 1);
       setLocalError(null);
       setNotice(message);
@@ -2258,6 +2267,12 @@ export function CashierPage() {
 
   const handleCheckout = async () => {
     if (confirmingPaymentRef.current) return;
+    // Pickup, delivery and take-away orders ask for the guest's details once
+    // per sale; they print on the slip, and Skip pays without them.
+    if (asksGuestDetails(activeServiceType) && guestDetailsRef.current === undefined) {
+      setGuestDetailsOpen(true);
+      return;
+    }
     setLocalError(null);
     setNotice(null);
 
@@ -2426,6 +2441,12 @@ export function CashierPage() {
       const checkoutSessionId =
         selectedOrderSession?.id || activeTableSession?.id;
 
+      const guestFacts = guestDetailRows(guestDetailsRef.current, {
+        name: t("cashier.guestDetails.name"),
+        location: t("cashier.guestDetails.location"),
+        time: t("cashier.guestDetails.time"),
+        phone: t("cashier.guestDetails.phone"),
+      });
       const paidReceipt = {
         title: "RECEIPT",
         sale: true,
@@ -2434,6 +2455,7 @@ export function CashierPage() {
         showLogo: true,
         showPrices: true,
         receiptId: selectedOrder?.orderNumber,
+        ...(guestFacts.length ? { facts: guestFacts } : {}),
         ...receiptParty(true),
         lines: printableLines(paymentBillLines, !billOptions.includeTax, true, promotionForLine),
         subtotal: receiptItemsSubtotal,
@@ -2608,6 +2630,13 @@ export function CashierPage() {
       confirmingPaymentRef.current = false;
       setIsConfirmingPayment(false);
     }
+  };
+
+  /** The till asked for the guest's details; pay with what was typed, or none. */
+  const submitGuestDetails = (details: GuestDetails | null) => {
+    guestDetailsRef.current = details;
+    setGuestDetailsOpen(false);
+    void handleCheckout();
   };
 
   const handleCancelOrder = async () => {
@@ -3567,6 +3596,13 @@ export function CashierPage() {
         >
           {t("cashier.voidApproval.body", { amount: formatCurrency(Number(selectedOrder.grandTotal) || 0) })}
         </ManagerApprovalDialog>
+      ) : null}
+
+      {guestDetailsOpen ? (
+        <GuestDetailsDialog
+          onContinue={submitGuestDetails}
+          onSkip={() => submitGuestDetails(null)}
+        />
       ) : null}
 
       {hostessFor ? (
