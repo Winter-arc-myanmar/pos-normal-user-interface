@@ -857,6 +857,16 @@
     }
   },
   "cashier": {
+    "guestDetails": {
+      "title": "Guest details",
+      "hint": "Printed under the cashier on the slip. Leave any box empty if the guest did not give it.",
+      "name": "Name",
+      "location": "Location",
+      "time": "Time",
+      "phone": "Phone",
+      "skip": "Skip",
+      "continue": "Continue"
+    },
     "extraFee": {
       "title": "Add an extra fee",
       "hint": "Charged on this bill as its own line. No tax, service charge or promotions.",

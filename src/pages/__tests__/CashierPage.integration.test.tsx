@@ -523,6 +523,12 @@ describe("CashierPage integration", () => {
       await screen.findByRole("button", { name: "cashier.payment.options" }, { timeout: 5000 });
     };
 
+    /** Confirm pay passes the guest-details prompt a take-away sale asks for. */
+    const confirmPay = () => {
+      fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+      fireEvent.click(screen.getByRole("button", { name: "cashier.guestDetails.skip" }));
+    };
+
     beforeEach(() => {
       selectedOrderState = null;
       selectedOrderLinesState = [];
@@ -565,7 +571,7 @@ describe("CashierPage integration", () => {
       if (!includeServiceCharge) fireEvent.click(serviceCheckbox);
       await waitFor(() => expect(screen.getAllByText(Number(expected).toFixed(2)).length).toBeGreaterThan(0));
       fireEvent.click(screen.getByRole("checkbox", { name: "cashier.payment.printBillOnConfirm" }));
-      fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+      confirmPay();
 
       await waitFor(() => expect(mocks.processCheckout).toHaveBeenCalledWith(expect.objectContaining({
         includeTax,
@@ -592,7 +598,7 @@ describe("CashierPage integration", () => {
       productState = { ...product, basePrice: "100.0000", taxRate: 10 };
       await startDirectBill();
       fireEvent.click(screen.getByRole("checkbox", { name: "cashier.payment.printBillOnConfirm" }));
-      fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+      confirmPay();
 
       await waitFor(() => expect(mocks.printReceipt).toHaveBeenCalled());
       const slip = mocks.printReceipt.mock.calls[0][0];
@@ -614,7 +620,7 @@ describe("CashierPage integration", () => {
       fireEvent.click(await screen.findByRole("button", { name: "pick U Kyaw" }));
       expect(screen.getByText("U Kyaw")).toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+      confirmPay();
 
       await waitFor(() => expect(mocks.processCheckout).toHaveBeenCalled());
       expect(mocks.processCheckout.mock.calls[0][0]).toMatchObject({
@@ -629,7 +635,7 @@ describe("CashierPage integration", () => {
       fireEvent.click(screen.getByRole("button", { name: /HOUSE CREDIT/ }));
       await screen.findByRole("button", { name: "pick U Kyaw" });
 
-      fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+      confirmPay();
 
       expect(await screen.findByText("cashier.credit.required")).toBeInTheDocument();
       expect(mocks.processCheckout).not.toHaveBeenCalled();
@@ -641,7 +647,7 @@ describe("CashierPage integration", () => {
       fireEvent.click(screen.getByRole("button", { name: "cashier.payment.options" }));
       expect(screen.getByRole("checkbox", { name: "cashier.payment.includeTax" })).toBeChecked();
       expect(screen.getByRole("checkbox", { name: "cashier.payment.includeServiceCharge" })).toBeChecked();
-      fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+      confirmPay();
 
       await waitFor(() => expect(mocks.processCheckout).toHaveBeenCalled());
       const payload = mocks.processCheckout.mock.calls[0][0];
@@ -657,7 +663,7 @@ describe("CashierPage integration", () => {
       fireEvent.click(screen.getByRole("button", { name: "cashier.payment.options" }));
       fireEvent.click(screen.getByRole("checkbox", { name: "cashier.payment.includeTax" }));
       fireEvent.click(screen.getByRole("checkbox", { name: "cashier.payment.includeServiceCharge" }));
-      fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+      confirmPay();
       await waitFor(() => expect(mocks.processCheckout).toHaveBeenCalledWith(expect.objectContaining({
         includeTax: false, includeServiceCharge: false,
         payments: [{ paymentMethodId: "cash", amount: "100.0000" }],
@@ -673,13 +679,85 @@ describe("CashierPage integration", () => {
       fireEvent.click(await screen.findByRole("button", { name: "cashier.payment.options" }));
       expect(screen.getByRole("checkbox", { name: "cashier.payment.includeTax" })).toBeChecked();
       expect(screen.getByRole("checkbox", { name: "cashier.payment.includeServiceCharge" })).toBeChecked();
-      fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+      confirmPay();
 
       await waitFor(() => expect(mocks.processCheckout).toHaveBeenCalledTimes(2));
       const secondBill = mocks.processCheckout.mock.calls[1][0];
       expect(secondBill.payments).toEqual([{ paymentMethodId: "cash", amount: "121.0000" }]);
       expect(secondBill).not.toHaveProperty("includeTax");
       expect(secondBill).not.toHaveProperty("includeServiceCharge");
+    });
+  });
+
+  describe("guest details before payment", () => {
+    const startBill = async () => {
+      render(<MemoryRouter initialEntries={["/cashier?view=menu"]}><CashierPage /></MemoryRouter>);
+      fireEvent.click(
+        screen.queryByRole("button", { name: "cashier.newOrder" }) ??
+          screen.getByRole("button", { name: "cashier.orderPanel.newDineInOrder" })
+      );
+      await waitFor(() =>
+        expect(screen.getByText(/cashier\.orderPanel\.(cartStarted|dineInStarted)/)).toBeInTheDocument()
+      );
+      fireEvent.click(screen.getByRole("button", { name: /Coffee/ }));
+      await waitFor(() => expect(screen.getByRole("button", { name: "cashier.payNow" })).toBeEnabled());
+      fireEvent.click(screen.getByRole("button", { name: "cashier.payNow" }));
+      await screen.findByRole("button", { name: "cashier.payment.options" }, { timeout: 5000 });
+    };
+
+    beforeEach(() => {
+      selectedOrderState = null;
+      selectedOrderLinesState = [];
+      activeServiceTypeState = "TAKE_AWAY";
+      productState = { ...product, basePrice: "100.0000", taxRate: 10 };
+    });
+
+    it("asks for the details and prints them under the cashier", async () => {
+      await startBill();
+      fireEvent.click(screen.getByRole("checkbox", { name: "cashier.payment.printBillOnConfirm" }));
+      fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+
+      // Nothing is paid until the details are skipped or filled in.
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+      expect(mocks.processCheckout).not.toHaveBeenCalled();
+
+      fireEvent.change(screen.getByLabelText("cashier.guestDetails.name"), { target: { value: "Aung" } });
+      fireEvent.change(screen.getByLabelText("cashier.guestDetails.location"), { target: { value: "12 Main St" } });
+      fireEvent.change(screen.getByLabelText("cashier.guestDetails.time"), { target: { value: "18:30" } });
+      fireEvent.change(screen.getByLabelText("cashier.guestDetails.phone"), { target: { value: "0912345" } });
+      fireEvent.click(screen.getByRole("button", { name: "cashier.guestDetails.continue" }));
+
+      await waitFor(() => expect(mocks.processCheckout).toHaveBeenCalled());
+      await waitFor(() => expect(mocks.printReceipt).toHaveBeenCalled());
+      expect(mocks.printReceipt.mock.calls[0][0].facts).toEqual([
+        { label: "cashier.guestDetails.name", value: "Aung" },
+        { label: "cashier.guestDetails.location", value: "12 Main St" },
+        { label: "cashier.guestDetails.time", value: "18:30" },
+        { label: "cashier.guestDetails.phone", value: "0912345" },
+      ]);
+    });
+
+    it("skips the details and still takes the payment", async () => {
+      await startBill();
+      fireEvent.click(screen.getByRole("checkbox", { name: "cashier.payment.printBillOnConfirm" }));
+      fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+      fireEvent.click(screen.getByRole("button", { name: "cashier.guestDetails.skip" }));
+
+      await waitFor(() => expect(mocks.processCheckout).toHaveBeenCalled());
+      await waitFor(() => expect(mocks.printReceipt).toHaveBeenCalled());
+      expect(mocks.printReceipt.mock.calls[0][0]).not.toHaveProperty("facts");
+    });
+
+    it("does not ask when the guest eats at the table", async () => {
+      activeServiceTypeState = "TABLE";
+      selectedOrderState = order;
+      selectedOrderLinesState = [orderLine];
+      render(<MemoryRouter initialEntries={["/cashier?view=pay"]}><CashierPage /></MemoryRouter>);
+      await waitFor(() => expect(screen.getByRole("button", { name: "cashier.confirmPay" })).toBeEnabled());
+      fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+
+      await waitFor(() => expect(mocks.checkoutTableSession).toHaveBeenCalled());
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
   });
 
@@ -1260,6 +1338,7 @@ describe("CashierPage integration", () => {
     render(<MemoryRouter initialEntries={["/cashier?view=pay"]}><CashierPage /></MemoryRouter>);
     await waitFor(() => expect(screen.getByRole("button", { name: "cashier.confirmPay" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+    fireEvent.click(screen.getByRole("button", { name: "cashier.guestDetails.skip" }));
 
     await waitFor(() => expect(mocks.settleOrder).toHaveBeenCalledWith("order-2", expect.objectContaining({
       payments: [expect.objectContaining({ paymentMethodId: "cash", amount: "8.4000" })],
