@@ -263,31 +263,47 @@ export function DevicesSettingsPanel() {
           </Button>
           <StatusRow
             label={t("settings.devices.printingDeployment")}
-            value={qzVersion || "—"}
+            value={
+              connection.printAgent.available
+                ? t("settings.devices.engineAgent", {
+                    version: connection.printAgent.version,
+                  })
+                : qzVersion || "—"
+            }
             ok={connection.isConnected}
           />
-          <StatusRow
-            label={t("settings.devices.licensePrinting")}
-            value={t("settings.devices.qzFreeLicense")}
-            ok={connection.isConnected}
-          />
+          {connection.printAgent.available ? null : (
+            <StatusRow
+              label={t("settings.devices.licensePrinting")}
+              value={t("settings.devices.qzFreeLicense")}
+              ok={connection.isConnected}
+            />
+          )}
           <StatusRow
             label={t("settings.devices.directPrinting")}
             value={
               connection.nativeBridge
                 ? t("settings.devices.directPrintingReady")
-                : t("settings.devices.directPrintingMissing")
+                : connection.printAgent.available
+                  ? t("settings.devices.directPrintingDesktop")
+                  : t("settings.devices.directPrintingMissing")
             }
-            ok={connection.nativeBridge}
+            ok={connection.nativeBridge || connection.printAgent.available}
           />
           <StatusRow
-            label={t("settings.devices.qzTray")}
-            value={
-              connection.isConnected
-                ? t("settings.printer.connected")
-                : t("settings.printer.disconnected")
+            label={
+              connection.printAgent.available
+                ? t("settings.devices.printingEngine")
+                : t("settings.devices.qzTray")
             }
-            ok={connection.isConnected}
+            value={
+              connection.printAgent.available
+                ? t("settings.devices.engineAgentShort")
+                : connection.isConnected
+                  ? t("settings.printer.connected")
+                  : t("settings.printer.disconnected")
+            }
+            ok={connection.printAgent.available || connection.isConnected}
           />
           <StatusRow
             label={t("settings.devices.localPrinting")}

@@ -11,6 +11,10 @@ export interface PrinterBinding {
   deviceName?: string;
   host?: string;
   port?: number;
+  /** The desktop agent's stable device identity, so a renamed queue still prints. */
+  hardwareId?: string;
+  /** The Windows port the queue used when it was saved (USB001). */
+  portName?: string;
   sectors?: PrinterSector[];
   printsFor?: PrinterArea[];
   categoryIds?: string[];

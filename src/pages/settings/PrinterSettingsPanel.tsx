@@ -12,7 +12,7 @@ import { useAuth } from "@/core/presentation/hooks/useAuth";
 import { useKdsStationManagement } from "@/core/presentation/hooks/useKdsStationManagement";
 import { useKitchenPrinterManagement } from "@/core/presentation/hooks/useKitchenPrinterManagement";
 import { usePosWorkspace } from "@/core/presentation/hooks/usePosWorkspace";
-import { isBrowserPrinting } from "@/core/infrastructure/printing/PrinterClient";
+import { isBrowserPrinting, isAgentPrinting } from "@/core/infrastructure/printing/PrinterClient";
 import { usePrinterConnection } from "@/core/presentation/hooks/usePrinterConnection";
 import {
   PrinterBinding,
@@ -62,6 +62,7 @@ export function PrinterSettingsPanel() {
   } = useKdsStationManagement();
   const connection = usePrinterConnection(tenantId, activePosRegisterId);
   const nativeBridge = connection.nativeBridge;
+  const agentPrinting = isAgentPrinting();
 
   const [selectedBackendId, setSelectedBackendId] = useState("");
   const [selectedBindingId, setSelectedBindingId] = useState("");
@@ -242,6 +243,27 @@ export function PrinterSettingsPanel() {
         caught instanceof Error
           ? caught.message
           : t("settings.printer.testFailed")
+      );
+    }
+  };
+
+  const cleanupPrinters = async () => {
+    setNotice(null);
+    setLocalError(null);
+    try {
+      const report = await connection.cleanupPrinters();
+      setNotice(
+        report.removedQueues.length
+          ? t("settings.printer.agentCleanupDone", {
+              count: report.removedQueues.length,
+            })
+          : t("settings.printer.agentCleanupNone")
+      );
+    } catch (caught) {
+      setLocalError(
+        caught instanceof Error
+          ? caught.message
+          : t("settings.printer.agentCleanupFailed")
       );
     }
   };
@@ -450,9 +472,11 @@ export function PrinterSettingsPanel() {
             <p className="mt-1 text-xs text-slate-500">
               {nativeBridge
                 ? t("settings.printer.nativeRequirement")
-                : isBrowserPrinting()
-                  ? t("settings.printer.mobileRequirement")
-                  : t("settings.printer.qzRequirement")}
+                : agentPrinting
+                  ? t("settings.printer.agentRequirement")
+                  : isBrowserPrinting()
+                    ? t("settings.printer.mobileRequirement")
+                    : t("settings.printer.qzRequirement")}
             </p>
           </div>
           <span
@@ -467,16 +491,20 @@ export function PrinterSettingsPanel() {
               ? t(
                   nativeBridge
                     ? "settings.printer.nativeConnected"
-                    : isBrowserPrinting()
-                      ? "settings.printer.mobileConnected"
-                      : "settings.printer.connected"
+                    : agentPrinting
+                      ? "settings.printer.agentConnected"
+                      : isBrowserPrinting()
+                        ? "settings.printer.mobileConnected"
+                        : "settings.printer.connected"
                 )
               : t(
                   nativeBridge
                     ? "settings.printer.nativeDisconnected"
-                    : isBrowserPrinting()
-                      ? "settings.printer.mobileDisconnected"
-                      : "settings.printer.disconnected"
+                    : agentPrinting
+                      ? "settings.printer.agentDisconnected"
+                      : isBrowserPrinting()
+                        ? "settings.printer.mobileDisconnected"
+                        : "settings.printer.disconnected"
                 )}
           </span>
         </div>
@@ -513,6 +541,31 @@ export function PrinterSettingsPanel() {
             </dd>
           </div>
         </dl>
+
+        {agentPrinting ? (
+          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white p-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-slate-800">
+                {t("settings.printer.agentTitle", {
+                  version: connection.printAgent.version || "—",
+                })}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                {connection.printAgent.elevated
+                  ? t("settings.printer.agentElevated")
+                  : t("settings.printer.agentNotElevated")}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={!connection.printAgent.elevated}
+              onClick={() => void cleanupPrinters()}
+            >
+              {t("settings.printer.agentCleanup")}
+            </Button>
+          </div>
+        ) : null}
 
         {(localError || apiError || connection.error) && (
           <p className="mt-4 rounded bg-red-50 p-3 text-sm text-red-700">
@@ -588,6 +641,10 @@ export function PrinterSettingsPanel() {
                 <p className="sm:col-span-2 text-xs text-slate-500">
                   {t("settings.printer.networkNativeHint")}
                 </p>
+              ) : agentPrinting ? (
+                <p className="sm:col-span-2 text-xs text-slate-500">
+                  {t("settings.printer.agentNetworkHint")}
+                </p>
               ) : isBrowserPrinting() ? (
                 <p className="sm:col-span-2 text-xs text-slate-500">
                   {t("settings.printer.networkAndroidHint")}
@@ -632,7 +689,9 @@ export function PrinterSettingsPanel() {
                 </Button>
               </div>
               <p className="mt-1 text-xs text-slate-500">
-                {t("settings.printer.usbDiscoverHint")}
+                {agentPrinting
+                  ? t("settings.printer.agentUsbHint")
+                  : t("settings.printer.usbDiscoverHint")}
               </p>
             </label>
           )}

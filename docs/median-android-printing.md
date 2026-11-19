@@ -12,7 +12,14 @@
 
 | Windows / Linux / macOS (desktop browser) | `QzTrayClient` | QZ Tray → the printer's Windows queue (USB), the OS spooler, or raw TCP `host:9100` |
 
+| Windows desktop with the print agent installed | `HttpPrintAgentClient` | Loopback HTTP to `Lnkits POS Print Agent` → Windows spooler RAW (USB), raw TCP `host:9100`, Bluetooth COM port - no QZ Tray, no dialog |
+
 | Android, iOS, Median WebView (native plugin) | `BrowserPrinterClient` + native `window.median.posPrinter` | Native ESC/POS to Wi-Fi `host:9100`, USB, or Bluetooth - silent, no print dialog |
+
+When the print agent answers its health probe it wins over QZ on desktop; QZ stays
+the fallback for computers without the agent. See
+[desktop-print-agent.md](./desktop-print-agent.md). Mobile detection runs first, so
+the Android bridge is never displaced.
 
 
 

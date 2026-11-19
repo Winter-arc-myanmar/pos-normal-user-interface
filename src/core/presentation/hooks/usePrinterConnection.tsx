@@ -12,10 +12,15 @@ import {
 } from "../../domain/entities/PrintTemplate";
 import type { ApiVenueSettingRepository } from "../../infrastructure/repositories/ApiVenueSettingRepository";
 import container from "../../infrastructure/di/container";
-import { browserPrinterClient } from "../../infrastructure/printing/BrowserPrinterClient";
 import { getPrinterClient } from "../../infrastructure/printing/getPrinterClient";
 import type { IPrinterClient } from "../../infrastructure/printing/IPrinterClient";
-import { isBrowserPrinting } from "../../infrastructure/printing/PrinterClient";
+import { isBrowserPrinting, printerRuntime } from "../../infrastructure/printing/PrinterClient";
+import {
+  isPrintAgentAvailable,
+  printAgentHealth,
+  probePrintAgent,
+  type AgentCleanupReport,
+} from "@/lib/printing/printAgent";
 import {
   kdsTicketSlip,
   KitchenSlip,
@@ -92,14 +97,18 @@ export const printCurrencyFor = (tenantId: string) => {
   return currency;
 };
 
+type ScopedPrinterClient = IPrinterClient & {
+  configureScope?: (tenantId: string, registerId: string) => void;
+  cleanup?: () => Promise<AgentCleanupReport>;
+};
+
 const configureClient = async (
   tenantId: string,
   registerId: string
 ): Promise<IPrinterClient> => {
   const client = await getPrinterClient();
-  if (client === browserPrinterClient) {
-    browserPrinterClient.configureScope(tenantId, registerId);
-  }
+  // Both native engines keep per-register state (mobile bridge, desktop agent).
+  (client as ScopedPrinterClient).configureScope?.(tenantId, registerId);
   return client;
 };
 
@@ -121,6 +130,35 @@ export function usePrinterConnection(
     return () => {
       window.removeEventListener(PRINTER_BINDINGS_CHANGED, refresh);
       window.removeEventListener("storage", refresh);
+    };
+  }, []);
+
+  /**
+   * Whether this computer runs the desktop print agent. The boot probe is shared
+   * with getPrinterClient(), so the first print already uses the right engine;
+   * this state only keeps the Settings copy in step when the probe settles late.
+   */
+  const [printAgent, setPrintAgent] = useState(() => {
+    const health = printAgentHealth();
+    return {
+      available: isPrintAgentAvailable(),
+      version: health?.agentVersion ?? "",
+      elevated: health?.elevated ?? false,
+    };
+  });
+
+  useEffect(() => {
+    let active = true;
+    void probePrintAgent().then((health) => {
+      if (!active) return;
+      setPrintAgent({
+        available: Boolean(health),
+        version: health?.agentVersion ?? "",
+        elevated: Boolean(health?.elevated),
+      });
+    });
+    return () => {
+      active = false;
     };
   }, []);
 
@@ -690,6 +728,18 @@ export function usePrinterConnection(
     [printKitchen, tenantId, ticketWithDetails]
   );
 
+  /** Removes stale print queues through the desktop agent (service = elevated). */
+  const cleanupPrinters = useCallback(async (): Promise<AgentCleanupReport> => {
+    const client = await configureClient(tenantId, registerId);
+    const cleanup = (client as ScopedPrinterClient).cleanup;
+    if (!cleanup) {
+      throw new Error("Printer cleanup needs the desktop print agent.");
+    }
+    const report = await cleanup();
+    setRevision((value) => value + 1);
+    return report;
+  }, [registerId, tenantId]);
+
   return {
     bindings,
     defaultBinding,
@@ -698,9 +748,12 @@ export function usePrinterConnection(
     isConnecting,
     error,
     nativeBridge: hasNativePrinterBridge(),
+    printAgent,
+    printingEngine: printerRuntime(),
     connect,
     discover,
     verify,
+    cleanupPrinters,
     saveBinding,
     removeBinding,
     makeDefault,
