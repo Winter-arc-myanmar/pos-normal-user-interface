@@ -514,6 +514,16 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     for (const item of spaPackages) names[item.variantId] = item.name;
     return names;
   }, [products, room, spaPackages, tr, variantsByProductId]);
+  /** How many variants each product the till has loaded is sold in, by variant. */
+  const variantCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const product of products) {
+      const variants = variantsByProductId[product.id];
+      if (!variants) continue;
+      for (const variant of variants) counts[variant.id] = variants.length;
+    }
+    return counts;
+  }, [products, variantsByProductId]);
   const pendingByProduct = useMemo(
     () =>
       pending.reduce<Record<string, number>>((counts, item) => {
@@ -596,7 +606,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
       const { line } = group.rows[0];
       const printed = name(
         line,
-        linePrintName(line, isFeeLine(line)) ||
+        linePrintName(line, isFeeLine(line), variantCounts[line.variantId]) ||
           itemNames[line.variantId] ||
           tr("item")
       );
