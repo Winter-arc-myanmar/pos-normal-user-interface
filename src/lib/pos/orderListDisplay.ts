@@ -112,8 +112,10 @@ export function variantPrintLabel(variant: {
 
 /**
  * The name an item prints under: the product with the variant it was sold as,
- * "Beer (Large)", and the variant's SKU where the shop names none. An extra fee
- * prints the name the cashier gave it, never the SKU the server made for it.
+ * "Beer (Large)", and the variant's SKU where the shop names none. A product
+ * the till knows is sold in only one variant prints as just its name; when the
+ * variant count is unknown, the label stays as it was. An extra fee prints the
+ * name the cashier gave it, never the SKU the server made for it.
  */
 export function linePrintName(
   line: {
@@ -122,17 +124,24 @@ export function linePrintName(
     sku?: string;
     matrixOptions?: Record<string, unknown> | null;
   },
-  isFee = false
+  isFee = false,
+  /**
+   * How many variants the product is sold in, when the till knows it: one
+   * variant is the item itself, so it is never named on the paper. Undefined
+   * leaves the label as it was, for lines read back from the server.
+   */
+  variantCount?: number
 ): string {
   if (!isHumanDisplayName(line.productName)) return lineDisplayName(line);
-  return withVariant(
-    line.productName.trim(),
-    variantPrintLabel({
-      variantName: line.variantName,
-      matrixOptions: line.matrixOptions,
-      sku: isFee ? undefined : line.sku,
-    })
-  );
+  const label =
+    variantCount !== undefined && variantCount <= 1
+      ? ""
+      : variantPrintLabel({
+          variantName: line.variantName,
+          matrixOptions: line.matrixOptions,
+          sku: isFee ? undefined : line.sku,
+        });
+  return withVariant(line.productName.trim(), label);
 }
 
 /** An order's lines by id, so a refund can show an item's name instead of its line id. */
