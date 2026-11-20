@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { APP_VERSION } from "@/lib/appVersion";
+import { WinterArcLogo } from "@/components/brand/WinterArcLogo";
 
 export interface PosRailItem {
   to: string;
@@ -292,6 +293,10 @@ export function PosIconRail({
       >
         {userName}
       </span>
+      {/* The Winter Arc mark, kept small above the release number. */}
+      <div className="mt-2 flex shrink-0 items-center justify-center">
+        <WinterArcLogo size={18} />
+      </div>
       <span
         className="mt-1 max-w-full truncate text-center text-[10px] text-white/40"
         title={t("shell.appVersion", { version: APP_VERSION })}
