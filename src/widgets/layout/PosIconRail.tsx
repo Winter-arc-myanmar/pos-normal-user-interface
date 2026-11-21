@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { APP_VERSION } from "@/lib/appVersion";
+import { PoweredByWinterArc } from "@/components/brand/PoweredByWinterArc";
 
 export interface PosRailItem {
   to: string;
@@ -292,6 +293,13 @@ export function PosIconRail({
       >
         {userName}
       </span>
+      {/* Powered by Winter Arc, small, above the release number. */}
+      <div className="mt-2 flex w-full shrink-0 items-center justify-center">
+        <PoweredByWinterArc
+          size={18}
+          className={showLabels ? undefined : "[&_.powered-by-winter-arc-text]:sr-only"}
+        />
+      </div>
       <span
         className="mt-1 max-w-full truncate text-center text-[10px] text-white/40"
         title={t("shell.appVersion", { version: APP_VERSION })}

@@ -141,6 +141,26 @@ export function KtvRoomPage() {
     });
     return { products, variantsByProductId };
   }, [roomTabletMenu]);
+  /**
+   * How many variants the room menu sells each item in, by variant id. The menu
+   * lists a product's variants as items of their own, so a product with more
+   * than one is still told apart on the paper.
+   */
+  const variantCounts = useMemo(() => {
+    const idsByProduct = new Map<string, string[]>();
+    roomTabletMenu?.categories.forEach((category) =>
+      category.items.forEach((item) => {
+        // An older server does not say which product an item belongs to.
+        if (!item.productId) return;
+        const ids = idsByProduct.get(item.productId) || [];
+        ids.push(item.variantId);
+        idsByProduct.set(item.productId, ids);
+      })
+    );
+    const counts: Record<string, number> = {};
+    idsByProduct.forEach((ids) => ids.forEach((id) => (counts[id] = ids.length)));
+    return counts;
+  }, [roomTabletMenu]);
 
   const refreshSessionData = useCallback(
     async (target: KtvSession) => {
@@ -393,7 +413,9 @@ export function KtvRoomPage() {
           lines: slipRows(ladySplit.items).map(({ line, quantity }) => {
             const modifiers = modifierPrintText(line.selectedModifiers);
             return {
-              name: linePrintName(line, isFeeLine(line)) || "Item",
+              name:
+                linePrintName(line, isFeeLine(line), variantCounts[line.variantId]) ||
+                "Item",
               quantity: String(quantity || line.quantity || "1"),
               unitPrice: line.unitPrice?.trim() || undefined,
               modifiers: modifiers.names,

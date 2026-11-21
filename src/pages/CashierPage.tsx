@@ -764,6 +764,11 @@ export function CashierPage() {
       .map((line) => {
         const variant = variantById[line.variantId];
         const product = variant ? productById[variant.productId] : undefined;
+        // The variants this product is sold in, once the menu has loaded them:
+        // a product with only one prints without it.
+        const variantCount = variant
+          ? variantsByProductId[variant.productId]?.length
+          : undefined;
         const modifiers = withHostessNote(
           modifierPrintText(line.selectedModifiers),
           lineHostess(line)
@@ -785,7 +790,8 @@ export function CashierPage() {
               matrixOptions: variant?.matrixOptions,
               sku: line.sku || variant?.variantSku,
             },
-            isFeeLine(line)
+            isFeeLine(line),
+            variantCount
           ) || "Item";
         const note = notePrices && !givenAway
           ? linePriceNote(line.unitPrice, menuPriceFor(line))

@@ -107,3 +107,32 @@ describe("a variant a shop has not named yet", () => {
     ).toBe("Paper bag");
   });
 });
+
+describe("a product sold in only one variant", () => {
+  it("prints as just its name, with no variant name or SKU", () => {
+    expect(linePrintName({ productName: "Coffee", sku: "COFFEE-LARGE" }, false, 1)).toBe(
+      "Coffee"
+    );
+    expect(linePrintName({ productName: "Coffee", variantName: "Regular" }, false, 1)).toBe(
+      "Coffee"
+    );
+    expect(
+      linePrintName({ productName: "Coffee", matrixOptions: { size: "Regular" } }, false, 1)
+    ).toBe("Coffee");
+  });
+
+  it("still names the variant of a product sold in more than one", () => {
+    expect(linePrintName({ productName: "Beer", variantName: "Large" }, false, 2)).toBe(
+      "Beer (Large)"
+    );
+    expect(linePrintName({ productName: "Beer", sku: "BEER-L" }, false, 2)).toBe(
+      "Beer (BEER-L)"
+    );
+  });
+
+  it("keeps the label when the till does not know the variant count", () => {
+    expect(linePrintName({ productName: "Coffee", sku: "COFFEE-LARGE" })).toBe(
+      "Coffee (COFFEE-LARGE)"
+    );
+  });
+});
