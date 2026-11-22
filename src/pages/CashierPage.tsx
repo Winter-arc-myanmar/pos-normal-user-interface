@@ -3841,6 +3841,29 @@ export function CashierPage() {
             onTableSelect={(tableId) => void handleTableTap(tableId)}
             onOrderSelect={(order) => void handleOrderSelect(order)}
             onPageChange={setBoardPage}
+            toolbar={
+              usesTableBoard && diningZones.length ? (
+                <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1 min-[1100px]:hidden">
+                  {[
+                    { id: "ALL", name: t("cashier.locations.all") },
+                    ...diningZones,
+                  ].map((zone) => (
+                    <button
+                      key={zone.id}
+                      type="button"
+                      aria-pressed={zoneFilter === zone.id}
+                      onClick={() => setZoneFilter(zone.id)}
+                      className={[
+                        "min-h-9 shrink-0 whitespace-nowrap rounded px-3 text-xs font-medium",
+                        zoneFilter === zone.id ? "bg-blue-600" : "bg-slate-600",
+                      ].join(" ")}
+                    >
+                      {zone.name}
+                    </button>
+                  ))}
+                </div>
+              ) : null
+            }
           />
         )}
       </main>

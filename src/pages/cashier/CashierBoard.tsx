@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   OrderStatus,
@@ -55,6 +56,8 @@ interface CashierBoardProps {
   onTableSelect: (tableId: string) => void;
   onOrderSelect: (order: SalesOrder) => void;
   onPageChange: (page: number) => void;
+  /** Extra filter row under the tabs, e.g. the zone chips on small screens. */
+  toolbar?: ReactNode;
 }
 
 const boardTileClass =
@@ -82,6 +85,7 @@ export function CashierBoard({
   onTableSelect,
   onOrderSelect,
   onPageChange,
+  toolbar,
 }: CashierBoardProps) {
   const { t } = useTranslation();
   // The cashier page resets a paid filter back to All on every board, so a Paid
@@ -145,6 +149,8 @@ export function CashierBoard({
           );
         })}
       </div>
+
+      {toolbar}
 
       {error ? (
         <div className="mt-2 rounded border border-red-800 bg-red-950/40 px-3 py-2 text-sm text-red-200">
