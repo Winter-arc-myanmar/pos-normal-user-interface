@@ -60,7 +60,7 @@ export function PosActionRail({
           type="button"
           disabled
           title={t("shell.drawerNotConfigured")}
-          className="min-h-11 w-full rounded bg-slate-500 px-2 py-2 text-left opacity-50 disabled:cursor-not-allowed"
+          className="min-h-11 w-full rounded bg-violet-600 px-2 py-2 text-left text-white opacity-50 disabled:cursor-not-allowed"
         >
           {drawerLabel}
         </button>
@@ -70,7 +70,8 @@ export function PosActionRail({
           aria-pressed={activeView === "menu"}
           className={[
             "min-h-11 w-full rounded px-2 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white",
-            activeView === "menu" ? "bg-blue-600" : "bg-slate-500 hover:bg-slate-600",
+            "bg-blue-600 text-white hover:bg-blue-500",
+            activeView === "menu" ? "ring-2 ring-white ring-offset-2 ring-offset-[#202020]" : "",
           ].join(" ")}
         >
           {menuLabel}
@@ -81,7 +82,8 @@ export function PosActionRail({
           aria-pressed={activeView === "orders"}
           className={[
             "min-h-11 w-full rounded px-2 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white",
-            activeView === "orders" ? "bg-blue-600" : "bg-slate-500 hover:bg-slate-600",
+            "bg-emerald-600 text-white hover:bg-emerald-500",
+            activeView === "orders" ? "ring-2 ring-white ring-offset-2 ring-offset-[#202020]" : "",
           ].join(" ")}
         >
           {ordersLabel}
@@ -92,7 +94,8 @@ export function PosActionRail({
           aria-pressed={activeView === "pay"}
           className={[
             "min-h-11 w-full rounded px-2 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white",
-            activeView === "pay" ? "bg-blue-600" : "bg-slate-500 hover:bg-slate-600",
+            "bg-gradient-to-br from-[#ffc83d] to-[#ff5a00] text-black hover:brightness-110",
+            activeView === "pay" ? "ring-2 ring-white ring-offset-2 ring-offset-[#202020]" : "",
           ].join(" ")}
         >
           {payLabel}
