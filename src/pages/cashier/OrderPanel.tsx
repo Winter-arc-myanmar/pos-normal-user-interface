@@ -882,80 +882,48 @@ export function OrderPanel({
               {t("cashier.payment.printBillOnConfirm")}
             </label>
           ) : null}
-          {!canTakePayment ? (
-            <p className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-center text-xs text-slate-600">
-              {t("cashier.orderPanel.paymentAtCashier")}
-            </p>
-          ) : (
-          <Button
-            fullWidth
-            disabled={
-              isSettledOrder ||
-              checkoutBlocked ||
-              !selectedOrderLines.length ||
-              isLoading ||
-              requiresTableAssignment ||
-              (isPayView && !checkoutReady)
-            }
-            title={
-              requiresTableAssignment
-                ? t("cashier.orderPanel.assignTableToContinue")
+          <div
+            className={
+              onCancelOrder && !confirmCancelOrder
+                ? "grid grid-cols-2 items-stretch gap-2"
                 : undefined
             }
-            isLoading={isLoading}
-            onClick={() => {
-              if (!isPayView && onOpenPay) {
-                onOpenPay();
-                return;
-              }
-              onCheckout();
-            }}
           >
-            {isPayView ? t("cashier.confirmPay") : t("cashier.payNow")}
-          </Button>
-          )}
-          {isPayView && onPrintFinance ? (
-            <Button
-              fullWidth
-              className="!border-emerald-600 !bg-emerald-600 !text-white hover:!border-emerald-700 hover:!bg-emerald-700"
-              disabled={isLoading || checkoutBlocked}
-              onClick={onPrintFinance}
-            >
-              {t("cashier.printFinance")}
-            </Button>
-          ) : null}
-          {onCancelOrder ? (
-            confirmCancelOrder ? (
-              <div className="space-y-2 rounded-lg border border-rose-200 bg-rose-50 p-2">
-                <p className="text-xs text-rose-900">
-                  {selectedTable
-                    ? t("cashier.orderPanel.cancelOrderConfirmTable")
-                    : t("cashier.orderPanel.cancelOrderConfirm")}
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={isLoading}
-                    onClick={() => setConfirmCancelOrder(false)}
-                  >
-                    {t("cashier.orderPanel.keepOrder")}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    disabled={isLoading}
-                    isLoading={isLoading}
-                    onClick={() => {
-                      setConfirmCancelOrder(false);
-                      onCancelOrder();
-                    }}
-                  >
-                    {t("cashier.orderPanel.confirmCancelOrder")}
-                  </Button>
-                </div>
-              </div>
+            {!canTakePayment ? (
+              <p className="flex h-full items-center justify-center rounded-lg border border-slate-200 bg-slate-50 p-2 text-center text-xs text-slate-600">
+                {t("cashier.orderPanel.paymentAtCashier")}
+              </p>
             ) : (
+              <Button
+                fullWidth
+                variant="secondary"
+                className="!border-blue-500 !bg-blue-500 !text-white shadow-sm hover:!border-blue-600 hover:!bg-blue-600 active:!bg-blue-700"
+                disabled={
+                  isSettledOrder ||
+                  checkoutBlocked ||
+                  !selectedOrderLines.length ||
+                  isLoading ||
+                  requiresTableAssignment ||
+                  (isPayView && !checkoutReady)
+                }
+                title={
+                  requiresTableAssignment
+                    ? t("cashier.orderPanel.assignTableToContinue")
+                    : undefined
+                }
+                isLoading={isLoading}
+                onClick={() => {
+                  if (!isPayView && onOpenPay) {
+                    onOpenPay();
+                    return;
+                  }
+                  onCheckout();
+                }}
+              >
+                {isPayView ? t("cashier.confirmPay") : t("cashier.payNow")}
+              </Button>
+            )}
+            {onCancelOrder && !confirmCancelOrder ? (
               <Button
                 fullWidth
                 variant="destructive"
@@ -968,7 +936,48 @@ export function OrderPanel({
               >
                 {t("cashier.orderPanel.cancelOrder")}
               </Button>
-            )
+            ) : null}
+          </div>
+          {onCancelOrder && confirmCancelOrder ? (
+            <div className="space-y-2 rounded-lg border border-rose-200 bg-rose-50 p-2">
+              <p className="text-xs text-rose-900">
+                {selectedTable
+                  ? t("cashier.orderPanel.cancelOrderConfirmTable")
+                  : t("cashier.orderPanel.cancelOrderConfirm")}
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={isLoading}
+                  onClick={() => setConfirmCancelOrder(false)}
+                >
+                  {t("cashier.orderPanel.keepOrder")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={isLoading}
+                  isLoading={isLoading}
+                  onClick={() => {
+                    setConfirmCancelOrder(false);
+                    onCancelOrder();
+                  }}
+                >
+                  {t("cashier.orderPanel.confirmCancelOrder")}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+          {isPayView && onPrintFinance ? (
+            <Button
+              fullWidth
+              className="!border-emerald-600 !bg-emerald-600 !text-white hover:!border-emerald-700 hover:!bg-emerald-700"
+              disabled={isLoading || checkoutBlocked}
+              onClick={onPrintFinance}
+            >
+              {t("cashier.printFinance")}
+            </Button>
           ) : null}
         </div>
       ) : (
