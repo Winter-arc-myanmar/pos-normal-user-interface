@@ -359,10 +359,10 @@ export function ProductMenu({
                   </span>
                 ) : null}
                 <span className="block flex-1 px-3 py-2">
-                  <span className="line-clamp-2 break-words text-sm font-semibold leading-snug">
+                  <span className="line-clamp-2 break-words text-xs font-semibold leading-snug min-[900px]:text-sm">
                     {product.name}
                   </span>
-                  <span className="mt-1 block font-semibold text-blue-400">
+                  <span className="mt-1 block text-sm font-semibold text-blue-400 min-[900px]:text-base">
                     {product.basePrice}
                   </span>
                 </span>

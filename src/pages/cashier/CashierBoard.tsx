@@ -200,7 +200,7 @@ export function CashierBoard({
                     >
                       <span
                         className={[
-                          "absolute left-2 top-2 max-w-[42%] truncate text-sm font-semibold",
+                          "absolute left-2 top-2 max-w-[42%] truncate text-xs font-semibold min-[900px]:text-sm",
                           occupied ? "text-slate-900" : "",
                         ].join(" ")}
                       >
@@ -226,7 +226,7 @@ export function CashierBoard({
                         <span className="text-4xl leading-none text-white/90">+</span>
                       ) : session ? (
                         <span
-                          className="mb-4 max-w-[90%] truncate text-[11px] font-semibold text-sky-700"
+                          className="mb-4 max-w-[90%] truncate text-[10px] font-semibold text-sky-700 min-[900px]:text-[11px]"
                           title={t("cashier.orderPanel.sessionState")}
                         >
                           {session.tableId !== table.id
@@ -247,7 +247,7 @@ export function CashierBoard({
                       ) : null}
                       <span
                         className={[
-                          "absolute bottom-1.5 max-w-[55%] truncate text-[10px]",
+                          "absolute bottom-1.5 max-w-[55%] truncate text-[9px] min-[900px]:text-[10px]",
                           occupied ? "text-slate-600" : "text-slate-300",
                           orderCount > 1 ? "right-2" : "left-2",
                         ].join(" ")}
@@ -274,13 +274,13 @@ export function CashierBoard({
                     ].join(" ")}
                     onClick={() => onOrderSelect(order)}
                   >
-                    <span className="absolute left-2 top-2 text-sm font-semibold">
+                    <span className="absolute left-2 top-2 text-xs font-semibold min-[900px]:text-sm">
                       {order.orderNumber || order.id.slice(0, 8)}
                     </span>
                     {settled ? null : (
                       <span className="text-4xl leading-none text-white/90">+</span>
                     )}
-                    <span className="absolute bottom-2 right-2 text-[10px] text-slate-300">
+                    <span className="absolute bottom-2 right-2 text-[9px] text-slate-300 min-[900px]:text-[10px]">
                       {order.status}
                     </span>
                   </button>
