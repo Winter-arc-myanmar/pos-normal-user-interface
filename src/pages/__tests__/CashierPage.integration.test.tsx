@@ -689,6 +689,76 @@ describe("CashierPage integration", () => {
     });
   });
 
+  // A discount typed on one table's bill used to follow the cashier to the next
+  // table, and to be lost when the cashier opened another screen and came back.
+  describe("bill adjustments per table", () => {
+    // A fresh element each time, so a rerender really renders the new order.
+    const bill = () => (
+      <MemoryRouter initialEntries={["/cashier?view=menu"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    const openBillOptions = async () => {
+      fireEvent.click(
+        await screen.findByRole("button", { name: /cashier\.billOptions\.title/ })
+      );
+    };
+
+    const closeBillOptions = () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: "cashier.billOptions.done" })
+      );
+    };
+
+    /** The discount this bill carries, as Bill & table shows it. */
+    const shownDiscount = async () => {
+      await openBillOptions();
+      const input = screen.getByRole("textbox", {
+        name: "cashier.orderPanel.discount",
+      }) as HTMLInputElement;
+      const value = input.value;
+      closeBillOptions();
+      return value;
+    };
+
+    const typeDiscount = async (value: string) => {
+      await openBillOptions();
+      fireEvent.change(
+        screen.getByRole("textbox", { name: "cashier.orderPanel.discount" }),
+        { target: { value } }
+      );
+      closeBillOptions();
+    };
+
+    it("does not hand one table's discount to the next table", async () => {
+      const { rerender } = render(bill());
+      await typeDiscount("2");
+      expect(await shownDiscount()).toBe("2");
+
+      // Back to the table board, which lets go of the order, then another table.
+      selectedOrderState = null;
+      selectedOrderLinesState = [];
+      rerender(bill());
+      selectedOrderState = { ...order, id: "order-2", orderNumber: "POS-002" };
+      selectedOrderLinesState = [{ ...orderLine, salesOrderId: "order-2" }];
+      rerender(bill());
+
+      expect(await shownDiscount()).toBe("");
+    });
+
+    it("brings a table's discount back after another screen", async () => {
+      const first = render(bill());
+      await typeDiscount("2");
+      first.unmount();
+
+      // The cashier left the till for another screen and opened the table again.
+      render(bill());
+
+      expect(await shownDiscount()).toBe("2");
+    });
+  });
+
   describe("guest details before payment", () => {
     const startBill = async () => {
       render(<MemoryRouter initialEntries={["/cashier?view=menu"]}><CashierPage /></MemoryRouter>);

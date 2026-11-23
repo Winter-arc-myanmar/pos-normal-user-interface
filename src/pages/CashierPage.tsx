@@ -97,6 +97,13 @@ import {
   writeTableOrderIds,
 } from "@/lib/pos/multiOrdering";
 import {
+  EMPTY_BILL_ADJUSTMENTS,
+  clearBillAdjustments,
+  readBillAdjustments,
+  writeBillAdjustments,
+  type BillAdjustments,
+} from "@/lib/pos/billAdjustments";
+import {
   ensureMemberCardPaymentMethod,
   findMemberCardPaymentMethod,
   isMemberCardPaymentMethod,
@@ -254,9 +261,55 @@ export function CashierPage() {
   const [isMultiOrderMutating, setIsMultiOrderMutating] = useState(false);
   const [isSplitMode, setIsSplitMode] = useState(false);
   const [splitTenders, setSplitTenders] = useState<SplitPaymentTenderDTO[]>([]);
-  const [discountAmount, setDiscountAmount] = useState("0.0000");
-  const [discountReasonId, setDiscountReasonId] = useState("");
-  const [tipAmount, setTipAmount] = useState("0.0000");
+  /**
+   * The discount, its reason and the tip belong to one order. Keeping them on
+   * the order that was chosen is what stops a table's discount landing on the
+   * next table, and what brings it back when the cashier returns to that table.
+   */
+  const [billAdjustments, setBillAdjustments] = useState<{
+    orderId?: string;
+    value: BillAdjustments;
+  }>(() => ({
+    orderId: selectedOrder?.id,
+    value: readBillAdjustments(selectedOrder?.id),
+  }));
+  const adjustments = useMemo(
+    () =>
+      billAdjustments.orderId === selectedOrder?.id
+        ? billAdjustments.value
+        : readBillAdjustments(selectedOrder?.id),
+    [billAdjustments, selectedOrder?.id]
+  );
+  const { discount: discountAmount, discountReasonId, tip: tipAmount } = adjustments;
+  const updateBillAdjustments = useCallback(
+    (patch: Partial<BillAdjustments>) => {
+      const orderId = selectedOrder?.id;
+      setBillAdjustments((current) => ({
+        orderId,
+        value: {
+          ...(current.orderId === orderId
+            ? current.value
+            : readBillAdjustments(orderId)),
+          ...patch,
+        },
+      }));
+    },
+    [selectedOrder?.id]
+  );
+  const setDiscountAmount = (value: string) =>
+    updateBillAdjustments({ discount: value });
+  const setDiscountReasonId = (value: string) =>
+    updateBillAdjustments({ discountReasonId: value });
+  const setTipAmount = (value: string) => updateBillAdjustments({ tip: value });
+  /** A bill back to its plain price: nothing left to carry to another order. */
+  const resetBillAdjustments = useCallback(() => {
+    const orderId = selectedOrder?.id;
+    setBillAdjustments({ orderId, value: EMPTY_BILL_ADJUSTMENTS });
+    clearBillAdjustments(orderId);
+  }, [selectedOrder?.id]);
+  useEffect(() => {
+    writeBillAdjustments(billAdjustments.orderId, billAdjustments.value);
+  }, [billAdjustments]);
   const [billGeneration, setBillGeneration] = useState(0);
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
   // A sale taken away asks once, when Confirm pay is pressed, for the details
@@ -358,6 +411,8 @@ export function CashierPage() {
 
   const resetWorkspaceAfterTransaction = useCallback(
     async (message: string) => {
+      // The sale is done, so its discount must not wait for the next bill.
+      resetBillAdjustments();
       clearOrderSelection();
       clearError();
       setIsDirectCheckoutMode(false);
@@ -365,9 +420,6 @@ export function CashierPage() {
       setPaymentAmount("0.0000");
       setIsSplitMode(false);
       setSplitTenders([]);
-      setDiscountAmount("0.0000");
-      setDiscountReasonId("");
-      setTipAmount("0.0000");
       guestDetailsRef.current = undefined;
       setGuestDetailsOpen(false);
       setBillGeneration((generation) => generation + 1);
@@ -376,7 +428,13 @@ export function CashierPage() {
       setSearchParams({ view: "orders" });
       await loadData();
     },
-    [clearError, clearOrderSelection, loadData, setSearchParams]
+    [
+      clearError,
+      clearOrderSelection,
+      loadData,
+      resetBillAdjustments,
+      setSearchParams,
+    ]
   );
 
   useEffect(() => {
@@ -1238,9 +1296,6 @@ export function CashierPage() {
     ) {
       setIsSplitMode(false);
       setSplitTenders([]);
-      setDiscountAmount("0.0000");
-      setDiscountReasonId("");
-      setTipAmount("0.0000");
     }
     previousOrderIdRef.current = nextId;
   }, [selectedOrder?.id]);
@@ -2572,6 +2627,8 @@ export function CashierPage() {
         }
 
         const nextIds = tableOrderIds.filter((id) => id !== selectedOrder.id);
+        // The paid order keeps no discount waiting for the table's next bill.
+        clearBillAdjustments(selectedOrder.id);
         writeTableOrderIds(activeTableId, nextIds);
         setTableOrderIds(nextIds);
         setMultiOrderLines((current) => {
@@ -3408,9 +3465,6 @@ export function CashierPage() {
     setMultiOrderLines({});
     setSelectedMergeOrderIds([]);
     clearOrderSelection();
-    setDiscountAmount("0.0000");
-    setDiscountReasonId("");
-    setTipAmount("0.0000");
     setLocalError(null);
     setNotice(null);
     setSearchParams({ view: "orders" });
@@ -3519,10 +3573,7 @@ export function CashierPage() {
         isMemberCardLoading={isMemberCardLoading}
         onDiscountAmountChange={setDiscountAmount}
         onDiscountReasonChange={setDiscountReasonId}
-        onRemoveDiscount={() => {
-          setDiscountAmount("0.0000");
-          setDiscountReasonId("");
-        }}
+        onRemoveDiscount={resetBillAdjustments}
         onTipAmountChange={setTipAmount}
         onMemberCardUidChange={setMemberCardUid}
         onLookupMemberCard={() => void handleLookupMemberCard()}
