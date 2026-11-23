@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   EMPTY_BILL_ADJUSTMENTS,
   clearBillAdjustments,
@@ -8,7 +8,12 @@ import {
 
 describe("billAdjustments", () => {
   beforeEach(() => {
-    sessionStorage.clear();
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("keeps each order's discount, reason and tip on that order alone", () => {
@@ -63,6 +68,45 @@ describe("billAdjustments", () => {
   it("stores nothing for a quick sale that has no order yet", () => {
     writeBillAdjustments(undefined, { ...EMPTY_BILL_ADJUSTMENTS, discount: "5" });
 
-    expect(sessionStorage.getItem("pos-bill-adjustments")).toBeNull();
+    expect(window.localStorage.getItem("pos-bill-adjustments")).toBeNull();
+    expect(window.sessionStorage.getItem("pos-bill-adjustments")).toBeNull();
+  });
+
+  // The Android shell recreates its WebView, which clears sessionStorage but
+  // keeps localStorage, so a typed bill must live in localStorage.
+  it("survives a closed till, not only the current view", () => {
+    writeBillAdjustments("order-1", { ...EMPTY_BILL_ADJUSTMENTS, discount: "5" });
+    window.sessionStorage.clear();
+
+    expect(JSON.parse(window.localStorage.getItem("pos-bill-adjustments") || "{}"))
+      .toHaveProperty("order-1");
+    expect(readBillAdjustments("order-1").discount).toBe("5");
+  });
+
+  it("drops a bill typed longer ago than a shift", () => {
+    window.localStorage.setItem(
+      "pos-bill-adjustments",
+      JSON.stringify({
+        "order-old": {
+          discount: "5",
+          discountReasonId: "",
+          tip: "0.0000",
+          savedAt: Date.now() - 13 * 60 * 60 * 1000,
+        },
+      })
+    );
+
+    expect(readBillAdjustments("order-old")).toEqual(EMPTY_BILL_ADJUSTMENTS);
+  });
+
+  // A WebView can deny storage by throwing instead of hiding the API.
+  it("keeps the bill for the session when the WebView denies storage", () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("storage denied");
+    });
+
+    writeBillAdjustments("order-1", { ...EMPTY_BILL_ADJUSTMENTS, discount: "5" });
+
+    expect(readBillAdjustments("order-1").discount).toBe("5");
   });
 });
