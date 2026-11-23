@@ -2,7 +2,7 @@ import { createRef, type ComponentProps } from "react";
 import { fireEvent, render as mount, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { DiningTable, PaymentMethod, SalesOrder, SalesOrderLine, TableSession } from "@/core/domain/entities/Cashier";
+import { AdjustmentReason, DiningTable, PaymentMethod, SalesOrder, SalesOrderLine, TableSession } from "@/core/domain/entities/Cashier";
 import type { RunningPromotion } from "@/core/domain/entities/Promotion";
 import { groupOrderLines, OrderPanel } from "../OrderPanel";
 
@@ -538,6 +538,35 @@ describe("OrderPanel", () => {
     fireEvent.click(options);
     expect(screen.getByLabelText("cashier.orderPanel.discount")).toBeInTheDocument();
     expect(screen.queryByText("cashier.billOptions.table")).not.toBeInTheDocument();
+  });
+
+  it("sets the bill discount from a percentage typed beside the amount", () => {
+    const onDiscountPercentChange = vi.fn();
+
+    render(
+      <OrderPanel
+        {...defaultProps}
+        selectedOrder={new SalesOrder({ ...paidOrder, status: "DRAFT" })}
+        discountAmount="0.0000"
+        discountPercent="10"
+        discountReasons={[new AdjustmentReason({ id: "reason-1", name: "Senior" })]}
+        onDiscountAmountChange={vi.fn()}
+        onDiscountPercentChange={onDiscountPercentChange}
+        onDiscountReasonChange={vi.fn()}
+        onRemoveDiscount={vi.fn()}
+        onTipAmountChange={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /cashier.billOptions.title/ }));
+    const percent = screen.getByLabelText("cashier.orderPanel.discountPercent");
+    expect(percent).toHaveValue("10");
+    expect(percent).toHaveAttribute("placeholder", "0");
+
+    fireEvent.change(percent, { target: { value: "15" } });
+    expect(onDiscountPercentChange).toHaveBeenCalledWith("15");
+    // The reason keeps a row of its own, so the rate can sit beside the amount.
+    expect(screen.getByLabelText("cashier.orderPanel.discountReason")).toBeInTheDocument();
   });
 
   it("starts the discount and tip boxes empty so typed amounts are not added after 0.0000", async () => {

@@ -62,6 +62,7 @@ import {
   estimateCardCharge,
 } from "@/lib/spa/payment";
 import { lineFocDiscount, withOrderTipOnFirstPayment } from "@/lib/pos/checkoutAdjustments";
+import { discountAmountForPercent } from "@/lib/pos/discountPercent";
 import { freeTimeFor } from "@/lib/spa/freeTime";
 import type { RentalChoice } from "@/lib/spa/freeTime";
 import {
@@ -271,6 +272,11 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
   const [manualTimes, setManualTimes] = useState<ManualTimes>({ inAt: "", outAt: "" });
   // Bill & table for a room: the same bill-level choices the cashier takes.
   const [billDiscount, setBillDiscount] = useState("0.0000");
+  /**
+   * The rate the cashier last typed, if any. The bill endpoints take money, so
+   * this only drives `billDiscount`: a typed amount leaves no rate behind.
+   */
+  const [billDiscountPercent, setBillDiscountPercent] = useState("");
   const [billDiscountReasonId, setBillDiscountReasonId] = useState("");
   const [billOptionsOpen, setBillOptionsOpen] = useState(false);
   const [splitCash, setSplitCash] = useState(false);
@@ -477,6 +483,13 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
     ? Number(serverBill.grandTotal) + timeNotOnLines
     : Number(quote?.amountDue || quote?.runningTotal || 0);
   const endBillTotal = endBillDue + tipValue;
+  /**
+   * What a typed percentage comes off: the room's items and time before any
+   * discount, as the server prices them.
+   */
+  const billDiscountBase = serverBill
+    ? Number(serverBill.subtotal) + timeNotOnLines
+    : endBillDue;
   const endBreakdown = endBillOrderId
     ? billBreakdown({
         lines: chargedLines,
@@ -3270,6 +3283,7 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
               </fieldset>
               <OrderAdjustments
                 discountAmount={billDiscount}
+                discountPercent={billDiscountPercent}
                 discountReasonId={billDiscountReasonId}
                 discountReasons={discountReasons}
                 serviceCharge={String(
@@ -3278,11 +3292,18 @@ export function SpaBoardPage({ kind = "spa" }: { kind?: RoomKind }) {
                 tipAmount={tip}
                 disabled={isPaying || billOptions.isLoading || billClosed}
                 onDiscountAmountChange={(value) => {
+                  setBillDiscountPercent("");
                   setBillDiscount(value);
+                  resetSplit();
+                }}
+                onDiscountPercentChange={(value) => {
+                  setBillDiscountPercent(value);
+                  setBillDiscount(discountAmountForPercent(value, billDiscountBase));
                   resetSplit();
                 }}
                 onDiscountReasonChange={setBillDiscountReasonId}
                 onRemoveDiscount={() => {
+                  setBillDiscountPercent("");
                   setBillDiscount("0.0000");
                   setBillDiscountReasonId("");
                   resetSplit();

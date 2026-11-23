@@ -592,6 +592,23 @@ describe("CashierPage integration", () => {
       expect(mocks.settleOrder).not.toHaveBeenCalled();
     });
 
+    // The bill endpoint takes an amount, never a rate: the till works the
+    // percentage out and the amount is what gets priced and paid.
+    it("turns a discount typed as a percentage into the amount the bill takes off", async () => {
+      productState = { ...product, basePrice: "100.0000", taxRate: 10 };
+      await startDirectBill();
+      fireEvent.click(screen.getByRole("button", { name: /cashier.billOptions.title/ }));
+
+      fireEvent.change(
+        screen.getByRole("textbox", { name: "cashier.orderPanel.discountPercent" }),
+        { target: { value: "10" } }
+      );
+
+      expect(
+        screen.getByRole("textbox", { name: "cashier.orderPanel.discount" })
+      ).toHaveValue("10.0000");
+    });
+
     // The slip prints Tax and Service charge as rows of their own under the
     // items, so its Subtotal is the items' money and the rows add up to TOTAL.
     it("prints the items alone as the subtotal when no bill option was changed", async () => {

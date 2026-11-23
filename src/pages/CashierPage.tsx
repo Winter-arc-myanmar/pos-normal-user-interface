@@ -103,6 +103,7 @@ import {
   writeBillAdjustments,
   type BillAdjustments,
 } from "@/lib/pos/billAdjustments";
+import { discountAmountForPercent } from "@/lib/pos/discountPercent";
 import {
   ensureMemberCardPaymentMethod,
   findMemberCardPaymentMethod,
@@ -281,6 +282,19 @@ export function CashierPage() {
     [billAdjustments, selectedOrder?.id]
   );
   const { discount: discountAmount, discountReasonId, tip: tipAmount } = adjustments;
+  /**
+   * The rate the cashier last typed, if any. The bill endpoints take money, so
+   * this only drives `discount`: a typed amount leaves no rate behind.
+   */
+  const [discountPercentState, setDiscountPercentState] = useState<{
+    orderId?: string;
+    value: string;
+  }>({ orderId: selectedOrder?.id, value: "" });
+  /** A rate belongs to the bill it was typed on, not to the next table's bill. */
+  const discountPercent =
+    discountPercentState.orderId === selectedOrder?.id ? discountPercentState.value : "";
+  const setDiscountPercent = (value: string) =>
+    setDiscountPercentState({ orderId: selectedOrder?.id, value });
   const updateBillAdjustments = useCallback(
     (patch: Partial<BillAdjustments>) => {
       const orderId = selectedOrder?.id;
@@ -296,8 +310,11 @@ export function CashierPage() {
     },
     [selectedOrder?.id]
   );
-  const setDiscountAmount = (value: string) =>
+  const setDiscountAmount = (value: string) => {
+    // The amount the cashier typed is the bill's own figure; no rate drives it.
+    setDiscountPercent("");
     updateBillAdjustments({ discount: value });
+  };
   const setDiscountReasonId = (value: string) =>
     updateBillAdjustments({ discountReasonId: value });
   const setTipAmount = (value: string) => updateBillAdjustments({ tip: value });
@@ -306,6 +323,7 @@ export function CashierPage() {
     const orderId = selectedOrder?.id;
     setBillAdjustments({ orderId, value: EMPTY_BILL_ADJUSTMENTS });
     clearBillAdjustments(orderId);
+    setDiscountPercentState({ orderId, value: "" });
   }, [selectedOrder?.id]);
   useEffect(() => {
     writeBillAdjustments(billAdjustments.orderId, billAdjustments.value);
@@ -1137,6 +1155,18 @@ export function CashierPage() {
   const receiptGivenAway = givenAwayDiscount(paymentBillLines);
   const receiptItemsSubtotal = toMoney(Number(receiptSubtotal) - receiptGivenAway);
   const receiptItemsDiscount = toMoney(Number(receiptDiscount) - receiptGivenAway);
+  /**
+   * What a typed percentage comes off: the bill's items before any discount,
+   * as the server prices them, or the cart's own lines before a quick sale has
+   * an order to ask about.
+   */
+  const discountPercentBase = Number(billOptions.quote?.subtotal ?? itemsSubtotal);
+  const applyDiscountPercent = (value: string) => {
+    setDiscountPercent(value);
+    updateBillAdjustments({
+      discount: discountAmountForPercent(value, discountPercentBase),
+    });
+  };
   /** How a promotion on one line reads under that item, e.g. "1+1  -10,000". */
   const promotionForLine = (line: PromotionLine) => {
     const saving = linePromotionSaving(
@@ -3557,6 +3587,7 @@ export function CashierPage() {
         promotionDiscounts={isDirectCheckoutMode ? promotions.discounts : undefined}
         promotionName={promotions.promotionName}
         discountAmount={discountAmount}
+        discountPercent={discountPercent}
         discountReasonId={discountReasonId}
         discountReasons={discountReasons}
         serviceCharge={toMoney(Number(receiptServiceCharge) + Number(billOptions.bill?.serviceChargeTax ?? serviceChargeTax))}
@@ -3572,6 +3603,7 @@ export function CashierPage() {
         memberCardError={memberCardError}
         isMemberCardLoading={isMemberCardLoading}
         onDiscountAmountChange={setDiscountAmount}
+        onDiscountPercentChange={applyDiscountPercent}
         onDiscountReasonChange={setDiscountReasonId}
         onRemoveDiscount={resetBillAdjustments}
         onTipAmountChange={setTipAmount}

@@ -5,6 +5,11 @@ import { formatPosMoney } from "@/lib/pos/orderListDisplay";
 
 interface OrderAdjustmentsProps {
   discountAmount: string;
+  /**
+   * A discount typed as a percentage. The till turns it into `discountAmount`:
+   * the bill endpoints take money, never a rate.
+   */
+  discountPercent?: string;
   discountReasonId: string;
   discountReasons: AdjustmentReason[];
   serviceCharge: string;
@@ -16,6 +21,8 @@ interface OrderAdjustmentsProps {
   isMemberCardLoading?: boolean;
   disabled?: boolean;
   onDiscountAmountChange: (value: string) => void;
+  /** Present wherever the till can turn a percentage into the amount above. */
+  onDiscountPercentChange?: (value: string) => void;
   onDiscountReasonChange: (value: string) => void;
   onRemoveDiscount: () => void;
   onTipAmountChange: (value: string) => void;
@@ -31,6 +38,7 @@ const inputClass =
 
 export function OrderAdjustments({
   discountAmount,
+  discountPercent = "",
   discountReasonId,
   discountReasons,
   serviceCharge,
@@ -41,6 +49,7 @@ export function OrderAdjustments({
   isMemberCardLoading = false,
   disabled = false,
   onDiscountAmountChange,
+  onDiscountPercentChange,
   onDiscountReasonChange,
   onRemoveDiscount,
   onTipAmountChange,
@@ -49,6 +58,27 @@ export function OrderAdjustments({
 }: OrderAdjustmentsProps) {
   const { t } = useTranslation();
   const hasDiscount = Number(discountAmount) > 0;
+  const reasonField = discountReasons.length ? (
+    <label className="block space-y-1">
+      <span className="text-xs text-slate-300">
+        {t("cashier.orderPanel.discountReason")}
+      </span>
+      <select
+        value={discountReasonId}
+        disabled={disabled}
+        aria-label={t("cashier.orderPanel.discountReason")}
+        onChange={(event) => onDiscountReasonChange(event.target.value)}
+        className={inputClass}
+      >
+        <option value="">{t("cashier.orderPanel.selectDiscountReason")}</option>
+        {discountReasons.map((reason) => (
+          <option key={reason.id} value={reason.id}>
+            {reason.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  ) : null;
 
   return (
     <div className="space-y-3 text-sm">
@@ -68,28 +98,28 @@ export function OrderAdjustments({
             className={inputClass}
           />
         </label>
-        {discountReasons.length ? (
+        {onDiscountPercentChange ? (
           <label className="block space-y-1">
             <span className="text-xs text-slate-300">
-              {t("cashier.orderPanel.discountReason")}
+              {t("cashier.orderPanel.discountPercent")}
             </span>
-            <select
-              value={discountReasonId}
+            <input
+              inputMode="decimal"
+              value={discountPercent}
+              placeholder="0"
               disabled={disabled}
-              aria-label={t("cashier.orderPanel.discountReason")}
-              onChange={(event) => onDiscountReasonChange(event.target.value)}
+              aria-label={t("cashier.orderPanel.discountPercent")}
+              onFocus={(event) => event.currentTarget.select()}
+              onChange={(event) => onDiscountPercentChange(event.target.value)}
               className={inputClass}
-            >
-              <option value="">{t("cashier.orderPanel.selectDiscountReason")}</option>
-              {discountReasons.map((reason) => (
-                <option key={reason.id} value={reason.id}>
-                  {reason.name}
-                </option>
-              ))}
-            </select>
+            />
           </label>
-        ) : null}
+        ) : (
+          reasonField
+        )}
       </div>
+      {/* With a percentage beside the amount, the reason keeps a row of its own. */}
+      {onDiscountPercentChange ? reasonField : null}
       {hasDiscount ? (
         <Button
           size="sm"
