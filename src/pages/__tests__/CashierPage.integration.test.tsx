@@ -592,6 +592,23 @@ describe("CashierPage integration", () => {
       expect(mocks.settleOrder).not.toHaveBeenCalled();
     });
 
+    // The bill endpoint takes an amount, never a rate: the till works the
+    // percentage out and the amount is what gets priced and paid.
+    it("turns a discount typed as a percentage into the amount the bill takes off", async () => {
+      productState = { ...product, basePrice: "100.0000", taxRate: 10 };
+      await startDirectBill();
+      fireEvent.click(screen.getByRole("button", { name: /cashier.billOptions.title/ }));
+
+      fireEvent.change(
+        screen.getByRole("textbox", { name: "cashier.orderPanel.discountPercent" }),
+        { target: { value: "10" } }
+      );
+
+      expect(
+        screen.getByRole("textbox", { name: "cashier.orderPanel.discount" })
+      ).toHaveValue("10.0000");
+    });
+
     // The slip prints Tax and Service charge as rows of their own under the
     // items, so its Subtotal is the items' money and the rows add up to TOTAL.
     it("prints the items alone as the subtotal when no bill option was changed", async () => {
@@ -686,6 +703,204 @@ describe("CashierPage integration", () => {
       expect(secondBill.payments).toEqual([{ paymentMethodId: "cash", amount: "121.0000" }]);
       expect(secondBill).not.toHaveProperty("includeTax");
       expect(secondBill).not.toHaveProperty("includeServiceCharge");
+    });
+  });
+
+  // A bill discount lowers what the guest is charged, so tax belongs on what is
+  // left after it — not on the prices before it.
+  describe("tax after a bill discount", () => {
+    const coffeeAt100 = { ...product, basePrice: "100.0000", taxRate: 10 };
+
+    const typeDiscount = (value: string) => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /cashier\.billOptions\.title/ })
+      );
+      fireEvent.change(
+        screen.getByRole("textbox", { name: "cashier.orderPanel.discount" }),
+        { target: { value } }
+      );
+      fireEvent.click(
+        screen.getByRole("button", { name: "cashier.billOptions.done" })
+      );
+    };
+
+    beforeEach(() => {
+      venueSettingsState = {
+        defaultTaxRate: null,
+        serviceChargeBps: 0,
+        serviceChargeOn: { BAR: true, SPA: true, KTV: true },
+        serviceChargeTaxRate: 0,
+        kdsDeleteSlips: true,
+      };
+      selectedOrderState = null;
+      selectedOrderLinesState = [];
+      productState = coffeeAt100;
+    });
+
+    it("taxes a quick sale on what is left after the discount", async () => {
+      activeServiceTypeState = "TAKE_AWAY";
+      render(
+        <MemoryRouter initialEntries={["/cashier?view=menu"]}>
+          <CashierPage />
+        </MemoryRouter>
+      );
+      fireEvent.click(screen.getByRole("button", { name: "cashier.newOrder" }));
+      await waitFor(() =>
+        expect(screen.getByText("cashier.orderPanel.cartStarted")).toBeInTheDocument()
+      );
+      fireEvent.click(screen.getByRole("button", { name: /Coffee/ }));
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "cashier.payNow" })).toBeEnabled()
+      );
+
+      typeDiscount("10");
+      fireEvent.click(screen.getByRole("button", { name: "cashier.payNow" }));
+      await screen.findByRole(
+        "button",
+        { name: "cashier.payment.options" },
+        { timeout: 5000 }
+      );
+      fireEvent.click(
+        screen.getByRole("checkbox", { name: "cashier.payment.printBillOnConfirm" })
+      );
+      fireEvent.click(screen.getByRole("button", { name: "cashier.confirmPay" }));
+      fireEvent.click(
+        await screen.findByRole("button", { name: "cashier.guestDetails.skip" })
+      );
+
+      await waitFor(() => expect(mocks.processCheckout).toHaveBeenCalled());
+      const bill = mocks.processCheckout.mock.calls[0][0];
+      // 100 − 10 = 90, and 10% of that is 9, so the guest pays 99 and not 100.
+      expect(bill.payments).toEqual([
+        { paymentMethodId: "cash", amount: "99.0000" },
+      ]);
+      await waitFor(() =>
+        expect(mocks.printReceipt).toHaveBeenCalledWith(
+          expect.objectContaining({
+            subtotal: "100.0000",
+            discount: "10.0000",
+            tax: "9.0000",
+            total: "99.0000",
+          })
+        )
+      );
+    });
+
+    it("taxes a saved bill on what is left after the discount", async () => {
+      productState = { ...product, basePrice: "10.0000", taxRate: 5 };
+      selectedOrderLinesState = [orderLine];
+      selectedOrderState = {
+        ...order,
+        serviceType: "DINE_IN",
+        subtotal: "10.0000",
+        totalTax: "0.5000",
+        grandTotal: "10.5000",
+      };
+      // The server prices the bill with the discount it is asked about.
+      mocks.fetchOrderBill.mockImplementation(
+        async (_id: string, query: { discount?: string }) => {
+          const discount = Number(query.discount || 0);
+          const net = Math.max(0, 10 - discount);
+          const tax = Number((net * 0.05).toFixed(4));
+          return {
+            orderId: "order-1",
+            subtotal: "10.0000",
+            totalDiscount: discount.toFixed(4),
+            addedTax: tax.toFixed(4),
+            totalTax: tax.toFixed(4),
+            serviceCharge: "0.0000",
+            serviceChargeTax: "0.0000",
+            grandTotal: (net + tax).toFixed(4),
+          };
+        }
+      );
+
+      render(
+        <MemoryRouter initialEntries={["/cashier?view=menu"]}>
+          <CashierPage />
+        </MemoryRouter>
+      );
+      typeDiscount("2");
+      fireEvent.click(screen.getByRole("button", { name: "cashier.payNow" }));
+
+      // 10 − 2 = 8, and 5% of that is 0.40, so the bill is 8.40 and not 8.50.
+      await waitFor(() =>
+        expect(screen.getAllByText("8.40").length).toBeGreaterThan(0)
+      );
+      expect(mocks.fetchOrderBill).toHaveBeenCalledWith(
+        "order-1",
+        expect.objectContaining({ discount: "2" })
+      );
+    });
+  });
+
+  // A discount typed on one table's bill used to follow the cashier to the next
+  // table, and to be lost when the cashier opened another screen and came back.
+  describe("bill adjustments per table", () => {
+    // A fresh element each time, so a rerender really renders the new order.
+    const bill = () => (
+      <MemoryRouter initialEntries={["/cashier?view=menu"]}>
+        <CashierPage />
+      </MemoryRouter>
+    );
+
+    const openBillOptions = async () => {
+      fireEvent.click(
+        await screen.findByRole("button", { name: /cashier\.billOptions\.title/ })
+      );
+    };
+
+    const closeBillOptions = () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: "cashier.billOptions.done" })
+      );
+    };
+
+    /** The discount this bill carries, as Bill & table shows it. */
+    const shownDiscount = async () => {
+      await openBillOptions();
+      const input = screen.getByRole("textbox", {
+        name: "cashier.orderPanel.discount",
+      }) as HTMLInputElement;
+      const value = input.value;
+      closeBillOptions();
+      return value;
+    };
+
+    const typeDiscount = async (value: string) => {
+      await openBillOptions();
+      fireEvent.change(
+        screen.getByRole("textbox", { name: "cashier.orderPanel.discount" }),
+        { target: { value } }
+      );
+      closeBillOptions();
+    };
+
+    it("does not hand one table's discount to the next table", async () => {
+      const { rerender } = render(bill());
+      await typeDiscount("2");
+      expect(await shownDiscount()).toBe("2");
+
+      // Back to the table board, which lets go of the order, then another table.
+      selectedOrderState = null;
+      selectedOrderLinesState = [];
+      rerender(bill());
+      selectedOrderState = { ...order, id: "order-2", orderNumber: "POS-002" };
+      selectedOrderLinesState = [{ ...orderLine, salesOrderId: "order-2" }];
+      rerender(bill());
+
+      expect(await shownDiscount()).toBe("");
+    });
+
+    it("brings a table's discount back after another screen", async () => {
+      const first = render(bill());
+      await typeDiscount("2");
+      first.unmount();
+
+      // The cashier left the till for another screen and opened the table again.
+      render(bill());
+
+      expect(await shownDiscount()).toBe("2");
     });
   });
 

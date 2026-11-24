@@ -97,6 +97,14 @@ import {
   writeTableOrderIds,
 } from "@/lib/pos/multiOrdering";
 import {
+  EMPTY_BILL_ADJUSTMENTS,
+  clearBillAdjustments,
+  readBillAdjustments,
+  writeBillAdjustments,
+  type BillAdjustments,
+} from "@/lib/pos/billAdjustments";
+import { discountAmountForPercent } from "@/lib/pos/discountPercent";
+import {
   ensureMemberCardPaymentMethod,
   findMemberCardPaymentMethod,
   isMemberCardPaymentMethod,
@@ -254,9 +262,74 @@ export function CashierPage() {
   const [isMultiOrderMutating, setIsMultiOrderMutating] = useState(false);
   const [isSplitMode, setIsSplitMode] = useState(false);
   const [splitTenders, setSplitTenders] = useState<SplitPaymentTenderDTO[]>([]);
-  const [discountAmount, setDiscountAmount] = useState("0.0000");
-  const [discountReasonId, setDiscountReasonId] = useState("");
-  const [tipAmount, setTipAmount] = useState("0.0000");
+  /**
+   * The discount, its reason and the tip belong to one order. Keeping them on
+   * the order that was chosen is what stops a table's discount landing on the
+   * next table, and what brings it back when the cashier returns to that table.
+   */
+  const [billAdjustments, setBillAdjustments] = useState<{
+    orderId?: string;
+    value: BillAdjustments;
+  }>(() => ({
+    orderId: selectedOrder?.id,
+    value: readBillAdjustments(selectedOrder?.id),
+  }));
+  const adjustments = useMemo(
+    () =>
+      billAdjustments.orderId === selectedOrder?.id
+        ? billAdjustments.value
+        : readBillAdjustments(selectedOrder?.id),
+    [billAdjustments, selectedOrder?.id]
+  );
+  const { discount: discountAmount, discountReasonId, tip: tipAmount } = adjustments;
+  /** The bill discount the cashier has typed; zero when the bill is not discounted. */
+  const billDiscountAmount = Math.max(0, Number(discountAmount) || 0);
+  /**
+   * The rate the cashier last typed, if any. The bill endpoints take money, so
+   * this only drives `discount`: a typed amount leaves no rate behind.
+   */
+  const [discountPercentState, setDiscountPercentState] = useState<{
+    orderId?: string;
+    value: string;
+  }>({ orderId: selectedOrder?.id, value: "" });
+  /** A rate belongs to the bill it was typed on, not to the next table's bill. */
+  const discountPercent =
+    discountPercentState.orderId === selectedOrder?.id ? discountPercentState.value : "";
+  const setDiscountPercent = (value: string) =>
+    setDiscountPercentState({ orderId: selectedOrder?.id, value });
+  const updateBillAdjustments = useCallback(
+    (patch: Partial<BillAdjustments>) => {
+      const orderId = selectedOrder?.id;
+      setBillAdjustments((current) => ({
+        orderId,
+        value: {
+          ...(current.orderId === orderId
+            ? current.value
+            : readBillAdjustments(orderId)),
+          ...patch,
+        },
+      }));
+    },
+    [selectedOrder?.id]
+  );
+  const setDiscountAmount = (value: string) => {
+    // The amount the cashier typed is the bill's own figure; no rate drives it.
+    setDiscountPercent("");
+    updateBillAdjustments({ discount: value });
+  };
+  const setDiscountReasonId = (value: string) =>
+    updateBillAdjustments({ discountReasonId: value });
+  const setTipAmount = (value: string) => updateBillAdjustments({ tip: value });
+  /** A bill back to its plain price: nothing left to carry to another order. */
+  const resetBillAdjustments = useCallback(() => {
+    const orderId = selectedOrder?.id;
+    setBillAdjustments({ orderId, value: EMPTY_BILL_ADJUSTMENTS });
+    clearBillAdjustments(orderId);
+    setDiscountPercentState({ orderId, value: "" });
+  }, [selectedOrder?.id]);
+  useEffect(() => {
+    writeBillAdjustments(billAdjustments.orderId, billAdjustments.value);
+  }, [billAdjustments]);
   const [billGeneration, setBillGeneration] = useState(0);
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
   // A sale taken away asks once, when Confirm pay is pressed, for the details
@@ -358,6 +431,8 @@ export function CashierPage() {
 
   const resetWorkspaceAfterTransaction = useCallback(
     async (message: string) => {
+      // The sale is done, so its discount must not wait for the next bill.
+      resetBillAdjustments();
       clearOrderSelection();
       clearError();
       setIsDirectCheckoutMode(false);
@@ -365,9 +440,6 @@ export function CashierPage() {
       setPaymentAmount("0.0000");
       setIsSplitMode(false);
       setSplitTenders([]);
-      setDiscountAmount("0.0000");
-      setDiscountReasonId("");
-      setTipAmount("0.0000");
       guestDetailsRef.current = undefined;
       setGuestDetailsOpen(false);
       setBillGeneration((generation) => generation + 1);
@@ -376,7 +448,13 @@ export function CashierPage() {
       setSearchParams({ view: "orders" });
       await loadData();
     },
-    [clearError, clearOrderSelection, loadData, setSearchParams]
+    [
+      clearError,
+      clearOrderSelection,
+      loadData,
+      resetBillAdjustments,
+      setSearchParams,
+    ]
   );
 
   useEffect(() => {
@@ -908,16 +986,29 @@ export function CashierPage() {
     setLocalError(null);
   };
 
-  // Instant checkout taxes the items after allocating the bill discount.
+  /**
+   * The bill as the server prices it. A typed discount is priced by the server,
+   * which taxes the bill after the discount, but the hook only holds that answer
+   * as `bill` once an option was changed; the same quote is already in `quote`.
+   * Ignoring it made the till tax the price before the discount.
+   */
+  const pricedBill =
+    billOptions.bill ?? (billDiscountAmount > 0 ? billOptions.quote : undefined);
+
+  // A quick sale is priced by the till, not the server, so the bill discount goes
+  // onto the items first: the tax is then worked out on what the guest pays, the
+  // way the server taxes a saved bill after its discount.
+  const previewLineDiscounts =
+    isDirectCheckoutMode && (billOptions.changed || billDiscountAmount > 0);
   const paymentBillLines = useMemo(() => {
-    if (!isDirectCheckoutMode || !billOptions.changed) return displayOrderLines;
-    const allocated = allocateOrderDiscountToLines(activeOrderLines, Number(discountAmount), isFeeLine);
+    if (!isDirectCheckoutMode || !previewLineDiscounts) return displayOrderLines;
+    const allocated = allocateOrderDiscountToLines(activeOrderLines, billDiscountAmount, isFeeLine);
     return activeOrderLines.map((line, index) => {
       const variant = variantById[line.variantId];
       const product = variant ? productById[variant.productId] : undefined;
       return buildDirectLine({ ...line, lineDiscount: allocated[index].lineDiscount }, product, variant);
     });
-  }, [activeOrderLines, billOptions.changed, buildDirectLine, discountAmount, displayOrderLines, isDirectCheckoutMode, isFeeLine, productById, variantById]);
+  }, [activeOrderLines, billDiscountAmount, buildDirectLine, displayOrderLines, isDirectCheckoutMode, isFeeLine, previewLineDiscounts, productById, variantById]);
 
   /**
    * What running promotions take off the bill: credited on a saved line, or
@@ -974,7 +1065,7 @@ export function CashierPage() {
           Number(line.lineDiscount || 0) -
           (line.taxInclusive ? Number(line.taxAmount || 0) : 0),
         0
-      ) - (isDirectCheckoutMode && billOptions.changed ? 0 : Math.max(0, Number(discountAmount) || 0));
+      ) - (isDirectCheckoutMode ? 0 : billDiscountAmount);
     const charge = (Math.max(0, preTax) * serviceChargeBps) / 10000;
     return {
       serviceCharge: charge,
@@ -982,10 +1073,9 @@ export function CashierPage() {
     };
   }, [
     paymentBillLines,
-    billOptions.changed,
+    billDiscountAmount,
     billOptions.includeServiceCharge,
     billOptions.includeTax,
-    discountAmount,
     isDirectCheckoutMode,
     isFeeLine,
     serviceChargeBps,
@@ -1004,8 +1094,8 @@ export function CashierPage() {
     ) {
       return syncedPaymentTotal.total.toFixed(4);
     }
-    if (billOptions.bill) {
-      return toMoney(Number(billOptions.bill.grandTotal) + Math.max(0, Number(tipAmount) || 0));
+    if (pricedBill) {
+      return toMoney(Number(pricedBill.grandTotal) + Math.max(0, Number(tipAmount) || 0));
     }
 
     const serverGrandTotal = !isDirectCheckoutMode
@@ -1018,24 +1108,25 @@ export function CashierPage() {
     if (serverGrandTotal > 0) {
       return payableFromServerGrandTotal({
         serverGrandTotal,
-        orderDiscount: Number(discountAmount),
+        orderDiscount: billDiscountAmount,
         tipAmount: Number(tipAmount),
       }).toFixed(4);
     }
 
     return payableTotal({
       lineTotal: lineSubtotal,
-      orderDiscount: isDirectCheckoutMode && billOptions.changed ? 0 : Number(discountAmount),
+      // A quick sale's lines already carry the bill discount, so it comes off once.
+      orderDiscount: isDirectCheckoutMode ? 0 : billDiscountAmount,
       serviceCharge: serviceCharge + serviceChargeTax,
       tipAmount: Number(tipAmount),
     }).toFixed(4);
   }, [
-    billOptions.bill,
-    billOptions.changed,
+    billDiscountAmount,
     billRevision,
     discountAmount,
     isDirectCheckoutMode,
     lineSubtotal,
+    pricedBill,
     selectedOrder?.grandTotal,
     selectedOrder?.id,
     serviceCharge,
@@ -1051,8 +1142,8 @@ export function CashierPage() {
         : 0).toFixed(4),
     [billOptions.includeTax, paymentBillLines]
   );
-  const receiptTax = billOptions.bill?.totalTax ?? toMoney(Number(orderTax) + serviceChargeTax);
-  const receiptServiceCharge = billOptions.bill?.serviceCharge ?? toMoney(serviceCharge);
+  const receiptTax = pricedBill?.totalTax ?? toMoney(Number(orderTax) + serviceChargeTax);
+  const receiptServiceCharge = pricedBill?.serviceCharge ?? toMoney(serviceCharge);
   // The slip prints Tax and Service charge as rows of their own under the items,
   // so its Subtotal is the items' own money. Falling back to the line total —
   // which adds the line tax — counted that tax twice on the paper and the rows
@@ -1068,8 +1159,8 @@ export function CashierPage() {
       0
     )
   );
-  const receiptSubtotal = billOptions.bill?.subtotal ?? itemsSubtotal;
-  const receiptDiscount = billOptions.bill?.totalDiscount ?? (billOptions.changed
+  const receiptSubtotal = pricedBill?.subtotal ?? itemsSubtotal;
+  const receiptDiscount = pricedBill?.totalDiscount ?? (billOptions.changed
     ? toMoney(paymentBillLines.reduce((sum, line) => sum + Number(line.lineDiscount || 0), 0)
       + (isDirectCheckoutMode ? 0 : Math.max(0, Number(discountAmount) || 0)))
     : discountAmount);
@@ -1079,6 +1170,18 @@ export function CashierPage() {
   const receiptGivenAway = givenAwayDiscount(paymentBillLines);
   const receiptItemsSubtotal = toMoney(Number(receiptSubtotal) - receiptGivenAway);
   const receiptItemsDiscount = toMoney(Number(receiptDiscount) - receiptGivenAway);
+  /**
+   * What a typed percentage comes off: the bill's items before any discount,
+   * as the server prices them, or the cart's own lines before a quick sale has
+   * an order to ask about.
+   */
+  const discountPercentBase = Number(billOptions.quote?.subtotal ?? itemsSubtotal);
+  const applyDiscountPercent = (value: string) => {
+    setDiscountPercent(value);
+    updateBillAdjustments({
+      discount: discountAmountForPercent(value, discountPercentBase),
+    });
+  };
   /** How a promotion on one line reads under that item, e.g. "1+1  -10,000". */
   const promotionForLine = (line: PromotionLine) => {
     const saving = linePromotionSaving(
@@ -1238,9 +1341,6 @@ export function CashierPage() {
     ) {
       setIsSplitMode(false);
       setSplitTenders([]);
-      setDiscountAmount("0.0000");
-      setDiscountReasonId("");
-      setTipAmount("0.0000");
     }
     previousOrderIdRef.current = nextId;
   }, [selectedOrder?.id]);
@@ -2303,7 +2403,9 @@ export function CashierPage() {
 
       const orderDiscount = Math.max(0, Number(discountAmount) || 0);
       const tip = Math.max(0, Number(tipAmount) || 0);
-      const discountLimit = isDirectCheckoutMode && billOptions.changed
+      // A quick sale's items are priced by the till, so its lines still carry the
+      // prices the bill discount comes off; a saved bill is checked against its own.
+      const discountLimit = isDirectCheckoutMode
         ? activeOrderLines.reduce((sum, line) => sum + Number(line.quantity) * Number(line.unitPrice) - Number(line.lineDiscount || 0), 0)
         : lineSubtotal;
       if (orderDiscount > discountLimit + 0.009) {
@@ -2334,9 +2436,12 @@ export function CashierPage() {
         // tax and service charge. Adding the local service charge here again
         // inflated 358,050 to 509,850. Only pending checkout adjustments belong
         // on top of the refreshed authoritative total.
-        const refreshedBill = billOptions.changed
-          ? await fetchOrderBill(selectedOrder.id, billOptions.query)
-          : null;
+        // A pending discount makes the amount depend on the quote as well: the
+        // server prices the bill after the discount, tax included.
+        const refreshedBill =
+          billOptions.changed || orderDiscount > 0
+            ? await fetchOrderBill(selectedOrder.id, billOptions.query)
+            : null;
         if (refreshedBill) billOptions.acceptBill(refreshedBill);
         const serverRefreshedTotal = refreshedBill
           ? Number(refreshedBill.grandTotal) + tip
@@ -2572,6 +2677,8 @@ export function CashierPage() {
         }
 
         const nextIds = tableOrderIds.filter((id) => id !== selectedOrder.id);
+        // The paid order keeps no discount waiting for the table's next bill.
+        clearBillAdjustments(selectedOrder.id);
         writeTableOrderIds(activeTableId, nextIds);
         setTableOrderIds(nextIds);
         setMultiOrderLines((current) => {
@@ -3408,9 +3515,6 @@ export function CashierPage() {
     setMultiOrderLines({});
     setSelectedMergeOrderIds([]);
     clearOrderSelection();
-    setDiscountAmount("0.0000");
-    setDiscountReasonId("");
-    setTipAmount("0.0000");
     setLocalError(null);
     setNotice(null);
     setSearchParams({ view: "orders" });
@@ -3503,6 +3607,7 @@ export function CashierPage() {
         promotionDiscounts={isDirectCheckoutMode ? promotions.discounts : undefined}
         promotionName={promotions.promotionName}
         discountAmount={discountAmount}
+        discountPercent={discountPercent}
         discountReasonId={discountReasonId}
         discountReasons={discountReasons}
         serviceCharge={toMoney(Number(receiptServiceCharge) + Number(billOptions.bill?.serviceChargeTax ?? serviceChargeTax))}
@@ -3518,11 +3623,9 @@ export function CashierPage() {
         memberCardError={memberCardError}
         isMemberCardLoading={isMemberCardLoading}
         onDiscountAmountChange={setDiscountAmount}
+        onDiscountPercentChange={applyDiscountPercent}
         onDiscountReasonChange={setDiscountReasonId}
-        onRemoveDiscount={() => {
-          setDiscountAmount("0.0000");
-          setDiscountReasonId("");
-        }}
+        onRemoveDiscount={resetBillAdjustments}
         onTipAmountChange={setTipAmount}
         onMemberCardUidChange={setMemberCardUid}
         onLookupMemberCard={() => void handleLookupMemberCard()}
@@ -3841,6 +3944,29 @@ export function CashierPage() {
             onTableSelect={(tableId) => void handleTableTap(tableId)}
             onOrderSelect={(order) => void handleOrderSelect(order)}
             onPageChange={setBoardPage}
+            toolbar={
+              usesTableBoard && diningZones.length ? (
+                <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1 min-[1100px]:hidden">
+                  {[
+                    { id: "ALL", name: t("cashier.locations.all") },
+                    ...diningZones,
+                  ].map((zone) => (
+                    <button
+                      key={zone.id}
+                      type="button"
+                      aria-pressed={zoneFilter === zone.id}
+                      onClick={() => setZoneFilter(zone.id)}
+                      className={[
+                        "min-h-9 shrink-0 whitespace-nowrap rounded px-3 text-xs font-medium",
+                        zoneFilter === zone.id ? "bg-blue-600" : "bg-slate-600",
+                      ].join(" ")}
+                    >
+                      {zone.name}
+                    </button>
+                  ))}
+                </div>
+              ) : null
+            }
           />
         )}
       </main>

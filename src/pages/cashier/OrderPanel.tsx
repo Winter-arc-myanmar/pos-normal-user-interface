@@ -145,6 +145,8 @@ interface OrderPanelProps {
   /** The name of a promotion already applied to a line, when it still exists. */
   promotionName?: (id: string | undefined) => string | undefined;
   discountAmount?: string;
+  /** A discount typed as a percentage, which the till turns into its amount. */
+  discountPercent?: string;
   discountReasonId?: string;
   discountReasons?: AdjustmentReason[];
   serviceCharge?: string;
@@ -154,6 +156,7 @@ interface OrderPanelProps {
   memberCardError?: string | null;
   isMemberCardLoading?: boolean;
   onDiscountAmountChange?: (value: string) => void;
+  onDiscountPercentChange?: (value: string) => void;
   onDiscountReasonChange?: (value: string) => void;
   onRemoveDiscount?: () => void;
   onTipAmountChange?: (value: string) => void;
@@ -232,6 +235,7 @@ export function OrderPanel({
   promotionDiscounts = {},
   promotionName = () => undefined,
   discountAmount = "0.0000",
+  discountPercent = "",
   discountReasonId = "",
   discountReasons = [],
   serviceCharge = "0.0000",
@@ -241,6 +245,7 @@ export function OrderPanel({
   memberCardError,
   isMemberCardLoading = false,
   onDiscountAmountChange,
+  onDiscountPercentChange,
   onDiscountReasonChange,
   onRemoveDiscount,
   onTipAmountChange,
@@ -1045,6 +1050,7 @@ export function OrderPanel({
               ) : null}
               <OrderAdjustments
                 discountAmount={discountAmount}
+                discountPercent={discountPercent}
                 discountReasonId={discountReasonId}
                 discountReasons={discountReasons}
                 serviceCharge={serviceCharge}
@@ -1055,6 +1061,7 @@ export function OrderPanel({
                 isMemberCardLoading={isMemberCardLoading}
                 disabled={isLoading || isSettledOrder}
                 onDiscountAmountChange={onDiscountAmountChange}
+                onDiscountPercentChange={onDiscountPercentChange}
                 onDiscountReasonChange={onDiscountReasonChange || (() => undefined)}
                 onRemoveDiscount={onRemoveDiscount || (() => undefined)}
                 onTipAmountChange={onTipAmountChange}
