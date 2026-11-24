@@ -1226,6 +1226,7 @@
       "itemRemoved": "Item removed from order.",
       "kdsDeleteTitle": "DELETE",
       "discount": "Discount",
+      "discountPercent": "Discount %",
       "discountReason": "Discount reason",
       "selectDiscountReason": "Select discount reason",
       "removeDiscount": "Remove discount",

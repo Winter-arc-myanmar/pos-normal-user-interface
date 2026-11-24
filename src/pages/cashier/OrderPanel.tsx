@@ -145,6 +145,8 @@ interface OrderPanelProps {
   /** The name of a promotion already applied to a line, when it still exists. */
   promotionName?: (id: string | undefined) => string | undefined;
   discountAmount?: string;
+  /** A discount typed as a percentage, which the till turns into its amount. */
+  discountPercent?: string;
   discountReasonId?: string;
   discountReasons?: AdjustmentReason[];
   serviceCharge?: string;
@@ -154,6 +156,7 @@ interface OrderPanelProps {
   memberCardError?: string | null;
   isMemberCardLoading?: boolean;
   onDiscountAmountChange?: (value: string) => void;
+  onDiscountPercentChange?: (value: string) => void;
   onDiscountReasonChange?: (value: string) => void;
   onRemoveDiscount?: () => void;
   onTipAmountChange?: (value: string) => void;
@@ -232,6 +235,7 @@ export function OrderPanel({
   promotionDiscounts = {},
   promotionName = () => undefined,
   discountAmount = "0.0000",
+  discountPercent = "",
   discountReasonId = "",
   discountReasons = [],
   serviceCharge = "0.0000",
@@ -241,6 +245,7 @@ export function OrderPanel({
   memberCardError,
   isMemberCardLoading = false,
   onDiscountAmountChange,
+  onDiscountPercentChange,
   onDiscountReasonChange,
   onRemoveDiscount,
   onTipAmountChange,
@@ -882,80 +887,48 @@ export function OrderPanel({
               {t("cashier.payment.printBillOnConfirm")}
             </label>
           ) : null}
-          {!canTakePayment ? (
-            <p className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-center text-xs text-slate-600">
-              {t("cashier.orderPanel.paymentAtCashier")}
-            </p>
-          ) : (
-          <Button
-            fullWidth
-            disabled={
-              isSettledOrder ||
-              checkoutBlocked ||
-              !selectedOrderLines.length ||
-              isLoading ||
-              requiresTableAssignment ||
-              (isPayView && !checkoutReady)
-            }
-            title={
-              requiresTableAssignment
-                ? t("cashier.orderPanel.assignTableToContinue")
+          <div
+            className={
+              onCancelOrder && !confirmCancelOrder
+                ? "grid grid-cols-2 items-stretch gap-2"
                 : undefined
             }
-            isLoading={isLoading}
-            onClick={() => {
-              if (!isPayView && onOpenPay) {
-                onOpenPay();
-                return;
-              }
-              onCheckout();
-            }}
           >
-            {isPayView ? t("cashier.confirmPay") : t("cashier.payNow")}
-          </Button>
-          )}
-          {isPayView && onPrintFinance ? (
-            <Button
-              fullWidth
-              className="!border-emerald-600 !bg-emerald-600 !text-white hover:!border-emerald-700 hover:!bg-emerald-700"
-              disabled={isLoading || checkoutBlocked}
-              onClick={onPrintFinance}
-            >
-              {t("cashier.printFinance")}
-            </Button>
-          ) : null}
-          {onCancelOrder ? (
-            confirmCancelOrder ? (
-              <div className="space-y-2 rounded-lg border border-rose-200 bg-rose-50 p-2">
-                <p className="text-xs text-rose-900">
-                  {selectedTable
-                    ? t("cashier.orderPanel.cancelOrderConfirmTable")
-                    : t("cashier.orderPanel.cancelOrderConfirm")}
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={isLoading}
-                    onClick={() => setConfirmCancelOrder(false)}
-                  >
-                    {t("cashier.orderPanel.keepOrder")}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    disabled={isLoading}
-                    isLoading={isLoading}
-                    onClick={() => {
-                      setConfirmCancelOrder(false);
-                      onCancelOrder();
-                    }}
-                  >
-                    {t("cashier.orderPanel.confirmCancelOrder")}
-                  </Button>
-                </div>
-              </div>
+            {!canTakePayment ? (
+              <p className="flex h-full items-center justify-center rounded-lg border border-slate-200 bg-slate-50 p-2 text-center text-xs text-slate-600">
+                {t("cashier.orderPanel.paymentAtCashier")}
+              </p>
             ) : (
+              <Button
+                fullWidth
+                variant="secondary"
+                className="!border-blue-500 !bg-blue-500 !text-white shadow-sm hover:!border-blue-600 hover:!bg-blue-600 active:!bg-blue-700"
+                disabled={
+                  isSettledOrder ||
+                  checkoutBlocked ||
+                  !selectedOrderLines.length ||
+                  isLoading ||
+                  requiresTableAssignment ||
+                  (isPayView && !checkoutReady)
+                }
+                title={
+                  requiresTableAssignment
+                    ? t("cashier.orderPanel.assignTableToContinue")
+                    : undefined
+                }
+                isLoading={isLoading}
+                onClick={() => {
+                  if (!isPayView && onOpenPay) {
+                    onOpenPay();
+                    return;
+                  }
+                  onCheckout();
+                }}
+              >
+                {isPayView ? t("cashier.confirmPay") : t("cashier.payNow")}
+              </Button>
+            )}
+            {onCancelOrder && !confirmCancelOrder ? (
               <Button
                 fullWidth
                 variant="destructive"
@@ -968,7 +941,48 @@ export function OrderPanel({
               >
                 {t("cashier.orderPanel.cancelOrder")}
               </Button>
-            )
+            ) : null}
+          </div>
+          {onCancelOrder && confirmCancelOrder ? (
+            <div className="space-y-2 rounded-lg border border-rose-200 bg-rose-50 p-2">
+              <p className="text-xs text-rose-900">
+                {selectedTable
+                  ? t("cashier.orderPanel.cancelOrderConfirmTable")
+                  : t("cashier.orderPanel.cancelOrderConfirm")}
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={isLoading}
+                  onClick={() => setConfirmCancelOrder(false)}
+                >
+                  {t("cashier.orderPanel.keepOrder")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={isLoading}
+                  isLoading={isLoading}
+                  onClick={() => {
+                    setConfirmCancelOrder(false);
+                    onCancelOrder();
+                  }}
+                >
+                  {t("cashier.orderPanel.confirmCancelOrder")}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+          {isPayView && onPrintFinance ? (
+            <Button
+              fullWidth
+              className="!border-emerald-600 !bg-emerald-600 !text-white hover:!border-emerald-700 hover:!bg-emerald-700"
+              disabled={isLoading || checkoutBlocked}
+              onClick={onPrintFinance}
+            >
+              {t("cashier.printFinance")}
+            </Button>
           ) : null}
         </div>
       ) : (
@@ -1036,6 +1050,7 @@ export function OrderPanel({
               ) : null}
               <OrderAdjustments
                 discountAmount={discountAmount}
+                discountPercent={discountPercent}
                 discountReasonId={discountReasonId}
                 discountReasons={discountReasons}
                 serviceCharge={serviceCharge}
@@ -1046,6 +1061,7 @@ export function OrderPanel({
                 isMemberCardLoading={isMemberCardLoading}
                 disabled={isLoading || isSettledOrder}
                 onDiscountAmountChange={onDiscountAmountChange}
+                onDiscountPercentChange={onDiscountPercentChange}
                 onDiscountReasonChange={onDiscountReasonChange || (() => undefined)}
                 onRemoveDiscount={onRemoveDiscount || (() => undefined)}
                 onTipAmountChange={onTipAmountChange}
