@@ -282,6 +282,8 @@ export function CashierPage() {
     [billAdjustments, selectedOrder?.id]
   );
   const { discount: discountAmount, discountReasonId, tip: tipAmount } = adjustments;
+  /** The bill discount the cashier has typed; zero when the bill is not discounted. */
+  const billDiscountAmount = Math.max(0, Number(discountAmount) || 0);
   /**
    * The rate the cashier last typed, if any. The bill endpoints take money, so
    * this only drives `discount`: a typed amount leaves no rate behind.
@@ -984,16 +986,29 @@ export function CashierPage() {
     setLocalError(null);
   };
 
-  // Instant checkout taxes the items after allocating the bill discount.
+  /**
+   * The bill as the server prices it. A typed discount is priced by the server,
+   * which taxes the bill after the discount, but the hook only holds that answer
+   * as `bill` once an option was changed; the same quote is already in `quote`.
+   * Ignoring it made the till tax the price before the discount.
+   */
+  const pricedBill =
+    billOptions.bill ?? (billDiscountAmount > 0 ? billOptions.quote : undefined);
+
+  // A quick sale is priced by the till, not the server, so the bill discount goes
+  // onto the items first: the tax is then worked out on what the guest pays, the
+  // way the server taxes a saved bill after its discount.
+  const previewLineDiscounts =
+    isDirectCheckoutMode && (billOptions.changed || billDiscountAmount > 0);
   const paymentBillLines = useMemo(() => {
-    if (!isDirectCheckoutMode || !billOptions.changed) return displayOrderLines;
-    const allocated = allocateOrderDiscountToLines(activeOrderLines, Number(discountAmount), isFeeLine);
+    if (!isDirectCheckoutMode || !previewLineDiscounts) return displayOrderLines;
+    const allocated = allocateOrderDiscountToLines(activeOrderLines, billDiscountAmount, isFeeLine);
     return activeOrderLines.map((line, index) => {
       const variant = variantById[line.variantId];
       const product = variant ? productById[variant.productId] : undefined;
       return buildDirectLine({ ...line, lineDiscount: allocated[index].lineDiscount }, product, variant);
     });
-  }, [activeOrderLines, billOptions.changed, buildDirectLine, discountAmount, displayOrderLines, isDirectCheckoutMode, isFeeLine, productById, variantById]);
+  }, [activeOrderLines, billDiscountAmount, buildDirectLine, displayOrderLines, isDirectCheckoutMode, isFeeLine, previewLineDiscounts, productById, variantById]);
 
   /**
    * What running promotions take off the bill: credited on a saved line, or
@@ -1050,7 +1065,7 @@ export function CashierPage() {
           Number(line.lineDiscount || 0) -
           (line.taxInclusive ? Number(line.taxAmount || 0) : 0),
         0
-      ) - (isDirectCheckoutMode && billOptions.changed ? 0 : Math.max(0, Number(discountAmount) || 0));
+      ) - (isDirectCheckoutMode ? 0 : billDiscountAmount);
     const charge = (Math.max(0, preTax) * serviceChargeBps) / 10000;
     return {
       serviceCharge: charge,
@@ -1058,10 +1073,9 @@ export function CashierPage() {
     };
   }, [
     paymentBillLines,
-    billOptions.changed,
+    billDiscountAmount,
     billOptions.includeServiceCharge,
     billOptions.includeTax,
-    discountAmount,
     isDirectCheckoutMode,
     isFeeLine,
     serviceChargeBps,
@@ -1080,8 +1094,8 @@ export function CashierPage() {
     ) {
       return syncedPaymentTotal.total.toFixed(4);
     }
-    if (billOptions.bill) {
-      return toMoney(Number(billOptions.bill.grandTotal) + Math.max(0, Number(tipAmount) || 0));
+    if (pricedBill) {
+      return toMoney(Number(pricedBill.grandTotal) + Math.max(0, Number(tipAmount) || 0));
     }
 
     const serverGrandTotal = !isDirectCheckoutMode
@@ -1094,24 +1108,25 @@ export function CashierPage() {
     if (serverGrandTotal > 0) {
       return payableFromServerGrandTotal({
         serverGrandTotal,
-        orderDiscount: Number(discountAmount),
+        orderDiscount: billDiscountAmount,
         tipAmount: Number(tipAmount),
       }).toFixed(4);
     }
 
     return payableTotal({
       lineTotal: lineSubtotal,
-      orderDiscount: isDirectCheckoutMode && billOptions.changed ? 0 : Number(discountAmount),
+      // A quick sale's lines already carry the bill discount, so it comes off once.
+      orderDiscount: isDirectCheckoutMode ? 0 : billDiscountAmount,
       serviceCharge: serviceCharge + serviceChargeTax,
       tipAmount: Number(tipAmount),
     }).toFixed(4);
   }, [
-    billOptions.bill,
-    billOptions.changed,
+    billDiscountAmount,
     billRevision,
     discountAmount,
     isDirectCheckoutMode,
     lineSubtotal,
+    pricedBill,
     selectedOrder?.grandTotal,
     selectedOrder?.id,
     serviceCharge,
@@ -1127,8 +1142,8 @@ export function CashierPage() {
         : 0).toFixed(4),
     [billOptions.includeTax, paymentBillLines]
   );
-  const receiptTax = billOptions.bill?.totalTax ?? toMoney(Number(orderTax) + serviceChargeTax);
-  const receiptServiceCharge = billOptions.bill?.serviceCharge ?? toMoney(serviceCharge);
+  const receiptTax = pricedBill?.totalTax ?? toMoney(Number(orderTax) + serviceChargeTax);
+  const receiptServiceCharge = pricedBill?.serviceCharge ?? toMoney(serviceCharge);
   // The slip prints Tax and Service charge as rows of their own under the items,
   // so its Subtotal is the items' own money. Falling back to the line total —
   // which adds the line tax — counted that tax twice on the paper and the rows
@@ -1144,8 +1159,8 @@ export function CashierPage() {
       0
     )
   );
-  const receiptSubtotal = billOptions.bill?.subtotal ?? itemsSubtotal;
-  const receiptDiscount = billOptions.bill?.totalDiscount ?? (billOptions.changed
+  const receiptSubtotal = pricedBill?.subtotal ?? itemsSubtotal;
+  const receiptDiscount = pricedBill?.totalDiscount ?? (billOptions.changed
     ? toMoney(paymentBillLines.reduce((sum, line) => sum + Number(line.lineDiscount || 0), 0)
       + (isDirectCheckoutMode ? 0 : Math.max(0, Number(discountAmount) || 0)))
     : discountAmount);
@@ -2388,7 +2403,9 @@ export function CashierPage() {
 
       const orderDiscount = Math.max(0, Number(discountAmount) || 0);
       const tip = Math.max(0, Number(tipAmount) || 0);
-      const discountLimit = isDirectCheckoutMode && billOptions.changed
+      // A quick sale's items are priced by the till, so its lines still carry the
+      // prices the bill discount comes off; a saved bill is checked against its own.
+      const discountLimit = isDirectCheckoutMode
         ? activeOrderLines.reduce((sum, line) => sum + Number(line.quantity) * Number(line.unitPrice) - Number(line.lineDiscount || 0), 0)
         : lineSubtotal;
       if (orderDiscount > discountLimit + 0.009) {
@@ -2419,9 +2436,12 @@ export function CashierPage() {
         // tax and service charge. Adding the local service charge here again
         // inflated 358,050 to 509,850. Only pending checkout adjustments belong
         // on top of the refreshed authoritative total.
-        const refreshedBill = billOptions.changed
-          ? await fetchOrderBill(selectedOrder.id, billOptions.query)
-          : null;
+        // A pending discount makes the amount depend on the quote as well: the
+        // server prices the bill after the discount, tax included.
+        const refreshedBill =
+          billOptions.changed || orderDiscount > 0
+            ? await fetchOrderBill(selectedOrder.id, billOptions.query)
+            : null;
         if (refreshedBill) billOptions.acceptBill(refreshedBill);
         const serverRefreshedTotal = refreshedBill
           ? Number(refreshedBill.grandTotal) + tip
