@@ -2,6 +2,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { canSendRawEscPos, hasNativePrinterBridge } from "../printerCapabilities";
 
+const agent = vi.hoisted(() => ({ available: false }));
+
+vi.mock("@/lib/printing/printAgent", () => ({
+  isPrintAgentAvailable: () => agent.available,
+}));
+
 const binding = {
   id: "printer-1",
   transport: "NETWORK" as const,
@@ -24,11 +30,23 @@ describe("canSendRawEscPos", () => {
     delete window.median;
     delete window.gonative;
     localStorage.clear();
+    agent.available = false;
   });
 
   it("allows raw network printing on desktop", () => {
     stubUserAgent("Mozilla/5.0 (Windows NT 10.0)");
     expect(canSendRawEscPos(binding)).toBe(true);
+  });
+
+  it("allows every transport through the desktop print agent", () => {
+    stubUserAgent("Mozilla/5.0 (Windows NT 10.0)");
+    agent.available = true;
+    expect(
+      canSendRawEscPos({ ...binding, transport: "USB", deviceName: "POS-80" })
+    ).toBe(true);
+    expect(
+      canSendRawEscPos({ ...binding, transport: "BLUETOOTH", deviceName: "COM5" })
+    ).toBe(true);
   });
 
   it("uses PDF for network printers on Android", () => {

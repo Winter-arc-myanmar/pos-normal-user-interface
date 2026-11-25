@@ -1,4 +1,6 @@
-export type PrinterRuntime = "QZ" | "BROWSER";
+import { isPrintAgentAvailable } from "@/lib/printing/printAgent";
+
+export type PrinterRuntime = "QZ" | "BROWSER" | "AGENT";
 
 /** @deprecated Use BROWSER */
 export type LegacyPrinterRuntime = "QZ" | "MEDIAN_ANDROID";
@@ -12,13 +14,24 @@ const isMedianShell = () =>
   typeof window !== "undefined" &&
   (Boolean(window.median) || /Median|GoNative/i.test(navigator.userAgent));
 
-/** Desktop uses QZ Tray. Android, iOS, and Median WebView use browser/WebUSB/BT/LAN transports. */
+/**
+ * Picks the printing engine.
+ *
+ * Mobile always wins so the Android bridge keeps working even if a desktop-style
+ * shell is ever built for a phone. On desktop, a running print agent (a loopback
+ * service the page probed at boot) beats QZ Tray, which remains the fallback for
+ * computers that do not have the agent installed yet.
+ */
 export const printerRuntime = (): PrinterRuntime => {
   if (isMobileOrTablet() || isMedianShell()) return "BROWSER";
+  if (isPrintAgentAvailable()) return "AGENT";
   return "QZ";
 };
 
 export const isBrowserPrinting = () => printerRuntime() === "BROWSER";
+
+/** True when the desktop print agent is the active engine. */
+export const isAgentPrinting = () => printerRuntime() === "AGENT";
 
 /** @deprecated Use isBrowserPrinting */
 export const isMedianPrinting = () => isBrowserPrinting();

@@ -1,5 +1,5 @@
 import { PrinterBinding } from "@/lib/pos/printerBindingStorage";
-import { isBrowserPrinting } from "@/core/infrastructure/printing/PrinterClient";
+import { isAgentPrinting, isBrowserPrinting } from "@/core/infrastructure/printing/PrinterClient";
 import {
   hasNativePrinterBridge,
   isWebBluetoothSupported,
@@ -13,6 +13,8 @@ export function canSendRawEscPos(binding: PrinterBinding): boolean {
   // The native Android/Median bridge handles every transport - including the raw
   // TCP:9100 socket no mobile browser can open - so it always wins when present.
   if (hasNativePrinterBridge()) return true;
+  // The desktop print agent owns the spooler, raw TCP and Bluetooth natively.
+  if (isAgentPrinting()) return true;
   switch (binding.transport) {
     case "NETWORK":
       // Without the bridge, mobile browsers cannot open raw TCP, so fall back to

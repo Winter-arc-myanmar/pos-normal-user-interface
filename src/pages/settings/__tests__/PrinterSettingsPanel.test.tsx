@@ -57,6 +57,8 @@ vi.mock("@/core/presentation/hooks/useKdsStationManagement", () => ({
 vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
   usePrinterConnection: () => ({
     nativeBridge: false,
+    printAgent: { available: false, version: "", elevated: false },
+    printingEngine: "QZ",
     isConnected: true,
     isConnecting: false,
     error: null,
@@ -65,6 +67,7 @@ vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
     connect: vi.fn(),
     discover: mocks.discover,
     verify: mocks.verify,
+    cleanupPrinters: vi.fn(),
     saveBinding: mocks.saveBinding,
     removeBinding: mocks.removeBinding,
     makeDefault: vi.fn(),
@@ -74,6 +77,8 @@ vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
 
 vi.mock("@/core/infrastructure/printing/PrinterClient", () => ({
   isBrowserPrinting: () => false,
+  isAgentPrinting: () => false,
+  printerRuntime: () => "QZ",
 }));
 
 import { PrinterSettingsPanel } from "../PrinterSettingsPanel";
