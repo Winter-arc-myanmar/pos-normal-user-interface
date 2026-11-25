@@ -12,15 +12,18 @@ import {
 } from "../../domain/entities/PrintTemplate";
 import type { ApiVenueSettingRepository } from "../../infrastructure/repositories/ApiVenueSettingRepository";
 import container from "../../infrastructure/di/container";
-import { getPrinterClient } from "../../infrastructure/printing/getPrinterClient";
+import { getPrinterClient, resetPrinterClientCache } from "../../infrastructure/printing/getPrinterClient";
 import type { IPrinterClient } from "../../infrastructure/printing/IPrinterClient";
-import { isBrowserPrinting, printerRuntime } from "../../infrastructure/printing/PrinterClient";
+import { isAgentPrinting, isBrowserPrinting } from "../../infrastructure/printing/PrinterClient";
 import {
-  isPrintAgentAvailable,
-  printAgentHealth,
+  printAgentProbe,
   probePrintAgent,
   type AgentCleanupReport,
+  type AgentPrinter,
+  type PrintAgentProbe,
+  type PrintAgentStatus,
 } from "@/lib/printing/printAgent";
+import { identityForDevice, type PrinterIdentity } from "@/lib/printing/printerIdentity";
 import {
   kdsTicketSlip,
   KitchenSlip,
@@ -100,7 +103,25 @@ export const printCurrencyFor = (tenantId: string) => {
 type ScopedPrinterClient = IPrinterClient & {
   configureScope?: (tenantId: string, registerId: string) => void;
   cleanup?: () => Promise<AgentCleanupReport>;
+  listPrinterDevices?: (transport?: PrinterTransport) => Promise<AgentPrinter[]>;
 };
+
+/** What Settings needs to know about the agent probe, including a failure. */
+type PrintAgentState = {
+  available: boolean;
+  version: string;
+  elevated: boolean;
+  status: PrintAgentStatus | null;
+  error: string | null;
+};
+
+const printAgentStateFrom = (probe: PrintAgentProbe | null): PrintAgentState => ({
+  available: probe?.status === "ready",
+  version: probe?.health?.agentVersion ?? "",
+  elevated: Boolean(probe?.health?.elevated),
+  status: probe?.status ?? null,
+  error: probe?.error ?? null,
+});
 
 const configureClient = async (
   tenantId: string,
@@ -136,26 +157,24 @@ export function usePrinterConnection(
   /**
    * Whether this computer runs the desktop print agent. The boot probe is shared
    * with getPrinterClient(), so the first print already uses the right engine;
-   * this state only keeps the Settings copy in step when the probe settles late.
+   * this state keeps the Settings copy in step when the probe settles late, and
+   * exposes *why* the agent is unavailable so a misconfiguration is not silently
+   * mistaken for "not installed".
    */
-  const [printAgent, setPrintAgent] = useState(() => {
-    const health = printAgentHealth();
-    return {
-      available: isPrintAgentAvailable(),
-      version: health?.agentVersion ?? "",
-      elevated: health?.elevated ?? false,
-    };
-  });
+  const [printAgent, setPrintAgent] = useState<PrintAgentState>(() =>
+    printAgentStateFrom(printAgentProbe())
+  );
+  /** Device metadata from the last discovery, used to save the queue identity. */
+  const [devicePrinters, setDevicePrinters] = useState<AgentPrinter[]>([]);
 
   useEffect(() => {
+    // A phone cannot reach a loopback agent, and the runtime is BROWSER anyway:
+    // do not send a pointless request from every tablet.
+    if (isBrowserPrinting()) return;
     let active = true;
-    void probePrintAgent().then((health) => {
+    void probePrintAgent().then((probe) => {
       if (!active) return;
-      setPrintAgent({
-        available: Boolean(health),
-        version: health?.agentVersion ?? "",
-        elevated: Boolean(health?.elevated),
-      });
+      setPrintAgent(printAgentStateFrom(probe));
     });
     return () => {
       active = false;
@@ -176,12 +195,12 @@ export function usePrinterConnection(
       await client.connect();
       setIsConnected(client.isConnected());
     } catch (caught) {
-      const message =
-        caught instanceof Error
-          ? caught.message
-          : isBrowserPrinting()
-            ? "Unable to start mobile printing"
-            : "Unable to connect to QZ Tray";
+      const engineFallback = isBrowserPrinting()
+        ? "Unable to start mobile printing"
+        : isAgentPrinting()
+          ? "Unable to connect to the print agent"
+          : "Unable to connect to QZ Tray";
+      const message = caught instanceof Error ? caught.message : engineFallback;
       setError(message);
       setIsConnected(false);
       throw caught;
@@ -199,9 +218,27 @@ export function usePrinterConnection(
       setIsConnecting(true);
       setError(null);
       try {
+        if (!isBrowserPrinting()) {
+          // An operator pressing Discover/Connect is the way back to the agent
+          // after a fallback, without reloading the page.
+          resetPrinterClientCache();
+          setPrintAgent(printAgentStateFrom(await probePrintAgent(true)));
+        }
         const client = await configureClient(tenantId, registerId);
         const names = await client.findPrinters(transport);
         setDeviceNames(names);
+        // The agent also returns each queue's stable identity. Keep it so the
+        // Save path can store hardwareId/portName before the first print.
+        const scoped = client as ScopedPrinterClient;
+        if (transport && scoped.listPrinterDevices) {
+          try {
+            setDevicePrinters(await scoped.listPrinterDevices(transport));
+          } catch {
+            setDevicePrinters([]);
+          }
+        } else {
+          setDevicePrinters([]);
+        }
         setIsConnected(client.isConnected());
         return names;
       } catch (caught) {
@@ -214,6 +251,12 @@ export function usePrinterConnection(
       }
     },
     [registerId, tenantId]
+  );
+
+  /** The agent identity for a discovered queue name (empty when unknown). */
+  const printerIdentity = useCallback(
+    (deviceName: string): PrinterIdentity => identityForDevice(devicePrinters, deviceName),
+    [devicePrinters]
   );
 
   const verify = useCallback(
@@ -729,16 +772,30 @@ export function usePrinterConnection(
   );
 
   /** Removes stale print queues through the desktop agent (service = elevated). */
-  const cleanupPrinters = useCallback(async (): Promise<AgentCleanupReport> => {
-    const client = await configureClient(tenantId, registerId);
-    const cleanup = (client as ScopedPrinterClient).cleanup;
-    if (!cleanup) {
-      throw new Error("Printer cleanup needs the desktop print agent.");
-    }
-    const report = await cleanup();
-    setRevision((value) => value + 1);
-    return report;
-  }, [registerId, tenantId]);
+  const cleanupPrinters = useCallback(
+    async (transport: PrinterTransport = "USB"): Promise<AgentCleanupReport> => {
+      const client = await configureClient(tenantId, registerId);
+      const scoped = client as ScopedPrinterClient;
+      const cleanup = scoped.cleanup;
+      if (!cleanup) {
+        throw new Error("Printer cleanup needs the desktop print agent.");
+      }
+      const report = await cleanup();
+      setRevision((value) => value + 1);
+      // The dropdown must not keep offering the queues that were just removed.
+      // Refresh the transport the operator is actually looking at.
+      try {
+        setDeviceNames(await client.findPrinters(transport));
+        if (scoped.listPrinterDevices) {
+          setDevicePrinters(await scoped.listPrinterDevices(transport));
+        }
+      } catch {
+        // Cleanup succeeded; a failed refresh is not worth replacing that notice.
+      }
+      return report;
+    },
+    [registerId, tenantId]
+  );
 
   return {
     bindings,
@@ -749,7 +806,7 @@ export function usePrinterConnection(
     error,
     nativeBridge: hasNativePrinterBridge(),
     printAgent,
-    printingEngine: printerRuntime(),
+    printerIdentity,
     connect,
     discover,
     verify,

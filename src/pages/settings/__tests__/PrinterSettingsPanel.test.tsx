@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   saveBinding: vi.fn(),
   removeBinding: vi.fn(),
   bindings: [] as Record<string, unknown>[],
+  printerIdentity: vi.fn(() => ({}) as Record<string, string>),
 }));
 
 vi.mock("react-i18next", () => ({
@@ -57,13 +58,14 @@ vi.mock("@/core/presentation/hooks/useKdsStationManagement", () => ({
 vi.mock("@/core/presentation/hooks/usePrinterConnection", () => ({
   usePrinterConnection: () => ({
     nativeBridge: false,
-    printAgent: { available: false, version: "", elevated: false },
-    printingEngine: "QZ",
+    printAgent: { available: false, version: "", elevated: false, status: null, error: null },
+    printerIdentity: (deviceName: string) => mocks.printerIdentity(deviceName),
     isConnected: true,
     isConnecting: false,
     error: null,
     bindings: mocks.bindings,
     defaultBinding: null,
+    deviceNames: [] as string[],
     connect: vi.fn(),
     discover: mocks.discover,
     verify: mocks.verify,
@@ -106,6 +108,15 @@ const barStation = {
   printerIds: ["printer-bar"],
   routingRules: { categoryIds: ["drink"] },
 };
+const usbPrinter = {
+  id: "printer-usb",
+  name: "POS-80",
+  ipAddress: "",
+  port: 9100,
+  sectors: ["CHECKOUT"],
+  printsFor: ["BAR"],
+  isActive: true,
+};
 
 const saveButton = () =>
   screen.getByRole("button", { name: "settings.printer.save" });
@@ -115,6 +126,8 @@ beforeEach(() => {
   mocks.printers = [bar];
   mocks.stations = [];
   mocks.bindings = [];
+  mocks.printerIdentity.mockReset();
+  mocks.printerIdentity.mockReturnValue({});
   for (const fn of [
     mocks.listPrinters,
     mocks.listStations,
@@ -241,5 +254,63 @@ describe("PrinterSettingsPanel save", () => {
       ).toBeGreaterThan(0)
     );
     expect(mocks.updatePrinter).not.toHaveBeenCalled();
+  });
+
+  it("saves the queue identity discovered for a USB printer", async () => {
+    mocks.printers = [usbPrinter];
+    mocks.updatePrinter.mockResolvedValue(usbPrinter);
+    mocks.discover.mockResolvedValue(["POS-80"]);
+    mocks.printerIdentity.mockReturnValue({
+      hardwareId: "usbprint:abc",
+      portName: "USB002",
+    });
+    mocks.verify.mockImplementation(async (binding) => binding);
+
+    render(<PrinterSettingsPanel />);
+    fireEvent.click(screen.getByRole("button", { name: /POS-80/ }));
+    await screen.findByRole("option", { name: "POS-80" });
+
+    fireEvent.click(saveButton());
+    await waitFor(() => expect(mocks.saveBinding).toHaveBeenCalled());
+
+    const [binding] = mocks.saveBinding.mock.calls[0];
+    expect(binding.hardwareId).toBe("usbprint:abc");
+    expect(binding.portName).toBe("USB002");
+    expect(mocks.verify).toHaveBeenCalledWith(
+      expect.objectContaining({ hardwareId: "usbprint:abc", portName: "USB002" })
+    );
+  });
+
+  it("keeps the identity a previous rebound saved when discovery has none", async () => {
+    mocks.printers = [usbPrinter];
+    mocks.updatePrinter.mockResolvedValue(usbPrinter);
+    mocks.discover.mockResolvedValue(["POS-80"]);
+    mocks.printerIdentity.mockReturnValue({});
+    mocks.verify.mockImplementation(async (binding) => binding);
+    mocks.bindings = [
+      {
+        id: "printer-usb",
+        backendPrinterId: "printer-usb",
+        transport: "USB",
+        displayName: "POS-80",
+        deviceName: "POS-80",
+        hardwareId: "usbprint:old",
+        portName: "USB001",
+        sectors: ["CHECKOUT"],
+        printsFor: ["BAR"],
+        lastVerifiedAt: "",
+      },
+    ];
+
+    render(<PrinterSettingsPanel />);
+    fireEvent.click(screen.getByRole("button", { name: /POS-80/ }));
+    await screen.findByRole("option", { name: "POS-80" });
+
+    fireEvent.click(saveButton());
+    await waitFor(() => expect(mocks.saveBinding).toHaveBeenCalled());
+
+    const [binding] = mocks.saveBinding.mock.calls[0];
+    expect(binding.hardwareId).toBe("usbprint:old");
+    expect(binding.portName).toBe("USB001");
   });
 });

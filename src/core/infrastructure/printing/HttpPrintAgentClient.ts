@@ -72,12 +72,22 @@ export class HttpPrintAgentClient implements IPrinterClient {
     this.ready = false;
   }
 
-  async findPrinters(transport?: PrinterTransport): Promise<string[]> {
+  /**
+   * Raw agent inventory for a transport, stale queues included. Callers that
+   * need to keep a binding stable across a Windows queue rename match on this
+   * list instead of on the ranked display names.
+   */
+  async listPrinterDevices(transport?: PrinterTransport): Promise<AgentPrinter[]> {
     if (!transport) return [];
     const result = await callPrintAgent<{ printers?: AgentPrinter[] }>(
       `/v1/printers?transport=${encodeURIComponent(transport)}`
     );
-    const printers = result.printers || [];
+    return result.printers || [];
+  }
+
+  async findPrinters(transport?: PrinterTransport): Promise<string[]> {
+    const printers = await this.listPrinterDevices(transport);
+    if (!transport) return [];
     if (transport === "USB") return rankAgentPrinterNames(printers);
     return printers.map((printer) => printer.name).filter(Boolean);
   }
