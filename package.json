@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "test": "node -r ./scripts/vitest-windows-patch.cjs ./node_modules/vitest/vitest.mjs run --configLoader native --pool threads",
+    "test:printing": "node -r ./scripts/vitest-windows-patch.cjs ./node_modules/vitest/vitest.mjs run --configLoader native --pool threads src/core/infrastructure/printing src/lib/printing src/lib/pos src/core/presentation/hooks/__tests__/usePrinterConnection.test.tsx src/core/presentation/hooks/__tests__/usePrinterConnection.printMatrix.test.tsx src/pages/settings/__tests__/PrinterSettingsPanel.test.tsx",
     "lint": "eslint .",
     "lint:cache": "eslint . --cache --cache-location .eslintcache",
     "preview": "vite preview"

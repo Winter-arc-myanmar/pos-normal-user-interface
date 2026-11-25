@@ -88,6 +88,7 @@ export function PrinterSettingsPanel() {
   );
   const [notice, setNotice] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [cleaningPrinters, setCleaningPrinters] = useState(false);
 
   useEffect(() => {
     removeLocalOnlyPrinterBindings(tenantId, activePosRegisterId || "");
@@ -184,19 +185,32 @@ export function PrinterSettingsPanel() {
     setLocalError(null);
   };
 
-  const draftBinding = (): PrinterBinding => ({
-    id: selectedBindingId || selectedBackendId || localId(),
-    backendPrinterId: selectedBackendId || undefined,
-    transport,
-    displayName: name.trim(),
-    deviceName: transport === "NETWORK" ? undefined : deviceName,
-    host: transport === "NETWORK" ? ipAddress.trim() : undefined,
-    port: transport === "NETWORK" ? Number(port) : undefined,
-    sectors,
-    printsFor,
-    lastVerifiedAt: "",
-    lastError: null,
-  });
+  const draftBinding = (): PrinterBinding => {
+    const stored = connection.bindings.find(
+      (item) => item.id === (selectedBindingId || selectedBackendId)
+    );
+    const discovered = transport === "USB" ? connection.printerIdentity(deviceName) : {};
+    // Keep the identity a previous rebound saved for this same queue. Without
+    // this, Save replaces the record and silently drops the queue-rename
+    // protection the agent wrote.
+    const storedIdentity =
+      transport === "USB" && stored?.deviceName === deviceName ? stored : null;
+    return {
+      id: selectedBindingId || selectedBackendId || localId(),
+      backendPrinterId: selectedBackendId || undefined,
+      transport,
+      displayName: name.trim(),
+      deviceName: transport === "NETWORK" ? undefined : deviceName,
+      host: transport === "NETWORK" ? ipAddress.trim() : undefined,
+      port: transport === "NETWORK" ? Number(port) : undefined,
+      hardwareId: discovered.hardwareId ?? storedIdentity?.hardwareId,
+      portName: discovered.portName ?? storedIdentity?.portName,
+      sectors,
+      printsFor,
+      lastVerifiedAt: "",
+      lastError: null,
+    };
+  };
 
   const servesKds = sectors.includes("KDS");
   /** A printer that prints slips has to say which parts of the venue they belong to. */
@@ -248,16 +262,20 @@ export function PrinterSettingsPanel() {
   };
 
   const cleanupPrinters = async () => {
+    if (cleaningPrinters) return;
     setNotice(null);
     setLocalError(null);
+    setCleaningPrinters(true);
     try {
-      const report = await connection.cleanupPrinters();
+      const report = await connection.cleanupPrinters(transport);
+      const removed = report.removedQueues?.length ?? 0;
+      const failed = report.failedQueues?.length ?? 0;
       setNotice(
-        report.removedQueues.length
-          ? t("settings.printer.agentCleanupDone", {
-              count: report.removedQueues.length,
-            })
-          : t("settings.printer.agentCleanupNone")
+        failed
+          ? t("settings.printer.agentCleanupPartial", { count: removed, failed })
+          : removed
+            ? t("settings.printer.agentCleanupDone", { count: removed })
+            : t("settings.printer.agentCleanupNone")
       );
     } catch (caught) {
       setLocalError(
@@ -265,6 +283,8 @@ export function PrinterSettingsPanel() {
           ? caught.message
           : t("settings.printer.agentCleanupFailed")
       );
+    } finally {
+      setCleaningPrinters(false);
     }
   };
 
@@ -542,6 +562,21 @@ export function PrinterSettingsPanel() {
           </div>
         </dl>
 
+        {!agentPrinting && connection.printAgent.status === "unreachable" ? (
+          <p className="mt-4 rounded bg-amber-50 p-3 text-sm text-amber-800">
+            {t("settings.printer.agentUnreachable")}
+          </p>
+        ) : null}
+
+        {!agentPrinting && connection.printAgent.status === "incompatible" ? (
+          <p className="mt-4 rounded bg-amber-50 p-3 text-sm text-amber-800">
+            {connection.printAgent.error ||
+              t("settings.printer.agentIncompatible", {
+                version: connection.printAgent.version || "—",
+              })}
+          </p>
+        ) : null}
+
         {agentPrinting ? (
           <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white p-3">
             <div className="min-w-0 flex-1">
@@ -559,7 +594,8 @@ export function PrinterSettingsPanel() {
             <Button
               type="button"
               variant="secondary"
-              disabled={!connection.printAgent.elevated}
+              disabled={!connection.printAgent.elevated || cleaningPrinters}
+              isLoading={cleaningPrinters}
               onClick={() => void cleanupPrinters()}
             >
               {t("settings.printer.agentCleanup")}

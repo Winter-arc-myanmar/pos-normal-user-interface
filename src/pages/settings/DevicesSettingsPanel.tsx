@@ -82,6 +82,16 @@ export function DevicesSettingsPanel() {
   } = usePosWorkspace();
   const tenantId = String(user?.tenantId || "");
   const connection = usePrinterConnection(tenantId, activePosRegisterId);
+  // The agent is installed but the page could not use it (origin/CORS, timeout,
+  // or a contract the POS does not speak). Say so instead of showing a plain QZ row.
+  const agentUnusable =
+    !connection.printAgent.available &&
+    (connection.printAgent.status === "unreachable" ||
+      connection.printAgent.status === "incompatible");
+  const agentUnusableLabel =
+    connection.printAgent.status === "incompatible"
+      ? t("settings.devices.engineAgentIncompatible")
+      : t("settings.devices.engineAgentUnreachable");
   const { printers, listPrinters } = useKitchenPrinterManagement();
   const sync = usePosSync({
     tenantId,
@@ -268,7 +278,9 @@ export function DevicesSettingsPanel() {
                 ? t("settings.devices.engineAgent", {
                     version: connection.printAgent.version,
                   })
-                : qzVersion || "—"
+                : agentUnusable
+                  ? agentUnusableLabel
+                  : qzVersion || "—"
             }
             ok={connection.isConnected}
           />
@@ -292,16 +304,18 @@ export function DevicesSettingsPanel() {
           />
           <StatusRow
             label={
-              connection.printAgent.available
+              connection.printAgent.available || agentUnusable
                 ? t("settings.devices.printingEngine")
                 : t("settings.devices.qzTray")
             }
             value={
               connection.printAgent.available
                 ? t("settings.devices.engineAgentShort")
-                : connection.isConnected
-                  ? t("settings.printer.connected")
-                  : t("settings.printer.disconnected")
+                : agentUnusable
+                  ? agentUnusableLabel
+                  : connection.isConnected
+                    ? t("settings.printer.connected")
+                    : t("settings.printer.disconnected")
             }
             ok={connection.printAgent.available || connection.isConnected}
           />

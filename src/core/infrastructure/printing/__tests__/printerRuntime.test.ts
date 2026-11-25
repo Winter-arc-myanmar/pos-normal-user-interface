@@ -18,6 +18,7 @@ describe("printerRuntime", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     delete window.median;
+    delete (window as Window & { gonative?: unknown }).gonative;
     agent.available = false;
   });
 
@@ -41,6 +42,12 @@ describe("printerRuntime", () => {
   it("uses browser printing inside a Median shell", () => {
     stubUserAgent("Mozilla/5.0 (Windows NT 10.0)");
     window.median = { posPrinter: { discover: vi.fn(), printRaw: vi.fn() } };
+    expect(printerRuntime()).toBe("BROWSER");
+  });
+
+  it("uses browser printing in a GoNative shell that only exposes window.gonative", () => {
+    stubUserAgent("Mozilla/5.0 (Windows NT 10.0)");
+    (window as Window & { gonative?: unknown }).gonative = { posPrinter: {} };
     expect(printerRuntime()).toBe("BROWSER");
   });
 });

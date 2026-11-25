@@ -1,4 +1,5 @@
 import { isPrintAgentAvailable } from "@/lib/printing/printAgent";
+import { isMedianAppShell } from "@/lib/printing/medianBridge";
 
 export type PrinterRuntime = "QZ" | "BROWSER" | "AGENT";
 
@@ -10,9 +11,8 @@ const isMobileOrTablet = () => {
   return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 };
 
-const isMedianShell = () =>
-  typeof window !== "undefined" &&
-  (Boolean(window.median) || /Median|GoNative/i.test(navigator.userAgent));
+/** Median and GoNative shells expose either window.median or window.gonative. */
+const isMedianShell = () => isMedianAppShell();
 
 /**
  * Picks the printing engine.
